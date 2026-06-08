@@ -8,7 +8,7 @@ holds three module-global tables and the single fallback rule that makes the sea
 * ``_OPS``       : ``(op_name, device) -> impl`` (per-device op implementations)
 * ``_WARNED``    : a dedup set for one-time fallback warnings
 
-Design invariants (see ``BACKEND_STRATEGY.md`` in the source repository):
+Design invariants:
 
 * **Additive / byte-identical.** The CPU implementations are the *same callable
   objects* exported by :mod:`tikitorch.functional` (registered via

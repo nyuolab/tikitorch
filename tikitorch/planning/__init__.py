@@ -5,10 +5,10 @@ value iteration ``V <- max_a(R + gamma V)`` is a ``(max,+)`` matrix-vector
 product, shortest path is repeated min-plus matmul, and Viterbi / DTW are
 ``(max/min,+)`` trellis recurrences. This submodule provides those primitives as
 differentiable, multiplier-free TikiTorch layers -- the planning/RL application
-layer, building toward a tropical MCTS / Tropical MuZero (added in later stages).
+layer, building toward a tropical MCTS / Tropical MuZero.
 
 Everything here reduces to comparisons and additions only, so it maps onto the
-same inlined max-plus PE used by the FORGE HLS training kernels.
+same inlined max-plus PE used by the HLS training kernels.
 
     import tikitorch.planning as planning
 

@@ -1,4 +1,4 @@
-"""Phase-C.1 -- the closed algorithmic-reasoner model zoo.
+"""The closed algorithmic-reasoner model zoo.
 
 Trains one CLOSED (zero-DSP) TropicalReasoner per algorithmic task under the verified
 closed recipe (hard tropical forward, perceptron/L1 loss, a multiplier-free optimizer),
@@ -9,7 +9,7 @@ then for each:
     we keep), asserting ``inference_closed`` and ``training_zero_dsp``,
   * round-trips ``tt.load`` and asserts the reloaded model is BIT-IDENTICAL.
 
-The default optimizer is the Phase-B bake-off winner. Usage:
+The default optimizer is the closed-optimizer bake-off winner. Usage:
     python scripts/build_algorithmic_zoo.py [--opt puretropical] [--out zoo/algorithmic]
 """
 from __future__ import annotations

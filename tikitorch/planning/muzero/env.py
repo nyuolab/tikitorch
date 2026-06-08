@@ -6,8 +6,8 @@ exactly a ``(max,+)`` Bellman quantity. They are deliberately small so the whole
 search/learning loop runs on CPU for smoke tests and scales on a single GPU.
 
 ``GridWorldNav`` is the stepping-stone: it threads the whole chain, because the
-SAME environment validates Stage-1 ``TropicalValueIteration`` (it exposes its
-exact ``(R, succ)`` MDP), Stage-3 ``TropicalMCTS`` (a known model), and Stage-5
+SAME environment validates ``TropicalValueIteration`` (it exposes its
+exact ``(R, succ)`` MDP), ``TropicalMCTS`` (a known model), and
 learned-model MuZero.
 
 ``KnownModel`` adapts an environment to the MuZero inference interface used by
@@ -148,7 +148,7 @@ class KnownModel:
     """Adapts a deterministic env to the MuZero inference interface.
 
     ``value_fn(state)`` supplies the leaf value (e.g. a value-iteration oracle for
-    Stage-3 validation, or ``0`` to force MCTS to bootstrap from realised rewards).
+    validating the search, or ``0`` to force MCTS to bootstrap from realised rewards).
     ``prior_fn(state)`` supplies the policy prior (default uniform).
     """
 

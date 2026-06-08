@@ -20,7 +20,7 @@ from .kernels import KernelCache
 
 
 class FpgaBackend(Backend):
-    """FORGE FPGA backend: Tier-1 whole-model fused-step binding over the seam."""
+    """TikiTorch FPGA backend: Tier-1 whole-model fused-step binding over the seam."""
 
     name = "fpga"
 

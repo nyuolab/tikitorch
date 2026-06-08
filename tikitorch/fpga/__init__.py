@@ -1,4 +1,4 @@
-"""tikitorch.fpga — the FORGE FPGA backend for TikiTorch.
+"""tikitorch.fpga — the FPGA backend for TikiTorch.
 
 Importing this module detects a board (via a native driver) and registers an
 ``'fpga'`` backend into :mod:`tikitorch.backend`. The headline entry point is the
@@ -18,7 +18,7 @@ DDP-style wrapper::
 **Honest scope (Tier 1).** The bundled silicon kernels are *fused whole-training-
 step monoliths* (no multi-kernel mux), so ``accelerate`` binds a whole *model* to
 a compiled kernel — it is not per-op ``.to('fpga')`` dispatch (that is Tier 2,
-F-gated; see ``BACKEND_STRATEGY.md`` in the source repository). A model is *bound*
+F-gated). A model is *bound*
 (runs on silicon) only when **all three** hold: a board is present, its shape
 matches a compiled kernel, *and* an on-board runner is registered for that kernel
 (:func:`register_board_runner`) — the hardware-validated last mile, of which

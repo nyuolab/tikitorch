@@ -153,7 +153,7 @@ wins** (≥2× step efficiency: running_max 0.78 vs 0.44 at 50 steps), and
 `CountAgreementSGD` (accum≥8) is the **stability** play (knapsack 0.778±0.01 vs
 0.711±0.13). So: `PureTropicalSGD` as the all-purpose default, `FrexpMagnitudeSGD`
 for tight/silicon budgets. The residual gap to softmax is **architectural** (sort),
-not an optimizer gap. See `TROPICAL_DL_ROADMAP.md` P4.
+not an optimizer gap.
 
 ---
 
@@ -256,7 +256,7 @@ differentiable relaxation, by design non-closed, meant to anneal to hard) — pl
 closure-faithful loss (`tropical_perceptron_loss`/L1, not cross-entropy), a
 sign-only optimizer (`PureTropicalSGD`), and a power-of-two `d_model` (so the
 norm's mean-subtract is a bit-shift). Under that recipe, `assert_training_closed`
-passes — the *entire* training step is zero-DSP (the FORGE on-silicon vision).
+passes — the *entire* training step is zero-DSP (the on-silicon vision).
 The realistic guarantee is **checkable closure**: the tools certify it op-by-op
 rather than asking you to trust it.
 
@@ -314,7 +314,7 @@ aggregator. Reproduce the sweep with `tikitorch.algorithmic.evaluate_task`
 ### Reference models (the closed model zoo)
 
 A set of saved, **closure-certified** reference models trained end-to-end under the
-verified closed recipe with `PureTropicalSGD` (the Phase-B full-budget closed
+verified closed recipe with `PureTropicalSGD` (the full-budget closed
 default). Every model is `tt.save`d with its config + closure manifest, certified by
 `tt.closure_report` (`inference_closed` *and* `training_zero_dsp`), and round-trips
 through `tt.load` **bit-identically**.
@@ -375,8 +375,7 @@ parameter-evolution proof is exact.)
 
 ## Beyond deep learning: the full tropical toolkit
 
-TikiTorch aims to be the *definitive* tropical-ML library (see
-[`TROPICAL_DL_ROADMAP.md`](TROPICAL_DL_ROADMAP.md)), not just deep nets:
+TikiTorch aims to be the *definitive* tropical-ML library, not just deep nets:
 
 - **`tikitorch.geometry`** — operationalizes the tropical geometry of nets
   (Zhang–Naitzat–Lim): `count_linear_regions` (distinct affine pieces — also a
@@ -512,8 +511,7 @@ loss = model.compute_loss(x, y); loss.backward(); opt.step()   # unchanged loop
 **Honest scope (Tier 1).** The bundled silicon kernels are *fused whole-training-
 step monoliths* (no multi-kernel mux), so `accelerate` binds a whole **model** to
 a compiled kernel matched by shape — it is *not* per-op `.to('fpga')` dispatch
-(that is Tier 2 / custom codegen; see
-[`BACKEND_STRATEGY.md`](BACKEND_STRATEGY.md)). The native driver is built
+(that is Tier 2 / custom codegen). The native driver is built
 out-of-band against the Xilinx toolchain — see
 [`tikitorch/fpga/BUILD_NATIVE.md`](tikitorch/fpga/BUILD_NATIVE.md). Other backends
 (a torch-free C/CPU runtime, WASM, integer NPUs) register the same way:

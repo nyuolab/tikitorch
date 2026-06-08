@@ -1,9 +1,9 @@
-"""Phase-C.2 reference: closed (zero-DSP) image/sequence benchmarks.
+"""Reference: closed (zero-DSP) image/sequence benchmarks.
 
 Trains a multiplier-free `MorphSSM` on the sequence tasks the README reports
 (sequential-MNIST len-784, sequential-CIFAR len-1024) under the verified CLOSED
-recipe (dropout=0, soft→hard `tau` anneal, `PureTropicalSGD` — the Phase-B
-full-budget closed default) with a LARGE EFFECTIVE BATCH via gradient accumulation
+recipe (dropout=0, soft→hard `tau` anneal, `PureTropicalSGD` — the full-budget
+closed default) with a LARGE EFFECTIVE BATCH via gradient accumulation
 (the morphological-net large-batch requirement, arXiv:2505.09710: `sign(Σ grad)` is
 the large-batch majority-vote sign). Accuracy is reported at HARD `tau=0` — the form
 that maps to the zero-DSP FPGA kernel — and each model is `tt.save`d + certified with

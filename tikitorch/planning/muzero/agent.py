@@ -7,8 +7,8 @@ buffer into the standard MuZero loop: alternate (self-play -> replay) with
 (max,+) bet). Losses: value and reward (MSE for a ScalarHead, categorical
 cross-entropy for a CategoricalHead), policy (cross-entropy to the MCTS visits).
 
-This is the CPU-scale vertical slice that validates the loop end-to-end; absolute
-performance scales on EC2 (the learned-model fidelity is the ceiling, see Stage 4).
+This is the CPU-scale vertical slice that validates the loop end-to-end; the
+learned-model fidelity is the ceiling on absolute performance.
 """
 
 from dataclasses import dataclass

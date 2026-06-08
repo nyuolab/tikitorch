@@ -3,7 +3,7 @@
 // Implements the extern-C symbols that tikitorch/fpga/_native.py binds, in three
 // transports selected at compile time:
 //
-//   LOCAL (default): runs the bundled FORGE kernel math ON THE HOST (no board) so
+//   LOCAL (default): runs the bundled kernel math ON THE HOST (no board) so
 //     the whole tikitorch.fpga chain (.fpga() -> bound -> train_step -> runner ->
 //     tt_fpga_run -> the silicon-validated kernel) is validated bit-exactly on a
 //     laptop. Build with -DCSIM_ONLY -DTT_KERNEL_1LAYER + the kernel .cpp.

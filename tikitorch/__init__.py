@@ -1,7 +1,7 @@
 """TikiTorch — a tropical-semiring deep-learning library, modeled on PyTorch.
 
-TikiTorch carves the validated tropical (max-plus / min-plus) closure machinery
-out of a research monorepo into a clean, installable, PyTorch-idiomatic package.
+TikiTorch packages the tropical (max-plus / min-plus) closure machinery as a
+clean, installable, PyTorch-idiomatic library.
 Every forward and backward op reduces to comparisons and additions — no
 multiplications — which is what makes the whole learning loop FPGA-native.
 
@@ -24,12 +24,12 @@ Submodules:
     tikitorch.models      — ready-to-use tropical architectures
     tikitorch.hardware    — HLS kernels + an AFI/silicon build guide
     tikitorch.backend     — pluggable execution-backend seam (logical devices + dispatch)
-    tikitorch.fpga        — the FORGE FPGA backend (DDP-style fpga.accelerate(model))
+    tikitorch.fpga        — the FPGA backend (DDP-style fpga.accelerate(model))
 """
 
 __version__ = "0.1.0"
 
-# functional and nn are foundational and always importable (Phase 1).
+# functional and nn are foundational and always importable.
 from tikitorch import functional  # noqa: F401
 from tikitorch import nn  # noqa: F401
 from tikitorch._hardware import HardwareCostProfile  # noqa: F401
@@ -40,7 +40,7 @@ from tikitorch._hardware import HardwareCostProfile  # noqa: F401
 from tikitorch import backend  # noqa: F401
 from tikitorch.backend import device, to  # noqa: F401  (tt.device(...) / tt.to(...))
 
-# optim and models are finalized in later phases. Guard their import so that
+# optim and models are guarded so that
 # `import tikitorch` never hard-fails while the package is being assembled.
 try:  # pragma: no cover - import guard
     from tikitorch import optim  # noqa: F401

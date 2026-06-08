@@ -1,7 +1,6 @@
 """tikitorch.planning.mcts — tropical Monte-Carlo tree search.
 
-MCTS over a learned-or-known model, with the two ingredients the FORGE brief
-flags as tropical:
+MCTS over a learned-or-known model, with the two ingredients that are tropical:
 
   * **Selection** picks ``a* = argmax_a [ Q(s,a) + c_puct * P(s,a) * sqrt(N)/(1+N_a) ]``
     -- a max reduction over the candidate (action) axis, the same argmax the HLS

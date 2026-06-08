@@ -6,8 +6,7 @@ For each model and each supported ``task_type`` we check:
   * param_count is a positive int.
 
 All tests are skip-guarded behind ``requires_model`` so the suite stays green
-until the Phase-2 models module lands, then activates automatically (the
-Phase-3 verification path).
+until the ``tikitorch.models`` module is available, then activates automatically.
 """
 import pytest
 import torch
@@ -129,7 +128,7 @@ def test_morphssm_regression_uses_plain_mse():
 
 @requires_model("MorphSSM")
 def test_morphssm_default_n_layers_is_8():
-    # API_SPEC: preserve forge default n_layers=8 for MorphSSM.
+    # Preserve the default n_layers=8 for MorphSSM.
     import inspect
     sig = inspect.signature(models.MorphSSM.__init__)
     assert sig.parameters["n_layers"].default == 8

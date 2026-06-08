@@ -14,7 +14,7 @@ you paste in: *how many hardware multiplies does this thing actually do?*
     (power-of-two multiplies/divides are bit-shifts, not multipliers).
   * **Param count** — trainable parameters.
   * **Hardware estimate** — if the model exposes ``hardware_cost(...)`` (the
-    optional forge-style accounting) its DSP/LUT/BRAM numbers are folded in.
+    optional hardware-cost accounting) its DSP/LUT/BRAM numbers are folded in.
 
 The whole point is the one line a reader looks for: for a closed tropical model
 the report prints ``multiplications: 0``.
@@ -173,7 +173,7 @@ def format_report(report: dict) -> str:
 
     hw = report["hardware"]
     if hw is not None:
-        lines.append("hardware estimate (forge HardwareCostProfile):")
+        lines.append("hardware estimate (HardwareCostProfile):")
         lines.append(f"    dsp_blocks: {hw['dsp_blocks']}")
         lines.append(f"    lut_estimate: {hw['lut_estimate']:,}")
         lines.append(f"    bram_kb: {hw['bram_kb']:,}")

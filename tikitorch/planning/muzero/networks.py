@@ -11,7 +11,7 @@ declared `nn.Linear` boundaries (the established "tropical core + boundary head"
 pattern; full closure is a later refinement). The bundle `TropicalMuZeroNet`
 exposes the MuZero inference interface (`initial_inference` / `recurrent_inference`)
 so it drops straight into :class:`tikitorch.planning.mcts.TropicalMCTS` in place of
-the Stage-3 `KnownModel`.
+the `KnownModel`.
 
 Backups are chosen at the MCTS level: make backup a swept hyperparameter; `mean`
 is the published-MuZero safe option, `topk` (small k) the tropical-leaning

@@ -1,9 +1,9 @@
-"""tikitorch.planning.muzero — Tropical MuZero (built up across Stages 3-6).
+"""tikitorch.planning.muzero — Tropical MuZero.
 
-Stage 3 lands the deterministic perfect-information environments used to validate
-the tropical MCTS engine against exact value iteration. The learned
+Provides the deterministic perfect-information environments used to validate
+the tropical MCTS engine against exact value iteration, plus the learned
 representation / dynamics / prediction networks, self-play, replay, and the full
-training loop are added in later stages.
+training loop.
 """
 
 from tikitorch.planning.muzero.env import GridWorldNav, KnownModel  # noqa: F401

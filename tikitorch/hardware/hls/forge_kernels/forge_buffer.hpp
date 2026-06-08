@@ -52,7 +52,7 @@ constexpr int WORDS_TOKENS     = FT_L_MAX;
 constexpr int WORDS_TARGETS    = FT_L_MAX;
 constexpr int WORDS_GRAD_LOGIT = FT_L_MAX * FT_V;
 // One predicted token id per position. Written by do_fwd_loss; read by
-// do_train_window for in-kernel accuracy counting (Phase 0a throughput
+// do_train_window for in-kernel accuracy counting (a throughput
 // path that amortises PCIe/host scheduling over a whole training window).
 constexpr int WORDS_PRED       = FT_L_MAX;
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phase-C.3 reference: TikiTorch model.fpga() char-LM trained on REAL AWS F2 silicon.
+# Reference: TikiTorch model.fpga() char-LM trained on REAL AWS F2 silicon.
 # Provisions an f2.6xlarge, syncs the tikitorch package, sets up the aws-fpga SDK,
 # loads the validated monolithic forge_train_step AGFI, and runs the proven
 # scripts/run_fpga_f2_verify.sh (binds model.fpga(), runs 50 on-board train_step()s,

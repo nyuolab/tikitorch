@@ -3,7 +3,7 @@
 Single source of truth for taking `model.fpga()` to real AWS F1/F2 silicon: the
 on-board **run** flow (load an AFI, train over PCIe), the **AFI build** flow (HLS →
 DCP → AFI), the validated AGFI registry, the timing-failure history + root cause, and
-the operational gotchas. Consolidates what was scattered across the FORGE monorepo
+the operational gotchas. Consolidates what was scattered across the source monorepo
 build scripts and the project memory.
 
 > Status legend: **[validated]** proven on silicon · **[blocked]** known failure ·
@@ -134,7 +134,7 @@ In this repo (`scripts/`), standalone:
 - `run_tikitorch_f2_silicon.sh` — provision an f2.6xlarge + run the verify (launch/monitor/download/terminate).
 - `run_tikitorch_gpu_benchmarks.sh` — provision a g5.4xlarge + run the closed image/seq benchmarks.
 
-Still in the FORGE monorepo (kernel-build infra, forge-coupled — flow B): `run_hdk_build_train_step.sh`,
+Still in the source monorepo (kernel-build infra, forge-coupled — flow B): `run_hdk_build_train_step.sh`,
 `run_hdk_build_remote.sh` (HLS→CL→DCP→S3), `create_afi.sh` (DCP→AGFI). The HLS kernel source is
 vendored here at `tikitorch/hardware/hls/forge_kernels/` (identical to the monorepo's `forge/`
 copy), so a standalone build flow is a clean follow-up — the only adaptation is `KERNEL_DIR` and

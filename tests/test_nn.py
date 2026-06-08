@@ -1,10 +1,10 @@
 """Tests for tikitorch.nn layer Modules.
 
-Phase-1 core layers (always present) are tested unconditionally:
+Core layers (always present) are tested unconditionally:
     TropicalSoftMin/Max, TropicalLinearModule, TropicalDilationModule,
     CompositionalTropicalProjection, TropicalTopKModule, and their aliases.
 
-Phase-2 building blocks (TropicalBatchShift, MorphConv1d, MorphSSMLayer,
+Optional building blocks (TropicalBatchShift, MorphConv1d, MorphSSMLayer,
 TropicalAttention, ...) are tested behind ``requires_nn`` skip guards so the
 suite is green before they land and turns active once they do.
 """
@@ -16,7 +16,7 @@ from conftest import requires_nn
 
 
 # ---------------------------------------------------------------------------
-# Phase-1 core: forward/backward shape + finiteness
+# Core: forward/backward shape + finiteness
 # ---------------------------------------------------------------------------
 
 
@@ -108,7 +108,7 @@ def test_soft_to_hard_equivalence_in_module():
 
 
 # ---------------------------------------------------------------------------
-# Phase-2 building blocks (skip-guarded until they land)
+# Optional building blocks (skip-guarded until they land)
 # ---------------------------------------------------------------------------
 
 

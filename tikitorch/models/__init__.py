@@ -1,7 +1,7 @@
 """tikitorch.models — ready-to-use tropical architectures (a la torchvision/timm).
 
-Carved, decoupled from the FORGE research monorepo. Every model subclasses
-``torch.nn.Module`` directly (no abstract ``ForgeModel`` base), takes plain
+Every model subclasses
+``torch.nn.Module`` directly (no abstract base class), takes plain
 keyword arguments (no ``config`` dict), and composes the tropical building
 blocks from :mod:`tikitorch.nn`. The tropical / closure math (forward,
 backward via the autograd Functions in :mod:`tikitorch.functional`, and the
@@ -16,17 +16,17 @@ Public models:
     TropicalTransformer   — transformer with tropical attention + tropical FFN
     MoTEModel (alias MoTE)— Mixture of Tropical Experts
 
-The ``task_type`` / loss convention (replacing ``ForgeModel``):
+The ``task_type`` / loss convention:
     Every model takes a ``task_type`` keyword (``"classification"``, ``"lm"``,
     or ``"regression"`` — the subset each supports is documented per class) and
     exposes a concrete ``compute_loss(x, y)`` method. ``compute_loss`` is the
-    carved body of the old ``ForgeModel.compute_loss`` (cross-entropy for
+    standard task loss (cross-entropy for
     classification / lm, MSE for regression). It is *not* enforced by any base
     class — it is provided because the training loops rely on it. MoTEModel
     additionally adds its load-balancing ``aux_loss`` term.
 
-Each model also exposes a cheap ``param_count`` property and, where the forge
-source had one, an optional ``hardware_cost(...)`` method returning a
+Each model also exposes a cheap ``param_count`` property and, where applicable,
+an optional ``hardware_cost(...)`` method returning a
 :class:`tikitorch.HardwareCostProfile` (with ``get_hardware_cost_profile`` kept
 as an alias). These are optional conveniences, never required.
 """
@@ -108,7 +108,7 @@ __all__ = [
 
 
 # ---------------------------------------------------------------------------
-# Tropical MLP  (carved from forge/models/tropical.py)
+# Tropical MLP
 # ---------------------------------------------------------------------------
 
 
@@ -297,7 +297,7 @@ class TropicalMLP(FpgaAccelerable, nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Tropical Sequence Model  (carved from forge/models/tropical.py)
+# Tropical Sequence Model
 # ---------------------------------------------------------------------------
 
 
@@ -480,7 +480,7 @@ class TropicalSequenceModel(FpgaAccelerable, nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Morphological SSM  (carved from forge/models/morphological.py)
+# Morphological SSM
 # ---------------------------------------------------------------------------
 
 
@@ -733,7 +733,7 @@ class MorphSSM(FpgaAccelerable, nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Morphological MLP  (carved from forge/models/morphological.py)
+# Morphological MLP
 # ---------------------------------------------------------------------------
 
 
@@ -854,7 +854,7 @@ class MorphMLP(FpgaAccelerable, nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Tropical Transformer  (carved from forge/models/tropical_transformer.py)
+# Tropical Transformer
 # ---------------------------------------------------------------------------
 
 
@@ -957,7 +957,7 @@ class TropicalTransformer(FpgaAccelerable, nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Mixture of Tropical Experts  (carved from forge/models/mote.py)
+# Mixture of Tropical Experts
 # ---------------------------------------------------------------------------
 
 
@@ -1313,7 +1313,7 @@ class TropicalCNN(FpgaAccelerable, nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Shared loss helper (carved body of ForgeModel.compute_loss, no GenerationLoss)
+# Shared loss helper
 # ---------------------------------------------------------------------------
 
 
@@ -1352,8 +1352,7 @@ def classification_loss(logits: torch.Tensor, y: torch.Tensor,
 def _default_compute_loss(model: nn.Module, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """Classification/LM loss (dispatched by ``model.loss_type``), MSE for regression.
 
-    This is the decoupled, carved body of the old ``ForgeModel.compute_loss``
-    (the ``GenerationLoss`` branch is dropped). Used by every model that does
+    The shared default loss body. Used by every model that does
     not override ``compute_loss`` with extra terms. The classification/LM loss is
     selected by ``model.loss_type`` (default ``"cross_entropy"``); set it to
     ``"perceptron"`` for the silicon baseline or ``"tropical_ce"`` /

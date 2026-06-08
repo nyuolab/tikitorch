@@ -1,6 +1,6 @@
 """Tests for the general backend seam (tikitorch.backend) — CPU-only, no board.
 
-Covers the load-bearing guarantees from BACKEND_STRATEGY.md: the CPU path is
+Covers the load-bearing backend guarantees: the CPU path is
 byte-identical and zero-overhead (the seam is additive), device parsing mirrors
 torch, and an unsupported device degrades to a one-time-warned CPU fallback rather
 than an error.

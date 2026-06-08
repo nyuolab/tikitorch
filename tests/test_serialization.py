@@ -8,7 +8,7 @@ Covers, per the API contract:
   * the generic-config fallback when no explicit config is given.
 
 Skip-guarded behind ``requires_model`` so the suite stays green until the
-Phase-2 models module lands, then activates automatically.
+``tikitorch.models`` module is available, then activates automatically.
 """
 import pytest
 import torch

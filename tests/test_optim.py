@@ -3,7 +3,7 @@
 Each optimizer must (a) take a single .step() without error on a parameter that
 has a gradient, and (b) reduce a simple convex toy loss over a handful of steps.
 All tests are skip-guarded behind ``requires_optim`` so the suite stays green
-until the Phase-2 optimizer module lands, then activates automatically.
+until the ``tikitorch.optim`` module is available, then activates automatically.
 """
 import pytest
 import torch
@@ -265,7 +265,7 @@ def test_tropical_adam_step_is_power_of_two_and_adapts():
     assert opt.step_density() < grown               # flips shrank the step
 
 
-# --- Closed adaptive optimizers (Phase A): magnitude/agreement-aware, zero-DSP ---
+# --- Closed adaptive optimizers: magnitude/agreement-aware, zero-DSP ---
 #
 # FrexpMagnitudeSGD, CountAgreementSGD, ExponentEMAAdam, PerLayerStepSGD recover a
 # magnitude / dense-signal analogue WITHOUT leaving the multiplier-free regime: the

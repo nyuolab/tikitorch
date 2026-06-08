@@ -1,13 +1,13 @@
 """tikitorch.nn — tropical-semiring neural-network layers (a la ``torch.nn``).
 
-Foundational layer modules (Phase 1):
+Foundational layer modules:
     TropicalSoftMin, TropicalSoftMax          — soft (logsumexp) relaxations
     TropicalLinearModule  (alias TropicalLinear)     — min-plus erosion linear
     TropicalDilationModule (alias TropicalDilation)  — max-plus dilation linear
     CompositionalTropicalProjection (alias TropicalProjection)
     TropicalTopKModule (alias TropicalTopK)
 
-Higher-level layers (Phase 2) are appended below the marker. Every layer here
+Higher-level layers are appended below the marker. Every layer here
 wraps the stateless ops in :mod:`tikitorch.functional`; the math is ported
 verbatim from the validated research code.
 
@@ -187,7 +187,7 @@ __all__ = [
     "TropicalProjection",
     "TropicalTopKModule",
     "TropicalTopK",
-    # --- higher-level layers (Phase 2) ---
+    # --- higher-level layers ---
     # normalization
     "TropicalBatchShift",
     "BatchShift",
@@ -547,21 +547,21 @@ TropicalProjection = CompositionalTropicalProjection
 TropicalTopK = TropicalTopKModule
 
 
-# --- higher-level layers added in Phase 2 ---
+# --- higher-level layers ---
 #
 # The modules below are ``nn.Module`` building blocks (NOT the full
 # architectures, which live in :mod:`tikitorch.models`). They are ported
 # verbatim from the validated research sources:
 #
-#   forge/models/morphological.py      -> TropicalBatchShift, DepthwiseMorphConv1d,
-#                                         MultiScaleMorphConv1d, MorphSSMLayer
-#   forge/models/tropical_transformer.py -> TropicalAttention,
-#                                         TropicalShiftAttention,
-#                                         TropicalTransformerBlock
-#   forge/models/mote.py               -> TropicalRouter, MoTEBlock
+#   morphological building blocks -> TropicalBatchShift, DepthwiseMorphConv1d,
+#                                    MultiScaleMorphConv1d, MorphSSMLayer
+#   tropical transformer          -> TropicalAttention,
+#                                    TropicalShiftAttention,
+#                                    TropicalTransformerBlock
+#   mixture-of-tropical-experts   -> TropicalRouter, MoTEBlock
 #
 # All tropical math is copied unchanged; only imports are rewired to
-# tikitorch.functional / the Phase-1 nn primitives defined above. Every
+# tikitorch.functional / the nn primitives defined above. Every
 # operation is +/max/min (comparisons + additions) — no multiplications in the
 # tropical path.
 
@@ -880,11 +880,11 @@ class MorphSSMLayer(nn.Module):
         #   "identity" - no projection (closure-rigorous; relies on subsequent
         #                blocks' FFN/expert layers to do channel mixing)
         # Default is now the multiplier-free path (was "linear" — every MorphSSM/
-        # MoTE block silently multiplied D^2 MACs/token; see OFFGPU_LEVERS.md H5).
+        # MoTE block silently multiplied D^2 MACs/token, the H5 closure hole).
         if out_proj_type is None:
             out_proj_type = "tropical"
         if out_proj_type == "tropical":
-            # Intra-package reference (was forge.arithmetic.tropical import).
+            # Intra-package reference.
             self.out_proj = TropicalDilationModule(d_model, d_model, use_softmax=False, tau=tau)
         elif out_proj_type == "identity":
             self.out_proj = nn.Identity()
@@ -1618,7 +1618,7 @@ class TropicalLayerNorm(nn.Module):
     (add, no multiply); ``gamma`` scaling is dropped (it is the multiply).
 
     .. note::
-       **Stability cost (known limitation, FUTURE_TODO.md).** Without true
+       **Stability cost (known limitation).** Without true
        variance scaling this norm is less stable than ``nn.LayerNorm`` in DEEP +
        annealed-to-hard models: shallow nets are fine (the closure-faithful-CE
        char-LM recovery holds), but a 2-layer MorphSSM on sMNIST trains to ~0.21
@@ -2001,7 +2001,7 @@ class TropicalRNN(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# PyTorch-idiomatic aliases (clean names) for the Phase-2 layers
+# PyTorch-idiomatic aliases (clean names) for the higher-level layers
 # ---------------------------------------------------------------------------
 
 BatchShift = TropicalBatchShift

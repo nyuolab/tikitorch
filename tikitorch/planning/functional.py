@@ -14,7 +14,7 @@ on, in the same multiplier-free spirit as :mod:`tikitorch.functional`:
     all-pairs longest/shortest path and max-plus matrix powers (value iteration).
 
 Both reduce to comparisons and additions only — no multiplies — so they map
-directly onto the inlined max-plus PE in the FORGE HLS kernels (the ``SCORE_N``
+directly onto the inlined max-plus PE in the HLS kernels (the ``SCORE_N``
 ``max_d(Q+K)`` loop iterated over a step axis).
 """
 

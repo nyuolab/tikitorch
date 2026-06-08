@@ -1,12 +1,11 @@
 """Shared pytest fixtures / skip helpers for the TikiTorch suite.
 
-The package is assembled in phases. Phase 1 (``functional`` + the core ``nn``
-layers) is frozen and always present, so those tests run unconditionally.
-Phase 2 (``optim``, ``models``, the higher-level ``nn`` blocks) may not have
-landed yet in a given working tree. Tests that depend on Phase-2 symbols are
-guarded with the ``requires_*`` skip markers below: they turn green the moment
-the corresponding module is populated (this is the Phase-3 verification path
-described in API_SPEC.md section 6), and skip cleanly until then instead of
+Some modules (``functional`` + the core ``nn`` layers) are always present, so
+those tests run unconditionally. Others (``optim``, ``models``, the higher-level
+``nn`` blocks) may not be available in a given working tree. Tests that depend on
+those optional symbols are guarded with the ``requires_*`` skip markers below:
+they turn green the moment
+the corresponding module is populated, and skip cleanly until then instead of
 hard-failing the whole run.
 """
 import pytest
@@ -48,23 +47,23 @@ def _attr_present(module_name: str, attr: str) -> bool:
 
 
 def requires_optim(name: str):
-    """Skip unless ``tikitorch.optim.<name>`` exists (Phase 2)."""
+    """Skip unless ``tikitorch.optim.<name>`` exists."""
     return pytest.mark.skipif(
         not _attr_present("tikitorch.optim", name),
-        reason=f"tikitorch.optim.{name} not implemented yet (Phase 2)",
+        reason=f"tikitorch.optim.{name} not implemented yet",
     )
 
 
 def requires_model(name: str):
-    """Skip unless ``tikitorch.models.<name>`` exists (Phase 2)."""
+    """Skip unless ``tikitorch.models.<name>`` exists."""
     return pytest.mark.skipif(
         not _attr_present("tikitorch.models", name),
-        reason=f"tikitorch.models.{name} not implemented yet (Phase 2)",
+        reason=f"tikitorch.models.{name} not implemented yet",
     )
 
 
 def requires_nn(name: str):
-    """Skip unless ``tikitorch.nn.<name>`` exists (Phase 1 core or Phase 2 block)."""
+    """Skip unless ``tikitorch.nn.<name>`` exists."""
     return pytest.mark.skipif(
         not _attr_present("tikitorch.nn", name),
         reason=f"tikitorch.nn.{name} not implemented yet",

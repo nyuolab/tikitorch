@@ -1,4 +1,4 @@
-"""Phase-B closed-optimizer bake-off.
+"""Closed-optimizer bake-off.
 
 Runs the full grid (TASKS x ARMS x SEEDS) of ``evaluate_task`` to decide whether
 any CLOSED (zero-DSP, ``assert_training_closed``-verified) adaptive optimizer closes
@@ -38,8 +38,8 @@ TASKS = ["running_max", "sort", "subset_sum", "knapsack", "min_coin_change"]
 CLOSED_OPTS = ["puretropical", "tropicaladam", "countagree", "perlayer", "frexpmag", "expadam"]
 
 
-# "countagree8" is the tuned CountAgreementSGD (accum=8 agreement window, per the
-# Phase-B verification); it reuses the countagree closed_opt with a larger accum.
+# "countagree8" is the tuned CountAgreementSGD (accum=8 agreement window); it
+# reuses the countagree closed_opt with a larger accum.
 _ARM_TO_OPT = {a: a for a in CLOSED_OPTS}
 _ARM_TO_OPT["countagree8"] = "countagree"
 _ARM_ACCUM = {"countagree": None, "countagree8": 8}   # None -> default accum

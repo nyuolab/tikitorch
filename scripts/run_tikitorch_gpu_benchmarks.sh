@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phase-C.2 reference: TikiTorch closed image/sequence benchmarks on an EC2 GPU.
+# Reference: TikiTorch closed image/sequence benchmarks on an EC2 GPU.
 # Provisions a g5.4xlarge (A10G), syncs the tikitorch package, and runs the closed
 # (zero-DSP) sequential-MNIST + sequential-CIFAR benchmarks (MorphSSM + PureTropicalSGD
 # + large effective batch, hard-tau eval) via scripts/run_closed_benchmarks.py.
@@ -15,7 +15,7 @@ KEY_NAME="mnemo-dev"; SG="sg-0efe5c4b6eeb6fda6"
 INSTANCE_TYPE="${INSTANCE_TYPE:-g5.4xlarge}"; REGION="us-east-1"
 PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="$HOME/.ssh/mnemo-dev.pem"
 EBS_SIZE=200
-AMI="${AMI:-ami-05603a42e5254c4bb}"               # GPU AMI used for FORGE training
+AMI="${AMI:-ami-05603a42e5254c4bb}"               # GPU AMI used for training
 STATE_DIR="$PROJECT_DIR/.tiki_gpu_state"; mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/instance.state"
 

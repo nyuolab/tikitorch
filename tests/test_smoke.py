@@ -1,9 +1,9 @@
 """Top-level smoke tests: package imports cleanly and the idiomatic path works.
 
-These guard the public surface described in API_SPEC.md section 1: ``import
+These guard the public surface: ``import
 tikitorch`` always succeeds, the submodules resolve, and the documented
-``model -> compute_loss -> backward -> step`` loop runs end-to-end once Phase 2
-lands (skip-guarded until then).
+``model -> compute_loss -> backward -> step`` loop runs end-to-end once the
+``optim``/``models`` modules are available (skip-guarded until then).
 """
 import importlib
 
@@ -62,7 +62,7 @@ def test_backend_seam_present_and_additive():
 @requires_model("MorphSSM")
 @requires_optim("PureTropicalSGD")
 def test_idiomatic_end_to_end_path():
-    # The exact usage pattern from API_SPEC.md / the README.
+    # The exact usage pattern from the README.
     import tikitorch as tt
     import tikitorch.optim as optim
 

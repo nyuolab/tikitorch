@@ -68,9 +68,9 @@ class TropicalNearestCentroid:
     """Supervised tropical classifier: nearest per-class centroid in the tropical metric.
 
     A clean, correct tropical classifier (the tropical-metric analogue of nearest
-    centroid). For the *max-margin* tropical SVM (an LP over tropical hyperplanes;
-    Tang & Yoshida), see TROPICAL_DL_ROADMAP.md — it is the documented next
-    extension; this centroid classifier is the shipped, tested baseline.
+    centroid). The *max-margin* tropical SVM (an LP over tropical hyperplanes;
+    Tang & Yoshida) is provided as :class:`TropicalSVM`; this centroid classifier
+    is the simpler, tested baseline.
     """
 
     def __init__(self):

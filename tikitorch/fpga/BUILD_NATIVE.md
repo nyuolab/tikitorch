@@ -1,6 +1,6 @@
 # Building the TikiTorch FPGA native driver (`_libtikifpga`)
 
-`tikitorch.fpga` talks to the silicon-validated FORGE kernels through a small
+`tikitorch.fpga` talks to the silicon-validated kernels through a small
 native shared library, `_libtikifpga`. **This library is not shipped in the
 wheel** (platform/ABI mismatch, and it needs the Xilinx toolchain to build).
 Without it, `tikitorch.fpga` transparently falls back to CPU — everything still
@@ -71,7 +71,7 @@ reference for the fused sequence — before ever touching real silicon.
 
 On an F2 instance with an `.xclbin` in hand, build `bridge.cpp` in XRT mode
 (implement the symbols with `xrt::device`/`xrt::kernel`/`xrt::bo`, mirroring the
-`host_training_xrt.cpp` flow in the FORGE source monorepo — that file is *not*
+`host_training_xrt.cpp` flow in the source monorepo — that file is *not*
 bundled in this package):
 
 ```bash
@@ -128,5 +128,4 @@ fpga.register_board_runner("forge_train_step_2layer", run_2layer)
 With a board present, a matching kernel, and a registered runner,
 `fpga.accelerate(model).bound` becomes `True` and `train_step` drives the fused
 loop on silicon. Validate the runner against LOCAL mode and the testbench first,
-then move to XRT. See `BACKEND_STRATEGY.md` (source repository) for the staged
-plan and `tikitorch/hardware/README.md` for the closure→silicon mapping.
+then move to XRT. See `tikitorch/hardware/README.md` for the closure→silicon mapping.

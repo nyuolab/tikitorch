@@ -2,7 +2,7 @@
 
 These optimizers close the learning loop without floating-point multiplies, so
 the *update* rule maps to the same comparison/addition/bit-shift hardware as the
-tropical forward and backward passes — the property that makes FORGE-style
+tropical forward and backward passes — the property that makes this
 training FPGA-native (zero DSP blocks).
 
 Optimizers (all ``torch.optim.Optimizer`` subclasses):
@@ -25,9 +25,7 @@ Idiomatic usage::
 There is intentionally no ``build_optimizer`` factory: TikiTorch is config-free,
 so users instantiate optimizers directly the way they would with ``torch.optim``.
 
-The math (sign updates, integer-counter momentum, bit-shift learning rate, LFSR
-noise, sign-L1 adaptive scaling) is ported verbatim from the validated research
-code; only imports were changed (no ``forge`` dependencies).
+
 """
 
 import torch
@@ -310,7 +308,7 @@ class TropicalLion(toptim.Optimizer):
     """Lion (sign-of-momentum) optimizer — multiplier-free, integer fixed-point.
 
     .. warning::
-       **Measured shortcoming (Phase 3, see FUTURE_TODO.md).** On char-LM at
+       **Measured shortcoming.** On char-LM at
        D=128/256 with tropical_ce and a tau→0 anneal, TropicalLion did NOT beat
        SignSGD and in fact *hurt* by 0.8–2.0pp, while the SignSGD→AdamW gap it
        targets failed to open (AdamW ≈ SignSGD). Sign-of-momentum appears to lag
@@ -538,7 +536,7 @@ class TropicalAdam(toptim.Optimizer):
 
 
 # =============================================================================
-# Closed ADAPTIVE optimizers (P4): recover Adam's per-parameter magnitude scaling
+# Closed ADAPTIVE optimizers: recover Adam's per-parameter magnitude scaling
 # using only sign / compare / power-of-two shift -- verified zero-DSP by
 # tikitorch.audit.assert_training_closed. The magnitude tier is read with
 # torch.frexp (exponent = floor(log2|x|)+1 = a leading-bit / priority-encoder on

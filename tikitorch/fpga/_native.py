@@ -1,4 +1,4 @@
-"""tikitorch.fpga._native — the ctypes bridge to the compiled FORGE driver.
+"""tikitorch.fpga._native — the ctypes bridge to the compiled native driver.
 
 This is the **only** place TikiTorch touches native code. It loads a shared
 library (``_libtikifpga``) built out-of-band from the bundled HLS sources +
