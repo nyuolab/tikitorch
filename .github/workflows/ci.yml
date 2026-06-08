@@ -42,6 +42,9 @@ jobs:
 
       - name: Run tests
         run: |
-          # The board-dependent FPGA tests self-skip without hardware, so the
-          # suite is green on a stock CI runner.
+          # Runs the fast building-block suite. The `slow` end-to-end training
+          # tests are deselected by default (addopts in pyproject) — they assert
+          # research/learning claims, not library correctness, and are run on
+          # demand with `pytest -m slow`. The board-dependent FPGA tests also
+          # self-skip without hardware, so the suite is green on a stock runner.
           python -m pytest -q

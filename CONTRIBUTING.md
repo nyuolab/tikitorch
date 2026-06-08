@@ -23,10 +23,19 @@ Run what CI runs — both must be green:
 
 ```bash
 ruff check .          # lint
-pytest -q             # the full suite (351 tests; 1 skips without an FPGA)
+pytest -q             # fast building-block suite: closure, exactness, gradchecks
 ```
 
 CI (`.github/workflows/ci.yml`) runs this on Python 3.9, 3.11, and 3.12.
+
+The end-to-end **training** tests (a tropical model learns an algorithmic task
+and generalizes) are marked `slow` and **deselected by default** — they validate
+research/learning claims, not library correctness, and they're stochastic and
+minutes-long. Run them on demand:
+
+```bash
+pytest -m slow        # the training tests only
+```
 
 ## The closure invariant (read this before adding an op or layer)
 

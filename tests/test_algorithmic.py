@@ -8,6 +8,7 @@ and extrapolates out-of-distribution in length).
 import itertools
 import random
 
+import pytest
 import torch
 
 import tikitorch.algorithmic as A
@@ -92,6 +93,7 @@ def test_reasoner_forward_shapes():
 
 # ----- training signal: closed DP execution + OOD extrapolation ----------
 
+@pytest.mark.slow
 def test_closed_model_learns_prefix_max_and_extrapolates():
     # A closed max-plus reasoner should execute the prefix-max scan and
     # generalize to longer sequences than it trained on.
@@ -123,6 +125,7 @@ def test_rope_shift_extrapolates_past_max_len():
     assert m(x).shape == (2, 64, task.n_symbols)            # runs at 4x the table size
 
 
+@pytest.mark.slow
 def test_iter_topk_reasoner_learns_running_max():
     res = A.evaluate_task("running_max", attention="tropical", agg_variant="iter_topk",
                           agg_topk_k=2, d_model=48, n_layers=2, train_len=16, ood_len=64,
@@ -130,6 +133,7 @@ def test_iter_topk_reasoner_learns_running_max():
     assert res["id_acc"] > 0.5 and res["ood_len_acc"] > 0.5
 
 
+@pytest.mark.slow
 def test_pos_mode_abs_is_the_length_ood_failure_mode():
     # The honest control: absolute learned positions do NOT length-generalize
     # (untrained rows), so they collapse OOD -- this is what the earlier 'sort'
@@ -388,6 +392,7 @@ def test_knapsack_reasoner_forward_shape():
     assert m(x).shape == (4, 9, 2)              # per-item binary selection logits
 
 
+@pytest.mark.slow
 def test_evaluate_task_knapsack_runs_and_reports_f1():
     res = A.evaluate_task("knapsack", attention="tropical", d_model=48, n_layers=2,
                           train_len=8, ood_len=12, train_n=1024, test_n=128,
@@ -411,6 +416,7 @@ def test_min_and_maxmin_aggregation_are_closed():
         assert find_runtime_multiplies(m, xb) == []     # negation/cat are not multiplies
 
 
+@pytest.mark.slow
 def test_min_aggregation_helps_min_plus_task():
     # min_coin_change is a MIN-plus DP; a min-plus aggregator must fit it at least
     # as well in-distribution as the max-plus iter_topk aggregator (which collapses).

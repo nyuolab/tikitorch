@@ -83,3 +83,12 @@ target-version = "py39"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `slow` marks end-to-end training tests that validate research/learning claims
+# (a model reaches some accuracy), NOT library correctness. They dominate runtime
+# and are inherently stochastic, so they are DESELECTED by default: plain `pytest`
+# and CI run the fast building-block suite (closure, exactness, gradchecks). Run
+# the training tests on demand with `pytest -m slow`.
+addopts = ["-m", "not slow"]
+markers = [
+    "slow: end-to-end training test (research/learning claim); deselected by default, run with `-m slow`",
+]
