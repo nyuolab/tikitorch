@@ -1,5 +1,9 @@
 # TikiTorch
 
+[![CI](https://github.com/nyuolab/tikitorch/actions/workflows/ci.yml/badge.svg)](https://github.com/nyuolab/tikitorch/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.9%20%7C%203.11%20%7C%203.12-blue.svg)](pyproject.toml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
 **A tropical-semiring deep-learning library — multiplier-free, FPGA-native
 training, modeled closely on PyTorch.**
 
@@ -568,7 +572,7 @@ If you use TikiTorch in your research, please cite:
   author       = {{TikiTorch Authors}},
   year         = {2026},
   version      = {0.1.0},
-  url          = {https://github.com/tikitorch/tikitorch},
+  url          = {https://github.com/nyuolab/tikitorch},
   note         = {Algebraic closure of the learning loop: max-plus / min-plus
                   training with zero DSP blocks on FPGA silicon.}
 }

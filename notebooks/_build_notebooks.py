@@ -43,15 +43,14 @@ def write_nb(name, cells):
 SETUP = code(r"""
 # --- Setup: install TikiTorch (run once) ---
 # TikiTorch is research code, not on PyPI. In Colab, install from the repo.
-# Replace REPO_URL with your TikiTorch checkout (it contains tikitorch/ + data/).
 try:
     import tikitorch  # already installed?
 except ImportError:
-    REPO_URL = "https://github.com/your-org/tikitorch.git"  # <-- set me
+    REPO_URL = "https://github.com/nyuolab/tikitorch.git"
     import subprocess, sys, os
     if not os.path.exists("tikitorch_repo"):
         subprocess.run(["git", "clone", REPO_URL, "tikitorch_repo"], check=False)
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", "tikitorch_repo/tikitorch"], check=False)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", "tikitorch_repo"], check=False)
     import tikitorch
 import torch
 print("TikiTorch", getattr(tikitorch, "__version__", "?"), "| torch", torch.__version__)
