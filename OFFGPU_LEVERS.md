@@ -288,7 +288,7 @@ projective scoring beats dot-product/L∞ on the benchmarks.
 
 These carry adversarial corrections from the design review. **Landmine first:**
 there are TWO copies of every kernel (`forge/hardware/hls/...` and
-`tikitorch/tikitorch/hardware/hls/...`), and `scripts/run_hdk_build_remote.sh`
+`tikitorch/hardware/hls/...`), and `scripts/run_hdk_build_remote.sh`
 defaults `KERNEL_DIR` to `forge/hardware/hls/tropical_signsgd` — **confirm which
 file the F2 AFI actually consumes before editing, or you ship nothing.**
 

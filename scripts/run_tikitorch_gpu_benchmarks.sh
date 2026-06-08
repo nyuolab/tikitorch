@@ -13,7 +13,7 @@ set -e
 PROFILE="NYUMCResearchAdminFullAccess-739966866637"
 KEY_NAME="mnemo-dev"; SG="sg-0efe5c4b6eeb6fda6"
 INSTANCE_TYPE="${INSTANCE_TYPE:-g5.4xlarge}"; REGION="us-east-1"
-PROJECT_DIR="/Users/ekoermann/Documents/tikitorch"; PEM="$HOME/.ssh/mnemo-dev.pem"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="$HOME/.ssh/mnemo-dev.pem"
 EBS_SIZE=200
 AMI="${AMI:-ami-05603a42e5254c4bb}"               # GPU AMI used for FORGE training
 STATE_DIR="$PROJECT_DIR/.tiki_gpu_state"; mkdir -p "$STATE_DIR"

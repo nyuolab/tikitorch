@@ -263,8 +263,8 @@ rather than asking you to trust it.
 ### Algorithmic reasoning (closed DP execution + OOD)
 
 `tikitorch.algorithmic` benchmarks the tropical claim that max-plus/min-plus
-models *are* dynamic programs. Reproduce with
-`scripts/run_algorithmic_reasoning.py`:
+models *are* dynamic programs. Reproduce with the `tikitorch.algorithmic`
+harness (`evaluate_task` + the verified reference solvers):
 
 | probe | result | reading |
 |---|---|---|
@@ -283,7 +283,8 @@ is scale-invariant but currently *under-fits* the regression in-distribution, so
 this is "degrades far less," not yet "wins outright."
 
 **Head-matched tropical-vs-softmax (GPU, 3 seeds, train→2× size-OOD, Micro-F1 for
-the combinatorial DPs; `scripts/run_algorithmic_gpu.py`):**
+the combinatorial DPs; via `tikitorch.algorithmic.evaluate_task` with
+`attention="tropical"` vs `"softmax"`):**
 
 | task | tropical (id / ood2×) | softmax (id / ood2×) | verdict |
 |---|---|---|---|
@@ -307,7 +308,8 @@ not semiring-bound), and elsewhere the effect is task-dependent (maxmin nudges
 running_max OOD 0.94→0.997, but min-plus *collapses* subset_sum OOD 0.69→0.01). So
 the min/maxmin variants ship as correct, semiring-complete primitives, but the real
 blocker is **training stability + the in-distribution under-fit**, not the
-aggregator. Reproduce the sweep with `scripts/run_algorithmic_gpu.py`.
+aggregator. Reproduce the sweep with `tikitorch.algorithmic.evaluate_task`
+(vary `attention`, `agg_variant`, and `seed`).
 
 ### Reference models (the closed model zoo)
 

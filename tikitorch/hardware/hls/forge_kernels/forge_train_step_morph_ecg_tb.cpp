@@ -19,9 +19,9 @@
 //   g++ -std=c++14 -O2 -DCSIM_ONLY \
 //       -DMDE_D_CFG=64 -DMDE_L_LAYERS_CFG=4 -DMDE_K_CFG=4 \
 //       -DMDE_L_SEQ_CFG=128 -DMDE_DIL_CAP_CFG=16 \
-//       -I forge/hardware/hls -I forge/hardware/hls/forge_kernels \
-//       forge/hardware/hls/forge_kernels/forge_train_step_morph_ecg.cpp \
-//       forge/hardware/hls/forge_kernels/forge_train_step_morph_ecg_tb.cpp -o /tmp/tb_ecg
+//       -I tikitorch/hardware/hls -I tikitorch/hardware/hls/forge_kernels \
+//       tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_ecg.cpp \
+//       tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_ecg_tb.cpp -o /tmp/tb_ecg
 
 #include "forge_buffer_morph_ecg.hpp"
 #include <cstdio>

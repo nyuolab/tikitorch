@@ -12,10 +12,10 @@
 //   Asserts accuracy rises well above chance.
 //
 // Compile:
-//   g++ -std=c++14 -O2 -DCSIM_ONLY -I forge/hardware/hls \
-//       -I forge/hardware/hls/forge_kernels \
-//       forge/hardware/hls/forge_kernels/forge_train_step_morph.cpp \
-//       forge/hardware/hls/forge_kernels/forge_train_step_morph_tb.cpp -o /tmp/tb_morph
+//   g++ -std=c++14 -O2 -DCSIM_ONLY -I tikitorch/hardware/hls \
+//       -I tikitorch/hardware/hls/forge_kernels \
+//       tikitorch/hardware/hls/forge_kernels/forge_train_step_morph.cpp \
+//       tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_tb.cpp -o /tmp/tb_morph
 
 #include "forge_buffer_morph.hpp"
 #include <cstdio>

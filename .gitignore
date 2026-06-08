@@ -7,3 +7,11 @@ dist/
 *.pt
 data/
 *.pyc
+
+# generated model artifacts (tt.save) — mirror of the *.pt rule above
+*.tt
+# results/ is a generated-output tree; track only curated, cited evidence
+results/closed_benchmarks/
+results/capacity_probe/
+# per-run console logs created by the run_* scripts
+logs/

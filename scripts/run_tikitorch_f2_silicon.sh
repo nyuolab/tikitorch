@@ -14,7 +14,7 @@ set -e
 PROFILE="NYUMCResearchAdminFullAccess-739966866637"
 KEY_NAME="mnemo-dev"; SG="sg-0efe5c4b6eeb6fda6"
 INSTANCE_TYPE="${INSTANCE_TYPE:-f2.6xlarge}"; REGION="us-east-1"
-PROJECT_DIR="/Users/ekoermann/Documents/tikitorch"; PEM="$HOME/.ssh/mnemo-dev.pem"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="$HOME/.ssh/mnemo-dev.pem"
 EBS_SIZE=200
 AMI="${AMI:-ami-092fc5deb8f3c0f7d}"                       # F2 FPGA dev AMI
 AGFI="${AGFI:-agfi-0a845113b088cf62e}"                    # cl_forge_train_step_v7_monolithic
