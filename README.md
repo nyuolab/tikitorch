@@ -530,6 +530,53 @@ See [`examples/backend_dispatch.py`](examples/backend_dispatch.py) and
 
 ---
 
+## Related work — how TikiTorch compares
+
+Tropical / morphological deep learning is a real but **fragmented** field: mostly
+theory and one-off layers, rarely a usable library, and — to our knowledge —
+never a *training loop* that is multiplier-free end to end. TikiTorch's
+distinctive bet is engineering: package the algebra as a PyTorch-shaped library
+(`nn` / `optim` / `models` / `functional`) **and** keep the forward pass, the
+backward pass, *and* the optimizer inside the semiring, so the whole loop maps to
+FPGA fabric with zero DSP blocks.
+
+**Tropical / morphological learning**
+
+| Work | What it is | Trainable layers | Multiplier-free *training* | FPGA / zero-DSP |
+|---|---|---|---|---|
+| [Tropical Geometry of DNNs](https://arxiv.org/abs/1805.07091) — Zhang, Naitzat & Lim, ICML 2018 | theory: ReLU nets *are* tropical rational maps | — (analysis) | — | — |
+| Morphological NNs — Ritter & Sussner (ICPR 1996); [Maragos et al. survey](https://ieeexplore.ieee.org/document/9394420) (Proc. IEEE 2021) | the add/max neuron; morphological perceptrons | model class | no | no |
+| [Maxout](https://arxiv.org/abs/1302.4389) — Goodfellow et al., ICML 2013 | a max-plus activation inside a standard multiply-net | one layer | no | no |
+| [Tropical Attention](https://arxiv.org/abs/2505.17190) — Hashemi et al., 2025 ([code](https://github.com/Baran-phys/Tropical-Attention)) | tropical attention + an algorithmic-reasoning harness | layer + harness | no (FP training) | no |
+| [TML](https://arxiv.org/abs/2309.01082) — Barnhill, Yoshida et al., 2023 | classical tropical ML (SVM, clustering) in **R** | — (classical) | — | no |
+| **TikiTorch** | **PyTorch-shaped library** (nn/optim/models/functional) | **yes** | **yes** | **yes (validated on AWS F2)** |
+
+**Multiplier-free / hardware-efficient deep learning** (the non-tropical neighbours)
+
+| Work | Removes multiplies in | Approach | Multiplier-free *training* | FPGA |
+|---|---|---|---|---|
+| [AdderNet](https://arxiv.org/abs/1912.13200) — Chen et al., CVPR 2020 | forward | L1 distance (approx.) | no — full-precision backward | — |
+| [DeepShift](https://arxiv.org/abs/1905.13298) — Elhoushi et al., 2019 | forward | power-of-two shifts (approx.) | no — FP gradients | — |
+| [ShiftAddNet](https://arxiv.org/abs/2010.12785) — You et al., NeurIPS 2020 | forward | shift + add hybrid | partial — still FP | — |
+| [BNN](https://arxiv.org/abs/1602.02830) / [XNOR-Net](https://arxiv.org/abs/1603.05279) / [BinaryConnect](https://arxiv.org/abs/1511.00363) — 2015–16 | forward | binary / XNOR-popcount | no — FP latent weights + STE | inference |
+| [FINN](https://arxiv.org/abs/1612.07119) — Umuroglu et al., FPGA 2017 | deployment | binary-net dataflow | — (inference only) | **yes (inference)** |
+| **TikiTorch** | **forward + backward + optimizer** | **tropical semiring (exact)** | **yes** | **yes (training)** |
+
+**Bottom line, honestly.** The hardware-efficiency nets remove the multiply from
+the *forward* / inference path but keep full-precision gradients and optimizers,
+so their *training* is not multiplier-free; FINN reaches the FPGA but only for
+inference. The tropical / morphological works are mostly theory or single layers,
+and the closest relative — Tropical Attention — ships a layer and an experiment
+harness, not a general library, and trains in floating point. TikiTorch's
+contribution is the combination: a tropical/morphological **library** whose
+**entire training loop** is multiplier-free and maps to **zero-DSP** FPGA. That
+combination is also its cost — see [Honest scope](#honest-scope): closure trades
+accuracy, TikiTorch does not beat softmax on the algorithmic benchmarks, and the
+on-silicon *training* path is validated but not yet turnkey (see
+[FPGA / silicon](#fpga--silicon)).
+
+---
+
 ## Honest scope
 
 TikiTorch is **research-grade**. Closure is not free: forcing the whole loop

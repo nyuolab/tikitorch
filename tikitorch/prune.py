@@ -7,8 +7,10 @@ can never win and contributes nothing. Setting such taps to the semiring's
 absorbing element (``-inf`` for max-plus, ``+inf`` for min-plus) removes them
 from the computation with **no change to closure** (a pruned tap is simply not
 compared), shrinking the per-output compare fan-in. This is the multiplier-free
-analogue of magnitude pruning (cf. Dimitriadis & Maragos; *Max-plus operators
-for filter selection and model pruning*, 2019).
+analogue of magnitude pruning (cf. Zhang, Blusseau, Velasco-Forero, Bloch &
+Angulo, *Max-plus Operators Applied to Filter Selection and Model Pruning in
+Neural Networks*, ISMM 2019; and Dimitriadis & Maragos, tropical-algebra pruning
+of morphological networks, 2020).
 
     from tikitorch.prune import tropical_prune
     pruned, total = tropical_prune(model, sparsity=0.5)   # prune 50% of morph taps
