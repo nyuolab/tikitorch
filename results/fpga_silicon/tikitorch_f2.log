@@ -1,0 +1,13 @@
+[f2] load AGFI agfi-0a845113b088cf62e on slot 0 ...
+Type  FpgaImageSlot  FpgaImageId             StatusName    StatusCode   ErrorName    ErrorCode   ShVersion
+AFI          0       No AFI                  cleared           1        ok               0       0x10212415
+AFI          0       agfi-0a845113b088cf62e  loaded            0        ok               0       0x10212415
+AFIDEVICE    0       0x1d0f      0xf010      0000:34:00.0
+AFI          0       agfi-0a845113b088cf62e  loaded            0        ok               0       0x10212415
+[f2] build _libtikifpga.so (fpga_pci mode) ...
+[f2] run model.fpga() on silicon (sudo for PCI register access) ...
+board present: True
+BOUND on silicon: True | kernel: forge_train_step | dsp: 0
+params evolved by on-silicon training: 229872 / 231040
+ON-SILICON MULTIPLIER-FREE TRAINING ACTIVE: True
+[f2] done.

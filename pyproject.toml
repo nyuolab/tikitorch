@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tikitorch"
+version = "0.1.0"
+description = "A tropical-semiring deep-learning library: multiplier-free, FPGA-native training, PyTorch-idiomatic."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "GPL-3.0-or-later" }
+authors = [
+    { name = "TikiTorch Authors" },
+]
+keywords = [
+    "tropical-semiring",
+    "max-plus",
+    "min-plus",
+    "morphological-networks",
+    "fpga",
+    "multiplier-free",
+    "deep-learning",
+    "pytorch",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Intended Audience :: Science/Research",
+]
+dependencies = [
+    "torch>=2.0",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+# The FPGA backend is pure-Python + ctypes (stdlib); the native driver is built
+# out-of-band against the Xilinx toolchain (see tikitorch/fpga/BUILD_NATIVE.md),
+# so this extra intentionally adds no pip deps. It exists as a documented marker
+# (`pip install tikitorch[fpga]`); pybind11 / pyxrt are out-of-band build hints.
+fpga = []
+
+[project.urls]
+Homepage = "https://github.com/tikitorch/tikitorch"
+Repository = "https://github.com/tikitorch/tikitorch"
+
+[tool.setuptools.packages.find]
+include = ["tikitorch*"]
+
+[tool.setuptools.package-data]
+tikitorch = [
+    "hardware/**/*.hpp",
+    "hardware/**/*.cpp",
+    "hardware/**/*.tcl",
+    "hardware/**/*.md",
+    "fpga/*.md",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

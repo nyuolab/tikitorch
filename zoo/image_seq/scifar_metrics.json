@@ -1,0 +1,13 @@
+{
+  "task": "scifar",
+  "model": "MorphSSM",
+  "d_model": 128,
+  "n_layers": 4,
+  "input_dim": 3,
+  "num_classes": 10,
+  "optimizer": "PureTropicalSGD",
+  "recipe": "closed",
+  "eff_batch": 384,
+  "best_acc": 0.3203,
+  "inference_closed": true
+}

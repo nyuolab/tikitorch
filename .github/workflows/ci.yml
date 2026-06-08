@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package (with torch + numpy + dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          # torch + numpy are runtime deps; install them explicitly (CPU wheels)
+          # so the matrix doesn't depend on resolver luck, then editable-install
+          # the package and its dev extras (pytest + ruff).
+          pip install torch numpy --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Lint with ruff (skips gracefully if unavailable)
+        run: |
+          # ruff is configured in pyproject ([tool.ruff]) and ships in the dev
+          # extra. If it's somehow not present, skip rather than fail the build.
+          if python -m ruff --version >/dev/null 2>&1; then
+            python -m ruff check .
+          else
+            echo "ruff not available; skipping lint"
+          fi
+
+      - name: Run tests
+        run: |
+          # The board-dependent FPGA tests self-skip without hardware, so the
+          # suite is green on a stock CI runner.
+          python -m pytest -q

@@ -1,0 +1,13 @@
+{
+  "task": "smnist",
+  "model": "MorphSSM",
+  "d_model": 128,
+  "n_layers": 4,
+  "input_dim": 1,
+  "num_classes": 10,
+  "optimizer": "PureTropicalSGD",
+  "recipe": "closed",
+  "eff_batch": 512,
+  "best_acc": 0.3429,
+  "inference_closed": true
+}

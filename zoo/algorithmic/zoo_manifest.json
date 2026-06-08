@@ -1,0 +1,82 @@
+{
+  "optimizer": "puretropical",
+  "arch": {
+    "d_model": 64,
+    "n_layers": 2,
+    "n_heads": 4,
+    "attention": "tropical",
+    "score_variant": "hilbert",
+    "norm_type": "tropical_shift",
+    "pos_mode": "rope_shift",
+    "agg_variant": "argmax",
+    "head": "auto"
+  },
+  "train": {
+    "train_len": 16,
+    "ood_len": 32,
+    "train_n": 2048,
+    "test_n": 512,
+    "batch_size": 64,
+    "steps": 400,
+    "accum": 4,
+    "lr": 0.0625,
+    "anneal": false
+  },
+  "models": [
+    {
+      "task": "running_max",
+      "path": "running_max.tt",
+      "best_seed": 3,
+      "n_seeds": 4,
+      "id_acc": 0.9961,
+      "ood_len_acc": 0.9984,
+      "inference_closed": true,
+      "training_zero_dsp": true,
+      "round_trip_identical": true
+    },
+    {
+      "task": "sort",
+      "path": "sort.tt",
+      "best_seed": 1,
+      "n_seeds": 4,
+      "id_acc": 0.1318,
+      "ood_len_acc": 0.0897,
+      "inference_closed": true,
+      "training_zero_dsp": true,
+      "round_trip_identical": true
+    },
+    {
+      "task": "subset_sum",
+      "path": "subset_sum.tt",
+      "best_seed": 0,
+      "n_seeds": 4,
+      "id_acc": 0.7089,
+      "ood_len_acc": 0.6756,
+      "inference_closed": true,
+      "training_zero_dsp": true,
+      "round_trip_identical": true
+    },
+    {
+      "task": "knapsack",
+      "path": "knapsack.tt",
+      "best_seed": 3,
+      "n_seeds": 4,
+      "id_acc": 0.7754,
+      "ood_len_acc": 0.7797,
+      "inference_closed": true,
+      "training_zero_dsp": true,
+      "round_trip_identical": true
+    },
+    {
+      "task": "min_coin_change",
+      "path": "min_coin_change.tt",
+      "best_seed": 0,
+      "n_seeds": 4,
+      "id_acc": 0.1733,
+      "ood_len_acc": 0.0881,
+      "inference_closed": true,
+      "training_zero_dsp": true,
+      "round_trip_identical": true
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+FORGE — Responsible-Use Request
+================================
+
+FORGE (FPGA-Optimized Representation & Gradient Engines) is distributed under the
+GNU General Public License v3.0 (GPLv3); see the LICENSE file. The GPLv3 grants
+you broad freedom to use, study, modify, and redistribute this software and
+imposes NO restrictions on the purposes for which it may be used.
+
+This NOTICE adds a request, not a condition. Nothing here limits, qualifies, or
+adds to your rights or obligations under the GPLv3; it is explicitly NON-BINDING
+and is offered only as a community norm.
+
+Edge machine-learning capabilities, like all dual-use technologies, can be
+applied to surveillance, weapons systems, or unauthorized data collection. The
+compute- and energy-efficiency gains that FORGE provides would benefit such
+applications equally. As a non-binding norm, we ask that you and any derivative
+work refrain from applying FORGE to:
+
+  - surveillance of individuals or populations;
+  - weapons systems; and
+  - collection of personal or physiological data without informed consent or
+    other lawful authorization.
+
+FORGE is motivated by, and intended for, the clinical edge — on-device
+adaptation of patient-specific models on low-power hardware, keeping raw
+physiological signals local rather than exfiltrating them to the cloud. We hope
+you will use it in that spirit.
