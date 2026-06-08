@@ -34,6 +34,7 @@ from tikitorch.planning.bellman import (  # noqa: F401
 from tikitorch.planning.dp import (  # noqa: F401
     TropicalViterbi,
     TropicalShortestPath,
+    TropicalCoinChangeDP,
 )
 from tikitorch.planning.mcts import MCTSConfig, TropicalMCTS  # noqa: F401
 
@@ -51,6 +52,7 @@ __all__ = [
     # differentiable DP layers
     "TropicalViterbi",
     "TropicalShortestPath",
+    "TropicalCoinChangeDP",
     # tropical Monte-Carlo tree search
     "MCTSConfig",
     "TropicalMCTS",

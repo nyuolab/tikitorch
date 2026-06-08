@@ -26,7 +26,7 @@ from tikitorch.planning.functional import (
     tropical_scan_decode,
 )
 
-__all__ = ["TropicalViterbi", "TropicalShortestPath"]
+__all__ = ["TropicalViterbi", "TropicalShortestPath", "TropicalCoinChangeDP"]
 
 _NEG_INF = -1e9
 _POS_INF = 1e9
@@ -146,3 +146,89 @@ class TropicalShortestPath(nn.Module):
         # Predecessor on the final relaxation sweep (argmin source per node).
         _, back = tropical_scan_decode(h0, T, None, reduce="min")
         return back[:, -1]                                   # (B, S)
+
+
+class TropicalCoinChangeDP(nn.Module):
+    """Min-plus unbounded coin-change DP as a closed (multiplier-free) layer.
+
+    The exact fewest-coins dynamic program ``dp[a] = min_c (dp[a-c] + 1)``,
+    ``dp[0]=0``, evaluated over the AMOUNT axis with **add / compare / gather only**
+    (no multiplies) — the "differentiable DP layer" lever (cf. ``TropicalViterbi`` /
+    ``TropicalShortestPath``) realized for coin change. Equivalently a min-plus
+    shortest path on the amount line (nodes ``0..A``, edges ``a -> a+c`` of weight 1).
+
+    ``forward(coins, amount, ...)``:
+        coins:  ``(B, k)`` positive integer denominations.
+        amount: ``(B,)`` (or int) target amounts.
+    Returns the per-denomination usage ``sel: (B, k)`` in ``{0,1}`` of the
+    *lexicographically-first* optimal solution — exactly the ``min_coin_change``
+    task label (``algorithmic.min_coin_selection``) — via a closed argmin traceback.
+    With ``return_count=True`` also returns the fewest-coins count ``(B,)`` (``inf``
+    if an amount is not makeable). The DP table is built differentiably (sub-gradient
+    through the ``min`` winners); the discrete traceback is a no-grad closed backtrace
+    (like ``TropicalViterbi._decode``).
+
+    HONEST FRAMING: at unit edge cost the layer *is* the algorithm — exact by
+    construction, a strong STRUCTURAL PRIOR (like a fixed-transition Viterbi), not a
+    solution gradient descent "discovers". Its point is that it makes the task
+    representable **closed / zero-DSP** (which the generic tropical aggregations cannot
+    — they plateau at ~0 F1) and gives an exact reference head; it is not a learned
+    win. Length-/amount-generalizes by construction.
+    """
+
+    def __init__(self, tau: float = 0.0):
+        super().__init__()
+        self.tau = float(tau)              # reserved for a soft-DP relaxation (fast-follow)
+
+    def set_tau(self, tau):
+        self.tau = float(tau)
+
+    def forward(self, coins, amount, return_count: bool = False):
+        if coins.dim() != 2:
+            raise ValueError(f"coins must be (B, k), got {tuple(coins.shape)}")
+        B, k = coins.shape
+        if isinstance(amount, int):
+            amount = torch.full((B,), amount, dtype=torch.long, device=coins.device)
+        amount = amount.to(torch.long).reshape(B)
+        cf = coins.to(torch.long)
+        A = int(amount.max().item()) if B else 0
+
+        # --- min-plus DP table over amounts 0..A (add/compare/gather only) ---
+        # built column-by-column so dp[a] can reference earlier columns dp[a-c].
+        dp = coins.new_zeros((B, 1), dtype=torch.float)               # dp[:,0] = 0
+        for a in range(1, A + 1):
+            idx = (a - cf).clamp(min=0, max=a - 1)                    # (B,k) source amount a-c
+            cand = dp.gather(1, idx) + 1.0                            # dp[a-c] + 1 (min-plus "*"=+)
+            cand = torch.where(cf <= a, cand, cand.new_full((), _POS_INF))   # mask c>a
+            best = cand.min(dim=1, keepdim=True).values              # min-plus reduce over coins
+            dp = torch.cat([dp, best], dim=1)                        # (B, a+1)
+
+        # --- lexicographically-first traceback for the per-denomination selection ---
+        sel = torch.zeros((B, k), dtype=torch.long, device=coins.device)
+        with torch.no_grad():
+            dpd = dp.detach()
+            rem = amount.clone()
+            ar = torch.arange(B, device=coins.device)
+            for _ in range(A + 1):
+                if bool((rem <= 0).all()):
+                    break
+                rem_c = rem.clamp(0, A)
+                dp_rem = dpd.gather(1, rem_c.unsqueeze(1))            # (B,1) dp[rem]
+                prev = (rem.unsqueeze(1) - cf).clamp(0, A)            # (B,k)
+                dp_prev = dpd.gather(1, prev)                         # dp[rem-c]
+                # denominations that lie on an optimal path: c<=rem, rem>0, dp[rem-c]+1==dp[rem]
+                onpath = ((cf <= rem.unsqueeze(1)) & (rem.unsqueeze(1) > 0)
+                          & ((dp_prev + 1.0 - dp_rem).abs() < 0.5)
+                          & (dp_rem < _POS_INF / 2))
+                has = onpath.any(dim=1)
+                first = onpath.to(torch.float).argmax(dim=1)         # earliest on-path denom
+                if bool(has.any()):
+                    sel[ar[has], first[has]] = 1
+                    used = cf.gather(1, first.unsqueeze(1)).squeeze(1)
+                    rem = torch.where(has, rem - used, rem)
+                rem = torch.where(~has, torch.zeros_like(rem), rem)  # unmakeable -> stop
+
+        if return_count:
+            count = dp.gather(1, amount.clamp(0, A).unsqueeze(1)).squeeze(1)  # (B,)
+            return sel, count
+        return sel

@@ -276,3 +276,48 @@ def test_planning_modules_are_closed():
     assert_closed(P.TropicalShortestPath())
     assert_closed(P.TropicalValueIteration(6, 3))
     assert_closed(P.TropicalViterbi(4))
+    assert_closed(P.TropicalCoinChangeDP())
+
+
+# --- TropicalCoinChangeDP: exact closed min-plus coin-change DP layer ---------
+
+def test_coin_change_dp_matches_reference():
+    import tikitorch.algorithmic as A
+    layer = P.TropicalCoinChangeDP()
+    torch.manual_seed(0)
+    for _ in range(25):
+        coins = torch.randint(1, 10, (8, 5))
+        amount = torch.randint(1, 30, (8,))
+        ref = A.min_coin_selection(coins, amount)        # reference DP + lex-first traceback
+        assert torch.equal(layer(coins, amount), ref)    # exact per-denomination selection
+
+
+def test_coin_change_dp_solves_task_exactly():
+    import tikitorch.algorithmic as A
+    layer = P.TropicalCoinChangeDP()
+    x, y = A.gen_min_coin_change(256, 16, seed=7)
+    coins, amount = x[..., 0].long(), x[:, 0, 1].long()
+    assert A.micro_f1(layer(coins, amount), y, positive=1) == 1.0   # the structural prior is exact
+
+
+def test_coin_change_dp_count_and_unmakeable():
+    layer = P.TropicalCoinChangeDP()
+    # coins {2,5}: amount 11 = 5+2+2+2 (4 coins); amount 1 is NOT makeable (-> inf, no selection)
+    coins = torch.tensor([[2, 5], [2, 5]])
+    amount = torch.tensor([11, 1])
+    sel, count = layer(coins, amount, return_count=True)
+    assert count[0].item() == 4 and count[1].item() >= 1e8   # unmakeable -> closed +inf sentinel
+    assert sel[1].sum().item() == 0                       # nothing selected for unmakeable amount
+
+
+def test_coin_change_dp_runtime_zero_dsp():
+    layer = P.TropicalCoinChangeDP()
+    coins = torch.randint(1, 10, (8, 5))
+    amount = torch.randint(1, 30, (8,))
+    hits = tt_find(layer, coins, amount)
+    assert not [h for h in hits if h[0] != "elementwise-divide"]   # multiplier-free forward
+
+
+def tt_find(layer, *inputs):
+    from tikitorch import find_runtime_multiplies
+    return find_runtime_multiplies(layer, *inputs)

@@ -385,6 +385,16 @@ TikiTorch aims to be the *definitive* tropical-ML library (see
   = max-plus DP, shortest paths = min-plus `bellman_ford`/`floyd_warshall`
   closure), a closure-verified `TropicalReasoner`, and an `evaluate_task` harness
   with in-distribution **and** out-of-distribution (length / magnitude) splits.
+- **`tikitorch.planning`** — **differentiable tropical DP layers** (the "DP-as-a-closed-layer"
+  lever): `TropicalViterbi` (max-plus trellis decode), `TropicalShortestPath` (min-plus
+  Bellman-Ford), `TropicalValueIteration` + `max_plus_power_iteration` (RL value iteration /
+  max-plus eigenvalue), `TropicalCoinChangeDP` (exact min-plus coin-change DP), and a tropical
+  `MCTS`/`MuZero` scaffold. Each is exact in the tropical semiring and multiplier-free
+  (`assert_closed`-true), only *smoothed-approximate* in a dense net. **Honest note:** these are
+  exact *structural priors* (the layer encodes the algorithm), not solutions gradient descent
+  discovers — e.g. `TropicalCoinChangeDP` solves the `min_coin_change` task at F1=1.000 closed/
+  zero-DSP (where the generic learned aggregations plateau at ~0.03), but that is the wired DP,
+  not a learned head. They make those tasks *representable* closed, and serve as exact references.
 - **`tikitorch.prune`** — `tropical_prune`: structured pruning of never-winning
   morph taps (a documented strength of morphological nets), closure-preserving.
 - **New layers** — `MaxPlusMin` (universal-approx morph layer) + `TropicalScale`
