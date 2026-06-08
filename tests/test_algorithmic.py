@@ -115,7 +115,6 @@ def test_reasoner_iter_topk_and_rope_shift_are_closed():
 
 def test_rope_shift_extrapolates_past_max_len():
     # rope_relative shift depends on (m-n), so it is well-defined for L > max_len.
-    import torch
     task = A.get_task("running_max")
     m = A.TropicalReasoner(task, d_model=32, n_layers=1, attention="tropical",
                            pos_mode="rope_shift", max_len=16)

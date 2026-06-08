@@ -15,7 +15,6 @@ for filter selection and model pruning*, 2019).
     # model still runs and assert_closed-passes; fewer live taps per output.
 """
 import torch
-import torch.nn as nn
 
 __all__ = ["tropical_prune", "tropical_sparsity"]
 

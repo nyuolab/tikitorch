@@ -249,7 +249,6 @@ def test_tropical_adam_training_step_is_multiplier_free():
 
 @requires_optim("TropicalAdam")
 def test_tropical_adam_step_is_power_of_two_and_adapts():
-    import math
     W = torch.nn.Parameter(torch.zeros(8))
     opt = optim.TropicalAdam([W], step_init=2 ** -4, streak=2)
     # consistent-direction gradient -> step should ACCELERATE (grow) after the streak.

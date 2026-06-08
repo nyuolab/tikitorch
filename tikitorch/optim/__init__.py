@@ -532,7 +532,8 @@ class TropicalAdam(toptim.Optimizer):
             for p in group["params"]:
                 s = self.state.get(p, {}).get("step")
                 if s is not None:
-                    acc += float(s.sum()); total += s.numel()
+                    acc += float(s.sum())
+                    total += s.numel()
         return (acc / total) if total else 0.0
 
 
@@ -650,7 +651,8 @@ class CountAgreementSGD(toptim.Optimizer):
             for p in group["params"]:
                 st = self.state[p]
                 if "pos" in st:
-                    st["pos"].zero_(); st["neg"].zero_()
+                    st["pos"].zero_()
+                    st["neg"].zero_()
 
     @torch.no_grad()
     def accumulate(self):
@@ -683,7 +685,8 @@ class CountAgreementSGD(toptim.Optimizer):
                     pos, neg = st["pos"], st["neg"]
                 elif p.grad is not None:               # graceful 1-sample fallback
                     s = torch.sign(p.grad)
-                    pos = (s > 0).to(torch.int32); neg = (s < 0).to(torch.int32)
+                    pos = (s > 0).to(torch.int32)
+                    neg = (s < 0).to(torch.int32)
                 else:
                     continue
                 agree = torch.maximum(pos, neg)
@@ -695,7 +698,8 @@ class CountAgreementSGD(toptim.Optimizer):
                 step = table[shift]
                 p.add_(net * step, alpha=-1.0)              # sign x pow2 = shift
                 if "pos" in st:
-                    st["pos"].zero_(); st["neg"].zero_()
+                    st["pos"].zero_()
+                    st["neg"].zero_()
         return loss
 
 

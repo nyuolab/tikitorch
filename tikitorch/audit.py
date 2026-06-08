@@ -113,8 +113,8 @@ def _is_pow2(x) -> bool:
     if ax == 0.0:
         return True
     import math
-    l = math.log2(ax)
-    return abs(l - round(l)) < 1e-6
+    lg = math.log2(ax)
+    return abs(lg - round(lg)) < 1e-6
 
 
 def _all_pow2_tensor(t, max_elems: int = 1 << 16) -> bool:
@@ -132,8 +132,8 @@ def _all_pow2_tensor(t, max_elems: int = 1 << 16) -> bool:
     nz = a[a > 0]
     if nz.numel() == 0:
         return True
-    l = torch.log2(nz)
-    return bool((l - l.round()).abs().max() < 1e-5)
+    lg = torch.log2(nz)
+    return bool((lg - lg.round()).abs().max() < 1e-5)
 
 
 def find_runtime_multiplies(model, *example_inputs, run_eval=True, harden_tau=True):
@@ -160,7 +160,6 @@ def find_runtime_multiplies(model, *example_inputs, run_eval=True, harden_tau=Tr
     class _Catcher(TorchDispatchMode):
         def __torch_dispatch__(self, func, types, args=(), kwargs=None):
             name = str(func)
-            short = name.split(".")[-2] if name.startswith("aten.") else name
             base = name[len("aten."):].split(".")[0] if name.startswith("aten.") else ""
             def _float_operands():
                 # Only FLOAT tensor*tensor is a hardware multiplier. bool*bool
@@ -210,7 +209,8 @@ def find_runtime_multiplies(model, *example_inputs, run_eval=True, harden_tau=Tr
     for cat, op in hits:
         key = (cat, op)
         if key not in seen:
-            seen.add(key); out.append((cat, op))
+            seen.add(key)
+            out.append((cat, op))
     return out
 
 
@@ -320,7 +320,8 @@ def find_training_multiplies(model, example_inputs, targets, loss_fn, optimizer=
     seen, out = set(), []
     for cat, op in hits:
         if (cat, op) not in seen:
-            seen.add((cat, op)); out.append((cat, op))
+            seen.add((cat, op))
+            out.append((cat, op))
     return out
 
 

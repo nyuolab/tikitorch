@@ -34,6 +34,7 @@ def test_tropical_kmeans_recovers_clusters():
                  (labels[40:] == labels[40]).float().mean().item())
     assert centroids.shape == (2, 5)
     assert ((labels[:40].float().mean() - labels[40:].float().mean()).abs() > 0.5)
+    assert purity > 0.8, f"clusters not recovered cleanly (purity={purity:.3f})"
 
 
 def test_tropical_nearest_centroid_separates():

@@ -131,7 +131,6 @@ class TropicalSVM:
         torch.manual_seed(self.seed)
         Xn = tropical_projective_normalize(X)
         self.classes = torch.unique(y)
-        C = len(self.classes)
         # warm-start apices at class means on the projective torus.
         apex = torch.stack([
             tropical_projective_normalize(Xn[y == c].mean(dim=0, keepdim=True))[0]

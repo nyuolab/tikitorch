@@ -74,7 +74,6 @@ def build_from_config(config: dict):
 
 
 def _loss_fn(task):
-    C = task.n_symbols if task.metric != "f1" else None
     if task.kind == "class":
         return lambda p, y: F.tropical_perceptron_loss(p.reshape(-1, p.shape[-1]), y.reshape(-1))
     return lambda p, y: (p - y).abs().mean()

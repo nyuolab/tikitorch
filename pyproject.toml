@@ -44,8 +44,8 @@ dev = ["pytest", "ruff"]
 fpga = []
 
 [project.urls]
-Homepage = "https://github.com/tikitorch/tikitorch"
-Repository = "https://github.com/tikitorch/tikitorch"
+Homepage = "https://github.com/nyuolab/tikitorch"
+Repository = "https://github.com/nyuolab/tikitorch"
 
 [tool.setuptools.packages.find]
 include = ["tikitorch*"]
@@ -62,6 +62,21 @@ tikitorch = [
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint.per-file-ignores]
+# __init__.py files curate the public API by re-importing symbols; those imports
+# are intentional re-exports, not dead code.
+"__init__.py" = ["F401"]
+# Tests favour compact setup lines (semicolons, short throwaway names). The
+# bug-catching F-rules (unused import/var, shadowing) stay ON.
+"tests/**" = ["E402", "E701", "E702", "E731", "E741"]
+# Example scripts are didactic: the compact one-liners (loss.backward(); step())
+# are the teaching point, so the layout rules are relaxed here.
+"examples/**" = ["E401", "E402", "E701", "E702", "E731", "E741"]
+"scripts/**" = ["E401", "E402", "E701", "E702", "E731", "E741"]
+# Notebooks re-import and re-assign freely across cells by design; lint only for
+# genuine syntax/logic errors, not style or per-cell redefinitions.
+"notebooks/**" = ["E401", "E402", "E701", "E702", "E731", "E741", "F401", "F811", "F841"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

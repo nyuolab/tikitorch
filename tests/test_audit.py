@@ -3,7 +3,7 @@ import pytest
 import torch
 import torch.nn as tnn
 
-from tikitorch.audit import assert_closed, find_closure_violations, MULTIPLY_MODULES
+from tikitorch.audit import assert_closed, find_closure_violations
 
 
 def test_flags_standard_torch_modules():
@@ -60,7 +60,6 @@ def test_allow_is_mro_aware():
 # --- runtime closure checker (traces actual aten ops; catches raw * / @ / exp) ---
 
 def test_runtime_checker_passes_closed_models():
-    import torch
     import tikitorch as tt
     from tikitorch.audit import find_runtime_multiplies
     cnn = tt.models.TropicalCNN(in_channels=1, num_classes=10)
@@ -70,7 +69,6 @@ def test_runtime_checker_passes_closed_models():
 
 
 def test_runtime_checker_passes_rope_and_iter_topk_reasoner():
-    import tikitorch as tt
     import tikitorch.algorithmic as A
     from tikitorch.audit import assert_closed_runtime
     m = A.build_reasoner("running_max", d_model=32, n_layers=2, attention="tropical",
@@ -80,8 +78,7 @@ def test_runtime_checker_passes_rope_and_iter_topk_reasoner():
 
 
 def test_runtime_checker_catches_real_multiply():
-    import torch, pytest
-    import tikitorch as tt
+    import pytest
     from tikitorch.audit import assert_closed_runtime, find_runtime_multiplies
 
     class Bad(torch.nn.Module):           # a non-pow2 scalar multiply (real DSP op)
@@ -97,7 +94,6 @@ def test_runtime_checker_catches_real_multiply():
 
 
 def test_runtime_checker_pow2_multiply_is_a_shift():
-    import torch
     from tikitorch.audit import find_runtime_multiplies
 
     class Pow2(torch.nn.Module):          # x * 0.25 and x / 8 are shifts, not multiplies
@@ -109,7 +105,6 @@ def test_runtime_checker_pow2_multiply_is_a_shift():
 # --- Level-B training-closure check (forward + loss + backward + optimizer) ---
 
 def _running_max_setup(d_model=24):
-    import torch
     import tikitorch.algorithmic as A
     import tikitorch.functional as F
     x, y = A.gen_running_max(6, 12, n_symbols=12, seed=0)
@@ -136,7 +131,7 @@ def test_training_closure_perceptron_puretropicalsgd_has_no_multiply():
 
 
 def test_training_closure_catches_adam_and_cross_entropy():
-    import torch, pytest
+    import pytest
     import tikitorch.algorithmic as A
     from tikitorch.audit import assert_training_closed, find_training_multiplies
     m, x, y, _ = _running_max_setup()
@@ -164,7 +159,9 @@ def test_training_closure_catches_signsgd_float_momentum():
 # --- closed-by-construction CONTRACT: the closed recipe is verified Level-B ---
 
 def test_closure_report_one_call_inference_and_training():
-    import torch, tikitorch as tt, tikitorch.functional as F, tikitorch.optim as optim
+    import tikitorch as tt
+    import tikitorch.functional as F
+    import tikitorch.optim as optim
     m = tt.models.TropicalTransformer(d_model=64, n_heads=4, n_layers=1,
                                       task_type="lm", vocab_size=32, dropout=0.0)
     x = torch.randint(0, 32, (2, 16)); y = torch.randint(0, 32, (2, 16))
@@ -176,7 +173,7 @@ def test_closure_report_one_call_inference_and_training():
 
 def test_inference_closed_by_construction_for_tropical_models():
     # Every standard tropical model is closed at INFERENCE by construction.
-    import torch, tikitorch as tt
+    import tikitorch as tt
     cases = [
         (tt.models.TropicalCNN(in_channels=1, num_classes=8), torch.rand(2, 1, 16, 16)),
         (tt.models.TropicalMLP(d_model=32, n_layers=2, input_dim=16, num_classes=8), torch.rand(2, 16)),
@@ -189,7 +186,9 @@ def test_inference_closed_by_construction_for_tropical_models():
 
 def test_dropout_breaks_training_closure_off_switch():
     # Dropout is a train-time mask multiply -> NOT closed; dropout=0 is the off-switch.
-    import torch, tikitorch as tt, tikitorch.functional as F, tikitorch.optim as optim
+    import tikitorch as tt
+    import tikitorch.functional as F
+    import tikitorch.optim as optim
     x = torch.randint(0, 32, (2, 16)); y = torch.randint(0, 32, (2, 16))
     perc = lambda p, yy: F.tropical_perceptron_loss(p.reshape(-1, p.shape[-1]), yy.reshape(-1))
     m = tt.models.TropicalTransformer(d_model=64, n_heads=4, n_layers=1,

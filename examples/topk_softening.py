@@ -143,7 +143,7 @@ def main():
     print("-" * 42)
     base = evals[ks[0]]
     best_k = max(evals, key=evals.get)
-    print(f"gradient density rises with k (the softening mechanism, multiplier-free).")
+    print("gradient density rises with k (the softening mechanism, multiplier-free).")
     print(f"best eval_acc at k={best_k}: {evals[best_k]:.4f}  "
           f"(vs k={ks[0]}: {base:.4f}, delta {evals[best_k]-base:+.4f})")
     if evals[best_k] <= base + 1e-4:

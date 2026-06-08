@@ -88,7 +88,9 @@ class TropicalMuZero:
             h, r, p, v = self.net.recurrent(h, acts[:, k])
             loss = (loss + w * vh.loss(v, vt[:, k + 1])
                     + rh.loss(r, rt[:, k]) + _ce(p, pt[:, k + 1]))
-        self.opt.zero_grad(); loss.backward(); self.opt.step()
+        self.opt.zero_grad()
+        loss.backward()
+        self.opt.step()
         return float(loss.detach())
 
     # ---------------------------------------------------------------- self-play

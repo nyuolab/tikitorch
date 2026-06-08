@@ -32,7 +32,6 @@ or, for a named built-in with a synthesized input, from the command line::
     python -m tikitorch TropicalCNN
     python -m tikitorch MorphSSM
 """
-import torch
 import torch.nn as nn
 
 from tikitorch.audit import find_closure_violations, find_runtime_multiplies

@@ -101,7 +101,8 @@ class TwoPlayerKnownModel:
         self.use_oracle = use_oracle
         self.A = game.n_actions
         if value_fn is None and hasattr(game, "minimax"):
-            value_fn = lambda b, t: float(game.minimax(b, t))
+            def value_fn(b, t):
+                return float(game.minimax(b, t))
         self.value_fn = value_fn
 
     def _inf(self, state, reward, done):

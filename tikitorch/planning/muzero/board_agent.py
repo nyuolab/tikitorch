@@ -12,7 +12,6 @@ the matched control for the head-to-head.
 from dataclasses import dataclass
 
 import torch
-import torch.nn.functional as F
 
 from tikitorch.planning.mcts import MCTSConfig, TropicalMCTS
 from tikitorch.planning.muzero.networks import TropicalMuZeroNet
@@ -116,7 +115,8 @@ class BoardReplay:
             r = int(torch.randint(0, max(tot, 1), (1,), generator=gen).item())
             gi = 0
             while r >= lengths[gi]:
-                r -= lengths[gi]; gi += 1
+                r -= lengths[gi]
+                gi += 1
             g, pos = self.games[gi], r
             obs0.append(g[pos][0])
             a_k, v_k, p_k = [], [g[pos][3]], [g[pos][2]]
@@ -158,7 +158,8 @@ class BoardMuZero:
             return
         # parallel actors: rebuild the current net once per worker, fan games across them
         import multiprocessing as mp
-        bp = dict(self._bp); bp["tau"] = self.current_tau
+        bp = dict(self._bp)
+        bp["tau"] = self.current_tau
         sd = {k: v.detach().cpu() for k, v in self.net.state_dict().items()}
         seeds = range(base_seed, base_seed + c.games_per_iter)
         with mp.Pool(c.num_workers, initializer=_init_worker, initargs=(bp, sd, self.game, sp)) as pool:
@@ -175,7 +176,9 @@ class BoardMuZero:
         for k in range(c.unroll):
             h, r, p, v = self.net.recurrent(h, acts[:, k])
             loss = loss + c.value_loss_weight * vh.loss(v, vt[:, k + 1]) + _ce(p, pt[:, k + 1])
-        self.opt.zero_grad(); loss.backward(); self.opt.step()
+        self.opt.zero_grad()
+        loss.backward()
+        self.opt.step()
         return float(loss.detach())
 
     # ---------------------------------------------------------------- evaluation
@@ -191,14 +194,16 @@ class BoardMuZero:
         """Win/draw/loss vs a depth-limited negamax opponent (the skill metric)."""
         me = self._mcts_agent()
         opp = negamax_agent(self.game, self.cfg.eval_depth)
-        w = d = l = 0
+        w = d = losses = 0
         for g in range(self.cfg.eval_games):
             res = (play_match(me, opp, self.game) if g % 2 == 0
                    else play_match(opp, me, self.game))
             my_id = 1 if g % 2 == 0 else 2
-            w += res == my_id; d += res == 0; l += (res != 0 and res != my_id)
+            w += res == my_id
+            d += res == 0
+            losses += (res != 0 and res != my_id)
         n = self.cfg.eval_games
-        return dict(win=w / n, draw=d / n, loss=l / n, score=(w + 0.5 * d) / n)
+        return dict(win=w / n, draw=d / n, loss=losses / n, score=(w + 0.5 * d) / n)
 
     # ---------------------------------------------------------------- main loop
     def run(self, log=print):

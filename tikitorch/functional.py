@@ -746,7 +746,6 @@ class TropicalConv2dFn(torch.autograd.Function):
         s, p, d = stride, padding, dilation
         Hout = (H + 2 * p - d * (Kh - 1) - 1) // s + 1
         Wout = (W + 2 * p - d * (Kw - 1) - 1) // s + 1
-        L = Hout * Wout
         P = Cin * Kh * Kw
 
         patches = torch.nn.functional.unfold(
