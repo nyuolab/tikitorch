@@ -36,7 +36,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff"]
+# scipy powers tikitorch.geometry.newton_polytope (convex hull); it is optional
+# at runtime (the util degrades to a warning) but required to exercise the
+# geometry tests, so it ships in the dev extra.
+dev = ["pytest", "ruff", "scipy"]
 # The FPGA backend is pure-Python + ctypes (stdlib); the native driver is built
 # out-of-band against the Xilinx toolchain (see tikitorch/fpga/BUILD_NATIVE.md),
 # so this extra intentionally adds no pip deps. It exists as a documented marker

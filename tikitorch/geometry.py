@@ -93,7 +93,19 @@ def newton_polytope(exponents):
         return pts
     try:
         from scipy.spatial import ConvexHull
+    except ImportError:
+        import warnings
+        warnings.warn(
+            "newton_polytope: scipy is not installed, so all input points are "
+            "returned instead of the true Newton-polytope vertices. Install scipy "
+            "(`pip install scipy` or `pip install tikitorch[dev]`) for correct results.",
+            RuntimeWarning, stacklevel=2,
+        )
+        return pts
+    try:
         hull = ConvexHull(pts.numpy())
         return pts[list(hull.vertices)]
     except Exception:
+        # Degenerate/low-rank point sets that qhull can't process: fall back to
+        # the input points (a superset of the true vertices).
         return pts

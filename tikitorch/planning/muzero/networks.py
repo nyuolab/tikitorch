@@ -13,9 +13,9 @@ exposes the MuZero inference interface (`initial_inference` / `recurrent_inferen
 so it drops straight into :class:`tikitorch.planning.mcts.TropicalMCTS` in place of
 the Stage-3 `KnownModel`.
 
-Backups are chosen at the MCTS level (see the verified backup study,
-results/backup_sweep/FINDINGS.md): make backup a swept hyperparameter; `mean` is
-the safe default, `topk` (small k) the tropical-leaning candidate.
+Backups are chosen at the MCTS level: make backup a swept hyperparameter; `mean`
+is the published-MuZero safe option, `topk` (small k) the tropical-leaning
+candidate (the wired default in MuZeroConfig), `max` the pure (max,+) bet.
 """
 
 import torch

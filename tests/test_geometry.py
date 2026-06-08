@@ -32,7 +32,12 @@ def test_decision_regions_2d_shape():
 
 
 def test_newton_polytope_hull():
-    # square corners + interior point -> hull = 4 corners
+    # square corners + interior point -> hull = 4 corners.
+    # newton_polytope needs scipy for the real ConvexHull; without it the util
+    # degrades to returning all input points (and warns), so skip rather than
+    # assert on the degraded path. scipy ships in the [dev] extra that CI installs.
+    import pytest
+    pytest.importorskip("scipy")
     pts = torch.tensor([[0., 0.], [1., 0.], [0., 1.], [1., 1.], [0.5, 0.5]])
     hull = newton_polytope(pts)
     assert hull.shape[0] == 4

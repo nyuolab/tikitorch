@@ -3,9 +3,9 @@
 Ties the tropical networks, the validated TropicalMCTS, self-play, and the replay
 buffer into the standard MuZero loop: alternate (self-play -> replay) with
 (sample -> K-step unrolled train). The backup operator is a swept hyperparameter
-(`mean` default; `topk` small-k the tropical-leaning candidate — see
-results/backup_sweep/FINDINGS.md). Losses: value (MSE to n-step bootstrap),
-reward (MSE), policy (cross-entropy to the MCTS visit distribution).
+(`topk` k=2 default here; `mean` the published-MuZero safe option, `max` the pure
+(max,+) bet). Losses: value and reward (MSE for a ScalarHead, categorical
+cross-entropy for a CategoricalHead), policy (cross-entropy to the MCTS visits).
 
 This is the CPU-scale vertical slice that validates the loop end-to-end; absolute
 performance scales on EC2 (the learned-model fidelity is the ceiling, see Stage 4).
