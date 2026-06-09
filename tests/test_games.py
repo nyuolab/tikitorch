@@ -8,6 +8,7 @@ opponent) -- the two-player sharpening of the backup study.
 """
 import random
 
+import pytest
 import torch
 
 import tikitorch.planning as P
@@ -86,13 +87,15 @@ def test_board_selfplay_produces_outcome_targets():
         assert z in (-1.0, 0.0, 1.0)
 
 
-def test_board_muzero_loop_runs():
+@pytest.mark.parametrize("core_kind", ["maxplus", "dyadic"])
+def test_board_muzero_loop_runs(core_kind):
     # the full learned two-player MuZero loop (self-play -> board replay -> outcome
     # training -> skill eval vs negamax) runs end to end on Connect4 with the closed
-    # TropicalSGD optimizer.
+    # TropicalSGD optimizer, for both the maxplus and the dyadic (oblique) cores.
     from tikitorch.planning.muzero import Connect4, BoardMuZero, BoardConfig
-    cfg = BoardConfig(latent_dim=16, num_simulations=8, iters=2, games_per_iter=2,
-                      train_steps_per_iter=3, batch=16, eval_every=1, eval_games=4, eval_depth=1)
+    cfg = BoardConfig(core_kind=core_kind, latent_dim=16, num_simulations=8, iters=2,
+                      games_per_iter=2, train_steps_per_iter=3, batch=16, eval_every=1,
+                      eval_games=4, eval_depth=1)
     agent = BoardMuZero(Connect4, cfg)
     assert type(agent.opt).__name__ == "TropicalSGD"      # closed optimizer by default
     hist = agent.run(log=lambda m: None)

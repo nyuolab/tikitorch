@@ -579,7 +579,19 @@ class DyadicLinear(nn.Linear):
     ``w_ij = +/- 2^{k_ij}`` so ``W x`` is a sum of bit-shifts (shift + add-tree,
     zero DSP). Identical parameters/shape to ``nn.Linear``; the dyadic constraint
     is applied in ``forward`` via a straight-through estimator.
+
+    ``_zero_dsp_layer = True`` marks this as a declared zero-DSP layer so the
+    *structural* :func:`tikitorch.audit.assert_closed` does not flag it as a
+    multiply (it is an ``nn.Linear`` subclass, but its deployed weights are pure
+    powers of two — a shift, not a DSP multiply). The authoritative numeric check
+    that the weights really are powers of two is
+    :func:`tikitorch.fpga.dyadic_export.verify_schedule` (integer exponents); the
+    runtime op-tracer still sees the float-sim matmul + STE, which is expected —
+    closure for dyadic is a weight-value property, verified statically, not by the
+    forward op trace.
     """
+
+    _zero_dsp_layer = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.linear(x, dyadic_quantize(self.weight), self.bias)

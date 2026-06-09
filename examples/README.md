@@ -11,6 +11,7 @@ flag for its no-download path).
 | [`closure_ablation.py`](closure_ablation.py) | The "closure penalty": flip soft→hard, dense→tropical projection, AdamW→`PureTropicalSGD` one at a time and watch accuracy trade off for an FPGA-native (multiplier-free) learning loop. |
 | [`backend_dispatch.py`](backend_dispatch.py) | The backend seam: logical `tt.device`, the op registry, byte-identical CPU dispatch, and transparent one-time-warned fallback. Runs CPU-only. |
 | [`fpga_quickstart.py`](fpga_quickstart.py) | One line — `model = tt.fpga.accelerate(model)` — to target the FPGA, training loop unchanged. Binds to a silicon kernel on an F2 board; CPU fallback everywhere else. |
+| [`tropical_muzero.py`](tropical_muzero.py) | The signature planner: a multiplier-free Tropical MuZero (dyadic zero-DSP cores) trains on GridWorld via self-play MCTS, scores vs a value-iteration oracle, then exports its weights to a bit-exact FPGA shift schedule. |
 
 ## Run
 
@@ -32,6 +33,9 @@ python examples/backend_dispatch.py
 
 # FPGA quickstart — one-line accelerate(); CPU fallback with no board
 python examples/fpga_quickstart.py
+
+# Tropical MuZero — multiplier-free planner on GridWorld + zero-DSP shift-schedule export
+python examples/tropical_muzero.py
 ```
 
 The point of every example: **tropical (multiplier-free) layers and optimizers

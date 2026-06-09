@@ -92,7 +92,7 @@ def find_closure_violations(model: nn.Module):
     """
     out = []
     for name, m in model.named_modules():
-        if isinstance(m, MULTIPLY_MODULES):
+        if isinstance(m, MULTIPLY_MODULES) and not getattr(m, "_zero_dsp_layer", False):
             out.append((name or "<root>", type(m).__name__))
     return out
 
@@ -502,7 +502,8 @@ def assert_closed(model: nn.Module, allow=()):
     violations = [
         (path, typ) for path, mod, typ in (
             (p, m, type(m).__name__)
-            for p, m in model.named_modules() if isinstance(m, MULTIPLY_MODULES))
+            for p, m in model.named_modules()
+            if isinstance(m, MULTIPLY_MODULES) and not getattr(m, "_zero_dsp_layer", False))
         if not _allowed(path, mod)
     ]
     if violations:
