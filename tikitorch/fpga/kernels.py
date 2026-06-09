@@ -101,7 +101,43 @@ class MorphKernelConfig:
         return MorphKernelConfig(D=int(d_model), n_layers=int(n_layers))
 
 
-KernelConfig = Union[LMKernelConfig, MorphKernelConfig]
+@dataclass(frozen=True)
+class MuZeroKernelConfig:
+    """Match key for the Tropical MuZero net: ``(n_actions, latent_dim, core_kind)``.
+
+    ``core_kind`` is ``"dyadic"`` (the multiplier-free OBLIQUE cores — signed power-of-two
+    weights -> shift+add, the shippable flagship core) or ``"maxplus"`` (axis-aligned).
+    Derived from attributes ``TropicalMuZeroNet`` reliably exposes; returns ``None`` on any
+    ambiguity (-> CPU fallback, the safe direction). NOTE: no MuZero ``KernelSpec`` is
+    registered in :meth:`KernelCache.default` yet (the HLS kernel is the §12 build task), so
+    ``match()`` returns ``None`` and the loop runs on CPU until that kernel exists — keying a
+    model is necessary but not sufficient to bind on-board.
+    """
+
+    n_actions: int
+    latent_dim: int
+    core_kind: str
+
+    @staticmethod
+    def from_model(model) -> Optional["MuZeroKernelConfig"]:
+        repr_mod = getattr(model, "repr", None)
+        pred = getattr(model, "pred", None)
+        n_actions = getattr(model, "n_actions", None)
+        if repr_mod is None or pred is None or n_actions is None:
+            return None
+        enc = getattr(repr_mod, "enc", None)
+        vhead = getattr(getattr(pred, "value_head", None), "head", None)  # nn.Linear(latent, .)
+        if enc is None or vhead is None or not hasattr(vhead, "in_features"):
+            return None
+        core = {"DyadicTropicalProjection": "dyadic",
+                "CompositionalTropicalProjection": "maxplus"}.get(type(enc).__name__)
+        if core is None:
+            return None
+        return MuZeroKernelConfig(n_actions=int(n_actions),
+                                  latent_dim=int(vhead.in_features), core_kind=core)
+
+
+KernelConfig = Union[LMKernelConfig, MorphKernelConfig, MuZeroKernelConfig]
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +246,8 @@ class KernelCache:
             cfg = LMKernelConfig.from_model(model)
         elif model_type == "MorphSSM":
             cfg = MorphKernelConfig.from_model(model)
+        elif model_type == "TropicalMuZeroNet":
+            cfg = MuZeroKernelConfig.from_model(model)   # keyable; no spec registered yet (CPU fallback)
         else:
             return None
         if cfg is None:

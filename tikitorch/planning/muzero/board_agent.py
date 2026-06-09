@@ -24,12 +24,12 @@ __all__ = ["BoardConfig", "BoardReplay", "BoardMuZero", "build_muzero_net"]
 
 
 def build_muzero_net(net_kind, obs_dim, n_actions, latent_dim, tau,
-                     value_support, reward_support, dense_hidden_mult):
+                     value_support, reward_support, dense_hidden_mult, core_kind="maxplus"):
     kw = dict(latent_dim=latent_dim, tau=tau, value_support=value_support,
               reward_support=reward_support)
     if net_kind == "dense":
         return DenseMuZeroNet(obs_dim, n_actions, hidden_mult=dense_hidden_mult, **kw)
-    return TropicalMuZeroNet(obs_dim, n_actions, **kw)
+    return TropicalMuZeroNet(obs_dim, n_actions, core_kind=core_kind, **kw)
 
 
 # --- parallel self-play workers (the MuZero "actor" pattern; module-level for pickling) ---
@@ -53,6 +53,7 @@ def _run_worker(seed):
 @dataclass
 class BoardConfig:
     net_kind: str = "tropical"
+    core_kind: str = "maxplus"          # tropical cores: "maxplus" | "dyadic" (multiplier-free oblique)
     optimizer: str = "tropicalsgd"      # closed (multiply-free) by default
     latent_dim: int = 64
     dense_hidden_mult: int = 3          # widen dense cores to param-match the tropical net
@@ -139,7 +140,7 @@ class BoardMuZero:
         self._bp = dict(net_kind=self.cfg.net_kind, obs_dim=game.obs_dim, n_actions=game.n_actions,
                         latent_dim=self.cfg.latent_dim, tau=self.cfg.tau,
                         value_support=self.cfg.value_support, reward_support=self.cfg.reward_support,
-                        dense_hidden_mult=self.cfg.dense_hidden_mult)
+                        dense_hidden_mult=self.cfg.dense_hidden_mult, core_kind=self.cfg.core_kind)
         self.net = build_muzero_net(**self._bp)
         self.opt = _make_optimizer(self.cfg.optimizer, self.net.parameters(), self.cfg.lr)
         self.buffer = BoardReplay(self.cfg.capacity, game.n_actions)
