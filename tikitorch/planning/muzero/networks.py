@@ -50,6 +50,16 @@ def _set_tau(module, tau):
             m.tau = tau
 
 
+def _make_proj(kind, in_features, out_features, tau):
+    """Core projection factory. ``"maxplus"`` -> the (axis-aligned) TropicalProjection;
+    ``"dyadic"`` -> the multiplier-free OBLIQUE DyadicTropicalProjection (closes the §2a
+    underfit on smooth/oblique value — see results/capacity_probe/FIX_FINDINGS.md). Both
+    are zero-DSP; dyadic adds oblique reach via signed power-of-two (shift+add) monomials."""
+    if kind == "dyadic":
+        return ttnn.DyadicTropicalProjection(in_features, out_features, tau=tau)
+    return ttnn.TropicalProjection(in_features, out_features, tau=tau)
+
+
 # ---------------------------------------------------------------------------
 # Value / reward heads (unified interface: forward->raw, scalar(raw), loss(raw,target))
 # ---------------------------------------------------------------------------
@@ -113,9 +123,9 @@ def _make_value_head(in_dim, support):
 class TropicalRepresentation(nn.Module):
     """obs (flat) -> latent h0, tropically encoded and rescaled to [0,1]."""
 
-    def __init__(self, obs_dim, latent_dim, tau=1.0):
+    def __init__(self, obs_dim, latent_dim, tau=1.0, proj_kind="maxplus"):
         super().__init__()
-        self.enc = ttnn.TropicalProjection(obs_dim, latent_dim, tau=tau)
+        self.enc = _make_proj(proj_kind, obs_dim, latent_dim, tau)
         self.norm = ttnn.TropicalLayerNorm(latent_dim)
 
     def set_tau(self, tau):
@@ -128,11 +138,11 @@ class TropicalRepresentation(nn.Module):
 class TropicalDynamics(nn.Module):
     """(latent h, action a) -> (next latent h', reward r). Action = closed gather."""
 
-    def __init__(self, latent_dim, n_actions, tau=1.0, depth=2, reward_support=None):
+    def __init__(self, latent_dim, n_actions, tau=1.0, depth=2, reward_support=None, proj_kind="maxplus"):
         super().__init__()
         self.action_embed = nn.Embedding(n_actions, latent_dim)   # closed gather
         self.core = nn.ModuleList(
-            [ttnn.TropicalProjection(latent_dim, latent_dim, tau=tau) for _ in range(depth)])
+            [_make_proj(proj_kind, latent_dim, latent_dim, tau) for _ in range(depth)])
         self.norm = nn.ModuleList(
             [ttnn.TropicalLayerNorm(latent_dim) for _ in range(depth)])
         self.reward_head = _make_value_head(latent_dim, reward_support)   # scalar or categorical
@@ -154,9 +164,9 @@ class TropicalDynamics(nn.Module):
 class TropicalPrediction(nn.Module):
     """latent h -> (policy logits over actions, scalar value)."""
 
-    def __init__(self, latent_dim, n_actions, tau=1.0, value_support=None):
+    def __init__(self, latent_dim, n_actions, tau=1.0, value_support=None, proj_kind="maxplus"):
         super().__init__()
-        self.mix = ttnn.TropicalProjection(latent_dim, latent_dim, tau=tau)
+        self.mix = _make_proj(proj_kind, latent_dim, latent_dim, tau)
         self.policy_head = nn.Linear(latent_dim, n_actions)      # declared boundary
         self.value_head = _make_value_head(latent_dim, value_support)   # scalar or categorical
 
@@ -180,12 +190,19 @@ class TropicalMuZeroNet(nn.Module):
     """
 
     def __init__(self, obs_dim, n_actions, latent_dim=64, tau=1.0,
-                 value_support=None, reward_support=None):
+                 value_support=None, reward_support=None,
+                 core_kind="maxplus", dyn_kind="maxplus"):
         super().__init__()
+        # core_kind controls the OBLIQUE-needing cores (repr encode + pred value/policy
+        # readout): "maxplus" (axis-aligned, default) | "dyadic" (multiplier-free oblique,
+        # closes the §2a underfit). Dynamics stays "maxplus" by default — it is the MCTS
+        # hot loop and was a wash in tropical (results/capacity_probe/COMPONENT_FINDINGS.md).
         self.n_actions = n_actions
-        self.repr = TropicalRepresentation(obs_dim, latent_dim, tau=tau)
-        self.dyn = TropicalDynamics(latent_dim, n_actions, tau=tau, reward_support=reward_support)
-        self.pred = TropicalPrediction(latent_dim, n_actions, tau=tau, value_support=value_support)
+        self.repr = TropicalRepresentation(obs_dim, latent_dim, tau=tau, proj_kind=core_kind)
+        self.dyn = TropicalDynamics(latent_dim, n_actions, tau=tau, reward_support=reward_support,
+                                    proj_kind=dyn_kind)
+        self.pred = TropicalPrediction(latent_dim, n_actions, tau=tau, value_support=value_support,
+                                       proj_kind=core_kind)
 
     # scalar conversions (identity for scalar heads; expectation for categorical)
     def value_scalar(self, raw):

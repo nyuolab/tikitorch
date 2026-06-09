@@ -187,6 +187,9 @@ __all__ = [
     "TropicalProjection",
     "TropicalTopKModule",
     "TropicalTopK",
+    # dyadic (power-of-two) multiplier-free oblique layers
+    "DyadicLinear",
+    "DyadicTropicalProjection",
     # --- higher-level layers ---
     # normalization
     "TropicalBatchShift",
@@ -535,6 +538,81 @@ class TropicalTopKModule(nn.Module):
             f"in_features={self.in_features}, out_features={self.out_features}, "
             f"k={self.k}, tau={self.tau}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Dyadic (power-of-two) multiplier-free OBLIQUE layers
+# ---------------------------------------------------------------------------
+#
+# The max-plus-linear primitive ``max_i(W[k,i] + x_i)`` has a one-hot input
+# gradient, so its piecewise-linear normals are exactly the axis vectors {e_i} --
+# it cannot represent OBLIQUE value/policy surfaces (the measured §2a underfit;
+# see results/capacity_probe/FIX_FINDINGS.md). Obliqueness in the tropical
+# semiring comes from MONOMIAL EXPONENTS (repeated addition): a weight ``w = +/-
+# 2^k`` applied as ``w * x`` is a bit-SHIFT, and ``sum_i (+/-2^{k_i}) x_i`` is a
+# shift+add-tree -- ZERO multiply, ZERO DSP -- whose gradient is a dense
+# signed-dyadic (oblique) normal. Validated to match a dense ReLU net on oblique
+# and smooth value where the max-plus-linear core underfits 1.5-1.7x
+# (scripts/dyadic_probe.py, n=5).
+
+
+def dyadic_quantize(w: torch.Tensor) -> torch.Tensor:
+    """Round each weight to the nearest SIGNED power of two (straight-through).
+
+    forward:  ``w -> sign(w) * 2^round(log2|w|)`` (a bit-shift on fabric);
+    backward: identity (STE through the round). The exponents freeze to a fixed
+    shift schedule at deploy, so inference is multiplier-free.
+    """
+    mag = w.abs().clamp_min(1e-12)
+    q = torch.sign(w) * torch.exp2(torch.log2(mag).round())
+    return w + (q - w).detach()
+
+
+class DyadicLinear(nn.Linear):
+    """``nn.Linear`` with weights constrained to signed powers of two (multiplier-free).
+
+    ``w_ij = +/- 2^{k_ij}`` so ``W x`` is a sum of bit-shifts (shift + add-tree,
+    zero DSP). Identical parameters/shape to ``nn.Linear``; the dyadic constraint
+    is applied in ``forward`` via a straight-through estimator.
+    """
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return F.linear(x, dyadic_quantize(self.weight), self.bias)
+
+
+class DyadicTropicalProjection(nn.Module):
+    """Multiplier-free OBLIQUE projection: dyadic monomial -> tropical max -> dyadic monomial.
+
+    A drop-in alternative to :class:`CompositionalTropicalProjection` for the
+    components that must represent oblique/smooth surfaces (value readout,
+    representation). ``in_features -> d_intermediate`` (dyadic, oblique normals)
+    -> ReLU (``= max(.,0)``, the tropical non-convexity) -> ``d_intermediate ->
+    out_features`` (dyadic). Everything is shift + add + compare: zero multiply,
+    zero DSP. ``tau`` is accepted for interface parity with the max-plus
+    projections but is inert (the dyadic forward deploys as-is).
+    """
+
+    def __init__(self, in_features: int, out_features: int,
+                 d_intermediate=None, tau: float = 0.0):
+        super().__init__()
+        if d_intermediate is None:
+            d_intermediate = max(in_features, out_features) * 2
+        self.in_features = in_features
+        self.out_features = out_features
+        self.d_intermediate = d_intermediate
+        self.tau = tau
+        self.lin1 = DyadicLinear(in_features, d_intermediate)
+        self.lin2 = DyadicLinear(d_intermediate, out_features)
+
+    def set_tau(self, tau: float) -> None:
+        self.tau = tau            # inert; kept for parity with TropicalProjection.set_tau
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.lin2(torch.relu(self.lin1(x)))
+
+    def extra_repr(self) -> str:
+        return (f"in_features={self.in_features}, d_intermediate={self.d_intermediate}, "
+                f"out_features={self.out_features} (dyadic, multiplier-free)")
 
 
 # ---------------------------------------------------------------------------
