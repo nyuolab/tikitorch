@@ -28,6 +28,7 @@ __all__ = ["MuZeroConfig", "TropicalMuZero"]
 @dataclass
 class MuZeroConfig:
     net_kind: str = "tropical"    # "tropical" (multiplier-free) | "dense" (matched control)
+    core_kind: str = "maxplus"    # tropical cores: "maxplus" (axis-aligned) | "dyadic" (multiplier-free oblique)
     optimizer: str = "tropicalsgd"  # "tropicalsgd"/"signsgd" (closed, multiply-free) | "adamw" (open baseline)
     latent_dim: int = 64
     tau: float = 1.0
@@ -67,10 +68,12 @@ class TropicalMuZero:
         self.cfg = config or MuZeroConfig()
         self.obs_dim = 3 * env.H * env.W
         net_cls = DenseMuZeroNet if self.cfg.net_kind == "dense" else TropicalMuZeroNet
-        self.net = net_cls(self.obs_dim, env.n_actions,
-                           latent_dim=self.cfg.latent_dim, tau=self.cfg.tau,
-                           value_support=self.cfg.value_support,
-                           reward_support=self.cfg.reward_support)
+        net_kw = dict(latent_dim=self.cfg.latent_dim, tau=self.cfg.tau,
+                      value_support=self.cfg.value_support,
+                      reward_support=self.cfg.reward_support)
+        if self.cfg.net_kind != "dense":
+            net_kw["core_kind"] = self.cfg.core_kind   # dyadic oblique cores (repr+pred); dyn stays maxplus
+        self.net = net_cls(self.obs_dim, env.n_actions, **net_kw)
         self.buffer = ReplayBuffer(capacity=self.cfg.capacity, n_actions=env.n_actions)
         self.opt = _make_optimizer(self.cfg.optimizer, self.net.parameters(), self.cfg.lr)
         self.gen = torch.Generator().manual_seed(self.cfg.seed)
