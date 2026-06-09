@@ -22,6 +22,14 @@ from tikitorch.planning.muzero.games import (  # noqa: F401
     negamax_agent,
     play_match,
 )
+# Chess needs the optional ``python-chess`` dependency; surface it only if installed
+# (the package must still import on a stock environment without it).
+try:
+    from tikitorch.planning.muzero.chess_game import Chess  # noqa: F401
+    _HAS_CHESS = True
+except ImportError:                                          # pragma: no cover
+    Chess = None
+    _HAS_CHESS = False
 from tikitorch.planning.muzero.replay import Game, ReplayBuffer  # noqa: F401
 from tikitorch.planning.muzero.selfplay import play_game, play_board_game  # noqa: F401
 from tikitorch.planning.muzero.agent import MuZeroConfig, TropicalMuZero  # noqa: F401
@@ -37,6 +45,7 @@ __all__ = [
     "DenseMuZeroNet",
     "TicTacToe",
     "Connect4",
+    "Chess",
     "TwoPlayerKnownModel",
     "BoardGameModel",
     "negamax_agent",

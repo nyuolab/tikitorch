@@ -1,0 +1,6 @@
+{"arm": "tropical-maxplus", "seed": 0, "game": "connect4", "optimizer": "tropicalsgd", "iters": 16, "best_score": 0.0, "gauntlet": {"1": 0.0, "2": 0.0, "3": 0.0}, "score_curve": [0.0, 0.0, 0.0, 0.0, 0.0]}
+{"arm": "tropical-maxplus", "seed": 1, "game": "connect4", "optimizer": "tropicalsgd", "iters": 16, "best_score": 0.0, "gauntlet": {"1": 0.0, "2": 0.0, "3": 0.0}, "score_curve": [0.0, 0.0, 0.0, 0.0, 0.0]}
+{"arm": "tropical-dyadic", "seed": 0, "game": "connect4", "optimizer": "tropicalsgd", "iters": 16, "best_score": 0.0, "gauntlet": {"1": 0.5, "2": 0.0, "3": 0.0}, "score_curve": [0.0, 0.0, 0.0, 0.0, 0.0]}
+{"arm": "tropical-dyadic", "seed": 1, "game": "connect4", "optimizer": "tropicalsgd", "iters": 16, "best_score": 0.0, "gauntlet": {"1": 0.5, "2": 0.0, "3": 0.0}, "score_curve": [0.0, 0.0, 0.0, 0.0, 0.0]}
+{"arm": "dense", "seed": 0, "game": "connect4", "optimizer": "tropicalsgd", "iters": 16, "best_score": 0.5, "gauntlet": {"1": 0.5, "2": 0.5, "3": 0.5}, "score_curve": [0.5, 0.5, 0.0, 0.0, 0.0]}
+{"arm": "dense", "seed": 1, "game": "connect4", "optimizer": "tropicalsgd", "iters": 16, "best_score": 0.0, "gauntlet": {"1": 0.0, "2": 0.0, "3": 0.0}, "score_curve": [0.0, 0.0, 0.0, 0.0, 0.0]}

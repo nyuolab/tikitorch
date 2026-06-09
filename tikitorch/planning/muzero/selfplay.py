@@ -67,7 +67,10 @@ def play_board_game(net, board_game, *, num_simulations=50, c_puct=1.25, backup=
 
     state = board_game.initial_state()
     moves = []                                          # (obs, action, policy, to_play)
-    for t in range(board_game.H * board_game.W if hasattr(board_game, "H") else board_game.n_actions):
+    # ply cap: an explicit max_moves (chess), else the board's cell count (H*W), else n_actions.
+    max_plies = getattr(board_game, "max_moves", None) or (
+        board_game.H * board_game.W if hasattr(board_game, "H") else board_game.n_actions)
+    for t in range(max_plies):
         if board_game.is_terminal(state[0]):
             break
         cfg.seed = seed * 100003 + t                    # fresh root noise each move
@@ -77,7 +80,14 @@ def play_board_game(net, board_game, *, num_simulations=50, c_puct=1.25, backup=
         moves.append((board_game.obs(state), a, visit_policy, tp))
         state = (board_game.apply(board, a, tp), 3 - tp)
 
-    w = board_game.winner(state[0])
+    # outcome from the final state. A game stopped at the ply cap (not truly terminal) gets a
+    # pseudo-outcome from the game's optional adjudicate() hook (chess: material balance) so the
+    # value target is informative instead of a forced 0 — games that never resolve otherwise carry
+    # no learning signal. Games that DO end (win/draw) use the real winner().
+    if not board_game.is_terminal(state[0]) and hasattr(board_game, "adjudicate"):
+        w = board_game.adjudicate(state[0])
+    else:
+        w = board_game.winner(state[0])
     records = [(obs, a, pol, (0.0 if w == 0 else (1.0 if w == tp else -1.0)))
                for (obs, a, pol, tp) in moves]
     return records, w

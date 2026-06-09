@@ -1,0 +1,8 @@
+{
+  "note": "pure-MuZero chess scaffold (no material adjudication); the adjudicated run is chess_scaffold_adjudicated.json",
+  "config": {"latent": 64, "sims": 10, "iters": 5, "games_per_iter": 8, "eval_games": 14},
+  "loss_curve": [25.9356, 22.3891, 20.1857, 18.3149, 16.8561],
+  "vs_random": {"opponent": "random", "win": 0.0, "draw": 0.2857142857142857, "loss": 0.7142857142857143, "score": 0.14285714285714285},
+  "vs_material": {"opponent": "material(1-ply)", "win": 0.0, "draw": 1.0, "loss": 0.0, "score": 0.5},
+  "untrained_vs_random": {"opponent": "random (untrained control)", "win": 0.0, "draw": 0.9285714285714286, "loss": 0.07142857142857142, "score": 0.4642857142857143}
+}

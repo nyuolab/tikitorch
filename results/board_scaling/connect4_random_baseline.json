@@ -1,0 +1,9 @@
+{
+  "note": "Connect4 floor: a uniform-random legal mover vs depth-limited negamax, score=win+0.5draw over 40 games (alternating colors). Separately measured, NOT part of the trained-net gauntlet().",
+  "games": 40,
+  "score_vs_negamax": {
+    "1": 0.175,
+    "2": 0.025,
+    "3": 0.025
+  }
+}
