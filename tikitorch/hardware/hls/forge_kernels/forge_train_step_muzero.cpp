@@ -2,9 +2,10 @@
 //
 // mode 0 -> do_fwd: obs -> repr -> pred -> (policy, value), every "multiply" a SIGN + bit-SHIFT
 //                   on an int32 add-tree (dyadic weights = signed powers of two). ZERO DSP.
-// modes 1/2/... (bwd / signsgd / dynamics-unroll, the on-chip TRAINING step) are the documented
-// next stage — this first kernel establishes the buffer ABI + the zero-DSP forward datapath that
-// CSIM-validates under g++ and synthesizes on F2.
+// This is the FROZEN forward-inference kernel (the deploy artifact): weights are a fixed
+// (sign, exponent) shift schedule. The on-chip TRAINING step (forward + backward + SignSGD,
+// zero-DSP in the backward too) is the sibling kernel forge_train_step_muzero_train.cpp, which
+// trains int16 shadow weights and exports their nearest-pow2 schedule into THIS buffer to deploy.
 //
 // CSIM:  g++ -O2 -std=c++17 -DCSIM_ONLY -I.. -I. forge_train_step_muzero.cpp \
 //            forge_train_step_muzero_tb.cpp -o tb_muzero && ./tb_muzero

@@ -2,10 +2,15 @@
 
 The TikiTorch claim is that a whole model — forward *and* backward — maps to
 comparisons, additions, and bit-shifts, with **zero hardware multipliers** (zero
-DSP blocks on FPGA). :func:`assert_closed` makes that claim *checkable*: it walks
-the module tree and raises if it finds any standard ``torch.nn`` layer that
-contains a data-dependent multiply or divide (``nn.Linear``, ``nn.Conv2d``,
-``nn.LayerNorm``, ``nn.MultiheadAttention``, the cuDNN RNNs, ...).
+DSP blocks on FPGA). That whole-model claim is checked by
+:func:`assert_training_closed` (forward + loss + backward + optimizer); it holds for
+the tropical max-plus stack trained with a sign-only rule, and is a property of the
+*training recipe*, not any single layer. :func:`assert_closed` is the narrower
+*structural, forward* gate: it walks the module tree and raises if it finds any
+standard ``torch.nn`` layer that contains a data-dependent multiply or divide
+(``nn.Linear``, ``nn.Conv2d``, ``nn.LayerNorm``, ``nn.MultiheadAttention``, the
+cuDNN RNNs, ...). A clean ``assert_closed`` therefore does not by itself certify the
+backward — see the ``_zero_dsp_layer`` note below for the dyadic case in particular.
 
 This is a reproducible artifact behind the paper's headline: paste a model,
 call ``assert_closed(model)``, and either it passes or it names every
@@ -44,6 +49,28 @@ Dropout / Identity / containers are inert and not flagged. The soft (``tau>0``)
 tropical relaxations use ``logsumexp`` (exp) and are training-time aids, not the
 deploy path — they are layer *modules* in TikiTorch (not ``torch.nn`` types) so
 they pass here; harden with ``tau -> 0`` for the closed deploy graph.
+
+**The ``_zero_dsp_layer`` marker is FORWARD-scoped.** A module may set
+``_zero_dsp_layer = True`` to tell the *structural* check to skip it — used by
+:class:`tikitorch.nn.DyadicLinear`, whose weights are signed powers of two, so the
+forward ``W·x`` compiles to sign+shift+add (ZERO DSP), proven *statically* by
+:func:`tikitorch.fpga.dyadic_export.verify_schedule`. Two things this marker does
+*not* claim, and which you must not read into it:
+
+1. It is NOT visible to an eager trace. On a CPU/GPU host the dyadic forward runs a
+   real BLAS ``addmm``, so :func:`find_runtime_multiplies` will (correctly, by its
+   own rules) report it as ``dense-multiply``. Dyadic forward-closure is the static
+   shift-schedule, not the eager op stream — the marker only stops the *structural*
+   scan from false-flagging the module.
+2. It says NOTHING about the backward. The dyadic *input*-gradient
+   ``dL/dx = Wᵀ·dL/dy`` is shift+add (closed), but the *weight*-gradient
+   ``dL/dW = dL/dy ⊗ x`` multiplies two arbitrary tensors — a genuine multiply that
+   :func:`find_training_multiplies` *does* report. A dyadic layer is therefore
+   **forward-zero-DSP but not backward-zero-DSP under autograd**. Backward-zero-DSP
+   requires a *training rule* that needs only ``sign(dL/dW) = sign(dL/dy) ⊕ sign(x)``
+   (SignSGD's sign-product, no multiply) and updates in the (sign, exponent) domain so
+   weights stay powers of two — check that recipe with :func:`assert_training_closed`,
+   never infer it from the marker.
 """
 import torch
 import torch.nn as nn
@@ -92,6 +119,10 @@ def find_closure_violations(model: nn.Module):
     """
     out = []
     for name, m in model.named_modules():
+        # _zero_dsp_layer is FORWARD-scoped (DyadicLinear: pow2 weights -> shift+add
+        # forward, proven by fpga.dyadic_export.verify_schedule). It does NOT assert a
+        # multiply-free backward — that is a training-rule property checked by
+        # assert_training_closed. See the module docstring.
         if isinstance(m, MULTIPLY_MODULES) and not getattr(m, "_zero_dsp_layer", False):
             out.append((name or "<root>", type(m).__name__))
     return out

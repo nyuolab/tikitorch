@@ -73,6 +73,11 @@ jobs:
           g++ -O2 -std=c++17 -DCSIM_ONLY -I"$HLS" -I tikitorch/hardware/hls \
               "$HLS"/forge_train_step_muzero.cpp "$HLS"/forge_train_step_muzero_tb.cpp -o /tmp/tb_muzero
           /tmp/tb_muzero
+          # dyadic MuZero ON-CHIP TRAINING kernel (zero-DSP backward: shift grad-input,
+          # sign-product weight grads, SignSGD on int16 shadows -> converges in CSIM)
+          g++ -O2 -std=c++17 -DCSIM_ONLY -I"$HLS" -I tikitorch/hardware/hls \
+              "$HLS"/forge_train_step_muzero_train.cpp "$HLS"/forge_train_step_muzero_train_tb.cpp -o /tmp/tb_muzero_train
+          /tmp/tb_muzero_train
 
   docs:
     name: docs (mkdocs build)

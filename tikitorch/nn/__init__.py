@@ -589,6 +589,16 @@ class DyadicLinear(nn.Linear):
     runtime op-tracer still sees the float-sim matmul + STE, which is expected —
     closure for dyadic is a weight-value property, verified statically, not by the
     forward op trace.
+
+    SCOPE: the marker is **forward only**. The ``W·x`` *forward* is zero-DSP. The
+    autograd *backward* is NOT: the input-gradient ``Wᵀ·dL/dy`` is shift+add, but
+    the weight-gradient ``dL/dy ⊗ x`` multiplies two arbitrary tensors — a real
+    multiply that :func:`tikitorch.audit.find_training_multiplies` reports. A
+    backward-zero-DSP training step needs a sign-only rule
+    (``sign(dL/dW)=sign(dL/dy)⊕sign(x)``, then a SignSGD update in the (sign,
+    exponent) domain so weights stay powers of two); that is the on-fabric training
+    kernel, and it is verified with ``assert_training_closed`` — never inferred from
+    this marker.
     """
 
     _zero_dsp_layer = True
