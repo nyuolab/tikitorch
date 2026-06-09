@@ -15,7 +15,7 @@
 // sgn * (x << exp); exp<0 => arithmetic right shift. A bit-shift + sign — NO multiplier.
 static inline acc_t dyadic_mac(data_t x, int exp, int sgn) {
     acc_t v = (exp >= 0) ? ((acc_t)x << exp) : ((acc_t)x >> (-exp));
-    return sgn >= 0 ? v : -v;
+    return sgn >= 0 ? v : (acc_t)(-v);   // explicit cast: ap_int negation widens to <33>, so the ?: needs it
 }
 
 static inline data_t sat16(acc_t a) {

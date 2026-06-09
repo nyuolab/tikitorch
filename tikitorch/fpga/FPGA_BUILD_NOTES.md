@@ -53,6 +53,34 @@ silicon failure mode) — the build aborts before the slow Vivado step if not.
 
 ---
 
+## 1b. MuZero dyadic kernels — HLS-validated on the F2 part [validated, 2026-06-09]
+
+The zero-DSP dyadic MuZero kernels (`forge_train_step_muzero.cpp` forward-inference +
+`forge_train_step_muzero_train.cpp` on-chip SignSGD training) **pass Vitis HLS 2024.1
+C-synthesis on the real F2 part `xcvu47p-fsvh2892-2L-e` at the 4.0 ns / 250 MHz target:**
+
+| kernel | DSP | est. period | timing | LUT | FF | BRAM |
+|---|---|---|---|---|---|---|
+| `forge_train_step_muzero` (fwd) | **0** | **2.920 ns** (closes @ 250 MHz, ~1 ns slack) | met | 109165 (8% dev) | 60552 | 2 |
+| `forge_train_step_muzero_train` (fwd+bwd+SignSGD) | **0** | **2.920 ns** | met | 96330 (7% dev) | 39860 | 2 |
+
+The vendor synthesizer's DSP operation table is **empty** for both — every "multiply" mapped
+to shift+add LUT logic, and the `/MZ_L` (=/32) normalization mapped to LUTs (not a DSP divide).
+This **clears the §3 timing wall for the MuZero kernels** (the LM kernel's 14.3 ns / 70 MHz
+512-bit-select critical path does not appear here), so a full P&R AFI build is low-risk on timing.
+Reports: `results/fpga_silicon/forge_train_step_muzero{,_train}_csynth.rpt`.
+
+GOTCHA found here: Vitis HLS rejects ambiguous `?:` that g++ accepts — `cond ? x : -x` where `-x`
+widens an `ap_int<32>` to `ap_int<33>`, and `relu`'s `data_t vs int 0`. Fix is an explicit cast on
+the negative/zero branch (`(acc_t)(-v)`, `(data_t)0`); semantics-preserving under the g++ CSIM shim.
+Synthesize early — the CSIM (g++) build does NOT catch these.
+
+STILL TODO: the full HLS→DCP→AFI build (flow B, ~3 h P&R + ~1–2 h AFI gen on z1d) then the
+f2.6xlarge on-board run. Build infra (`aws_build_dcp_from_cl.py` etc.) is monorepo-coupled — adapt
+`KERNEL_DIR`/top to `forge_train_step_muzero{,_train}` and reuse this part/clock.
+
+---
+
 ## 2. Validated AGFI registry (account 739966866637, us-east-1)
 
 | AGFI | name | notes |

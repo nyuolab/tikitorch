@@ -54,7 +54,7 @@ static inline void nearest_pow2(int w, int& e, int& s) {
 static inline acc_t dyq_apply(int e, int s, acc_t v) {
     if (s == 0) return 0;
     acc_t r = (e >= 0) ? (v << e) : (v >> (-e));
-    return (s > 0) ? r : -r;
+    return (s > 0) ? r : (acc_t)(-r);   // explicit cast: ap_int negation widens to <33>, so the ?: needs it
 }
 
 static inline data_t sat16(acc_t a) {
@@ -122,14 +122,14 @@ static int train_step(int32_t* buf, int lr) {
     data_t hraw[MZ_L], pre[MZ_DR > MZ_DP ? MZ_DR : MZ_DP];
 
     fwd_linear(WR1, BR1, obs, pre, MZ_DR, MZ_OBS);                  // repr lin1
-    for (int i = 0; i < MZ_DR; i++) zr1[i] = pre[i] > 0 ? pre[i] : 0;   // relu
+    for (int i = 0; i < MZ_DR; i++) zr1[i] = pre[i] > 0 ? pre[i] : (data_t)0;   // relu
     fwd_linear(WR2, BR2, zr1, hraw, MZ_L, MZ_DR);                  // repr lin2
     acc_t sm = 0; for (int i = 0; i < MZ_L; i++) sm += hraw[i];
     data_t mean = (data_t)(sm / MZ_L);                            // /L = shift (L pow2)
     for (int i = 0; i < MZ_L; i++) h[i] = sat16((acc_t)hraw[i] - mean);  // submean -> latent
 
     fwd_linear(WP1, BP1, h, pre, MZ_DP, MZ_L);                    // pred lin1
-    for (int i = 0; i < MZ_DP; i++) zp1[i] = pre[i] > 0 ? pre[i] : 0;   // relu
+    for (int i = 0; i < MZ_DP; i++) zp1[i] = pre[i] > 0 ? pre[i] : (data_t)0;   // relu
     fwd_linear(WP2, BP2, zp1, z, MZ_L, MZ_DP);                    // pred lin2
     fwd_linear(WPH, BPH, z, pol, MZ_A, MZ_L);                     // policy head
     fwd_linear(WVH, BVH, z, val, 1, MZ_L);                        // value head
@@ -141,10 +141,10 @@ static int train_step(int32_t* buf, int lr) {
     acc_t loss = 0, gpol[MZ_A], gval;
     for (int o = 0; o < MZ_A; o++) {
         acc_t d = (acc_t)pol[o] - (acc_t)buf[TOFF_PTGT + o];
-        loss += (d > 0 ? d : -d); gpol[o] = isign(d);
+        loss += (d > 0 ? d : (acc_t)(-d)); gpol[o] = isign(d);
     }
     { acc_t d = (acc_t)val[0] - (acc_t)buf[TOFF_VTGT];
-      loss += (d > 0 ? d : -d); gval = isign(d); }
+      loss += (d > 0 ? d : (acc_t)(-d)); gval = isign(d); }
     buf[TOFF_LOSS] = (int32_t)loss;
 
     // ---- BACKWARD: per layer compute grad-input with CURRENT weights, then SignSGD-update ----
