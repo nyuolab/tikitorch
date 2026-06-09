@@ -417,6 +417,23 @@ FPGA fabric. The whole thing synthesizes to **zero DSP blocks**, which is the
 physical confirmation of the closure claim: there is literally no multiplier on
 the chip.
 
+**You can verify all of this with no FPGA, in one command.** The kernels compile
+as plain C++, so the *real* kernel math runs on your laptop — `model.fpga()` binds
+and trains at dsp=0:
+
+```bash
+eval "$(bash scripts/build_fpga_local.sh --export)"   # build the LOCAL bridge (needs only a C++ compiler)
+python examples/fpga_quickstart.py                    # closure audit + a multiplier-free training step on the kernel
+```
+
+Checkable with **no hardware**: the closure audit (`assert_closed` /
+`find_runtime_multiplies` / `closure_report`) proves the loop is multiplier-free,
+the LOCAL bridge runs the bit-faithful kernel math, and the HLS testbenches
+(`*_tb.cpp`) compile and pass under `g++`. What needs an **F2 board** — and is
+*not* turnkey (bring your own AWS account; build your own AFI from the bundled HLS,
+see [`BUILD_NATIVE.md`](tikitorch/fpga/BUILD_NATIVE.md)) — is the on-silicon
+timing/energy below.
+
 Measured on AWS EC2 F2 (Virtex UltraScale+ VU47P), validated end-to-end:
 
 | Build | Throughput | Energy | Timing (WNS) | Notes |

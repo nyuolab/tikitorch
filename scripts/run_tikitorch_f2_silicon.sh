@@ -11,13 +11,15 @@
 #   bash scripts/run_tikitorch_f2_silicon.sh download
 #   bash scripts/run_tikitorch_f2_silicon.sh terminate
 set -e
-PROFILE="NYUMCResearchAdminFullAccess-739966866637"
-KEY_NAME="mnemo-dev"; SG="sg-0efe5c4b6eeb6fda6"
-INSTANCE_TYPE="${INSTANCE_TYPE:-f2.6xlarge}"; REGION="us-east-1"
-PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="$HOME/.ssh/mnemo-dev.pem"
+# --- REQUIRED: your own AWS account/infra. This script NEVER defaults to anyone's
+# account; set these in your environment before running. ---
+PROFILE="${AWS_PROFILE:?set AWS_PROFILE to your AWS CLI profile (e.g. export AWS_PROFILE=my-profile)}"
+KEY_NAME="${KEY_NAME:?set KEY_NAME to your EC2 key pair name}"; SG="${SG:?set SG to your security-group id (must allow inbound SSH)}"
+INSTANCE_TYPE="${INSTANCE_TYPE:-f2.6xlarge}"; REGION="${REGION:-us-east-1}"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="${PEM:-$HOME/.ssh/$KEY_NAME.pem}"
 EBS_SIZE=200
-AMI="${AMI:-ami-092fc5deb8f3c0f7d}"                       # F2 FPGA dev AMI
-AGFI="${AGFI:-agfi-0a845113b088cf62e}"                    # cl_forge_train_step_v7_monolithic
+AMI="${AMI:-ami-092fc5deb8f3c0f7d}"                       # overridable: the AWS FPGA Developer AMI for $REGION
+AGFI="${AGFI:?set AGFI to your OWN AFI global id — this library ships NO AFI; build one from the bundled HLS (see tikitorch/fpga/BUILD_NATIVE.md)}"
 STATE_DIR="$PROJECT_DIR/.tiki_f2_state"; mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/instance.state"
 

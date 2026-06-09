@@ -53,14 +53,32 @@ The kernels compile as plain C++ (the `forge_hls_types.hpp` shim maps `ap_int<>`
 to `int16_t`/`int32_t` under g++). Wrap them with a `bridge.cpp` that implements
 the symbols above against the kernel C functions and a heap buffer:
 
+The easiest way is the helper script (auto-detects compiler/OS, sets the flags),
+then the quickstart:
+
+```bash
+eval "$(bash scripts/build_fpga_local.sh --export)"   # 1-layer LM kernel + sets TIKITORCH_FPGA_LIB
+python examples/fpga_quickstart.py                    # binds + trains on the kernel (dsp=0)
+```
+
+By hand it is one `g++`/`clang++` call — but note the **`-DCSIM_ONLY` and
+`-DTT_KERNEL_<which>`** defines: without them `bridge.cpp` compiles no kernel to
+dispatch and every `tt_fpga_run` returns rc `-99`.
+
 ```bash
 HLS=$(python -c "import tikitorch.hardware as h; print(h.hls_dir())")/forge_kernels
-g++ -O2 -std=c++17 -fPIC -shared \
+g++ -O2 -std=c++17 -fPIC -shared -DCSIM_ONLY -DTT_KERNEL_1LAYER \
     -I"$HLS" \
-    bridge.cpp "$HLS"/forge_train_step_2layer.cpp \
+    tikitorch/fpga/bridge.cpp "$HLS"/forge_train_step.cpp \
     -o _libtikifpga.so
 export TIKITORCH_FPGA_LIB=$PWD/_libtikifpga.so
 ```
+
+`forge_train_step` is the 1-layer LM kernel; it ships a reference runner, so a
+`TropicalTransformer(d_model=128, n_layers=1, vocab_size=128, task_type="lm")`
+binds out of the box. For another kernel, pass its `-DTT_KERNEL_2LAYER` /
+`…_3LAYER` / `…_MORPH` / `…_MORPH_ECG` and matching `.cpp`, and register a runner
+for it (see `runners.py`).
 
 LOCAL mode runs the kernel math on the host (no `xrt`), so `board_present()`
 returns 1 and you can validate your **on-board runner** (see below) against the

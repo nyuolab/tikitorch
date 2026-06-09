@@ -10,10 +10,11 @@
 #   bash scripts/run_tikitorch_gpu_benchmarks.sh download
 #   bash scripts/run_tikitorch_gpu_benchmarks.sh terminate
 set -e
-PROFILE="NYUMCResearchAdminFullAccess-739966866637"
-KEY_NAME="mnemo-dev"; SG="sg-0efe5c4b6eeb6fda6"
-INSTANCE_TYPE="${INSTANCE_TYPE:-g5.4xlarge}"; REGION="us-east-1"
-PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="$HOME/.ssh/mnemo-dev.pem"
+# --- REQUIRED: your own AWS account/infra (this script never defaults to one) ---
+PROFILE="${AWS_PROFILE:?set AWS_PROFILE to your AWS CLI profile}"
+KEY_NAME="${KEY_NAME:?set KEY_NAME to your EC2 key pair name}"; SG="${SG:?set SG to your security-group id (must allow inbound SSH)}"
+INSTANCE_TYPE="${INSTANCE_TYPE:-g5.4xlarge}"; REGION="${REGION:-us-east-1}"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="${PEM:-$HOME/.ssh/$KEY_NAME.pem}"
 EBS_SIZE=200
 AMI="${AMI:-ami-05603a42e5254c4bb}"               # GPU AMI used for training
 STATE_DIR="$PROJECT_DIR/.tiki_gpu_state"; mkdir -p "$STATE_DIR"

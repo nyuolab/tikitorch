@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest a layer, optimizer, kernel, or capability
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API or approach
+      description: >
+        If it's a new op/layer/optimizer, does it preserve the multiplier-free
+        closure (compare/add/bit-shift only)? See CONTRIBUTING.md.
+    validations:
+      required: true

@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a bug in TikiTorch
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: A short snippet (model + the call that fails). Keep it self-contained.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: 'Output of: python -c "import tikitorch, torch; print(tikitorch.__version__, torch.__version__)"'
+    validations:
+      required: true
+  - type: checkboxes
+    id: closure
+    attributes:
+      label: Area
+      options:
+        - label: Involves the FPGA backend (model.fpga()) or the closure audit (assert_closed / closure_report)

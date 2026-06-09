@@ -48,3 +48,24 @@ jobs:
           # demand with `pytest -m slow`. The board-dependent FPGA tests also
           # self-skip without hardware, so the suite is green on a stock runner.
           python -m pytest -q
+
+  csim:
+    name: csim (HLS kernel testbenches)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile + run the HLS kernel CSIM testbenches
+        run: |
+          # The bundled HLS kernels compile as plain C++ (the forge_hls_types.hpp
+          # shim maps ap_int<> to int16/int32 under g++), so their silicon-validated
+          # testbenches run on a stock runner with NO Xilinx toolchain — corroborating
+          # the multiplier-free kernel math (DSP=0 closure) on every push, no board.
+          set -ex
+          HLS=tikitorch/hardware/hls/forge_kernels
+          g++ -O2 -std=c++17 -DCSIM_ONLY -I"$HLS" -I tikitorch/hardware/hls \
+              "$HLS"/forge_train_step.cpp "$HLS"/forge_train_step_tb.cpp -o /tmp/tb_lm
+          /tmp/tb_lm
+          g++ -O2 -std=c++17 -DCSIM_ONLY -I"$HLS" -I tikitorch/hardware/hls \
+              "$HLS"/forge_train_step_morph.cpp "$HLS"/forge_train_step_morph_tb.cpp -o /tmp/tb_morph
+          /tmp/tb_morph

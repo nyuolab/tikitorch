@@ -15,3 +15,5 @@ results/closed_benchmarks/
 results/capacity_probe/
 # per-run console logs created by the run_* scripts
 logs/
+# compiled LOCAL FPGA bridge (scripts/build_fpga_local.sh)
+_libtikifpga.*
