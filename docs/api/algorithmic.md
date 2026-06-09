@@ -1,0 +1,3 @@
+# tikitorch.algorithmic
+
+::: tikitorch.algorithmic

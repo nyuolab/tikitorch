@@ -17,3 +17,5 @@ results/capacity_probe/
 logs/
 # compiled LOCAL FPGA bridge (scripts/build_fpga_local.sh)
 _libtikifpga.*
+# mkdocs build output
+site/

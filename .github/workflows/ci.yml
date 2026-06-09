@@ -69,3 +69,21 @@ jobs:
           g++ -O2 -std=c++17 -DCSIM_ONLY -I"$HLS" -I tikitorch/hardware/hls \
               "$HLS"/forge_train_step_morph.cpp "$HLS"/forge_train_step_morph_tb.cpp -o /tmp/tb_morph
           /tmp/tb_morph
+
+  docs:
+    name: docs (mkdocs build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the API docs site
+        run: |
+          # mkdocstrings reads the in-source docstrings statically (griffe), so the
+          # API reference can't drift from the code. Plain `build` (not --strict):
+          # it fails on broken nav/refs/yaml but tolerates the docstring-param
+          # annotation warnings (the partial-typing item tracked separately).
+          python -m pip install --upgrade pip
+          pip install mkdocs-material "mkdocstrings[python]"
+          mkdocs build

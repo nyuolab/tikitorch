@@ -1,0 +1,3 @@
+# tikitorch.geometry
+
+::: tikitorch.geometry

@@ -95,6 +95,25 @@ def _make_input_proj(input_type: str, in_dim: int, out_dim: int):
         return nn.Linear(in_dim, out_dim)
     raise ValueError(f"input_type must be 'tropical' or 'linear', got {input_type!r}")
 
+
+_VALID_TASK_TYPES = ("classification", "lm", "regression")
+
+
+def _validate_task_type(task_type):
+    """Validate the ``task_type`` keyword shared by every model.
+
+    Fails fast with a clear message at construction instead of a cryptic error
+    deep in a later ``compute_loss``/forward. (Not every model supports all three
+    — e.g. ``TropicalCNN`` is classification-only — but every supported value is
+    one of these; an unsupported-but-valid value still errors where it's used.)
+    """
+    if task_type not in _VALID_TASK_TYPES:
+        raise ValueError(
+            f"task_type must be one of {_VALID_TASK_TYPES}, got {task_type!r}"
+        )
+    return task_type
+
+
 __all__ = [
     "TropicalMLP",
     "TropicalSequenceModel",
@@ -142,7 +161,7 @@ class TropicalMLP(FpgaAccelerable, nn.Module):
 
         self.input_dim = input_dim
         self.num_classes = num_classes
-        self.task_type = task_type
+        self.task_type = _validate_task_type(task_type)
 
         # Build tropical layers
         self.layers = nn.ModuleList()
@@ -338,7 +357,7 @@ class TropicalSequenceModel(FpgaAccelerable, nn.Module):
         self.input_dim = input_dim
         self.seq_len = seq_len
         self.num_classes = num_classes
-        self.task_type = task_type
+        self.task_type = _validate_task_type(task_type)
 
         # Closed tropical input projection (N-D capable).
         self.input_proj = _make_input_proj("tropical", self.input_dim, self.d_model)
@@ -532,7 +551,7 @@ class MorphSSM(FpgaAccelerable, nn.Module):
         kernel_sizes = tuple(kernel_sizes)
         residual_scale = 1.0 / (n_layers ** 0.5) if residual_scaling else 1.0
 
-        self.task_type = task_type
+        self.task_type = _validate_task_type(task_type)
         self.d_model = d_model
         self.num_classes = num_classes
         self.use_checkpoint = gradient_checkpointing
@@ -769,7 +788,7 @@ class MorphMLP(FpgaAccelerable, nn.Module):
 
         self.input_dim = input_dim
         self.num_classes = num_classes
-        self.task_type = task_type
+        self.task_type = _validate_task_type(task_type)
 
         # Build alternating dilation/erosion layers
         self.layers = nn.ModuleList()
@@ -897,7 +916,7 @@ class TropicalTransformer(FpgaAccelerable, nn.Module):
         if d_ff is None:
             d_ff = d_model * 4
 
-        self.task_type = task_type
+        self.task_type = _validate_task_type(task_type)
         self.d_model = d_model
         self.num_classes = num_classes
 
@@ -1018,7 +1037,7 @@ class MoTEModel(FpgaAccelerable, nn.Module):
             d_ff = d_model * 4
 
         self.aux_loss_weight = aux_loss_weight
-        self.task_type = task_type
+        self.task_type = _validate_task_type(task_type)
         self.d_model = d_model
         self.num_classes = num_classes
 
@@ -1262,7 +1281,7 @@ class TropicalCNN(FpgaAccelerable, nn.Module):
         super().__init__()
         assert task_type == "classification", "TropicalCNN is a classifier"
         assert head_type in ("tropical", "linear"), head_type
-        self.task_type = task_type
+        self.task_type = _validate_task_type(task_type)
         self.num_classes = num_classes
         self.head_type = head_type
         self.pool_grid = pool_grid

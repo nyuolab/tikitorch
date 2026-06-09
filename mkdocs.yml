@@ -1,0 +1,45 @@
+site_name: TikiTorch
+site_description: A tropical-semiring deep-learning library — multiplier-free, FPGA-native training.
+repo_url: https://github.com/nyuolab/tikitorch
+repo_name: nyuolab/tikitorch
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_source: true
+            members_order: source
+            docstring_section_style: list
+            filters: ["!^_"]
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - tables
+
+nav:
+  - Home: index.md
+  - API reference:
+      - functional: api/functional.md
+      - nn (layers): api/nn.md
+      - optim: api/optim.md
+      - models: api/models.md
+      - audit (closure): api/audit.md
+      - fpga: api/fpga.md
+      - classical: api/classical.md
+      - geometry: api/geometry.md
+      - prune: api/prune.md
+      - algorithmic: api/algorithmic.md
