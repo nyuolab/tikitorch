@@ -23,10 +23,8 @@ Both classes interpolate train; the gap is generalization. Usage:
 """
 import argparse
 import json
-import math
 import os
 import random
-from collections import defaultdict
 
 import numpy as np
 import torch
