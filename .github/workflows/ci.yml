@@ -69,6 +69,10 @@ jobs:
           g++ -O2 -std=c++17 -DCSIM_ONLY -I"$HLS" -I tikitorch/hardware/hls \
               "$HLS"/forge_train_step_morph.cpp "$HLS"/forge_train_step_morph_tb.cpp -o /tmp/tb_morph
           /tmp/tb_morph
+          # dyadic MuZero forward kernel (zero-DSP shift+add datapath)
+          g++ -O2 -std=c++17 -DCSIM_ONLY -I"$HLS" -I tikitorch/hardware/hls \
+              "$HLS"/forge_train_step_muzero.cpp "$HLS"/forge_train_step_muzero_tb.cpp -o /tmp/tb_muzero
+          /tmp/tb_muzero
 
   docs:
     name: docs (mkdocs build)

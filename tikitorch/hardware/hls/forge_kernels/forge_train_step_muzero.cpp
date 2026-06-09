@@ -1,0 +1,87 @@
+// forge_train_step_muzero.cpp — DYADIC Tropical MuZero kernel (Tier-1, FORWARD inference).
+//
+// mode 0 -> do_fwd: obs -> repr -> pred -> (policy, value), every "multiply" a SIGN + bit-SHIFT
+//                   on an int32 add-tree (dyadic weights = signed powers of two). ZERO DSP.
+// modes 1/2/... (bwd / signsgd / dynamics-unroll, the on-chip TRAINING step) are the documented
+// next stage — this first kernel establishes the buffer ABI + the zero-DSP forward datapath that
+// CSIM-validates under g++ and synthesizes on F2.
+//
+// CSIM:  g++ -O2 -std=c++17 -DCSIM_ONLY -I.. -I. forge_train_step_muzero.cpp \
+//            forge_train_step_muzero_tb.cpp -o tb_muzero && ./tb_muzero
+#include "forge_buffer_muzero.hpp"
+#include <cstdint>
+
+// sgn * (x << exp); exp<0 => arithmetic right shift. A bit-shift + sign — NO multiplier.
+static inline acc_t dyadic_mac(data_t x, int exp, int sgn) {
+    acc_t v = (exp >= 0) ? ((acc_t)x << exp) : ((acc_t)x >> (-exp));
+    return sgn >= 0 ? v : -v;
+}
+
+static inline data_t sat16(acc_t a) {
+    if (a > 32767) a = 32767;
+    if (a < -32768) a = -32768;
+    return (data_t)a;
+}
+
+// y[o] = sat16( bias[o] + sum_i dyadic_mac(x[i], exp[o,i], sgn[o,i]) ) — a shift+add-tree matmul.
+static void dyadic_linear(const int32_t* exp, const int32_t* sgn, const int32_t* bias,
+                          const data_t* x, data_t* y, int OUT, int IN) {
+    for (int o = 0; o < OUT; o++) {
+        acc_t acc = (acc_t)bias[o];
+        for (int i = 0; i < IN; i++) {
+            int idx = o * IN + i;
+            acc += dyadic_mac(x[i], (int)exp[idx], (int)sgn[idx]);
+        }
+        y[o] = sat16(acc);
+    }
+}
+
+static inline void relu(data_t* a, int n) {              // tropical max(.,0)
+    for (int i = 0; i < n; i++) if (a[i] < 0) a[i] = 0;
+}
+
+// subtract-mean normalization (closure-clean BatchShift). n=MZ_L=32 is a power of two, so the
+// /n is a right-shift on fabric (a constant-pow2 divide), not a DSP divide.
+static void submean(data_t* a, int n) {
+    acc_t s = 0;
+    for (int i = 0; i < n; i++) s += a[i];
+    data_t m = (data_t)(s / n);
+    for (int i = 0; i < n; i++) a[i] = sat16((acc_t)a[i] - m);
+}
+
+static int do_fwd(int32_t* buffer) {
+    data_t obs[MZ_OBS], tdr[MZ_DR], h[MZ_L], tdp[MZ_DP], z[MZ_L], pol[MZ_A], val[1];
+    for (int i = 0; i < MZ_OBS; i++) obs[i] = (data_t)buffer[OFF_OBS + i];
+
+    // representation: DyadicLin1 (OBS->DR) -> relu -> DyadicLin2 (DR->L) -> subtract-mean
+    dyadic_linear(&buffer[OFF_R1_EXP], &buffer[OFF_R1_SGN], &buffer[OFF_B_R1], obs, tdr, MZ_DR, MZ_OBS);
+    relu(tdr, MZ_DR);
+    dyadic_linear(&buffer[OFF_R2_EXP], &buffer[OFF_R2_SGN], &buffer[OFF_B_R2], tdr, h, MZ_L, MZ_DR);
+    submean(h, MZ_L);
+    for (int i = 0; i < MZ_L; i++) buffer[OFF_H + i] = h[i];
+
+    // prediction: DyadicLin1 (L->DP) -> relu -> DyadicLin2 (DP->L) -> dyadic heads
+    dyadic_linear(&buffer[OFF_P1_EXP], &buffer[OFF_P1_SGN], &buffer[OFF_B_P1], h, tdp, MZ_DP, MZ_L);
+    relu(tdp, MZ_DP);
+    dyadic_linear(&buffer[OFF_P2_EXP], &buffer[OFF_P2_SGN], &buffer[OFF_B_P2], tdp, z, MZ_L, MZ_DP);
+    for (int i = 0; i < MZ_L; i++) buffer[OFF_TMP_L + i] = z[i];
+
+    dyadic_linear(&buffer[OFF_PH_EXP], &buffer[OFF_PH_SGN], &buffer[OFF_B_PH], z, pol, MZ_A, MZ_L);
+    dyadic_linear(&buffer[OFF_VH_EXP], &buffer[OFF_VH_SGN], &buffer[OFF_B_VH], z, val, 1, MZ_L);
+    for (int i = 0; i < MZ_A; i++) buffer[OFF_POLICY + i] = pol[i];
+    buffer[OFF_VALUE] = val[0];
+    return 0;
+}
+
+extern "C" int forge_train_step_muzero(int32_t* buffer, int mode, int arg1, int arg2, int arg3) {
+#pragma HLS INTERFACE m_axi port=buffer offset=slave bundle=gmem max_widen_bitwidth=512
+#pragma HLS INTERFACE s_axilite port=buffer
+#pragma HLS INTERFACE s_axilite port=mode
+#pragma HLS INTERFACE s_axilite port=arg1
+#pragma HLS INTERFACE s_axilite port=arg2
+#pragma HLS INTERFACE s_axilite port=arg3
+#pragma HLS INTERFACE s_axilite port=return
+    (void)arg1; (void)arg2; (void)arg3;
+    if (mode == 0) return do_fwd(buffer);
+    return -1;   // bwd / signsgd / dynamics-unroll: next stage
+}
