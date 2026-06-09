@@ -47,6 +47,8 @@ dev = ["pytest", "ruff", "scipy"]
 # so this extra intentionally adds no pip deps. It exists as a documented marker
 # (`pip install tikitorch[fpga]`); pybind11 / pyxrt are out-of-band build hints.
 fpga = []
+# Build the API-reference docs site: `pip install -e ".[docs]"` then `mkdocs build`.
+docs = ["mkdocs-material", "mkdocstrings[python]"]
 
 [project.urls]
 Homepage = "https://github.com/nyuolab/tikitorch"
