@@ -85,3 +85,18 @@ extern "C" int forge_train_step_muzero(int32_t* buffer, int mode, int arg1, int 
     if (mode == 0) return do_fwd(buffer);
     return -1;   // bwd / signsgd / dynamics-unroll: next stage
 }
+
+// Layout introspection for the host bit-exact harness (so a Python reference cannot
+// silently drift from this buffer layout). Not part of the silicon ABI.
+extern "C" int forge_muzero_buffer_words() { return MZ_BUFFER_WORDS; }
+extern "C" void forge_muzero_layout(int* out) {
+    // [OBS, L, A, DR, DP, OFF_OBS, OFF_H, OFF_TMP_L, OFF_POLICY, OFF_VALUE,
+    //  OFF_R1_EXP, OFF_R1_SGN, OFF_R2_EXP, OFF_R2_SGN, OFF_P1_EXP, OFF_P1_SGN,
+    //  OFF_P2_EXP, OFF_P2_SGN, OFF_PH_EXP, OFF_PH_SGN, OFF_VH_EXP, OFF_VH_SGN,
+    //  OFF_B_R1, OFF_B_R2, OFF_B_P1, OFF_B_P2, OFF_B_PH, OFF_B_VH]
+    int v[] = {MZ_OBS, MZ_L, MZ_A, MZ_DR, MZ_DP, OFF_OBS, OFF_H, OFF_TMP_L, OFF_POLICY, OFF_VALUE,
+               OFF_R1_EXP, OFF_R1_SGN, OFF_R2_EXP, OFF_R2_SGN, OFF_P1_EXP, OFF_P1_SGN,
+               OFF_P2_EXP, OFF_P2_SGN, OFF_PH_EXP, OFF_PH_SGN, OFF_VH_EXP, OFF_VH_SGN,
+               OFF_B_R1, OFF_B_R2, OFF_B_P1, OFF_B_P2, OFF_B_PH, OFF_B_VH};
+    for (int i = 0; i < (int)(sizeof(v) / sizeof(int)); i++) out[i] = v[i];
+}
