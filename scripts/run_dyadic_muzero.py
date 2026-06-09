@@ -37,18 +37,20 @@ ARMS = [
 
 def run(mode, optimizer):
     os.makedirs(OUT, exist_ok=True)
-    iters = 4 if mode == "smoke" else 14
+    iters = {"smoke": 4, "full": 14, "long": 30}[mode]
     arms = ARMS[1:2] if mode == "smoke" else ARMS
-    seeds = [0] if mode == "smoke" else [0, 1, 2]
+    seeds = [0] if mode == "smoke" else ([0, 1, 2] if mode == "full" else [0, 1, 2, 3, 4])
+    games = 8 if mode == "long" else 6
+    sims = 25 if mode == "long" else 20
     out = os.path.join(OUT, f"muzero_loop_{mode}.jsonl")
     n = 0
     with open(out, "w") as fh:
         for name, kw in arms:
             for seed in seeds:
                 cfg = MuZeroConfig(
-                    optimizer=optimizer, latent_dim=32, num_simulations=20,
-                    iters=iters, games_per_iter=6, train_steps_per_iter=12, batch=64,
-                    td_steps=5, unroll=3, eval_every=3, lr=3e-3, seed=seed, **kw)
+                    optimizer=optimizer, latent_dim=32, num_simulations=sims,
+                    iters=iters, games_per_iter=games, train_steps_per_iter=12, batch=64,
+                    td_steps=5, unroll=3, eval_every=5, lr=3e-3, seed=seed, **kw)
                 env = GridWorldNav(GRID)
                 mz = TropicalMuZero(env, cfg)
                 hist = mz.run(log=lambda s: None)
@@ -95,7 +97,7 @@ def summarize(out, mode):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["smoke", "full"], default="full")
+    ap.add_argument("--mode", choices=["smoke", "full", "long"], default="full")
     ap.add_argument("--optimizer", default="adamw", choices=["adamw", "tropicalsgd", "signsgd"])
     a = ap.parse_args()
     run(a.mode, a.optimizer)
