@@ -28,10 +28,12 @@ FPGA path. So the gaps that matter are *ergonomics + the moat*, not core-framewo
       power-of-2 dims). The namespace is already 1:1; the *idioms* are the adoption blocker.
 - [ ] **`tt-closure` CLI** (`[project.scripts]`) — point at any `model.py:factory`, print
       `multiplications: 0` / nonzero-exit. Generalizes the `__main__` demo; the CI-gate primitive.
-- [ ] **Promote `fpga.dyadic_export`** to first-class (export in `__all__`, save/load the schedule, a
-      test, embed `verify_schedule` bit-exact result in the checkpoint as a "closure passport").
+- [x] **Promote `fpga.dyadic_export`** to first-class — `export_net`/`verify_schedule`/`export_layer`/
+      `reconstruct_weight` + `MuZeroKernelConfig` now exported in `tikitorch.fpga.__all__`, with tests
+      (bit-exact shift-schedule round-trip). **Done.** _(Follow-ons: save/load the schedule to disk; embed
+      the `verify_schedule` result in the checkpoint as a "closure passport".)_
 - [ ] Cheap credibility: `git tag v0.1.0` + release (CHANGELOG links a missing tag); fix `examples/README`;
-      publish the docs site.
+      publish the docs site (the mkdocs site itself now **exists** — added alongside this work).
 
 ## NEXT (medium)
 

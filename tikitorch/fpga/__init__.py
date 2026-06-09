@@ -46,7 +46,9 @@ from .kernels import (
     KernelSpec,
     LMKernelConfig,
     MorphKernelConfig,
+    MuZeroKernelConfig,
 )
+from .dyadic_export import export_net, verify_schedule, export_layer, reconstruct_weight
 
 __all__ = [
     "FpgaBackend",
@@ -57,6 +59,7 @@ __all__ = [
     "get_backend",
     "LMKernelConfig",
     "MorphKernelConfig",
+    "MuZeroKernelConfig",
     "KernelSpec",
     "KernelABI",
     "KernelCache",
@@ -64,6 +67,11 @@ __all__ = [
     "NativeUnavailable",
     "register_board_runner",
     "register_reference_runners",
+    # dyadic (multiplier-free) weight -> zero-DSP shift-schedule export
+    "export_net",
+    "verify_schedule",
+    "export_layer",
+    "reconstruct_weight",
 ]
 
 # Load the native driver (None in this repo / CI), build the kernel allow-list,

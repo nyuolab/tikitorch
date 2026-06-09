@@ -297,3 +297,32 @@ def test_on_board_train_step_is_zero_dsp_and_trains():
     for _ in range(20):
         last = acc.train_step(x, x)
     assert last <= first
+
+
+# ---------------------------------------------------------------------------
+# Dyadic (multiplier-free) weight -> zero-DSP shift-schedule export
+# ---------------------------------------------------------------------------
+def test_dyadic_export_roundtrip_bit_exact():
+    """export_net freezes a dyadic net to a (sign, exponent) shift schedule that
+    reconstructs the deployed forward bit-exactly (the FPGA closure passport)."""
+    from tikitorch.planning.muzero.networks import TropicalMuZeroNet
+    net = TropicalMuZeroNet(75, 4, latent_dim=16, core_kind="dyadic", value_support=None)
+    sched = fpga.export_net(net)
+    assert len(sched) == 4                      # repr.enc {lin1,lin2} + pred.mix {lin1,lin2}
+    assert fpga.verify_schedule(net, sched) == []     # empty == bit-exact
+    # exponents are integers (bit-shifts), and reconstruct == sign * 2**exponent
+    for ls in sched.values():
+        assert ls["exponent"].dtype == torch.int16
+        w = fpga.reconstruct_weight(ls)
+        lg = torch.log2(w.abs().clamp_min(1e-30))
+        assert torch.allclose(lg, lg.round())   # every weight is a pure power of two
+
+
+def test_muzero_kernel_config_keys_but_does_not_bind():
+    """MuZeroKernelConfig keys a TropicalMuZeroNet, but no KernelSpec is registered
+    yet (the HLS kernel is the build task) -> match() returns None -> CPU fallback."""
+    from tikitorch.planning.muzero.networks import TropicalMuZeroNet
+    net = TropicalMuZeroNet(75, 4, latent_dim=16, core_kind="dyadic", value_support=None)
+    cfg = fpga.MuZeroKernelConfig.from_model(net)
+    assert cfg is not None and cfg.core_kind == "dyadic" and cfg.n_actions == 4
+    assert fpga.KernelCache.default().match(net) is None   # honest: keyable != bindable
