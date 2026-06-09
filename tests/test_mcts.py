@@ -193,3 +193,22 @@ def test_topk_runs_under_oracle_and_is_optimal():
             continue
         vp, _ = mcts.run(s)
         assert int(vp.argmax()) in _optimal_actions(s, V, R, succ)
+
+
+def test_root_noise_is_seeded_and_global_rng_isolated():
+    """Root Dirichlet noise (root_exploration_frac>0) is reproducible from cfg.seed and does
+    NOT mutate the process-global torch RNG — the parallel-actor / repro fix (mcts.py:170)."""
+    env = GridWorldNav(GRID_OPEN)
+    m = KnownModel(env)
+
+    def run(seed):
+        cfg = P.MCTSConfig(num_simulations=12, root_exploration_frac=0.25,
+                           dirichlet_alpha=0.3, seed=seed)
+        return P.TropicalMCTS(m, cfg).run(0)[0]      # state 0; noise is applied at the root
+
+    torch.manual_seed(999); before = torch.randn(2)
+    vp1, vp2 = run(3), run(3)
+    torch.manual_seed(999); after = torch.randn(2)
+    assert torch.equal(before, after)                # MCTS noise left the global torch RNG untouched
+    assert torch.allclose(vp1, vp2)                  # same seed -> reproducible visit policy
+    assert not torch.allclose(vp1, run(4))           # different seed -> different noise

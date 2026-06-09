@@ -104,6 +104,14 @@ _DENSE_MUL = ("mm", "bmm", "addmm", "matmul", "linear", "einsum",
               "convolution", "conv1d", "conv2d", "conv3d", "addbmm", "baddbmm")
 _TRANSCENDENTAL = ("exp", "log", "pow", "sin", "cos", "tanh", "sigmoid",
                    "erf", "rsqrt", "reciprocal")
+# KNOWN LIMITATION: ``exp2`` / ``log2`` are deliberately NOT in _TRANSCENDENTAL. They are
+# used (under no_grad) to DERIVE power-of-two shift constants — `x * 2**round(s)` in
+# TropicalScale/Pow2Scale, `_pow2_normalize`, and `dyadic_quantize` — whose downstream
+# multiply is already recognized as a shift; listing them would falsely flag those closed
+# layers (and the flagship closed-model test). The residual blind spot is a *hypothetical*
+# non-pow2-producing exp2/log2 on the data path (none exists in-tree). A precise guard would
+# flag exp2 only when its RESULT is not all-pow2 (with a raised size cap so large dyadic
+# weight matrices are not false-positived) — deferred; the moat is not currently falsified.
 
 
 def _is_pow2(x) -> bool:

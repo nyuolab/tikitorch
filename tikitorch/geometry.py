@@ -18,11 +18,6 @@ __all__ = ["count_linear_regions", "decision_regions_2d", "newton_polytope",
            "jacobian_signature"]
 
 
-@torch.no_grad()
-def _unused():
-    pass
-
-
 def jacobian_signature(model, x, round_decimals: int = 4):
     """Gradient of the summed output w.r.t. one input point.
 

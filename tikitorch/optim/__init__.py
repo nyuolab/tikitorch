@@ -250,8 +250,10 @@ class PureTropicalSGD(toptim.Optimizer):
                     if "v_max" not in state:
                         state["v_max"] = torch.zeros_like(p)
                     v = state["v_max"]
-                    # Tropical max update: v = max(v/2, |grad|)
-                    # The v/2 is a bit-shift decay (no multiplier on FPGA)
+                    # Tropical max update: v = max(v/2, |grad|). The v*0.5 here is a genuine
+                    # bit-shift, BUT this whole `adaptive` branch is NOT zero-DSP — the median
+                    # (sort), v/v_median (divide), and log2 (transcendental) below are real ops,
+                    # which is why the docstring marks adaptive=True EXPERIMENTAL / not closed.
                     v.copy_(torch.max(v * 0.5, grad.abs()))
                     # Bucket into power-of-2 tiers: tier = floor(log2(v / v_median))
                     # Clamp to [-adaptive_bits, adaptive_bits] range

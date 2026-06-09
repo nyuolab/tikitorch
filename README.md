@@ -174,6 +174,9 @@ in `torch`, you know where it lives in `tikitorch`.
 | `tt.nn.TropicalDilation` *(= `TropicalDilationModule`)* | `nn.Linear` | max-plus linear layer |
 | `tt.nn.TropicalProjection` *(= `CompositionalTropicalProjection`)* | `nn.Linear` | dilation∘erosion = tropical rational (universal PWL) |
 | `tt.nn.TropicalTopK` *(= `TropicalTopKModule`)* | top-k pooling | top-K max-plus aggregation |
+| `tt.nn.DyadicLinear` / `DyadicTropicalProjection` | `nn.Linear` | signed-power-of-two weights (shift+add, **zero-DSP**) — the OBLIQUE-capable multiplier-free core |
+| `tt.nn.TropicalReLU` / `TropicalLeakyReLU` / `TropicalHardtanh` | `nn.ReLU` / `LeakyReLU` / `Hardtanh` | closure-clean activations (pow-2 leaky slope) |
+| `tt.nn.TropicalDropout` | `nn.Dropout` | `{0,1}` gate — no `1/(1-p)` rescale (closure-clean at any `p`) |
 | `tt.nn.MorphConv1d` *(= `DepthwiseMorphConv1d`)* | `nn.Conv1d` (depthwise) | morphological (max/min-plus) depthwise conv |
 | `tt.nn.BatchShift` *(= `TropicalBatchShift`)* | `nn.BatchNorm` | additive (subtract-mean) normalization |
 | `tt.nn.MorphSSMLayer`, `TropicalAttention`, `TropicalTransformerBlock`, `MoTEBlock` | `nn.TransformerEncoderLayer` etc. | composable tropical blocks |

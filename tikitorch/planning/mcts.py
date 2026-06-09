@@ -37,6 +37,7 @@ import heapq
 import math
 from dataclasses import dataclass
 
+import numpy as np
 import torch
 
 __all__ = ["MCTSConfig", "TropicalMCTS"]
@@ -167,9 +168,14 @@ class TropicalMCTS:
 
     def _add_root_noise(self, root):
         children = list(root.children.values())    # legal children (sparse keys for board games)
-        torch.manual_seed(self.cfg.seed)           # reproducible root exploration noise
-        noise = torch.distributions.Dirichlet(
-            torch.full((len(children),), self.cfg.dirichlet_alpha)).sample()
+        # Use a LOCAL seeded RNG — never mutate the process-global torch RNG (that broke
+        # reproducibility under parallel self-play actors, and re-seeded to the same fixed
+        # value every call so the noise was identical across moves). torch's
+        # Dirichlet.sample() takes no generator=, so draw the symmetric Dirichlet from
+        # numpy's seeded Generator (per-move distinct, since selfplay mutates cfg.seed;
+        # isolated per actor process).
+        rng = np.random.default_rng(self.cfg.seed)
+        noise = rng.dirichlet([self.cfg.dirichlet_alpha] * len(children))
         frac = self.cfg.root_exploration_frac
         for child, ng in zip(children, noise):
             child.prior = child.prior * (1 - frac) + float(ng) * frac

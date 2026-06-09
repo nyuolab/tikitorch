@@ -1183,8 +1183,12 @@ class MoTEModel(FpgaAccelerable, nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def get_expert_utilization(self) -> dict:
-        """Get expert utilization stats from last forward pass (for logging)."""
-        # This would need hooks to track; placeholder for now
+        """Expert-utilization stats for logging — UNIMPLEMENTED, returns ``{}``.
+
+        Tracking per-expert routing load needs forward hooks on the router/experts,
+        which are not wired up; this returns an empty dict so callers must treat it as
+        "no stats available" rather than expecting populated counts.
+        """
         return {}
 
     def hardware_cost(self, batch_size: int = 1, seq_len: int = 1) -> HardwareCostProfile:
