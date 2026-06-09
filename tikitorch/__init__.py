@@ -69,6 +69,7 @@ from tikitorch import algorithmic  # noqa: F401
 from tikitorch.audit import (  # noqa: F401
     assert_closed, assert_closed_runtime, assert_training_closed,
     find_runtime_multiplies, find_training_multiplies, closure_report,
+    assert_no_multiply, closed, ClosureViolation,
 )
 
 # Model (de)serialization and the closure/hardware profiler depend only on
@@ -95,6 +96,7 @@ _top = ["__version__", "functional", "nn", "optim", "models", "HardwareCostProfi
         "audit", "geometry", "classical", "prune", "algorithmic", "assert_closed",
         "assert_closed_runtime", "assert_training_closed", "find_runtime_multiplies",
         "find_training_multiplies", "closure_report",
+        "assert_no_multiply", "closed", "ClosureViolation",
         "backend", "device", "to",
         "serialization", "save", "load", "profile", "profile_model", "format_report"]
 if fpga is not None:

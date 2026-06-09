@@ -50,7 +50,8 @@ import torch.nn as nn
 
 __all__ = ["assert_closed", "find_closure_violations", "MULTIPLY_MODULES",
            "find_runtime_multiplies", "assert_closed_runtime",
-           "find_training_multiplies", "assert_training_closed", "closure_report"]
+           "find_training_multiplies", "assert_training_closed", "closure_report",
+           "assert_no_multiply", "closed", "ClosureViolation"]
 
 # Standard torch modules that contain a data-dependent hardware multiply/divide.
 MULTIPLY_MODULES = tuple(
@@ -381,6 +382,100 @@ def closure_report(model, example_inputs=None, targets=None, loss_fn=None,
         # sign-invariant loss-value divide (host-side, not on-chip).
         rep["training_zero_dsp"] = not [h for h in tr if h[0] != "elementwise-divide"]
     return rep
+
+
+class ClosureViolation(AssertionError):
+    """Raised by :class:`assert_no_multiply` / :func:`closed` when a hardware
+    multiply / divide / transcendental executes inside the guarded block."""
+
+
+class assert_no_multiply:
+    """Guard that asserts NO hardware multiply runs inside a block of YOUR code.
+
+    The fail-fast, wrap-your-own-loop closure check — ``torch.no_grad()``-shaped::
+
+        import tikitorch as tt
+        with tt.assert_no_multiply():
+            loss = model.compute_loss(x, y)
+            loss.backward()
+            opt.step()
+        # raises ClosureViolation listing every multiply/divide/transcendental ATen op.
+
+    Unlike :func:`assert_closed` (which only inspects *registered modules*), this traces
+    the actual ATen ops via the same :func:`_make_catcher` ``TorchDispatchMode`` the audit
+    helpers use, so it catches a raw ``*`` / ``@`` / ``torch.exp`` written in any custom
+    ``forward`` or training step. Powers of two (``x * 2**k``, ``x / 8``) are bit-shifts
+    and pass; bool/int logic passes. ``allow_transcendental=True`` permits the soft
+    ``tau>0`` ``exp``/``log`` relaxations. Tracing has per-op overhead — use it as an
+    opt-in guard / test / CI gate, not in the hot training loop.
+
+    Also usable as a decorator via :func:`closed` (preferred) or ``@assert_no_multiply()``.
+    """
+
+    def __init__(self, allow_transcendental: bool = False, label: str = None):
+        self.allow_transcendental = allow_transcendental
+        self.label = label
+        self._hits = []
+        self._mode = None
+
+    def __enter__(self):
+        self._hits = []
+        self._mode = _make_catcher(self._hits)
+        self._mode.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self._mode.__exit__(exc_type, exc, tb)
+        if exc_type is not None:
+            return False                       # let the user's own exception propagate
+        hits = self._hits
+        if self.allow_transcendental:
+            hits = [(c, op) for c, op in hits if c != "transcendental"]
+        seen, uniq = set(), []
+        for h in hits:
+            if h not in seen:
+                seen.add(h)
+                uniq.append(h)
+        if uniq:
+            where = f" in {self.label}" if self.label else ""
+            lines = "\n".join(f"    {c}: {op}" for c, op in uniq)
+            raise ClosureViolation(
+                f"Hardware multiply/divide executed{where} — closure violated:\n" + lines +
+                "\n\nRewrite as add/compare/shift (powers of two are bit-shifts and pass); "
+                "anneal tau->0 for the soft exp/log relaxations, or pass allow_transcendental=True.")
+        return False
+
+    def __call__(self, fn):                    # @assert_no_multiply() decorator form
+        import functools
+
+        @functools.wraps(fn)
+        def wrapped(*a, **k):
+            with assert_no_multiply(self.allow_transcendental, self.label or fn.__name__):
+                return fn(*a, **k)
+        return wrapped
+
+
+def closed(fn=None, *, allow_transcendental=False):
+    """Decorator asserting the wrapped function/forward runs no hardware multiply::
+
+        @tt.closed
+        def train_step(x, y): ...
+
+        @tt.closed(allow_transcendental=True)     # permit soft tau>0 exp/log
+        def soft_forward(x): ...
+
+    Thin wrapper over :class:`assert_no_multiply`; raises :class:`ClosureViolation`
+    (naming every offending op) if the call executes a hardware multiply/divide.
+    """
+    if fn is None:
+        return lambda f: closed(f, allow_transcendental=allow_transcendental)
+    import functools
+
+    @functools.wraps(fn)
+    def wrapped(*a, **k):
+        with assert_no_multiply(allow_transcendental=allow_transcendental, label=fn.__name__):
+            return fn(*a, **k)
+    return wrapped
 
 
 def assert_closed(model: nn.Module, allow=()):

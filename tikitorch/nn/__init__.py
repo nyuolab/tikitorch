@@ -187,6 +187,11 @@ __all__ = [
     "TropicalProjection",
     "TropicalTopKModule",
     "TropicalTopK",
+    # activation + dropout modules (closure-clean)
+    "TropicalReLU",
+    "TropicalLeakyReLU",
+    "TropicalHardtanh",
+    "TropicalDropout",
     # --- higher-level layers ---
     # normalization
     "TropicalBatchShift",
@@ -547,6 +552,94 @@ TropicalProjection = CompositionalTropicalProjection
 TropicalTopK = TropicalTopKModule
 
 
+# ---------------------------------------------------------------------------
+# Activation + dropout MODULES (nn.Module wrappers over the closed functional ops)
+# ---------------------------------------------------------------------------
+#
+# torch.nn.ReLU is already multiplier-free, but nn.LeakyReLU(slope) hides a non-pow2
+# ``x*slope`` multiply and nn.Dropout hides the ``1/(1-p)`` survivor rescale — both
+# break training closure. These give a torch-familiar, Sequential-friendly,
+# closure-clean set (each carries an inert set_tau for parity with the tau cascade).
+
+
+class TropicalReLU(nn.Module):
+    """ReLU = ``max(x, 0)`` as a Module — multiplier-free (tropical max-with-0)."""
+
+    def forward(self, x):
+        return tropical_relu(x)
+
+    def set_tau(self, tau):
+        pass
+
+
+class TropicalLeakyReLU(nn.Module):
+    """Leaky ReLU with a POWER-OF-2 negative slope: ``max(x, x >> shift)`` (slope 2**-shift).
+
+    Unlike ``nn.LeakyReLU(0.01)`` (a non-pow2 ``x*0.01`` multiply), the slope is an
+    arithmetic right-shift — multiplier-free / zero-DSP.
+    """
+
+    def __init__(self, shift: int = 3):
+        super().__init__()
+        self.shift = int(shift)
+
+    def forward(self, x):
+        return tropical_leaky_relu(x, shift=self.shift)
+
+    def set_tau(self, tau):
+        pass
+
+    def extra_repr(self):
+        return f"slope=2**-{self.shift}"
+
+
+class TropicalHardtanh(nn.Module):
+    """Hard tanh = ``clamp(x, lo, hi)`` = ``min(max(x, lo), hi)``. Pure compare, no multiply."""
+
+    def __init__(self, lo: float = -1.0, hi: float = 1.0):
+        super().__init__()
+        self.lo, self.hi = lo, hi
+
+    def forward(self, x):
+        return tropical_hardtanh(x, self.lo, self.hi)
+
+    def set_tau(self, tau):
+        pass
+
+    def extra_repr(self):
+        return f"lo={self.lo}, hi={self.hi}"
+
+
+class TropicalDropout(nn.Module):
+    """Closure-clean dropout: a ``{0,1}`` GATE, with NO ``1/(1-p)`` survivor rescale.
+
+    Standard ``nn.Dropout`` scales survivors by ``1/(1-p)`` — a non-power-of-2 real
+    multiply that silently breaks *training* closure (``assert_training_closed`` flags
+    it). ``TropicalDropout`` drops by masking to zero only (gating = a mux/AND, which the
+    closure audit treats as a shift, not a DSP multiply); at ``eval()`` it is the
+    identity. The (small) train/eval activation-scale shift this trades away is the
+    price of a zero-DSP training step.
+    """
+
+    def __init__(self, p: float = 0.5):
+        super().__init__()
+        if not 0.0 <= p < 1.0:
+            raise ValueError(f"dropout p must be in [0, 1), got {p}")
+        self.p = float(p)
+
+    def forward(self, x):
+        if not self.training or self.p == 0.0:
+            return x
+        mask = (torch.rand_like(x) >= self.p).to(x.dtype)    # {0,1} gate (no rescale)
+        return x * mask
+
+    def set_tau(self, tau):
+        pass
+
+    def extra_repr(self):
+        return f"p={self.p}"
+
+
 # --- higher-level layers ---
 #
 # The modules below are ``nn.Module`` building blocks (NOT the full
@@ -873,7 +966,7 @@ class MorphSSMLayer(nn.Module):
                 d_model, kernel_size, dilation=dilation,
                 mode=mode, use_soft=use_soft, tau=tau, group_size=group_size,
             )
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = TropicalDropout(dropout) if dropout > 0 else nn.Identity()
         # out_proj_type:
         #   "tropical" - TropicalDilationModule (max-plus + bias; closure-preserving, DEFAULT)
         #   "linear"   - nn.Linear (NOT closure-preserving; opt-in ablation only — closure hole H5)
@@ -1239,7 +1332,7 @@ class TropicalTransformerBlock(nn.Module):
         # Tropical FFN: Dilation (max-plus) -> Erosion (min-plus) = tropical rational
         self.ffn_up = TropicalDilationModule(d_model, d_ff, use_softmax=False)
         self.ffn_down = TropicalLinearModule(d_ff, d_model, use_softmin=False)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = TropicalDropout(dropout) if dropout > 0 else nn.Identity()
 
     def set_tau(self, tau: float) -> None:
         self.attn.set_tau(tau)

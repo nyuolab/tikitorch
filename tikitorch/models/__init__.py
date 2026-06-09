@@ -53,6 +53,7 @@ from tikitorch.nn import (
     TropicalAdaptiveMaxPool2d,
     TropicalBatchShift,
     TropicalDilationModule,
+    TropicalDropout,
     TropicalGlobalMaxPool,
     TropicalLinearModule,
     TropicalQuantizedEmbed,
@@ -155,7 +156,7 @@ class TropicalMLP(FpgaAccelerable, nn.Module):
                     tau=self.temperature,
                 )
             )
-            self.dropouts.append(nn.Dropout(dropout) if dropout > 0 else nn.Identity())
+            self.dropouts.append(TropicalDropout(dropout) if dropout > 0 else nn.Identity())
             in_dim = self.d_model
 
         # Standard linear output head (for fair perplexity comparison)
@@ -362,7 +363,7 @@ class TropicalSequenceModel(FpgaAccelerable, nn.Module):
                     tau=self.temperature,
                 )
             )
-            self.layer_drops.append(nn.Dropout(dropout) if dropout > 0 else nn.Identity())
+            self.layer_drops.append(TropicalDropout(dropout) if dropout > 0 else nn.Identity())
 
         # Output head
         self.head = _make_head("tropical", self.d_model, self.num_classes)
@@ -563,7 +564,7 @@ class MorphSSM(FpgaAccelerable, nn.Module):
             )
 
         self.ln_final = _make_norm(norm_type, d_model)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = TropicalDropout(dropout) if dropout > 0 else nn.Identity()
 
         # GPT-2 style residual scaling: scale out_proj weights by
         # 1/sqrt(2*n_layers) at init to prevent the residual branch from
@@ -794,7 +795,7 @@ class MorphMLP(FpgaAccelerable, nn.Module):
                     )
                 )
             self.norms.append(TropicalBatchShift())
-            self.dropouts.append(nn.Dropout(dropout) if dropout > 0 else nn.Identity())
+            self.dropouts.append(TropicalDropout(dropout) if dropout > 0 else nn.Identity())
             in_dim = self.d_model
 
         # Standard linear output head
@@ -1077,7 +1078,7 @@ class MoTEModel(FpgaAccelerable, nn.Module):
         # Closed final norm; the pre/post MorphSSMLayers and the MoTEBlock's
         # transformer/morph experts already default to TropicalLayerNorm (N1).
         self.ln_final = _make_norm("tropical", d_model)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = TropicalDropout(dropout) if dropout > 0 else nn.Identity()
 
         # GPT-2 style init scaling for deep residual paths
         n_total_layers = n_shared_pre + n_shared_post

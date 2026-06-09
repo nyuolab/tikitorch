@@ -184,14 +184,27 @@ def test_inference_closed_by_construction_for_tropical_models():
         assert tt.closure_report(m, x)["inference_closed"], f"{type(m).__name__} not inference-closed"
 
 
-def test_dropout_breaks_training_closure_off_switch():
-    # Dropout is a train-time mask multiply -> NOT closed; dropout=0 is the off-switch.
+def test_tropical_dropout_keeps_training_zero_dsp():
+    # The models now use TropicalDropout (a {0,1} gate, no 1/(1-p) rescale), so dropout>0
+    # NO LONGER breaks training closure — it is zero-DSP at any dropout rate. (Previously the
+    # raw nn.Dropout survivor rescale was a non-pow2 multiply that broke closure off-pow2-p.)
     import tikitorch as tt
     import tikitorch.functional as F
+    import tikitorch.nn as ttnn
     import tikitorch.optim as optim
+    import torch.nn as nn
     x = torch.randint(0, 32, (2, 16)); y = torch.randint(0, 32, (2, 16))
     perc = lambda p, yy: F.tropical_perceptron_loss(p.reshape(-1, p.shape[-1]), yy.reshape(-1))
     m = tt.models.TropicalTransformer(d_model=64, n_heads=4, n_layers=1,
                                       task_type="lm", vocab_size=32, dropout=0.1)
     rep = tt.closure_report(m, x, y, perc, optimizer=optim.PureTropicalSGD(m.parameters(), lr_shift=4))
-    assert rep["training_zero_dsp"] is False         # dropout>0 -> training not zero-DSP
+    assert rep["training_zero_dsp"] is True          # TropicalDropout>0 stays zero-DSP
+    assert rep["training_closed"] is True
+
+    # contrast: the raw nn.Dropout it replaced rescales by 1/(1-p); at non-pow2 p that is a
+    # real multiply the closure guard flags (1/(1-0.3)=1.43); TropicalDropout(0.3) does not.
+    with tt.assert_no_multiply():
+        ttnn.TropicalDropout(0.3).train()(torch.randn(256))
+    with pytest.raises(tt.ClosureViolation):
+        with tt.assert_no_multiply():
+            nn.Dropout(0.3).train()(torch.randn(256))
