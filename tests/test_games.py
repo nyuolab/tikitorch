@@ -113,3 +113,31 @@ def test_legal_move_masking_only_expands_legal():
     assert vp.shape == (9,)
     illegal = [i for i in range(9) if board[i] != 0]
     assert float(vp[illegal].sum()) == 0.0   # no visits to illegal moves
+
+
+def test_random_opening_diversifies_eval_games():
+    """Regression for the deterministic-eval artifact: a deterministic agent vs a deterministic
+    opponent from the FIXED start replays one game (score quantizes, gradual skill invisible);
+    random openings give distinct start states -> distinct games. Pins games.random_opening +
+    play_match(start_state=...)."""
+    from tikitorch.planning.muzero.games import random_opening, Connect4
+
+    def first_legal(state):                       # a deterministic agent
+        return Connect4.legal_actions(state[0])[0]
+
+    def last_legal(state):
+        return Connect4.legal_actions(state[0])[-1]
+
+    # fixed start -> deterministic: identical winner every time
+    w1 = play_match(first_legal, last_legal, Connect4)
+    w2 = play_match(first_legal, last_legal, Connect4)
+    assert w1 == w2
+
+    # random openings -> diverse start states (the fix that makes eval see >2 games)
+    rng = torch.Generator().manual_seed(0)
+    starts = [random_opening(Connect4, rng, 4) for _ in range(16)]
+    assert len({s for s in starts}) > 1                       # not all the same opening
+    assert all(s != Connect4.initial_state() for s in starts)  # all moved off the fixed start
+    # play_match accepts and plays from a given opening
+    res = play_match(first_legal, last_legal, Connect4, start_state=starts[0])
+    assert res in (0, 1, 2)

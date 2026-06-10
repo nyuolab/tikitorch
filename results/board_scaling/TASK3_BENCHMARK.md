@@ -14,7 +14,33 @@ self-play→replay→K-step-training loop runs **structurally end-to-end** on Co
 
 ---
 
-## Connect4 — dyadic vs max-plus vs dense
+> **UPDATE (eval bug found + fixed, follow-up to the M0 gate).** The gauntlet numbers in this section
+> were measured with a **deterministic eval** (MCTS root-noise off + deterministic negamax), which
+> replays the *same game per color* — so the "20–30 game" gauntlet is effectively **n=2**, score
+> quantized to {0, 0.5, 1.0} and blind to gradual skill. This was confirmed directly (agent-as-X vs
+> negamax-d2 is byte-identical every game) and explains why the score was an invariant 0.5/0.0/0.0
+> across 48→200 sims and 320→2000 games and both optimizers. Fixed in `games.random_opening` +
+> `BoardMuZero.evaluate` (random openings → distinct games). **Re-measured under the working eval**
+> (random openings, 60 distinct games, dyadic+TropicalSGD, 1600 self-play games — `connect4_eval_diagnostic.json`):
+>
+> | opponent | trained | untrained control |
+> |---|---|---|
+> | random | 0.77 | 0.83 |
+> | negamax-d1 | **0.72** | 0.57 |
+> | negamax-d2 | 0.00 | 0.02 |
+> | negamax-d3 | 0.00 | 0.02 |
+>
+> Corrected conclusions: (1) training gives a **real** gain vs the weak depth-1 opponent (0.57→0.72,
+> ~2–3 SE) — it *is* learning, which the broken eval hid; (2) it is flat-to-slightly-down vs random
+> (within ~1 SE — not a strong collapse, but no gain either); (3) **the depth-2 barrier is REAL, not an
+> eval artifact** — trained and untrained both ~0 vs d2. So the plateau survives the eval fix: it is a
+> genuine ceiling that is **not the optimizer** (M0: TropicalSGD≡AdamW, 8/8 runs) and **not curable by
+> the search/volume tried** (the scaled 200-sim/2000-game run did not move it). The remaining blocker is
+> training dynamics (the policy learns weak-opponent play but not depth-2 tactics) — the M1 levers in
+> `tikitorch/fpga/COMPETITIVE_TRAINING_ROADMAP.md` (anti-collapse entropy/KL, n-step value bootstrap,
+> more search) — not more raw games. The original deterministic-eval table is kept below for the record.
+
+## Connect4 — dyadic vs max-plus vs dense (original deterministic-eval gauntlet — see UPDATE above)
 
 Two-player negamax-MCTS self-play (latent 64, **48 sims, 20 iters × 16 games**, closed TropicalSGD —
 multiplier-free), then a gauntlet vs depth-limited negamax of **increasing** strength. The n=4

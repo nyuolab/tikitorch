@@ -16,7 +16,7 @@ import torch
 from tikitorch.planning.mcts import MCTSConfig, TropicalMCTS
 from tikitorch.planning.muzero.networks import TropicalMuZeroNet
 from tikitorch.planning.muzero.networks_dense import DenseMuZeroNet
-from tikitorch.planning.muzero.games import BoardGameModel, negamax_agent, play_match
+from tikitorch.planning.muzero.games import BoardGameModel, negamax_agent, play_match, random_opening
 from tikitorch.planning.muzero.selfplay import play_board_game
 from tikitorch.planning.muzero.agent import _make_optimizer, _ce
 
@@ -84,6 +84,7 @@ class BoardConfig:
     eval_every: int = 5
     eval_games: int = 20
     eval_depth: int = 2                # depth of the negamax skill opponent
+    eval_open_plies: int = 4           # random opening plies per eval game (0 = fixed start; see below)
     seed: int = 0
 
 
@@ -192,14 +193,22 @@ class BoardMuZero:
 
     @torch.no_grad()
     def evaluate(self):
-        """Win/draw/loss vs a depth-limited negamax opponent (the skill metric)."""
+        """Win/draw/loss vs a depth-limited negamax opponent, from RANDOM OPENINGS so the games are
+        distinct. Both the MCTS agent (root noise off) and negamax are deterministic, so playing from
+        the single fixed start collapses to ~2 games (one per color) replayed eval_games times — a
+        silent artifact that quantizes the score to {0,0.5,1} and is blind to gradual skill. Starting
+        each game from eval_open_plies random plies (alternating which color the agent plays) gives
+        eval_games genuinely distinct games and a smooth skill estimate."""
         me = self._mcts_agent()
         opp = negamax_agent(self.game, self.cfg.eval_depth)
+        rng = torch.Generator().manual_seed(self.cfg.seed + 99991)
         w = d = losses = 0
         for g in range(self.cfg.eval_games):
-            res = (play_match(me, opp, self.game) if g % 2 == 0
-                   else play_match(opp, me, self.game))
-            my_id = 1 if g % 2 == 0 else 2
+            start = (random_opening(self.game, rng, self.cfg.eval_open_plies)
+                     if self.cfg.eval_open_plies else None)
+            my_id = 1 if g % 2 == 0 else 2                 # alternate the agent's color for fairness
+            agents = {my_id: me, 3 - my_id: opp}
+            res = play_match(agents[1], agents[2], self.game, start_state=start)
             w += res == my_id
             d += res == 0
             losses += (res != 0 and res != my_id)

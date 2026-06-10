@@ -32,15 +32,22 @@ ARMS = [
 
 
 def gauntlet(mz, game, depths, eval_games, seed0=10_000):
-    """Score (win + 0.5*draw) vs negamax opponents of increasing depth (the trained best net)."""
+    """Score (win + 0.5*draw) vs negamax opponents of increasing depth, from RANDOM OPENINGS so the
+    deterministic agent/opponent produce DISTINCT games (a fixed start collapses to ~2 games — a
+    silent eval artifact; see games.random_opening / BoardMuZero.evaluate)."""
+    import torch
+    from tikitorch.planning.muzero.games import random_opening
     me = mz._mcts_agent()
     out = {}
     for d in depths:
         opp = negamax_agent(game, d)
+        rng = torch.Generator().manual_seed(seed0 + d)
         w = dr = 0
         for g in range(eval_games):
-            res = (play_match(me, opp, game) if g % 2 == 0 else play_match(opp, me, game))
+            start = random_opening(game, rng, 4)
             my_id = 1 if g % 2 == 0 else 2
+            agents = {my_id: me, 3 - my_id: opp}
+            res = play_match(agents[1], agents[2], game, start_state=start)
             w += res == my_id
             dr += res == 0
         out[d] = round((w + 0.5 * dr) / eval_games, 3)

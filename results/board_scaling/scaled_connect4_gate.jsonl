@@ -1,0 +1,4 @@
+{"arm": "dyadic", "seed": 0, "optimizer": "tropicalsgd", "game": "connect4", "best_score": 0.0, "gauntlet": {"1": 0.5, "2": 0.0, "3": 0.0}}
+{"arm": "dyadic", "seed": 1, "optimizer": "tropicalsgd", "game": "connect4", "best_score": 0.0, "gauntlet": {"1": 0.5, "2": 0.0, "3": 0.0}}
+{"arm": "dyadic", "seed": 0, "optimizer": "adamw", "game": "connect4", "best_score": 0.0, "gauntlet": {"1": 0.5, "2": 0.0, "3": 0.0}}
+{"arm": "dyadic", "seed": 1, "optimizer": "adamw", "game": "connect4", "best_score": 0.0, "gauntlet": {"1": 0.5, "2": 0.0, "3": 0.0}}

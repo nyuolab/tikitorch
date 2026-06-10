@@ -1,0 +1,19 @@
+{
+  "note": "random-opening stochastic eval (60 distinct games each) vs the deterministic gauntlet",
+  "config": "dyadic+tropicalsgd, 200 sims train / 100 sims eval, 1600 self-play games",
+  "score": "win + 0.5*draw from agent perspective",
+  "results": {
+    "trained": {
+      "random": 0.767,
+      "negamax-d1": 0.717,
+      "negamax-d2": 0.0,
+      "negamax-d3": 0.0
+    },
+    "untrained": {
+      "random": 0.833,
+      "negamax-d1": 0.567,
+      "negamax-d2": 0.017,
+      "negamax-d3": 0.017
+    }
+  }
+}

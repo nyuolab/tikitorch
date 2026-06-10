@@ -29,7 +29,7 @@ def main(a):
     cfg = BoardConfig(optimizer=a.opt, latent_dim=64, num_simulations=a.sims,
                       iters=a.iters, games_per_iter=a.games, train_steps_per_iter=30, batch=128,
                       unroll=3, eval_every=max(a.iters - 1, 1), eval_games=a.eval, eval_depth=2,
-                      num_workers=1, tau_start=1.0, tau_end=0.1, lr=3e-3, seed=a.seed, **ARM[a.arm])
+                      num_workers=a.workers, tau_start=1.0, tau_end=0.1, lr=3e-3, seed=a.seed, **ARM[a.arm])
     mz = BoardMuZero(game, cfg)
     hist = mz.run(log=lambda s: None)
     gaunt = gauntlet(mz, game, [1, 2, 3], a.eval)
@@ -47,4 +47,5 @@ if __name__ == "__main__":
     p.add_argument("--iters", type=int, default=20)
     p.add_argument("--games", type=int, default=16)
     p.add_argument("--eval", type=int, default=20)
+    p.add_argument("--workers", type=int, default=1)   # parallel self-play workers within this run
     main(p.parse_args())

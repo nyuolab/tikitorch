@@ -47,6 +47,19 @@ competitive value/policy net at all. That question is the first gate (M0), not a
 The near-term, defensible answer to "competitive **and** trains with FPGA" is **M1 + M3**: cure the
 measured Connect4 starvation, deployed as a QAT actor-farm. M5 (pure on-fabric learner) is the stretch.
 
+### M0 outcome (2026-06-10) — partial GO, plus a found+fixed eval bug
+- **Optimizer is NOT the blocker:** across 8 Connect4 runs (dyadic/dense × TropicalSGD/AdamW, 2 seeds),
+  the multiply-free optimizer is **bit-identical to AdamW**. No detectable penalty for going on-fabric →
+  the NO-GO/QAT-forced case is ruled out (QAT stays the documented *fallback*, not triggered).
+- **A scaled run (200 sims / 2000 games) did not move the score** → suspicious invariance led to finding
+  a **deterministic-eval artifact**: the gauntlet replayed ~2 games. Fixed (`games.random_opening` +
+  `BoardMuZero.evaluate` random openings). Under the working eval, training gives a real depth-1 gain
+  (0.57→0.72) but **does not beat depth-2** (genuine ceiling, not eval, not optimizer, not the volume tried).
+- **Verdict: not yet a full GO** (nothing beats depth-2), but the on-fabric path is alive. The binding
+  blocker is now **training dynamics** (policy learns weak-opponent play, not depth-2 tactics) → the M1
+  levers (anti-collapse entropy/KL, n-step value bootstrap, more search), NOT more raw games. See
+  `results/board_scaling/TASK3_BENCHMARK.md` (UPDATE block) + `connect4_eval_diagnostic.json`.
+
 ## Concrete fixes the panel identified (all PyTorch-validatable, no silicon)
 
 - **Value signal (the chess killer):** games must *resolve* or be adjudicated. Continuous bounded

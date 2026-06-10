@@ -16,7 +16,7 @@ import torch
 
 from tikitorch.planning.muzero.env import Inference
 
-__all__ = ["TicTacToe", "TwoPlayerKnownModel", "play_match"]
+__all__ = ["TicTacToe", "TwoPlayerKnownModel", "play_match", "random_opening"]
 
 _LINES = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (0, 3, 6), (1, 4, 7),
           (2, 5, 8), (0, 4, 8), (2, 4, 6)]
@@ -241,9 +241,28 @@ class BoardGameModel:
         return self.net.recurrent_inference(latent, action)
 
 
-def play_match(agent_x, agent_y, game=TicTacToe):
-    """Play one full game; agent_* are callables state->action. Returns winner (1/2) or 0 (draw)."""
+def random_opening(game, rng, n_plies):
+    """A state after ``n_plies`` uniform-random legal moves from the start (stops early at terminal).
+
+    Used to begin EVAL games from DIVERSE positions: a deterministic agent vs a deterministic
+    opponent played from the single fixed start collapses to one game per color (a silent eval
+    artifact that quantizes the score and hides gradual skill); random openings give distinct games.
+    """
     state = game.initial_state()
+    for _ in range(n_plies):
+        if game.is_terminal(state[0]):
+            break
+        board, tp = state
+        legal = game.legal_actions(board)
+        a = legal[int(torch.randint(0, len(legal), (1,), generator=rng).item())]
+        state = (game.apply(board, a, tp), 3 - tp)
+    return state
+
+
+def play_match(agent_x, agent_y, game=TicTacToe, start_state=None):
+    """Play one full game from ``start_state`` (default the initial state); ``agent_*`` are callables
+    state->action keyed by player (agent_x = player 1, agent_y = player 2). Returns winner (1/2) or 0."""
+    state = start_state if start_state is not None else game.initial_state()
     agents = {1: agent_x, 2: agent_y}
     while not game.is_terminal(state[0]):
         board, tp = state
