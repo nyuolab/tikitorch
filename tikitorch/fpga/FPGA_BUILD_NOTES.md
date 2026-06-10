@@ -59,15 +59,29 @@ The zero-DSP dyadic MuZero kernels (`forge_train_step_muzero.cpp` forward-infere
 `forge_train_step_muzero_train.cpp` on-chip SignSGD training) **pass Vitis HLS 2024.1
 C-synthesis on the real F2 part `xcvu47p-fsvh2892-2L-e` at the 4.0 ns / 250 MHz target:**
 
-| kernel | DSP | est. period | timing | LUT | FF | BRAM |
+| kernel | DSP | est. clock | latency (cycles) | LUT | FF | BRAM |
 |---|---|---|---|---|---|---|
-| `forge_train_step_muzero` (fwd) | **0** | **2.920 ns** (closes @ 250 MHz, ~1 ns slack) | met | 109165 (8% dev) | 60552 | 2 |
-| `forge_train_step_muzero_train` (fwd+bwd+SignSGD) | **0** | **2.920 ns** | met | 96330 (7% dev) | 39860 | 2 |
+| `forge_train_step_muzero` (fwd) | **0** | **2.920 ns** | **bounded: 25,539** (~102 µs) | 109165 (8% dev) | 60552 | 2 |
+| `forge_train_step_muzero_train` (fwd+bwd+SignSGD) | **0** | 2.920 ns (clock est. only) | **UNBOUNDED — HLS reports `?`** | 96330 (7% dev) | 39860 | 2 |
 
-The vendor synthesizer's DSP operation table is **empty** for both — every "multiply" mapped
-to shift+add LUT logic, and the `/MZ_L` (=/32) normalization mapped to LUTs (not a DSP divide).
-This **clears the §3 timing wall for the MuZero kernels** (the LM kernel's 14.3 ns / 70 MHz
-512-bit-select critical path does not appear here), so a full P&R AFI build is low-risk on timing.
+The vendor synthesizer's DSP operation table is **empty** for both — every "multiply" mapped to
+shift+add LUT logic, and the `/MZ_L` (=/32) normalization mapped to LUTs (not a DSP divide).
+**DSP=0 is solid for both.** But read the rest carefully (corrected 2026-06-09 after artifact re-audit):
+
+- **Forward kernel: genuinely measured** — DSP=0, latency *bounded* at 25,539 cycles, clock 2.920 ns.
+  This is a real, schedulable, complete initial-inference datapath.
+- **Training kernel: NOT a complete/bounded learner yet.** DSP=0 holds and 2.920 ns is reported, but
+  that is only the **AXI-wrapper clock estimate** — HLS could not **bound the latency** (every
+  cycle/interval field is `?`, because `nearest_pow2`'s leading-bit `while` loop has a data-dependent
+  trip count). It is also **initial-inference only** (returns −1 for the dynamics stage; no K-step
+  unroll, no reward head). So it is a validated **zero-DSP arithmetic primitive**, not a finished
+  on-fabric learner. To make it real: bound `nearest_pow2` to a fixed ≤15-iteration loop, add the
+  dynamics unroll + reward head, re-synthesize, and report the *actual* bounded latency.
+- **"Low-risk P&R" was an overstatement — corrected.** A clean HLS *C-synthesis* estimate is **not** a
+  P&R timing guarantee: per §3, the only MuZero-family kernel ever placed-and-routed (the char-LM)
+  **FAILED post-route timing** (WNS −1.557 ns) despite plausible HLS numbers. The HLS estimate is
+  encouraging, but **P&R timing closure is a genuine open risk** until an AFI is actually built.
+
 Reports: `results/fpga_silicon/forge_train_step_muzero{,_train}_csynth.rpt`.
 
 GOTCHA found here: Vitis HLS rejects ambiguous `?:` that g++ accepts — `cond ? x : -x` where `-x`
