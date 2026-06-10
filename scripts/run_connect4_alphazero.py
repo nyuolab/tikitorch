@@ -65,13 +65,15 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     open(os.path.join(OUT, "connect4_alphazero.json"), "w").write(json.dumps(
         {"note": "AlphaZero-style (true model in tree) + dyadic zero-DSP net; score=win+0.5draw, "
-                 "random openings, 30 games. Shows depth beats d2/d3 and training -> sim-efficiency.",
+                 "random openings, 30 games. Depth beats d2/d3; this measures what (light) training "
+                 "buys on top (sim-efficiency, if any) — interpret vs n=30 noise (SE~0.09).",
          "results": res}, indent=2))
     md = ["# Connect4 — AlphaZero-style (true model in tree) + zero-DSP dyadic net", "",
           "_Score = win + 0.5*draw vs depth-limited negamax, random openings (30 games). The TRUE game "
           "model in the MCTS tree (exact transitions/terminals/legality) + the dyadic net as prior/leaf "
           "value. Still multiplier-free (net = shift+add; rules = integer logic). Shows (a) depth beats "
-          "the negamax-d2/d3 wall that pure-MuZero couldn't, and (b) training buys sim-efficiency._", "",
+          "the negamax-d2/d3 wall that pure-MuZero couldn't; (b) what light training buys on top "
+          "(sim-efficiency, if any) — read vs n=30 noise._", "",
           "| sims | trained vs d2 | untrained vs d2 | trained vs d3 | untrained vs d3 |",
           "|---|---|---|---|---|"]
     for sims in sims_grid:
