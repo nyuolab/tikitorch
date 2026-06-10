@@ -16,7 +16,8 @@ import torch
 from tikitorch.planning.mcts import MCTSConfig, TropicalMCTS
 from tikitorch.planning.muzero.networks import TropicalMuZeroNet
 from tikitorch.planning.muzero.networks_dense import DenseMuZeroNet
-from tikitorch.planning.muzero.games import BoardGameModel, negamax_agent, play_match, random_opening
+from tikitorch.planning.muzero.games import (BoardGameModel, AlphaZeroBoardModel, negamax_agent,
+                                             play_match, random_opening)
 from tikitorch.planning.muzero.selfplay import play_board_game
 from tikitorch.planning.muzero.agent import _make_optimizer, _ce
 
@@ -54,6 +55,7 @@ def _run_worker(seed):
 class BoardConfig:
     net_kind: str = "tropical"
     core_kind: str = "maxplus"          # tropical cores: "maxplus" | "dyadic" (multiplier-free oblique)
+    tree_model: str = "muzero"          # MCTS tree: "muzero" (learned dynamics) | "alphazero" (true rules)
     optimizer: str = "tropicalsgd"      # closed (multiply-free) by default
     latent_dim: int = 64
     dense_hidden_mult: int = 3          # widen dense cores to param-match the tropical net
@@ -152,7 +154,7 @@ class BoardMuZero:
         c = self.cfg
         sp = dict(num_simulations=c.num_simulations, c_puct=c.c_puct, backup=c.backup,
                   root_exploration_frac=c.root_exploration_frac,
-                  dirichlet_alpha=c.dirichlet_alpha, temperature=temperature)
+                  dirichlet_alpha=c.dirichlet_alpha, temperature=temperature, tree_model=c.tree_model)
         if c.num_workers <= 1:
             for i in range(c.games_per_iter):
                 records, _ = play_board_game(self.net, self.game, seed=base_seed + i, **sp)
@@ -188,7 +190,9 @@ class BoardMuZero:
     def _mcts_agent(self):
         cfg = MCTSConfig(num_simulations=self.cfg.num_simulations, c_puct=self.cfg.c_puct,
                          gamma=1.0, backup=self.cfg.backup, players=2, root_exploration_frac=0.0)
-        mcts = TropicalMCTS(BoardGameModel(self.net, self.game), cfg)
+        model = (AlphaZeroBoardModel(self.net, self.game) if self.cfg.tree_model == "alphazero"
+                 else BoardGameModel(self.net, self.game))
+        mcts = TropicalMCTS(model, cfg)
         return lambda state: int(mcts.run(state)[0].argmax())
 
     @torch.no_grad()

@@ -19,8 +19,10 @@ from tikitorch.planning.muzero.games import (  # noqa: F401
     Connect4,
     TwoPlayerKnownModel,
     BoardGameModel,
+    AlphaZeroBoardModel,
     negamax_agent,
     play_match,
+    random_opening,
 )
 # Chess needs the optional ``python-chess`` dependency; surface it only if installed
 # (the package must still import on a stock environment without it).
@@ -47,6 +49,9 @@ __all__ = [
     "Connect4",
     "Chess",
     "TwoPlayerKnownModel",
+    "BoardGameModel",
+    "AlphaZeroBoardModel",
+    "random_opening",
     "BoardGameModel",
     "negamax_agent",
     "play_match",

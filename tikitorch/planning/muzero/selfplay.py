@@ -53,17 +53,23 @@ def play_game(net, env, *, num_simulations=50, c_puct=1.25, gamma=1.0,
 
 
 def play_board_game(net, board_game, *, num_simulations=50, c_puct=1.25, backup="mean",
-                    root_exploration_frac=0.25, dirichlet_alpha=0.3, temperature=1.0, seed=0):
+                    root_exploration_frac=0.25, dirichlet_alpha=0.3, temperature=1.0, seed=0,
+                    tree_model="muzero"):
     """Two-player self-play with the learned net (the agent plays BOTH sides via
     negamax MCTS). Returns ``(records, winner)`` where each record is
     ``(obs, action, mcts_policy, value_target)`` with the value target the final
-    game OUTCOME from that position's player-to-move perspective (+1/0/-1)."""
-    from tikitorch.planning.muzero.games import BoardGameModel
+    game OUTCOME from that position's player-to-move perspective (+1/0/-1).
+
+    ``tree_model``: ``"muzero"`` runs the learned latent dynamics inside the tree (no simulator);
+    ``"alphazero"`` runs the game's TRUE rules in the tree (exact transitions/terminals/legality,
+    net = prior+leaf-value) — far stronger search per sim when the simulator is available."""
+    from tikitorch.planning.muzero.games import BoardGameModel, AlphaZeroBoardModel
     gen = torch.Generator().manual_seed(seed)
     cfg = MCTSConfig(num_simulations=num_simulations, c_puct=c_puct, gamma=1.0,
                      backup=backup, players=2, root_exploration_frac=root_exploration_frac,
                      dirichlet_alpha=dirichlet_alpha, seed=seed)
-    mcts = TropicalMCTS(BoardGameModel(net, board_game), cfg)
+    model = AlphaZeroBoardModel(net, board_game) if tree_model == "alphazero" else BoardGameModel(net, board_game)
+    mcts = TropicalMCTS(model, cfg)
 
     state = board_game.initial_state()
     moves = []                                          # (obs, action, policy, to_play)

@@ -16,7 +16,8 @@ import torch
 
 from tikitorch.planning.muzero.env import Inference
 
-__all__ = ["TicTacToe", "TwoPlayerKnownModel", "play_match", "random_opening"]
+__all__ = ["TicTacToe", "Connect4", "TwoPlayerKnownModel", "BoardGameModel", "AlphaZeroBoardModel",
+           "negamax_agent", "play_match", "random_opening"]
 
 _LINES = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (0, 3, 6), (1, 4, 7),
           (2, 5, 8), (0, 4, 8), (2, 4, 6)]
@@ -239,6 +240,45 @@ class BoardGameModel:
 
     def recurrent_inference(self, latent, action):
         return self.net.recurrent_inference(latent, action)
+
+
+class AlphaZeroBoardModel:
+    """Wraps a net + game for AlphaZero-style MCTS: the TRUE game model in the tree.
+
+    Unlike :class:`BoardGameModel` (pure MuZero — learned latent dynamics inside the tree, legality
+    only at the root), this evaluates every node at its REAL state: transitions use the game's exact
+    rules, terminals use the exact outcome, and legal moves are injected at EVERY node. The (zero-DSP)
+    net supplies only the policy PRIOR and the leaf VALUE; search quality then scales with depth
+    largely independent of net quality, and deeper search => stronger play (it cannot be fooled by a
+    weak learned model or waste sims on illegal moves). This is the right setting for board games where
+    we HAVE the simulator (Connect4/chess); the rules are integer compare/branch logic — still
+    multiplier-free, so the closed/zero-DSP story holds (net = shift+add kernel, tree = game logic)."""
+
+    def __init__(self, net, game):
+        self.net = net
+        self.game = game
+        self.A = game.n_actions
+
+    def _eval(self, state, done):
+        board, tp = state
+        if done:                                     # exact terminal value from tp's perspective
+            return Inference(state=state, reward=0.0,
+                             policy=torch.full((self.A,), 1.0 / self.A),
+                             value=terminal_value(self.game, board, tp), legal=None)
+        inf = self.net.initial_inference(self.game.obs(state))   # net prior+value at the REAL state
+        inf.state = state                            # node carries the true state (not a latent)
+        inf.legal = self.game.legal_actions(board)   # true legality at EVERY node
+        return inf
+
+    def initial_inference(self, state):
+        return self._eval(state, self.game.is_terminal(state[0]))
+
+    def recurrent_inference(self, state, action):
+        board, tp = state
+        nb = self.game.apply(board, action, tp)
+        nstate = (nb, 3 - tp)
+        done = self.game.is_terminal(nb)
+        return self._eval(nstate, done), done
 
 
 def random_opening(game, rng, n_plies):

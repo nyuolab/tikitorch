@@ -141,3 +141,34 @@ def test_random_opening_diversifies_eval_games():
     # play_match accepts and plays from a given opening
     res = play_match(first_legal, last_legal, Connect4, start_state=starts[0])
     assert res in (0, 1, 2)
+
+
+def test_alphazero_board_model_uses_true_rules_to_find_a_forced_win():
+    """AlphaZeroBoardModel runs the TRUE game in the tree (exact terminals + legality at every node),
+    so even an UNTRAINED net finds a tactic that the learned-model tree (BoardGameModel) misses. Here:
+    a win-in-1 (bottom row cols 0,1,2 are player 1, player 1 to move -> col 3 completes four)."""
+    from tikitorch.planning.muzero.games import AlphaZeroBoardModel, Connect4
+    from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig
+
+    net = BoardMuZero(Connect4, BoardConfig(net_kind="tropical", core_kind="dyadic",
+                                            latent_dim=16)).net      # untrained
+    net.eval()
+    board = [0] * 42
+    for c in (0, 1, 2):
+        board[5 * 7 + c] = 1                                          # player-1 three-in-a-row, bottom
+    state = (tuple(board), 1)
+    assert 3 in Connect4.legal_actions(state[0])
+
+    cfg = P.MCTSConfig(num_simulations=60, players=2, backup="mean", root_exploration_frac=0.0)
+    az = P.TropicalMCTS(AlphaZeroBoardModel(net, Connect4), cfg)
+    vp_az, _ = az.run(state)
+    assert int(vp_az.argmax()) == 3                                  # true terminals -> finds the win
+
+    # AlphaZero never visits illegal moves (true legality at every node): a full column gets 0 visits
+    full = [0] * 42
+    for r in range(6):
+        full[r * 7 + 0] = 1 if r % 2 else 2                          # column 0 completely full
+    st2 = (tuple(full), 1)
+    assert 0 not in Connect4.legal_actions(st2[0])
+    vp2, _ = P.TropicalMCTS(AlphaZeroBoardModel(net, Connect4), cfg).run(st2)
+    assert float(vp2[0]) == 0.0
