@@ -40,9 +40,22 @@ def build_muzero_net(net_kind, obs_dim, n_actions, latent_dim, tau,
 _W = {}
 
 
+def _robust_mp_sharing():
+    """Workers return records holding torch tensors; the default 'file_descriptor' sharing strategy
+    passes an fd per tensor over the Pool's socket and overflows ``ulimit -n`` at high worker counts
+    (the 'received 0 items of ancdata' crash on Linux). 'file_system' avoids fd-passing. Set in BOTH
+    the parent (before Pool creation) and each worker."""
+    try:
+        import torch.multiprocessing as _tmp
+        _tmp.set_sharing_strategy("file_system")
+    except Exception:
+        pass
+
+
 def _init_worker(blueprint, state_dict, game, sp_kwargs):
     import torch as _t
     _t.set_num_threads(1)                       # one thread/worker; parallelism is across games
+    _robust_mp_sharing()
     net = build_muzero_net(**blueprint)
     net.load_state_dict(state_dict)
     net.eval()
@@ -168,6 +181,7 @@ class BoardMuZero:
             return
         # parallel actors: rebuild the current net once per worker, fan games across them
         import multiprocessing as mp
+        _robust_mp_sharing()                        # avoid the 'ancdata' fd-overflow at many workers
         bp = dict(self._bp)
         bp["tau"] = self.current_tau
         sd = {k: v.detach().cpu() for k, v in self.net.state_dict().items()}

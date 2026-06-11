@@ -1,0 +1,21 @@
+{
+  "note": "chess: AlphaZero-style (true rules in tree, ~30 legal branch) vs pure-MuZero (4096-way learned tree); UNTRAINED dyadic net, depth only. score=win+0.5draw, 12 games. Pure-MuZero trained chess agent previously scored 0.07-0.14 vs random.",
+  "results": {
+    "alphazero": {
+      "50": {
+        "random": 0.375,
+        "material": 0.5
+      },
+      "200": {
+        "random": 0.625,
+        "material": 0.5
+      }
+    },
+    "muzero": {
+      "200": {
+        "random": 0.375,
+        "material": 0.5
+      }
+    }
+  }
+}
