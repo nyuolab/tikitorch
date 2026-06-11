@@ -172,3 +172,22 @@ def test_alphazero_board_model_uses_true_rules_to_find_a_forced_win():
     assert 0 not in Connect4.legal_actions(st2[0])
     vp2, _ = P.TropicalMCTS(AlphaZeroBoardModel(net, Connect4), cfg).run(st2)
     assert float(vp2[0]) == 0.0
+
+
+def test_fully_tropical_board_net_is_closure_empty_and_trains():
+    """The fully multiplier-free recipe: dyadic cores + DYADIC heads (no nn.Linear) => closure audit
+    returns NOTHING, and the closure-faithful training step (perceptron policy + L1 value + sign-only
+    TropicalSGD) runs. This is the 'fully tropical, multiply-free' board agent."""
+    from tikitorch.audit import find_closure_violations
+    from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig
+    from tikitorch.planning.muzero.games import Connect4
+
+    cfg = BoardConfig(net_kind="tropical", core_kind="dyadic", dyadic_heads=True,
+                      policy_loss="perceptron", optimizer="tropicalsgd", tree_model="alphazero",
+                      latent_dim=32, num_simulations=16, games_per_iter=2, eval_games=2, seed=0)
+    mz = BoardMuZero(Connect4, cfg)
+    assert find_closure_violations(mz.net) == []          # zero nn.Linear: fully multiplier-free
+    assert type(mz.opt).__name__ == "TropicalSGD"         # sign-only (multiply-free update)
+    mz.self_play(temperature=1.0, base_seed=1)
+    loss = mz.train_step()                                # perceptron + L1, sign-SGD step
+    assert loss == loss and loss >= 0.0                   # finite, ran

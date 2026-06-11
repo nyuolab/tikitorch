@@ -65,12 +65,19 @@ def _make_proj(kind, in_features, out_features, tau):
 # ---------------------------------------------------------------------------
 
 
-class ScalarHead(nn.Module):
-    """Plain scalar regression head (raw == scalar; MSE loss)."""
+def _lin(in_dim, out_dim, dyadic):
+    """A linear readout: ``nn.Linear`` (declared DSP boundary) or ``DyadicLinear`` (signed
+    power-of-two weights -> shift+add, multiplier-free / zero-DSP) for a FULLY tropical net."""
+    return ttnn.DyadicLinear(in_dim, out_dim) if dyadic else nn.Linear(in_dim, out_dim)
 
-    def __init__(self, in_dim):
+
+class ScalarHead(nn.Module):
+    """Plain scalar regression head (raw == scalar; MSE loss). L1 (``l1_loss``) is the
+    closure-faithful (multiplier-free, ±1-gradient) alternative used by the tropical recipe."""
+
+    def __init__(self, in_dim, dyadic=False):
         super().__init__()
-        self.head = nn.Linear(in_dim, 1)
+        self.head = _lin(in_dim, 1, dyadic)
 
     def forward(self, h):
         return self.head(h).squeeze(-1)
@@ -79,7 +86,7 @@ class ScalarHead(nn.Module):
         return raw
 
     def loss(self, raw, target):
-        return F.mse_loss(raw, target)
+        return F.l1_loss(raw, target)
 
 
 class CategoricalHead(nn.Module):
@@ -90,10 +97,10 @@ class CategoricalHead(nn.Module):
     value/reward are MuZero's standard stability lever vs. scalar MSE regression.
     """
 
-    def __init__(self, in_dim, lo, hi):
+    def __init__(self, in_dim, lo, hi, dyadic=False):
         super().__init__()
         self.register_buffer("support", torch.arange(lo, hi + 1).float())
-        self.head = nn.Linear(in_dim, self.support.numel())
+        self.head = _lin(in_dim, self.support.numel(), dyadic)
 
     def forward(self, h):
         return self.head(h)                       # logits (..., N)
@@ -116,8 +123,9 @@ class CategoricalHead(nn.Module):
         return -(self._two_hot(target) * raw.log_softmax(-1)).sum(-1).mean()
 
 
-def _make_value_head(in_dim, support):
-    return CategoricalHead(in_dim, *support) if support is not None else ScalarHead(in_dim)
+def _make_value_head(in_dim, support, dyadic=False):
+    return (CategoricalHead(in_dim, *support, dyadic=dyadic) if support is not None
+            else ScalarHead(in_dim, dyadic=dyadic))
 
 
 class TropicalRepresentation(nn.Module):
@@ -138,14 +146,15 @@ class TropicalRepresentation(nn.Module):
 class TropicalDynamics(nn.Module):
     """(latent h, action a) -> (next latent h', reward r). Action = closed gather."""
 
-    def __init__(self, latent_dim, n_actions, tau=1.0, depth=2, reward_support=None, proj_kind="maxplus"):
+    def __init__(self, latent_dim, n_actions, tau=1.0, depth=2, reward_support=None,
+                 proj_kind="maxplus", dyadic_heads=False):
         super().__init__()
         self.action_embed = nn.Embedding(n_actions, latent_dim)   # closed gather
         self.core = nn.ModuleList(
             [_make_proj(proj_kind, latent_dim, latent_dim, tau) for _ in range(depth)])
         self.norm = nn.ModuleList(
             [ttnn.TropicalLayerNorm(latent_dim) for _ in range(depth)])
-        self.reward_head = _make_value_head(latent_dim, reward_support)   # scalar or categorical
+        self.reward_head = _make_value_head(latent_dim, reward_support, dyadic=dyadic_heads)
 
     def set_tau(self, tau):
         _set_tau(self, tau)
@@ -164,11 +173,13 @@ class TropicalDynamics(nn.Module):
 class TropicalPrediction(nn.Module):
     """latent h -> (policy logits over actions, scalar value)."""
 
-    def __init__(self, latent_dim, n_actions, tau=1.0, value_support=None, proj_kind="maxplus"):
+    def __init__(self, latent_dim, n_actions, tau=1.0, value_support=None, proj_kind="maxplus",
+                 dyadic_heads=False):
         super().__init__()
         self.mix = _make_proj(proj_kind, latent_dim, latent_dim, tau)
-        self.policy_head = nn.Linear(latent_dim, n_actions)      # declared boundary
-        self.value_head = _make_value_head(latent_dim, value_support)   # scalar or categorical
+        # policy head: DyadicLinear (shift+add) for a fully multiplier-free net, else nn.Linear boundary
+        self.policy_head = _lin(latent_dim, n_actions, dyadic_heads)
+        self.value_head = _make_value_head(latent_dim, value_support, dyadic=dyadic_heads)
 
     def set_tau(self, tau):
         _set_tau(self, tau)
@@ -191,18 +202,20 @@ class TropicalMuZeroNet(nn.Module):
 
     def __init__(self, obs_dim, n_actions, latent_dim=64, tau=1.0,
                  value_support=None, reward_support=None,
-                 core_kind="maxplus", dyn_kind="maxplus"):
+                 core_kind="maxplus", dyn_kind="maxplus", dyadic_heads=False):
         super().__init__()
         # core_kind controls the OBLIQUE-needing cores (repr encode + pred value/policy
         # readout): "maxplus" (axis-aligned, default) | "dyadic" (multiplier-free oblique,
         # closes the §2a underfit). Dynamics stays "maxplus" by default — it is the MCTS
         # hot loop and was a wash in tropical (results/capacity_probe/COMPONENT_FINDINGS.md).
+        # dyadic_heads=True makes the policy/value/reward readouts DyadicLinear too, so the WHOLE
+        # net is multiplier-free / zero-DSP (no nn.Linear boundary) — the fully-tropical deploy net.
         self.n_actions = n_actions
         self.repr = TropicalRepresentation(obs_dim, latent_dim, tau=tau, proj_kind=core_kind)
         self.dyn = TropicalDynamics(latent_dim, n_actions, tau=tau, reward_support=reward_support,
-                                    proj_kind=dyn_kind)
+                                    proj_kind=dyn_kind, dyadic_heads=dyadic_heads)
         self.pred = TropicalPrediction(latent_dim, n_actions, tau=tau, value_support=value_support,
-                                       proj_kind=core_kind)
+                                       proj_kind=core_kind, dyadic_heads=dyadic_heads)
 
     # scalar conversions (identity for scalar heads; expectation for categorical)
     def value_scalar(self, raw):

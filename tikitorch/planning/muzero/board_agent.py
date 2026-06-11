@@ -20,17 +20,20 @@ from tikitorch.planning.muzero.games import (BoardGameModel, AlphaZeroBoardModel
                                              play_match, random_opening)
 from tikitorch.planning.muzero.selfplay import play_board_game
 from tikitorch.planning.muzero.agent import _make_optimizer, _ce
+from tikitorch.functional import tropical_perceptron_loss
 
 __all__ = ["BoardConfig", "BoardReplay", "BoardMuZero", "build_muzero_net"]
 
 
 def build_muzero_net(net_kind, obs_dim, n_actions, latent_dim, tau,
-                     value_support, reward_support, dense_hidden_mult, core_kind="maxplus"):
+                     value_support, reward_support, dense_hidden_mult, core_kind="maxplus",
+                     dyadic_heads=False):
     kw = dict(latent_dim=latent_dim, tau=tau, value_support=value_support,
               reward_support=reward_support)
     if net_kind == "dense":
         return DenseMuZeroNet(obs_dim, n_actions, hidden_mult=dense_hidden_mult, **kw)
-    return TropicalMuZeroNet(obs_dim, n_actions, core_kind=core_kind, **kw)
+    return TropicalMuZeroNet(obs_dim, n_actions, core_kind=core_kind,
+                             dyadic_heads=dyadic_heads, **kw)
 
 
 # --- parallel self-play workers (the MuZero "actor" pattern; module-level for pickling) ---
@@ -55,7 +58,9 @@ def _run_worker(seed):
 class BoardConfig:
     net_kind: str = "tropical"
     core_kind: str = "maxplus"          # tropical cores: "maxplus" | "dyadic" (multiplier-free oblique)
+    dyadic_heads: bool = False          # True -> DyadicLinear policy/value/reward heads (fully zero-DSP net)
     tree_model: str = "muzero"          # MCTS tree: "muzero" (learned dynamics) | "alphazero" (true rules)
+    policy_loss: str = "ce"             # "ce" (soft x-ent) | "perceptron" (closure-faithful, multiply-free)
     optimizer: str = "tropicalsgd"      # closed (multiply-free) by default
     latent_dim: int = 64
     dense_hidden_mult: int = 3          # widen dense cores to param-match the tropical net
@@ -143,7 +148,8 @@ class BoardMuZero:
         self._bp = dict(net_kind=self.cfg.net_kind, obs_dim=game.obs_dim, n_actions=game.n_actions,
                         latent_dim=self.cfg.latent_dim, tau=self.cfg.tau,
                         value_support=self.cfg.value_support, reward_support=self.cfg.reward_support,
-                        dense_hidden_mult=self.cfg.dense_hidden_mult, core_kind=self.cfg.core_kind)
+                        dense_hidden_mult=self.cfg.dense_hidden_mult, core_kind=self.cfg.core_kind,
+                        dyadic_heads=self.cfg.dyadic_heads)
         self.net = build_muzero_net(**self._bp)
         self.opt = _make_optimizer(self.cfg.optimizer, self.net.parameters(), self.cfg.lr)
         self.buffer = BoardReplay(self.cfg.capacity, game.n_actions)
@@ -171,15 +177,24 @@ class BoardMuZero:
                 self.buffer.save(records)
 
     # ---------------------------------------------------------------- training
+    def _policy_loss(self, logits, target_dist):
+        # "ce" = soft cross-entropy to the visit distribution (softmax+log, NOT multiplier-free).
+        # "perceptron" = closure-faithful multiclass perceptron distilling the search's BEST move
+        # (argmax of visits); ±1/2-hot silicon gradient -> fully multiply-free training (with L1 value
+        # + SignSGD). Distilling the argmax suffices for play (MCTS re-searches at move time).
+        if self.cfg.policy_loss == "perceptron":
+            return tropical_perceptron_loss(logits, target_dist.argmax(-1))
+        return _ce(logits, target_dist)
+
     def train_step(self):
         c = self.cfg
         obs0, acts, vt, pt = self.buffer.sample_batch(c.batch, c.unroll, self.gen)
         vh = self.net.pred.value_head
         h, p, v = self.net.initial(obs0)
-        loss = c.value_loss_weight * vh.loss(v, vt[:, 0]) + _ce(p, pt[:, 0])
+        loss = c.value_loss_weight * vh.loss(v, vt[:, 0]) + self._policy_loss(p, pt[:, 0])
         for k in range(c.unroll):
             h, r, p, v = self.net.recurrent(h, acts[:, k])
-            loss = loss + c.value_loss_weight * vh.loss(v, vt[:, k + 1]) + _ce(p, pt[:, k + 1])
+            loss = loss + c.value_loss_weight * vh.loss(v, vt[:, k + 1]) + self._policy_loss(p, pt[:, k + 1])
         self.opt.zero_grad()
         loss.backward()
         self.opt.step()
