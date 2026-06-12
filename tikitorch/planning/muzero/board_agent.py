@@ -64,7 +64,11 @@ def _init_worker(blueprint, state_dict, game, sp_kwargs):
 
 def _run_worker(seed):
     records, _ = play_board_game(_W["net"], _W["game"], seed=seed, **_W["sp"])
-    return records
+    # Return PLAIN numpy (not torch tensors): a self-play game holds dozens of tiny tensors, and
+    # crossing the Pool boundary as torch tensors makes each a shared-memory object -> fd-overflow
+    # ('ancdata') or mmap exhaustion ('Cannot allocate memory') at high worker counts. numpy pickles
+    # as ordinary bytes; BoardReplay.save normalizes back to torch. (No tensor sharing at all.)
+    return [(o.numpy(), a, p.numpy(), v) for (o, a, p, v) in records]
 
 
 @dataclass
@@ -118,7 +122,9 @@ class BoardReplay:
 
     def save(self, records):
         if records:
-            self.games.append(records)
+            # normalize to torch (serial self-play yields tensors; parallel workers yield numpy --
+            # see _run_worker). torch.as_tensor is a no-op on tensors, a cheap wrap on numpy.
+            self.games.append([(torch.as_tensor(o), a, torch.as_tensor(p), v) for (o, a, p, v) in records])
         if len(self.games) > self.capacity:
             self.games.pop(0)
 
