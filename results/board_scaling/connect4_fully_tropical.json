@@ -1,0 +1,37 @@
+{
+  "note": "FULLY multiplier-free Connect4 (dyadic cores+heads, perceptron+L1+SignSGD, AlphaZero tree). closure_violations must be []. score=win+0.5draw, random openings, 40 games.",
+  "config": {
+    "sims": 256,
+    "iters": 40,
+    "games": 48
+  },
+  "closure_violations": [],
+  "trained": {
+    "100": {
+      "2": 0.025,
+      "3": 0.075
+    },
+    "200": {
+      "2": 0.9,
+      "3": 0.75
+    },
+    "400": {
+      "2": 0.875,
+      "3": 0.725
+    }
+  },
+  "untrained": {
+    "100": {
+      "2": 0.787,
+      "3": 0.7
+    },
+    "200": {
+      "2": 0.9,
+      "3": 0.738
+    },
+    "400": {
+      "2": 0.975,
+      "3": 0.838
+    }
+  }
+}
