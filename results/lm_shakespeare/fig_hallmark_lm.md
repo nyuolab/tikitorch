@@ -23,10 +23,17 @@ update rule runs on F2 silicon (on-chip training validated, zero DSP blocks).
 
 | system | train tok/s | energy/token | provenance |
 |---|---|---|---|
+| **nanoGPT on NVIDIA A10G (CUDA, g5.xlarge)** | **107,091** | **1.46–1.49 mJ** | **both MEASURED** (nvidia-smi board power @5 Hz, active avg 72 W; bounds = active-phase vs whole-window; results/lm_gpu_baseline/). Quality reproduced vs MPS: 3.5563 vs 3.5561 val CE |
 | nanoGPT on Apple GPU (MPS) | 188,492 | ≈0.13 mJ | tok/s measured; energy ROUGH (25 W package assumption, not instrumented) |
 | MorphSSM strict, host MPS | 1,072 | ≈23 mJ | tok/s measured; energy ROUGH (same caveat; no fused tropical kernels — implementation artifact) |
 | 2-layer attention-LM kernel, **F2 silicon** | 772 | ≈9.0 mJ | tok/s measured on silicon (on-chip training validated, DSP=0, AGFI `agfi-0a845113b088cf62e`); energy WNS-derived, not power-rail |
 | morph-LM kernel (config B) | 11,188 | n/a | host CSIM (bit-exact gradients validated); C-synth/AFI pending |
+
+Note: at this model scale the GPU wins per-token energy (~6× vs the F2's
+WNS-derived figure) — the pathway's case is closure + on-fabric adaptation,
+not toy-scale energy. The MorphSSM-float CUDA run crashed at startup (no
+traceback; logged in results/lm_gpu_baseline/gpu_morph.log) — the
+tropical-on-CUDA datapoint is pending; MPS stands in for that arm.
 
 ## What the figure does and does not claim
 

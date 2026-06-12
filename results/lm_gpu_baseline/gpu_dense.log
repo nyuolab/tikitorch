@@ -1,0 +1,28 @@
+/opt/pytorch/lib/python3.12/site-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+
+
+
+tiny-shakespeare [bpe]: vocab=1024  train=411158 val=49420 tokens  (0.443 tok/byte)
+config: d=128 L=3 heads=4 d_ff=384 seq=96 batch=24 steps=1500 device=cuda
+
+[dense] step     0  train 7.0946  val_ce 6.7996 (4.346 bpb)  127 tok/s
+[dense] step   100  train 4.3484  val_ce 4.5462 (2.906 bpb)  10959 tok/s
+[dense] step   200  train 4.0941  val_ce 4.2273 (2.702 bpb)  21060 tok/s
+[dense] step   300  train 3.9620  val_ce 4.0776 (2.606 bpb)  30423 tok/s
+[dense] step   400  train 3.9019  val_ce 4.0066 (2.561 bpb)  39041 tok/s
+[dense] step   500  train 3.8372  val_ce 3.9177 (2.504 bpb)  47048 tok/s
+[dense] step   600  train 3.6140  val_ce 3.8092 (2.435 bpb)  54614 tok/s
+[dense] step   700  train 3.7880  val_ce 3.7557 (2.401 bpb)  61719 tok/s
+[dense] step   800  train 3.5606  val_ce 3.6965 (2.363 bpb)  68588 tok/s
+[dense] step   900  train 3.3797  val_ce 3.6937 (2.361 bpb)  75114 tok/s
+[dense] step  1000  train 3.4806  val_ce 3.6273 (2.319 bpb)  81311 tok/s
+[dense] step  1100  train 3.4723  val_ce 3.6127 (2.309 bpb)  87197 tok/s
+[dense] step  1200  train 3.2327  val_ce 3.5894 (2.294 bpb)  92792 tok/s
+[dense] step  1300  train 3.4772  val_ce 3.5836 (2.291 bpb)  98090 tok/s
+[dense] step  1400  train 3.4409  val_ce 3.5485 (2.268 bpb)  102752 tok/s
+[dense] step  1499  train 3.2288  val_ce 3.5563 (2.273 bpb)  107091 tok/s
+
+run                  params  val_ce    bpc    acc  hard_ce hard_acc   tok/s
+----------------------------------------------------------------------------
+dense                770816  3.5563  5.131  0.277        —        —  107091

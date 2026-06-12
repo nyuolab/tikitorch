@@ -94,7 +94,7 @@ def main():
     # ---------------- Panel C: systems ----------------
     ax = fig.add_subplot(gs[2])
     sys_bars = [
-        ("nanoGPT\nMPS", 188492, "≈0.13 mJ/tok\n(rough, 25 W)", "#1f77b4"),
+        ("nanoGPT\nA10G CUDA", 107091, "1.46 mJ/tok\nMEASURED (72 W)", "#1f77b4"),
         ("Morph strict\nhost MPS", 1072, "≈23 mJ/tok\n(rough, 25 W)", "#ff7f0e"),
         ("attn-LM\nF2 SILICON", 772, "≈9.0 mJ/tok\n(WNS-derived)", "#2ca02c"),
         ("morph-LM\nCSIM", 11188, "n/a\n(AFI pending)", "#98df8a"),
@@ -120,14 +120,17 @@ def main():
         "machine-audited (zero multiplies in forward+loss+backward+update)",
         fontsize=9.5, y=1.02)
     fig.text(0.005, -0.04,
-             "Provenance: host curves/bars measured (MPS). F2 throughput measured on "
+             "Provenance: quality curves/bars measured (MPS; dense quality reproduced "
+             "bit-close on A10G CUDA: 3.5563 vs 3.5561 val CE). nanoGPT A10G: tok/s and "
+             "energy MEASURED (nvidia-smi board power, 5 Hz, active avg 72 W; 1.46-1.49 "
+             "mJ/tok active/whole-window bounds; g5.xlarge). F2 throughput measured on "
              "silicon (2-layer attention-LM kernel, on-chip training validated, DSP=0); "
-             "9.0 mJ/tok is WNS-derived, not a power-rail measurement. morph-LM kernel is "
-             "CSIM-validated (bit-exact gradients; AFI build pending). MPS energy is a rough "
-             "package-power estimate (25 W) — not instrumented. Full-budget from-scratch "
-             "FPGA training at quality remains open (integer-lattice dichotomy; see "
-             "tikitorch/fpga/LM_FPGA_VS_GPU_PLAN.md); the deployment design is warm-handoff: "
-             "host-train strict, stage int16, serve + short-horizon fine-tune on fabric.",
+             "9.0 mJ/tok is WNS-derived, not power-rail. morph-LM kernel is CSIM-validated "
+             "(bit-exact gradients; AFI pending). Morph-MPS energy is a rough package "
+             "estimate. Full-budget from-scratch FPGA training at quality remains open "
+             "(integer-lattice dichotomy; tikitorch/fpga/LM_FPGA_VS_GPU_PLAN.md); the "
+             "deployment design is warm-handoff: host-train strict, stage int16, serve + "
+             "short-horizon fine-tune on fabric.",
              fontsize=6.4, va="top")
 
     out = OUT / "fig_hallmark_lm.png"
