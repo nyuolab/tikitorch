@@ -59,6 +59,9 @@ int forge_train_step_morph(int32_t* buffer, int mode, int a1, int a2, int a3);
 #ifdef TT_KERNEL_MORPH_ECG
 int forge_train_step_morph_ecg(int32_t* buffer, int mode, int a1, int a2, int a3);
 #endif
+#ifdef TT_KERNEL_MORPH_LM
+int forge_train_step_morph_lm(int32_t* buffer, int mode, int a1, int a2, int a3);
+#endif
 }
 #endif
 
@@ -283,6 +286,10 @@ int tt_fpga_run(void* h, const char* entry, void* buf, int mode,
 #ifdef TT_KERNEL_MORPH_ECG
     if (std::strcmp(entry, "forge_train_step_morph_ecg") == 0)
         return forge_train_step_morph_ecg(b, mode, a1, a2, a3);
+#endif
+#ifdef TT_KERNEL_MORPH_LM
+    if (std::strcmp(entry, "forge_train_step_morph_lm") == 0)
+        return forge_train_step_morph_lm(b, mode, a1, a2, a3);
 #endif
     return -99;
 #endif

@@ -95,7 +95,20 @@ constexpr int OFF_TARGETS    = OFF_TOKENS     + WORDS_TOKENS;
 constexpr int OFF_GRAD_LOGIT = OFF_TARGETS    + WORDS_TARGETS;
 constexpr int OFF_PRED       = OFF_GRAD_LOGIT + WORDS_GRAD_LOGIT;
 
-constexpr int FT_BUFFER_WORDS = OFF_PRED      + WORDS_PRED;
+// Host-written config words, read by do_fwd_loss. Zero-initialized buffers
+// reproduce the silicon-validated behavior exactly (perceptron loss).
+//   buffer[OFF_CFG + 0] = CFG_LOSS_KIND : 0 = 2-hot perceptron (default)
+//                         1 = balanced LUT cross-entropy (exp2 ROM +
+//                             shift-normalize; grad rows sum to zero --
+//                             an unbalanced row bias collapses sign-trained
+//                             models; see forge_ce_lut.hpp)
+//   buffer[OFF_CFG + 1] = CFG_CE_ZSHIFT : LUT index = (zmax - logit) >> this.
+// NOTE: LUT-CE gradients are Q16 (<= 65536), not +/-1; pass a proportionally
+// larger threshold to do_signsgd (mode 2, arg2).
+constexpr int WORDS_CFG      = 2;
+constexpr int OFF_CFG        = OFF_PRED       + WORDS_PRED;
+
+constexpr int FT_BUFFER_WORDS = OFF_CFG       + WORDS_CFG;
 constexpr int FT_BUFFER_BYTES = FT_BUFFER_WORDS * 4;
 
 #endif  // FORGE_BUFFER_HPP

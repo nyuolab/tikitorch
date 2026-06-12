@@ -70,7 +70,11 @@ class _Layout1:
         acts = [("AD_SCORE", L * L), ("AN_OUT", L * D), ("AD_DIL", L * D_FF),
                 ("AK_ERO", L * D), ("AD_HEAD", L * V), ("K_CACHE", L * D),
                 ("V_CACHE", L * D), ("TOKENS", L), ("TARGETS", L),
-                ("GRAD_LOGIT", L * V), ("PRED", L)]
+                ("GRAD_LOGIT", L * V), ("PRED", L),
+                # Config words (mirrors forge_buffer.hpp OFF_CFG):
+                # [0] loss kind (0 = perceptron, 1 = balanced LUT-CE),
+                # [1] LUT-CE z-shift. Zeros = silicon-validated default.
+                ("CFG", 2)]
         for name, n in acts:
             off["OFF_" + name] = cur
             off["W_" + name] = n

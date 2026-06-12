@@ -22,6 +22,7 @@
 // Mode 3 returns the number of correct predictions in the window.
 
 #include "forge_buffer.hpp"
+#include "forge_ce_lut.hpp"
 
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
 #include <ap_int.h>
@@ -271,7 +272,45 @@ GINIT: for (int v = 0; v < FT_V; v++) {
 #pragma HLS PIPELINE II=1
         grad_logit_row[v] = 0;
     }
-    if (pred != target) {
+    const int loss_kind = buffer[OFF_CFG + 0];
+    if (loss_kind == 1) {
+        // Balanced LUT cross-entropy: p = exp2-ROM(z >> zshift) shift-normalized
+        // to Q16 (sum in (2^15, 2^16]); grad = p - s*onehot(target) with
+        // s = sum(p) so every row sums to zero exactly. Adds, compares, shifts,
+        // and a 256-word ROM -- no multiply, no DSP. The unbalanced (p - 1@target)
+        // variant collapses sign-trained models (see forge_ce_lut.hpp).
+        const int zshift = buffer[OFF_CFG + 1];
+        static int32_t e_row[FT_V];
+        int32_t S = 0;                       // <= FT_V * 65536 = 2^23: fits int32
+CE_E:   for (int v = 0; v < FT_V; v++) {
+#pragma HLS PIPELINE II=1
+            int32_t zneg = (int32_t)logits[pred] - (int32_t)logits[v];   // >= 0
+            int idx = (int)(zneg >> zshift);
+            if (idx > 255) idx = 255;
+            e_row[v] = FT_CE_EXP2_Q16[idx];
+            S += e_row[v];
+        }
+        int sh = 0;                          // ceil_log2(S) - 16, bounded by 7
+CE_SH:  for (int b = 0; b < 8; b++) {
+#pragma HLS UNROLL
+            if ((S >> sh) > 65536) sh++;
+        }
+        // Balance against the POST-truncation sum: shifting each e_v
+        // individually drops fractional bits, so sum(e_v >> sh) != S >> sh
+        // (short by up to V-1). Scattering the sum of the p values actually
+        // emitted makes the row sum exactly zero by construction.
+        int32_t psum = 0;
+CE_P:   for (int v = 0; v < FT_V; v++) {
+#pragma HLS PIPELINE II=1
+            int32_t p = e_row[v] >> sh;
+            e_row[v] = p;
+            psum += p;
+        }
+CE_G:   for (int v = 0; v < FT_V; v++) {
+#pragma HLS PIPELINE II=1
+            grad_logit_row[v] = e_row[v] - (v == target ? psum : 0);
+        }
+    } else if (pred != target) {
         grad_logit_row[pred]   = +1;
         grad_logit_row[target] = -1;
     }

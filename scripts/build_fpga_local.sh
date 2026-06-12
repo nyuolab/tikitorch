@@ -20,6 +20,7 @@ case "$KERNEL" in
   forge_train_step_3layer)    DEF=TT_KERNEL_3LAYER    ; SRC=forge_train_step_3layer.cpp ;;
   forge_train_step_morph)     DEF=TT_KERNEL_MORPH     ; SRC=forge_train_step_morph.cpp ;;
   forge_train_step_morph_ecg) DEF=TT_KERNEL_MORPH_ECG ; SRC=forge_train_step_morph_ecg.cpp ;;
+  forge_train_step_morph_lm)  DEF=TT_KERNEL_MORPH_LM  ; SRC=forge_train_step_morph_lm.cpp ;;
   *) echo "unknown KERNEL='$KERNEL' (see tikitorch/fpga/BUILD_NATIVE.md)" >&2; exit 2 ;;
 esac
 
