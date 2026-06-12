@@ -1,0 +1,17 @@
+{"run": "dense", "variant": "baseline", "step": 0, "train_loss": 4.3771185874938965, "wall_s": 0.2, "tok_per_s": 9418, "val_ce": 3.9208789931403265, "val_acc": 0.10020616319444445}
+{"run": "dense", "variant": "baseline", "step": 100, "train_loss": 2.5174551010131836, "wall_s": 1.5, "tok_per_s": 151967, "val_ce": 2.477902465396457, "val_acc": 0.2787000868055556}
+{"run": "dense", "variant": "baseline", "step": 200, "train_loss": 2.312136650085449, "wall_s": 2.8, "tok_per_s": 164339, "val_ce": 2.2953533596462674, "val_acc": 0.3317057291666667}
+{"run": "dense", "variant": "baseline", "step": 300, "train_loss": 2.1656062602996826, "wall_s": 4.1, "tok_per_s": 170767, "val_ce": 2.1516753567589655, "val_acc": 0.3703884548611111}
+{"run": "dense", "variant": "baseline", "step": 400, "train_loss": 2.0071589946746826, "wall_s": 5.3, "tok_per_s": 173105, "val_ce": 2.0719832844204373, "val_acc": 0.3891059027777778}
+{"run": "dense", "variant": "baseline", "step": 500, "train_loss": 1.9653735160827637, "wall_s": 6.6, "tok_per_s": 174308, "val_ce": 2.012072457207574, "val_acc": 0.4081488715277778}
+{"run": "dense", "variant": "baseline", "step": 600, "train_loss": 1.9203635454177856, "wall_s": 7.9, "tok_per_s": 176041, "val_ce": 1.9540376663208008, "val_acc": 0.4253472222222222}
+{"run": "dense", "variant": "baseline", "step": 700, "train_loss": 1.8831384181976318, "wall_s": 9.1, "tok_per_s": 176583, "val_ce": 1.9374157587687175, "val_acc": 0.427734375}
+{"run": "dense", "variant": "baseline", "step": 800, "train_loss": 1.733134150505066, "wall_s": 10.4, "tok_per_s": 178028, "val_ce": 1.8895586596594915, "val_acc": 0.4447157118055556}
+{"run": "dense", "variant": "baseline", "step": 900, "train_loss": 1.7755825519561768, "wall_s": 11.6, "tok_per_s": 179019, "val_ce": 1.8622171878814697, "val_acc": 0.4489474826388889}
+{"run": "dense", "variant": "baseline", "step": 1000, "train_loss": 1.7238218784332275, "wall_s": 12.8, "tok_per_s": 179801, "val_ce": 1.8389854166242812, "val_acc": 0.458984375}
+{"run": "dense", "variant": "baseline", "step": 1100, "train_loss": 1.7291988134384155, "wall_s": 14.1, "tok_per_s": 180202, "val_ce": 1.8170007202360365, "val_acc": 0.45751953125}
+{"run": "dense", "variant": "baseline", "step": 1200, "train_loss": 1.8050024509429932, "wall_s": 15.3, "tok_per_s": 180859, "val_ce": 1.8262396388583713, "val_acc": 0.4667426215277778}
+{"run": "dense", "variant": "baseline", "step": 1300, "train_loss": 1.714256763458252, "wall_s": 16.5, "tok_per_s": 181554, "val_ce": 1.801539871427748, "val_acc": 0.46728515625}
+{"run": "dense", "variant": "baseline", "step": 1400, "train_loss": 1.6211918592453003, "wall_s": 17.7, "tok_per_s": 182130, "val_ce": 1.7800333897272747, "val_acc": 0.4752604166666667}
+{"run": "dense", "variant": "baseline", "step": 1499, "train_loss": 1.6765960454940796, "wall_s": 18.9, "tok_per_s": 182745, "val_ce": 1.7686294714609783, "val_acc": 0.4781358506944444}
+{"run": "dense", "variant": "baseline", "step": 1499, "train_loss": 1.6765960454940796, "wall_s": 18.9, "tok_per_s": 182745, "val_ce": 1.7686294714609783, "val_acc": 0.4781358506944444, "n_params": 525312, "sample": "\nthou more king self meone aneral by in I the fand\nIs upon his thee rechies offorderel some one contents,\nHe rewell explent in exforrow never to go well your bring I see,\nAnd the contain with there for my prace, if me:\nAnd hence say that our challow with the mean of no.\n\nKING EDWARD IV:\nI come have a", "total_wall_s": 21.1, "final": true}

@@ -1,0 +1,17 @@
+{"run": "dense", "variant": "baseline", "step": 0, "train_loss": 4.3771185874938965, "wall_s": 0.2, "tok_per_s": 9263, "val_ce": 3.7662496036953397, "val_acc": 0.1369357638888889}
+{"run": "dense", "variant": "baseline", "step": 100, "train_loss": 2.4869463443756104, "wall_s": 1.5, "tok_per_s": 153231, "val_ce": 2.4515831735399036, "val_acc": 0.2872721354166667}
+{"run": "dense", "variant": "baseline", "step": 200, "train_loss": 2.2253551483154297, "wall_s": 2.8, "tok_per_s": 168113, "val_ce": 2.2275452084011502, "val_acc": 0.3454318576388889}
+{"run": "dense", "variant": "baseline", "step": 300, "train_loss": 2.0971450805664062, "wall_s": 4.0, "tok_per_s": 174264, "val_ce": 2.107009861204359, "val_acc": 0.3797743055555556}
+{"run": "dense", "variant": "baseline", "step": 400, "train_loss": 1.9451814889907837, "wall_s": 5.2, "tok_per_s": 177207, "val_ce": 2.0265115367041693, "val_acc": 0.4046766493055556}
+{"run": "dense", "variant": "baseline", "step": 500, "train_loss": 1.8964805603027344, "wall_s": 6.5, "tok_per_s": 178830, "val_ce": 1.9721506966484919, "val_acc": 0.4204644097222222}
+{"run": "dense", "variant": "baseline", "step": 600, "train_loss": 1.8494486808776855, "wall_s": 7.7, "tok_per_s": 180778, "val_ce": 1.9128252930111356, "val_acc": 0.4363606770833333}
+{"run": "dense", "variant": "baseline", "step": 700, "train_loss": 1.8340685367584229, "wall_s": 8.9, "tok_per_s": 181340, "val_ce": 1.9062254693773057, "val_acc": 0.4391276041666667}
+{"run": "dense", "variant": "baseline", "step": 800, "train_loss": 1.6826138496398926, "wall_s": 10.1, "tok_per_s": 182018, "val_ce": 1.8526935047573514, "val_acc": 0.4537217881944444}
+{"run": "dense", "variant": "baseline", "step": 900, "train_loss": 1.7098309993743896, "wall_s": 11.4, "tok_per_s": 182824, "val_ce": 1.8458063337537978, "val_acc": 0.4529079861111111}
+{"run": "dense", "variant": "baseline", "step": 1000, "train_loss": 1.6793179512023926, "wall_s": 12.5, "tok_per_s": 183843, "val_ce": 1.815651125378079, "val_acc": 0.4679904513888889}
+{"run": "dense", "variant": "baseline", "step": 1100, "train_loss": 1.6937907934188843, "wall_s": 13.7, "tok_per_s": 184571, "val_ce": 1.7929930686950684, "val_acc": 0.4712999131944444}
+{"run": "dense", "variant": "baseline", "step": 1200, "train_loss": 1.7670701742172241, "wall_s": 15.0, "tok_per_s": 185002, "val_ce": 1.8007878992292616, "val_acc": 0.4737413194444444}
+{"run": "dense", "variant": "baseline", "step": 1300, "train_loss": 1.6858031749725342, "wall_s": 16.2, "tok_per_s": 185564, "val_ce": 1.7764211893081665, "val_acc": 0.4815538194444444}
+{"run": "dense", "variant": "baseline", "step": 1400, "train_loss": 1.6151726245880127, "wall_s": 17.4, "tok_per_s": 185957, "val_ce": 1.7512848774592082, "val_acc": 0.4855685763888889}
+{"run": "dense", "variant": "baseline", "step": 1499, "train_loss": 1.6505966186523438, "wall_s": 18.6, "tok_per_s": 185937, "val_ce": 1.738833400938246, "val_acc": 0.4892578125}
+{"run": "dense", "variant": "baseline", "step": 1499, "train_loss": 1.6505966186523438, "wall_s": 18.6, "tok_per_s": 185937, "val_ce": 1.738833400938246, "val_acc": 0.4892578125, "n_params": 525312, "sample": "\nthore his king! There our foes,\nAnd in I thee, great upon his thee rechers of on\nA hastest one contents, your was wear.\n\nKING EDWARD IV:\nWhat thou we would for me I men the death. I know.\n\nFRIAR LAURENCE:\nShapeare me: I poor heaven, if come?\n\nGLOUCESTER:\nMy left than shamen,\nSo thou stand from my ha", "total_wall_s": 21.0, "final": true}

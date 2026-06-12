@@ -1,0 +1,17 @@
+{"run": "dense", "variant": "baseline", "step": 0, "train_loss": 4.336917400360107, "wall_s": 0.3, "tok_per_s": 8482, "val_ce": 4.07458692126804, "val_acc": 0.04025607638888889}
+{"run": "dense", "variant": "baseline", "step": 100, "train_loss": 2.5692875385284424, "wall_s": 1.6, "tok_per_s": 144317, "val_ce": 2.5319356123606362, "val_acc": 0.2694769965277778}
+{"run": "dense", "variant": "baseline", "step": 200, "train_loss": 2.451978921890259, "wall_s": 2.9, "tok_per_s": 158134, "val_ce": 2.4331255753835044, "val_acc": 0.2943793402777778}
+{"run": "dense", "variant": "baseline", "step": 300, "train_loss": 2.2794883251190186, "wall_s": 4.2, "tok_per_s": 165722, "val_ce": 2.3038804796006946, "val_acc": 0.3240017361111111}
+{"run": "dense", "variant": "baseline", "step": 400, "train_loss": 2.207200527191162, "wall_s": 5.5, "tok_per_s": 168342, "val_ce": 2.1913486321767173, "val_acc": 0.3538953993055556}
+{"run": "dense", "variant": "baseline", "step": 500, "train_loss": 2.117934226989746, "wall_s": 6.8, "tok_per_s": 170404, "val_ce": 2.1219203207227917, "val_acc": 0.3712565104166667}
+{"run": "dense", "variant": "baseline", "step": 600, "train_loss": 2.0634472370147705, "wall_s": 8.1, "tok_per_s": 171872, "val_ce": 2.0725739267137318, "val_acc": 0.3863389756944444}
+{"run": "dense", "variant": "baseline", "step": 700, "train_loss": 2.020909070968628, "wall_s": 9.3, "tok_per_s": 172773, "val_ce": 2.0252193344963922, "val_acc": 0.3991970486111111}
+{"run": "dense", "variant": "baseline", "step": 800, "train_loss": 1.947480320930481, "wall_s": 10.6, "tok_per_s": 173482, "val_ce": 1.9872923427157931, "val_acc": 0.4093967013888889}
+{"run": "dense", "variant": "baseline", "step": 900, "train_loss": 1.9234504699707031, "wall_s": 11.9, "tok_per_s": 174228, "val_ce": 1.9659823576609294, "val_acc": 0.4156901041666667}
+{"run": "dense", "variant": "baseline", "step": 1000, "train_loss": 1.9160760641098022, "wall_s": 13.2, "tok_per_s": 174727, "val_ce": 1.9393288294474285, "val_acc": 0.4236111111111111}
+{"run": "dense", "variant": "baseline", "step": 1100, "train_loss": 1.884376049041748, "wall_s": 14.5, "tok_per_s": 175269, "val_ce": 1.9156616263919406, "val_acc": 0.4315863715277778}
+{"run": "dense", "variant": "baseline", "step": 1200, "train_loss": 1.8545095920562744, "wall_s": 15.8, "tok_per_s": 175601, "val_ce": 1.8983597225613065, "val_acc": 0.4359266493055556}
+{"run": "dense", "variant": "baseline", "step": 1300, "train_loss": 1.8110029697418213, "wall_s": 17.0, "tok_per_s": 175973, "val_ce": 1.8947037590874567, "val_acc": 0.4359809027777778}
+{"run": "dense", "variant": "baseline", "step": 1400, "train_loss": 1.8091788291931152, "wall_s": 18.3, "tok_per_s": 176149, "val_ce": 1.8647470209333632, "val_acc": 0.4424370659722222}
+{"run": "dense", "variant": "baseline", "step": 1499, "train_loss": 1.7160929441452026, "wall_s": 19.6, "tok_per_s": 176396, "val_ce": 1.8520485825008817, "val_acc": 0.4466688368055556}
+{"run": "dense", "variant": "baseline", "step": 1499, "train_loss": 1.7160929441452026, "wall_s": 19.6, "tok_per_s": 176396, "val_ce": 1.8520485825008817, "val_acc": 0.4466688368055556, "n_params": 525312, "sample": "\nROMEO:\nHow you so you to spand of the king, and we no courd.\n\nCORIOLANUS:\nWhat that boy! I, where a come love me of than\nHe follow; and pleasies for that that my chare lie.\n\nROMEO:\nJul that for I much with on mine tone,\nCome he expray more more last is part frier;\nWhat you, my lord fear you will you", "total_wall_s": 22.1, "final": true}

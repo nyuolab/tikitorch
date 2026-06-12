@@ -1,0 +1,17 @@
+{"run": "dense", "variant": "baseline", "step": 0, "train_loss": 4.33323860168457, "wall_s": 0.2, "tok_per_s": 9521, "val_ce": 4.094538847605388, "val_acc": 0.049750434027777776}
+{"run": "dense", "variant": "baseline", "step": 100, "train_loss": 2.562973976135254, "wall_s": 1.5, "tok_per_s": 151110, "val_ce": 2.5192573335435657, "val_acc": 0.2703993055555556}
+{"run": "dense", "variant": "baseline", "step": 200, "train_loss": 2.4515035152435303, "wall_s": 2.7, "tok_per_s": 170774, "val_ce": 2.418784883287218, "val_acc": 0.2960069444444444}
+{"run": "dense", "variant": "baseline", "step": 300, "train_loss": 2.35612416267395, "wall_s": 3.9, "tok_per_s": 178769, "val_ce": 2.290171596739027, "val_acc": 0.3306206597222222}
+{"run": "dense", "variant": "baseline", "step": 400, "train_loss": 2.259275436401367, "wall_s": 5.0, "tok_per_s": 183685, "val_ce": 2.181905428568522, "val_acc": 0.3600802951388889}
+{"run": "dense", "variant": "baseline", "step": 500, "train_loss": 2.1513824462890625, "wall_s": 6.3, "tok_per_s": 183262, "val_ce": 2.111662016974555, "val_acc": 0.3777669270833333}
+{"run": "dense", "variant": "baseline", "step": 600, "train_loss": 2.1249849796295166, "wall_s": 7.5, "tok_per_s": 183914, "val_ce": 2.0528421666887073, "val_acc": 0.3902452256944444}
+{"run": "dense", "variant": "baseline", "step": 700, "train_loss": 1.9626543521881104, "wall_s": 8.7, "tok_per_s": 186284, "val_ce": 2.008859157562256, "val_acc": 0.4034288194444444}
+{"run": "dense", "variant": "baseline", "step": 800, "train_loss": 1.970700979232788, "wall_s": 9.8, "tok_per_s": 188828, "val_ce": 1.9624247815873888, "val_acc": 0.4164496527777778}
+{"run": "dense", "variant": "baseline", "step": 900, "train_loss": 1.952665090560913, "wall_s": 10.9, "tok_per_s": 190351, "val_ce": 1.938555532031589, "val_acc": 0.4235568576388889}
+{"run": "dense", "variant": "baseline", "step": 1000, "train_loss": 1.8847241401672363, "wall_s": 12.1, "tok_per_s": 191038, "val_ce": 1.9059940444098578, "val_acc": 0.4347330729166667}
+{"run": "dense", "variant": "baseline", "step": 1100, "train_loss": 1.8789931535720825, "wall_s": 13.3, "tok_per_s": 190111, "val_ce": 1.8795228269365098, "val_acc": 0.4380967881944444}
+{"run": "dense", "variant": "baseline", "step": 1200, "train_loss": 1.922239065170288, "wall_s": 14.5, "tok_per_s": 190775, "val_ce": 1.8584583600362141, "val_acc": 0.4446614583333333}
+{"run": "dense", "variant": "baseline", "step": 1300, "train_loss": 1.795214295387268, "wall_s": 15.7, "tok_per_s": 191465, "val_ce": 1.8529349168141682, "val_acc": 0.4453125}
+{"run": "dense", "variant": "baseline", "step": 1400, "train_loss": 1.750836730003357, "wall_s": 16.9, "tok_per_s": 191198, "val_ce": 1.8245375156402588, "val_acc": 0.4548068576388889}
+{"run": "dense", "variant": "baseline", "step": 1499, "train_loss": 1.8131849765777588, "wall_s": 18.0, "tok_per_s": 191563, "val_ce": 1.803688022825453, "val_acc": 0.4613715277777778}
+{"run": "dense", "variant": "baseline", "step": 1499, "train_loss": 1.8131849765777588, "wall_s": 18.0, "tok_per_s": 191563, "val_ce": 1.803688022825453, "val_acc": 0.4613715277777778, "n_params": 525312, "sample": "\n\nCORIOLIO:\nAnd much leave and honour come,\nBut than you warth mine, then my spore\nAnd gainst we should, thought our deservents\nMy thishour deverd: confess! whom have say sounds?\n\nDUKE VINCENTIO:\nBut be me not the desing.\n\nDUKE VINCENTIO:\nWe weave he mighter ward the herefore him not\nOf mine and thee", "total_wall_s": 20.2, "final": true}
