@@ -48,6 +48,9 @@ def score_vs(net, sims, depth, n=40):
 
 
 def main(a):
+    if a.threads > 0:
+        torch.set_num_threads(a.threads)   # PIN threads: running N recipes concurrently on one box with
+        # torch's default (= all cores) per process oversubscribes the eval phase ~Nx and runs for HOURS.
     cfg = BoardConfig(net_kind="tropical", core_kind="dyadic", dyadic_heads=True,
                       policy_loss=a.policy_loss, policy_entropy_coef=a.entropy_coef, target_temp=a.target_temp,
                       optimizer="tropicalsgd", tree_model="alphazero",
@@ -90,5 +93,6 @@ if __name__ == "__main__":
     p.add_argument("--entropy-coef", dest="entropy_coef", type=float, default=0.0)
     p.add_argument("--target-temp", dest="target_temp", type=float, default=1.0)
     p.add_argument("--lr", type=float, default=3e-3)
+    p.add_argument("--threads", type=int, default=0, help="pin torch threads (use 1 per process in parallel sweeps)")
     p.add_argument("--tag", default="run")
     main(p.parse_args())
