@@ -198,3 +198,62 @@ training story.** The full chain:
 - Round-4 lesson applies on chip too: any future on-chip loss variant must
   keep gradient rows EXACTLY zero-sum in integer arithmetic (post-truncation
   balance), or sign updates will drift into the constant predictor.
+
+## Silicon bring-up status for cl_forge_morph_lm (2026-06-12 session)
+
+**Registered AFI: `agfi-029bc010e061e4626` (cl_forge_morph_lm_v5) — DSP=0,
+TIMING MET (+0.007 ns @ the F2's fixed 250 MHz).** The kernel is
+silicon-ready; one CL-level integration piece remains before the on-chip
+training run completes.
+
+What was proven on silicon this session:
+- AFI loads and enumerates; OCL AXI-Lite control path ALIVE (registers
+  read/write verified by probe; ocl-slave-timeout = 0).
+- Kernel starts and masters PCIM (first weight burst completes: read
+  count == WORDS_MH/16 exactly).
+
+The blocking find: **the CL does not back the BAR4 buffer window.** The
+bridge stages the int32 buffer via BAR4/DMA-PCIS at 0x01000000 and points
+the kernel's m_axi at the same address — but this CL ties off DMA-PCIS
+(`unused_dma_pcis_template.inc`), so host staging times out
+(dma-pcis-timeout: 128k+ at 0x01000xxx) and the kernel's PCIM reads hit
+unrelated host memory. The working v7-era CL evidently contains the missing
+block: an on-CL buffer RAM (URAM; ~1.7 MB needed for ML_BUFFER_WORDS)
+dual-ported between (a) a DMA-PCIS AXI slave for host staging and (b) the
+kernel's gmem master, via a 2x1 AXI interconnect. That v7 CL design was
+never carried into this repo — only its AFI survives.
+
+Next session's task (well-scoped): build the buffer-RAM CL block
+(HDK interconnect + AXI BRAM controller patterns from cl_mem_perf /
+cl_dram_hbm_dma examples), re-run the validated pipeline (12-min P&R
+iterations), and execute ~/morph_lm_silicon.py-style training.
+
+### Hard-won F2 HDK build lessons (cost ~6 debug cycles; all now scripted)
+1. The 2026 F2 HDK renamed the OCL ports (`sh_ocl_*`->`ocl_cl_*`,
+   `ocl_sh_*`->`cl_ocl_*`); May-era CL wrappers synthesize CLEAN with
+   floating implicit nets and a dead control plane. ALWAYS audit every
+   shell-facing identifier against today's cl_ports.vh.
+2. Use the HDK's `create_new_cl.py` scaffold; the flow expects
+   build_all.tcl + per-CL aws_build_dcp_from_cl.py (-c CL, no -name, no
+   clock recipes without --aws_clk_gen). The encrypt step FLATTENS design/
+   (no subdirs).
+3. The manifest generator parses LITERAL `CL_SH_ID0/1` defines from
+   cl_id_defines.vh (device_vendor packing). Include-redirects break AFI
+   registration (MANIFEST_PARSE_FAILED).
+4. clk_main_a0 is FIXED 250 MHz on F2 — no slow-clock escape. HLS
+   ap_clk estimates of ~11.4 ns on this toolchain are systematically
+   pessimistic (the silicon-validated kernel reports the same).
+5. **Argmax max-reduce loops do NOT pipeline as written**: UNROLL-8
+   compare-select cascades into the running best/argmax registers are a
+   ~-4.3 ns OOC path. Restructure as an explicit 8-lane balanced tree
+   (feedforward) + ONE carried compare-select: -4.30 -> +0.18 OOC,
+   full CL +0.007 MET. Applied to PJ/HEAD/batch-shift in
+   forge_train_step_morph_lm.cpp; bit-exact (lowest-index-wins ==
+   first-max; integer adds associative).
+6. Wedged slots (hung kernel) survive `reboot`; instance STOP/START
+   power-cycles the card. /tmp is lost — rebuild bridges.
+7. Diagnose with: regprobe (BAR0 readback), fpga-describe-local-image -M
+   counters (ocl-slave-timeout = dead control; pcim counts = burst
+   progress; dma-pcis-timeout = unbacked BAR4), OOC synth of the
+   UNENCRYPTED kernel verilog for named paths (the AWS flow encrypts
+   user RTL — post-route reports hide names).

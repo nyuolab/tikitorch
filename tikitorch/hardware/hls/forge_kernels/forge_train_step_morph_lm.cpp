@@ -90,10 +90,13 @@ static inline data_t sat16(acc_t v) {
 static void batch_shift_row(const data_t x[ML_D], data_t y[ML_D]) {
 #pragma HLS INLINE
     acc_t sum = 0;
-BS_SUM: for (int d = 0; d < ML_D; d++) {
-#pragma HLS UNROLL factor=8
+BS_SUM: for (int d = 0; d < ML_D; d += 8) {
 #pragma HLS PIPELINE II=1
-        sum += (acc_t)x[d];
+        acc_t t0 = (acc_t)x[d]     + (acc_t)x[d + 1];
+        acc_t t1 = (acc_t)x[d + 2] + (acc_t)x[d + 3];
+        acc_t t2 = (acc_t)x[d + 4] + (acc_t)x[d + 5];
+        acc_t t3 = (acc_t)x[d + 6] + (acc_t)x[d + 7];
+        sum += (t0 + t1) + (t2 + t3);   // carried dep: one add
     }
     acc_t mean = sum >> ML_LOG2_D;
 BS_SUB: for (int d = 0; d < ML_D; d++) {
@@ -115,8 +118,12 @@ static int do_fwd_loss(int32_t* buffer, int m, int token, int target) {
     // Weights (loaded per call, like forge_train_step.cpp's per-position loads).
     static int32_t mh_buf[WORDS_MH];
     static int32_t mb_buf[WORDS_MB];
+    static int32_t mp_buf[WORDS_MP];      // URAM-class; loaded once per call
+    static int32_t wh_buf[WORDS_W_HEAD];
     burst_load_words(buffer, OFF_MH, mh_buf, WORDS_MH);
     burst_load_words(buffer, OFF_MB, mb_buf, WORDS_MB);
+    burst_load_words(buffer, OFF_MP, mp_buf, WORDS_MP);
+    burst_load_words(buffer, OFF_W_HEAD, wh_buf, WORDS_W_HEAD);
 
     // Embed gather: R = EMBED[token].
     static data_t R[ML_D];
@@ -134,10 +141,12 @@ EMB: for (int d = 0; d < ML_D; d++) {
     static int32_t proj_row[ML_D];
     static int32_t bs32[ML_D];
     static int32_t taps32[ML_K][ML_D];   // earlier BS rows for the conv taps
-    static int32_t mp_row[ML_D];         // one projection row P[l][j][:]
 
 LAYER_LOOP: for (int l = 0; l < ML_N_LAYERS; l++) {
-        const int dil    = dilation_of_layer(l);
+        // dil = 1 << dsh (power of two by construction): tap offsets are
+        // SHIFTS. k*dil as a multiply binds DSP48s (measured: 3) - forbidden.
+        const int dsh    = (l < 6) ? l : 6;   // log2(min(2^l, ML_DIL_CAP))
+        const int dil    = 1 << dsh; (void)dil;
         const bool is_dil = ((l & 1) == 0);   // even -> dilation(max), odd -> erosion(min)
         const int hbase  = l * (ML_D * ML_K);
 
@@ -155,7 +164,7 @@ BS32: for (int d = 0; d < ML_D; d++) {
         // zero-pad — see the buffer header note). Tap rows are burst-loaded
         // from the stream; k = 0 is the row just computed.
 TAPS: for (int k = 1; k < ML_K; k++) {
-            int t_in = m - k * dil;
+            int t_in = m - (k << dsh);
             if (t_in >= 0) {
                 burst_load_words(buffer, off_bs(l, t_in), taps32[k], ML_D);
             }
@@ -166,7 +175,7 @@ MC_C: for (int c = 0; c < ML_D; c++) {
             int   kstar = 0;
 MC_K: for (int k = 0; k < ML_K; k++) {
 #pragma HLS UNROLL
-                int t_in = m - k * dil;
+                int t_in = m - (k << dsh);
                 if (t_in >= 0) {
                     data_t hck = (data_t)(int16_t)(mh_buf[hbase + c * ML_K + k] & 0xFFFF);
                     data_t bsv = (k == 0) ? BS_row[c]
@@ -182,16 +191,29 @@ MC_K: for (int k = 0; k < ML_K; k++) {
 
         // ---- max-plus projection + additive bias ----
         // PJ[j] = max_i(P[l][j][i] + MC[i]) + MB[l][j]; argmax i* saved.
+        const int pbase = l * (ML_D * ML_D);
 PJ_J: for (int j = 0; j < ML_D; j++) {
-            burst_load_words(buffer, off_mp(l) + j * ML_D, mp_row, ML_D);
             acc_t best = ML_NEG_INF;
             int   istar = 0;
-PJ_I: for (int i = 0; i < ML_D; i++) {
-#pragma HLS UNROLL factor=8
+PJ_I: for (int i = 0; i < ML_D; i += 8) {
 #pragma HLS PIPELINE II=1
-                data_t pji = (data_t)(int16_t)(mp_row[i] & 0xFFFF);
-                acc_t s = (acc_t)pji + (acc_t)MC[i];
-                if (s > best) { best = s; istar = i; }
+                acc_t cand[8]; int cidx[8];
+#pragma HLS ARRAY_PARTITION variable=cand complete
+#pragma HLS ARRAY_PARTITION variable=cidx complete
+PJ_LANE: for (int u = 0; u < 8; u++) {
+#pragma HLS UNROLL
+                    data_t pji = (data_t)(int16_t)(mp_buf[pbase + j * ML_D + i + u] & 0xFFFF);
+                    cand[u] = (acc_t)pji + (acc_t)MC[i + u];
+                    cidx[u] = i + u;
+                }
+PJ_TREE: for (int st = 1; st < 8; st <<= 1) {
+#pragma HLS UNROLL
+                    for (int u = 0; u < 8; u += (st << 1)) {
+#pragma HLS UNROLL
+                        if (cand[u + st] > cand[u]) { cand[u] = cand[u + st]; cidx[u] = cidx[u + st]; }
+                    }
+                }
+                if (cand[0] > best) { best = cand[0]; istar = cidx[0]; }
             }
             data_t bj = (data_t)(int16_t)(mb_buf[l * ML_D + j] & 0xFFFF);
             PJ[j]       = sat16(best + (acc_t)bj);
@@ -211,17 +233,28 @@ RES: for (int j = 0; j < ML_D; j++) {
     // ---- LM head: logits[v] = max_d(W_HEAD[v][d] + R[d]) ----
     static data_t  logits[ML_V];
     static int32_t ad_head_row[ML_V];
-    static int32_t wh_row[ML_D];
 HEAD_V: for (int v = 0; v < ML_V; v++) {
-        burst_load_words(buffer, OFF_W_HEAD + v * ML_D, wh_row, ML_D);
         acc_t mx = ML_NEG_INF;
         int   idx_d = 0;
-HEAD_D: for (int d = 0; d < ML_D; d++) {
-#pragma HLS UNROLL factor=8
+HEAD_D: for (int d = 0; d < ML_D; d += 8) {
 #pragma HLS PIPELINE II=1
-            data_t W_vd = (data_t)(int16_t)(wh_row[d] & 0xFFFF);
-            acc_t s = (acc_t)W_vd + (acc_t)R[d];
-            if (s > mx) { mx = s; idx_d = d; }
+            acc_t cand[8]; int cidx[8];
+#pragma HLS ARRAY_PARTITION variable=cand complete
+#pragma HLS ARRAY_PARTITION variable=cidx complete
+HD_LANE: for (int u = 0; u < 8; u++) {
+#pragma HLS UNROLL
+                data_t W_vd = (data_t)(int16_t)(wh_buf[v * ML_D + d + u] & 0xFFFF);
+                cand[u] = (acc_t)W_vd + (acc_t)R[d + u];
+                cidx[u] = d + u;
+            }
+HD_TREE: for (int st = 1; st < 8; st <<= 1) {
+#pragma HLS UNROLL
+                for (int u = 0; u < 8; u += (st << 1)) {
+#pragma HLS UNROLL
+                    if (cand[u + st] > cand[u]) { cand[u] = cand[u + st]; cidx[u] = cidx[u + st]; }
+                }
+            }
+            if (cand[0] > mx) { mx = cand[0]; idx_d = cidx[0]; }
         }
         logits[v] = sat16(mx);
         ad_head_row[v] = idx_d;
@@ -327,7 +360,8 @@ HEAD_BWD: for (int v = 0; v < ML_V; v++) {
 
 BWD_LAYER: for (int lr = 0; lr < ML_N_LAYERS; lr++) {
         const int l   = ML_N_LAYERS - 1 - lr;
-        const int dil = dilation_of_layer(l);
+        const int dsh = (l < 6) ? l : 6;      // log2 dilation (see fwd note)
+        const int dil = 1 << dsh; (void)dil;
         const int pbase = l * (ML_D * ML_D);
         const int hbase = l * (ML_D * ML_K);
 
@@ -361,7 +395,7 @@ MC_BWD: for (int c = 0; c < ML_D; c++) {
             if (g == 0) continue;
             int kstar = tap_row[c];
             if (kstar < 0 || kstar >= ML_K) continue;
-            int t_in = m - kstar * dil;
+            int t_in = m - (kstar << dsh);
             if (t_in < 0) continue;
             buffer[OFF_G_MH + hbase + c * ML_K + kstar] += (int32_t)g;
             buffer[off_bs(l, t_in) + c]                 += (int32_t)g;
