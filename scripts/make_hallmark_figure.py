@@ -97,7 +97,7 @@ def main():
         ("nanoGPT\nA10G CUDA", 107091, "1.46 mJ/tok\nMEASURED (72 W)", "#1f77b4"),
         ("Morph strict\nhost MPS", 1072, "≈23 mJ/tok\n(rough, 25 W)", "#ff7f0e"),
         ("attn-LM\nF2 SILICON", 772, "≈9.0 mJ/tok\n(WNS-derived)", "#2ca02c"),
-        ("morph-LM\nCSIM", 11188, "n/a\n(AFI pending)", "#98df8a"),
+        ("morph-LM\nCSIM", 11188, "AFI registered:\nDSP=0, WNS+0.007", "#98df8a"),
     ]
     x = range(len(sys_bars))
     tput = [b[1] for b in sys_bars]

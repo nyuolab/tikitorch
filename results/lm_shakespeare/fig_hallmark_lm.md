@@ -27,7 +27,7 @@ update rule runs on F2 silicon (on-chip training validated, zero DSP blocks).
 | nanoGPT on Apple GPU (MPS) | 188,492 | ≈0.13 mJ | tok/s measured; energy ROUGH (25 W package assumption, not instrumented) |
 | MorphSSM strict, host MPS | 1,072 | ≈23 mJ | tok/s measured; energy ROUGH (same caveat; no fused tropical kernels — implementation artifact) |
 | 2-layer attention-LM kernel, **F2 silicon** | 772 | ≈9.0 mJ | tok/s measured on silicon (on-chip training validated, DSP=0, AGFI `agfi-0a845113b088cf62e`); energy WNS-derived, not power-rail |
-| morph-LM kernel (config B) | 11,188 | n/a | host CSIM (bit-exact gradients validated); C-synth/AFI pending |
+| morph-LM kernel (config B) | 11,188 | n/a | host CSIM (bit-exact); **AFI registered** `agfi-029bc010e061e4626`: DSP=0, full-CL timing MET +0.007 ns @250 MHz; silicon bring-up at the CL buffer-RAM integration step (control plane + first PCIM burst proven on silicon; see LM_FPGA_VS_GPU_PLAN.md) |
 
 Note: at this model scale the GPU wins per-token energy (~6× vs the F2's
 WNS-derived figure) — the pathway's case is closure + on-fabric adaptation,
