@@ -1366,7 +1366,13 @@ def classification_loss(logits: torch.Tensor, y: torch.Tensor,
     if loss_type == "tropical_ce":
         return tropical_cross_entropy(logits, y, softmax="exact")
     if loss_type == "tropical_ce_lut":
-        return tropical_cross_entropy(logits, y, softmax="lut")
+        # normalize="shift" is the on-chip power-of-2 normalization; the default
+        # "exact" uses a host reciprocal, contradicting this label's whole-loop
+        # multiplier-free promise. Safe ONLY because TropicalCrossEntropyFn
+        # scatters sum(p) (not 1.0) at the target — an unbalanced gradient with
+        # sum(p) < 1 collapses sign-trained models (see functional.py and
+        # tests/test_functional.py::test_lut_shift_ce_grad_rows_sum_to_zero).
+        return tropical_cross_entropy(logits, y, softmax="lut", normalize="shift")
     raise ValueError(
         f"Unknown loss_type {loss_type!r}; expected one of "
         "'cross_entropy', 'perceptron', 'tropical_ce', 'tropical_ce_lut'."

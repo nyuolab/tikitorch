@@ -309,6 +309,23 @@ def test_lut_ce_grad_close_to_exact_ce_grad():
     assert (a.grad - b.grad).abs().max() < 5e-3
 
 
+def test_lut_shift_ce_grad_rows_sum_to_zero():
+    # Regression guard for the balanced-onehot gradient: shift-normalized
+    # shift_softmax has sum(p) in [0.5, 1], and an unbalanced (p - onehot)
+    # gradient carries a per-row bias of (s-1)/m — the same order as the
+    # gradient signal — which sign-based optimizers integrate into a
+    # constant-predictor collapse (measured on MorphSSM char-LM, dead by
+    # step ~900). TropicalCrossEntropyFn must scatter sum(p), not 1.0.
+    torch.manual_seed(5)
+    n, v = 24, 65
+    logits = (torch.randn(n, v) * 3.0).requires_grad_(True)
+    target = torch.randint(0, v, (n,))
+    F.tropical_cross_entropy(logits, target, softmax="lut",
+                             normalize="shift").backward()
+    row_sums = logits.grad.sum(dim=-1)
+    assert row_sums.abs().max() < 1e-6   # old unbalanced bug: ~1e-2
+
+
 def test_gradcheck_continuous_ce_ref():
     logits = torch.randn(4, 16, dtype=torch.double, requires_grad=True)
     target = torch.randint(0, 16, (4,))

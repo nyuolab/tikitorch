@@ -631,7 +631,9 @@ class TropicalValuePullIterTopKFn(torch.autograd.Function):
         finite = torch.isfinite(topvals)
         contrib = topvals
         if rank_bias is not None:
-            rb = rank_bias.reshape(*([1] * (topvals.dim() - 2)), kk, 1)
+            # Lv can clip kk below k (e.g. a 1-token generation prompt); only the
+            # first kk rank biases participate.
+            rb = rank_bias[:kk].reshape(*([1] * (topvals.dim() - 2)), kk, 1)
             contrib = contrib + rb
         contrib = torch.where(finite, contrib, torch.zeros_like(contrib))
         out = contrib.sum(dim=-2)                                 # SUM-combine, no divide
@@ -641,6 +643,7 @@ class TropicalValuePullIterTopKFn(torch.autograd.Function):
         ctx.v_shape = V.shape
         ctx.scores_shape = scores.shape
         ctx.has_bias = rank_bias is not None
+        ctx.bias_len = rank_bias.shape[0] if rank_bias is not None else 0
         ctx.kk = kk
         return out
 
@@ -666,6 +669,9 @@ class TropicalValuePullIterTopKFn(torch.autograd.Function):
         if ctx.has_bias:
             reduce_dims = tuple(d for d in range(g_full.dim()) if d != g_full.dim() - 2)
             grad_bias = g_full.sum(dim=reduce_dims)
+            if grad_bias.shape[0] < ctx.bias_len:   # kk was clipped by Lv < k
+                grad_bias = torch.cat(
+                    [grad_bias, grad_bias.new_zeros(ctx.bias_len - grad_bias.shape[0])])
         return grad_V, grad_scores, None, grad_bias
 
 
@@ -988,7 +994,14 @@ class TropicalCrossEntropyFn(torch.autograd.Function):
         else:
             raise ValueError(f"softmax must be 'exact' or 'lut', got {softmax!r}")
         onehot = torch.zeros_like(p)
-        onehot.scatter_(1, target2.view(-1, 1), 1.0)
+        # Scatter the ROW SUM of p (not 1.0) at the target: sum(grad) == 0 per
+        # row for ANY normalization. With exact softmax s == 1 (unchanged); with
+        # shift_softmax(normalize="shift") s is in [0.5, 1] and an unbalanced
+        # (p - onehot) gradient carries a systematic per-row bias that sign-based
+        # optimizers integrate into a drift -> constant-predictor collapse
+        # (measured: MorphSSM char-LM dies by step ~900). Placing the precomputed
+        # s at the target index is a scatter, not a multiply -- closure-clean.
+        onehot.scatter_(1, target2.view(-1, 1), p.sum(dim=-1, keepdim=True))
         grad = (p - onehot) / m
         ctx.save_for_backward(grad)
         ctx.in_shape = logits.shape
