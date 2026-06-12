@@ -19,7 +19,7 @@ from tikitorch.planning.muzero.networks_dense import DenseMuZeroNet
 from tikitorch.planning.muzero.games import (BoardGameModel, AlphaZeroBoardModel, negamax_agent,
                                              play_match, random_opening)
 from tikitorch.planning.muzero.selfplay import play_board_game
-from tikitorch.planning.muzero.agent import _make_optimizer, _ce
+from tikitorch.planning.muzero.agent import _make_optimizer
 from tikitorch.functional import tropical_perceptron_loss
 
 __all__ = ["BoardConfig", "BoardReplay", "BoardMuZero", "build_muzero_net"]
@@ -77,7 +77,9 @@ class BoardConfig:
     core_kind: str = "maxplus"          # tropical cores: "maxplus" | "dyadic" (multiplier-free oblique)
     dyadic_heads: bool = False          # True -> DyadicLinear policy/value/reward heads (fully zero-DSP net)
     tree_model: str = "muzero"          # MCTS tree: "muzero" (learned dynamics) | "alphazero" (true rules)
-    policy_loss: str = "ce"             # "ce" (soft x-ent) | "perceptron" (closure-faithful, multiply-free)
+    policy_loss: str = "ce"             # "ce" (full-distribution soft x-ent) | "perceptron" (argmax-only)
+    policy_entropy_coef: float = 0.0    # >0 adds an entropy bonus to the policy (anti prior-collapse)
+    target_temp: float = 1.0            # >1 softens the visit target before distillation (anti-collapse)
     optimizer: str = "tropicalsgd"      # closed (multiply-free) by default
     latent_dim: int = 64
     dense_hidden_mult: int = 3          # widen dense cores to param-match the tropical net
@@ -198,13 +200,27 @@ class BoardMuZero:
 
     # ---------------------------------------------------------------- training
     def _policy_loss(self, logits, target_dist):
-        # "ce" = soft cross-entropy to the visit distribution (softmax+log, NOT multiplier-free).
-        # "perceptron" = closure-faithful multiclass perceptron distilling the search's BEST move
-        # (argmax of visits); ±1/2-hot silicon gradient -> fully multiply-free training (with L1 value
-        # + SignSGD). Distilling the argmax suffices for play (MCTS re-searches at move time).
-        if self.cfg.policy_loss == "perceptron":
-            return tropical_perceptron_loss(logits, target_dist.argmax(-1))
-        return _ce(logits, target_dist)
+        """Distill the MCTS visit distribution into the policy head. Levers against prior-collapse:
+          * policy_loss: "ce" = full-distribution soft cross-entropy (calibrated softmax gradient,
+            keeps the whole distribution) vs "perceptron" = argmax-only (overconfident -> collapses).
+          * target_temp > 1: soften the visit target (flatter prior, harder to over-sharpen).
+          * policy_entropy_coef > 0: add an entropy BONUS (maximize policy entropy) -> anti-collapse.
+        For SignSGD the update is sign(grad), so the on-fabric realization (shift_softmax / sign-product)
+        is bit-equivalent in its updates; ce's softmax/log is the one host transcendental (LUT on-chip)."""
+        import torch.nn.functional as F
+        c = self.cfg
+        if c.target_temp != 1.0:                       # temper the target: t^(1/T) renormalized
+            t = target_dist.clamp_min(1e-9) ** (1.0 / c.target_temp)
+            target_dist = t / t.sum(-1, keepdim=True)
+        if c.policy_loss == "perceptron":
+            base = tropical_perceptron_loss(logits, target_dist.argmax(-1))
+        else:                                          # "ce": full-distribution soft cross-entropy
+            base = -(target_dist * F.log_softmax(logits, -1)).sum(-1).mean()
+        if c.policy_entropy_coef > 0.0:                # maximize predicted-policy entropy (anti-collapse)
+            sm = logits.softmax(-1)
+            ent = -(sm * sm.clamp_min(1e-9).log()).sum(-1).mean()
+            base = base - c.policy_entropy_coef * ent
+        return base
 
     def train_step(self):
         c = self.cfg

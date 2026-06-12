@@ -49,32 +49,35 @@ def score_vs(net, sims, depth, n=40):
 
 def main(a):
     cfg = BoardConfig(net_kind="tropical", core_kind="dyadic", dyadic_heads=True,
-                      policy_loss="perceptron", optimizer="tropicalsgd", tree_model="alphazero",
+                      policy_loss=a.policy_loss, policy_entropy_coef=a.entropy_coef, target_temp=a.target_temp,
+                      optimizer="tropicalsgd", tree_model="alphazero",
                       latent_dim=64, num_simulations=a.sims, iters=a.iters, games_per_iter=a.games,
                       train_steps_per_iter=40, batch=128, unroll=3, num_workers=a.workers,
-                      tau_start=1.0, tau_end=0.1, lr=3e-3, seed=0, eval_every=999, eval_games=2)
+                      tau_start=1.0, tau_end=0.1, lr=a.lr, seed=0, eval_every=999, eval_games=2)
     probe = BoardMuZero(Connect4, cfg)
     viol = find_closure_violations(probe.net)
-    print(f"closure audit (must be empty for fully multiply-free): {viol or 'NONE'}", flush=True)
-    print(f"training FULLY-tropical net (dyadic heads, perceptron+L1, SignSGD, AlphaZero tree): "
-          f"{a.sims} sims, {a.iters}x{a.games} games, {a.workers} workers...", flush=True)
+    print(f"[{a.tag}] closure audit (empty for fully multiply-free): {viol or 'NONE'}", flush=True)
+    print(f"[{a.tag}] recipe: policy_loss={a.policy_loss} entropy={a.entropy_coef} temp={a.target_temp} "
+          f"lr={a.lr} | {a.sims} sims, {a.iters}x{a.games} games, {a.workers} workers...", flush=True)
     probe.run(log=lambda s: None)
     untrained = BoardMuZero(Connect4, cfg)
 
     grid = [100, 200, 400]
-    res = {"closure_violations": viol, "trained": {}, "untrained": {}}
+    res = {"recipe": dict(policy_loss=a.policy_loss, entropy_coef=a.entropy_coef, target_temp=a.target_temp, lr=a.lr),
+           "closure_violations": viol, "trained": {}, "untrained": {}}
     for label, mz in (("trained", probe), ("untrained", untrained)):
         for sims in grid:
             res[label][sims] = {d: score_vs(mz.net, sims, d) for d in (2, 3)}
-            print(f"  {label:9s} @ {sims:3d} sims:  d2={res[label][sims][2]}  d3={res[label][sims][3]}", flush=True)
+            print(f"[{a.tag}]  {label:9s} @ {sims:3d} sims:  d2={res[label][sims][2]}  d3={res[label][sims][3]}", flush=True)
 
     os.makedirs(OUT, exist_ok=True)
-    open(os.path.join(OUT, "connect4_fully_tropical.json"), "w").write(json.dumps(
-        {"note": "FULLY multiplier-free Connect4 (dyadic cores+heads, perceptron+L1+SignSGD, AlphaZero "
-                 "tree). closure_violations must be []. score=win+0.5draw, random openings, 40 games.",
+    out = os.path.join(OUT, f"connect4_fully_tropical_{a.tag}.json")
+    open(out, "w").write(json.dumps(
+        {"note": "FULLY multiplier-free Connect4 (dyadic cores+heads, soft-CE/perceptron + entropy/temp + "
+                 "L1 + SignSGD, AlphaZero tree). closure_violations must be []. score=win+0.5draw, 40 games.",
          "config": {"sims": a.sims, "iters": a.iters, "games": a.games}, **res}, indent=2))
-    print("\n[saved] connect4_fully_tropical.json")
-    print("DONE_FT")
+    print(f"[{a.tag}] [saved] {out}")
+    print(f"DONE_FT_{a.tag}")
 
 
 if __name__ == "__main__":
@@ -83,4 +86,9 @@ if __name__ == "__main__":
     p.add_argument("--iters", type=int, default=40)
     p.add_argument("--games", type=int, default=48)
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
+    p.add_argument("--policy-loss", dest="policy_loss", default="ce", choices=["ce", "perceptron"])
+    p.add_argument("--entropy-coef", dest="entropy_coef", type=float, default=0.0)
+    p.add_argument("--target-temp", dest="target_temp", type=float, default=1.0)
+    p.add_argument("--lr", type=float, default=3e-3)
+    p.add_argument("--tag", default="run")
     main(p.parse_args())
