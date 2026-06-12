@@ -191,3 +191,36 @@ def test_fully_tropical_board_net_is_closure_empty_and_trains():
     mz.self_play(temperature=1.0, base_seed=1)
     loss = mz.train_step()                                # perceptron + L1, sign-SGD step
     assert loss == loss and loss >= 0.0                   # finite, ran
+
+
+def test_balanced_policy_loss_gradients_sum_to_zero_per_row():
+    """The collapse guard the other instance flagged: under SIGN training, a per-row gradient bias drifts
+    the prior to a constant/collapsed predictor. tropical_cross_entropy scatters the softmax row-sum at
+    the target so sum(grad)==0 per row for ANY normalization (exact AND shift LUT) — and the perceptron's
+    2-hot gradient is balanced too. Pins that property for the policy losses the board agent distills with."""
+    import torch
+    from tikitorch.functional import tropical_cross_entropy, tropical_perceptron_loss
+
+    logits = torch.randn(8, 7, requires_grad=True)
+    target = torch.randint(0, 7, (8,))
+    for fn, kw in [(tropical_cross_entropy, dict(softmax="exact")),
+                   (tropical_cross_entropy, dict(softmax="lut")),   # shift_softmax: row-sum != 1
+                   (tropical_perceptron_loss, {})]:
+        logits.grad = None
+        fn(logits, target, **kw).backward()
+        row_sums = logits.grad.sum(-1).abs()
+        assert float(row_sums.max()) < 1e-5, f"{fn.__name__} {kw}: gradient row-sum {float(row_sums.max())} != 0"
+
+
+def test_mode_frac_collapse_detector_populates():
+    """The early collapse detector: train_step records last_mode_frac (mean prob on the policy argmax),
+    a healthy prior over A=7 actions sitting well below 1."""
+    from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig
+    from tikitorch.planning.muzero.games import Connect4
+
+    mz = BoardMuZero(Connect4, BoardConfig(core_kind="dyadic", dyadic_heads=True, policy_loss="tropce",
+                                           tree_model="alphazero", num_simulations=12, games_per_iter=2,
+                                           num_workers=1, seed=0))
+    mz.self_play(temperature=1.0, base_seed=1)
+    mz.train_step()
+    assert 0.0 < mz.last_mode_frac <= 1.0

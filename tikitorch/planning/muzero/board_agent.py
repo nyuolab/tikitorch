@@ -20,7 +20,7 @@ from tikitorch.planning.muzero.games import (BoardGameModel, AlphaZeroBoardModel
                                              play_match, random_opening)
 from tikitorch.planning.muzero.selfplay import play_board_game
 from tikitorch.planning.muzero.agent import _make_optimizer
-from tikitorch.functional import tropical_perceptron_loss
+from tikitorch.functional import tropical_perceptron_loss, tropical_cross_entropy
 
 __all__ = ["BoardConfig", "BoardReplay", "BoardMuZero", "build_muzero_net"]
 
@@ -214,6 +214,13 @@ class BoardMuZero:
             target_dist = t / t.sum(-1, keepdim=True)
         if c.policy_loss == "perceptron":
             base = tropical_perceptron_loss(logits, target_dist.argmax(-1))
+        elif c.policy_loss == "tropce":
+            # balanced, calibrated, closure-faithful CE to the best move (argmax of visits). Its gradient
+            # scatters the softmax ROW-SUM at the target so sum(grad)==0 per row for ANY normalization
+            # (exact OR shift_softmax) -> no sign-training row-bias drift (the on-fabric collapse mode the
+            # other instance flagged). The deployable hard-target distillation; softmax="lut" is the fully
+            # multiplier-free on-chip form. Soft-distribution balance would need s*target (a multiply).
+            base = tropical_cross_entropy(logits, target_dist.argmax(-1), softmax="exact")
         else:                                          # "ce": full-distribution soft cross-entropy
             base = -(target_dist * F.log_softmax(logits, -1)).sum(-1).mean()
         if c.policy_entropy_coef > 0.0:                # maximize predicted-policy entropy (anti-collapse)
@@ -227,6 +234,10 @@ class BoardMuZero:
         obs0, acts, vt, pt = self.buffer.sample_batch(c.batch, c.unroll, self.gen)
         vh = self.net.pred.value_head
         h, p, v = self.net.initial(obs0)
+        # mode-frac collapse detector: mean prob mass on the policy's argmax. A healthy prior over A
+        # actions sits well below 1; -> ~1 means the prior is collapsing to a (often wrong) spike, which
+        # this catches hundreds of steps before the eval/loss curve does. Stored for the loop to monitor.
+        self.last_mode_frac = float(p.detach().softmax(-1).max(-1).values.mean())
         loss = c.value_loss_weight * vh.loss(v, vt[:, 0]) + self._policy_loss(p, pt[:, 0])
         for k in range(c.unroll):
             h, r, p, v = self.net.recurrent(h, acts[:, k])

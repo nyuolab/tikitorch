@@ -86,7 +86,7 @@ if __name__ == "__main__":
     p.add_argument("--iters", type=int, default=40)
     p.add_argument("--games", type=int, default=48)
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
-    p.add_argument("--policy-loss", dest="policy_loss", default="ce", choices=["ce", "perceptron"])
+    p.add_argument("--policy-loss", dest="policy_loss", default="ce", choices=["ce", "perceptron", "tropce"])
     p.add_argument("--entropy-coef", dest="entropy_coef", type=float, default=0.0)
     p.add_argument("--target-temp", dest="target_temp", type=float, default=1.0)
     p.add_argument("--lr", type=float, default=3e-3)
