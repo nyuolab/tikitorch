@@ -1,56 +1,101 @@
-# Learning a good tropical policy prior — the anti-collapse sweep (Connect4, fully multiply-free)
+# Learning a tropical policy prior — the clean apples-to-apples sweep (Connect4, fully multiply-free)
 
-_Goal: a MULTIPLY-FREE training recipe that makes the dyadic policy prior **help** low-sim search, instead
-of the perceptron+SignSGD collapse (trained 0.025 vs untrained ~0.787 @ 100 sims). Net: dyadic cores + dyadic
-heads (closure `[]`), AlphaZero true-model tree, sign-only TropicalSGD. Score = win+0.5·draw vs negamax,
-random openings. The diagnostic metric is **trained @ 100 sims vs d2**: does the learned prior beat the
-untrained ~0.787 (helps) or collapse (0.025)?  Run on EC2 (c5.9xlarge)._
+_Goal: does a MULTIPLY-FREE training recipe make the dyadic policy prior **help** low-sim search? Net: dyadic
+tropical cores + dyadic heads (closure audit returns `[]` — fully zero-DSP), AlphaZero true-model tree,
+sign-only TropicalSGD. Score = win+0.5·draw vs negamax, random openings, **n=40 games/cell**. Each recipe runs
+TRAINED **and** UNTRAINED in the **same run** over the sim grid [100,200,400] at negamax depths d2/d3, so this
+is a genuine apples-to-apples table. The diagnostic the study defined: does the learned prior beat the untrained
+net at low sims (100)?_
 
-## Result — the collapse is solved, and the prior now helps
+**Provenance (this is the clean confirmation run).** Run on a c5.9xlarge (36 vCPU) via the robust one-shot runner
+`scripts/run_connect4_prior_sweep_ec2.sh` (threads pinned `--threads 1`/recipe, results streamed to S3,
+IAM-instance-profile, `shutdown` cost-backstop, self-terminate). ~66 min, ~$1.80. This run **supersedes and
+partly corrects** the earlier partial sweep (commit `d380b0f`), whose two headline numbers do **not** reproduce
+(see "Correction" below).
 
-| recipe (all fully multiply-free) | trained @100 d2/d3 | @200 d2/d3 |
-|---|---|---|
-| perceptron only (prior run) | **0.025** / 0.075 | 0.90 / 0.75 |
-| `ce` — full-distribution soft-CE | 0.60 / 0.60 | 0.85 / 0.86 |
-| `ce` + entropy 0.1 | 0.787 / 0.71 | 0.84 / 0.81 |
-| **`ce` + entropy 0.3** | **0.90 / 0.80** | 0.91 / 0.90 |
-| `ce` + entropy 0.1 + lr 1e-3 | 0.80 / 0.675 | 0.875 / 0.81 |
-| `ce` + target-temp 2.0 | 0.875 / 0.70 | 0.90 / 0.825 |
-| perceptron + entropy 0.1 | 0.838 / 0.71 | 0.925 / 0.81 |
-| _untrained reference (prior run, same cfg)_ | _~0.787_ | _~0.90_ |
+## Result — the clean apples-to-apples table (`tr` = trained, `un` = untrained, both from the same run)
 
-**Findings:**
-- **Collapse SOLVED.** Every anti-collapse recipe lands 0.60–0.90 @100 sims vs the perceptron-only 0.025.
-- **The trained prior now HELPS low-sim search.** The strong recipes — full-dist soft-CE + entropy 0.3
-  (**0.90**), + target-temp 2.0 (0.875), even perceptron + entropy (0.838) — exceed the untrained ~0.787 at
-  100 sims. So a multiply-free trained prior buys sim-efficiency (fewer sims for the same strength = cheaper
-  FPGA actors) — the thing that failed before.
-- **Lever ranking:** ANTI-COLLAPSE (entropy bonus or visit/target temperature) is the key lever. Full-dist
-  soft-CE alone helps (0.60 vs 0.025) but doesn't beat untrained; entropy/temp on top does. Winner here:
-  full-distribution soft-CE + entropy ≈ 0.3.
+| recipe (all closure `[]`) | @100 tr · un | @200 tr · un | @400 tr · un | mean Δ(tr−un) |
+|---|---|---|---|---|
+| perceptron only | 0.975/0.588 · 0.525/0.562 | 0.775/0.450 · 0.775/0.512 | 0.863/0.787 · 0.838/0.688 | +0.090 |
+| `ce` — full-dist soft-CE | 0.713/0.512 · 0.812/0.600 | 0.775/0.850 · 0.812/0.675 | 0.912/0.800 · 0.938/0.688 | +0.006 |
+| **`ce` + entropy 0.1** | **0.925/0.825 · 0.688/0.350** | 0.850/0.825 · 0.825/0.625 | 0.900/0.925 · 0.875/0.762 | **+0.188** |
+| `ce` + entropy 0.3 | 0.675/0.613 · 0.875/0.650 | 0.875/0.850 · 0.900/0.762 | 0.912/0.900 · 0.925/0.812 | −0.016 |
+| `ce` + entropy 0.1 + lr 1e-3 | 0.825/0.725 · 0.800/0.812 | 0.900/0.800 · 0.850/0.787 | 0.863/0.838 · 0.900/0.850 | −0.008 |
+| `ce` + target-temp 2.0 | 0.750/0.500 · 0.525/0.425 | 0.812/0.750 · 0.550/0.375 | 0.950/0.900 · 0.700/0.550 | +0.256† |
+| perceptron + entropy 0.1 | 0.725/0.688 · 0.775/0.537 | 0.900/0.713 · 0.900/0.812 | 0.700/0.662 · 0.950/0.812 | −0.066 |
 
-## The general lesson for learning tropical nets (converges with the LM-bakeoff instance)
+_Cells are `d2/d3`. mean Δ is the trained−untrained gap averaged over the 6 (sim×depth) cells. Noise: per-cell
+score SE = √(0.25/40) = 0.079; a depth-averaged trained−untrained delta has SE ≈ 0.079 (2σ band ≈ 0.158); a
+recipe's 6-cell mean Δ has SE ≈ 0.046. †`ce`+target-temp's large Δ is a **weak-untrained-baseline artifact**,
+not a strong trained net — see Findings._
 
-Sign/shift training collapses a learned prior via two compounding mechanisms: **(1) overconfidence** —
-sign-only updates drive logits to extremes with no calibration, especially with an argmax-only target
-(perceptron); and **(2) gradient row-bias** — a shift-normalized soft loss whose row-sum ≠ 1 leaves a
-per-row bias that sign training integrates into a constant-predictor drift. The cure is **(a) a calibrated,
-row-balanced loss** (full-distribution soft-CE; or `tropical_cross_entropy`, which scatters the softmax
-row-sum at the target so `sum(grad)==0` for exact *and* shift LUT — the deployable closure-faithful form),
-plus **(b) explicit entropy / temperature regularization** to keep the prior soft. The `mode-frac` detector
-(mean prob on the policy argmax) flags collapse hundreds of steps before the eval does.
+## Findings (honest; this clean run is more deflationary than the partial run)
+
+1. **The multiply-free substrate is competitive — this part is solid.** All 7 recipes audit closure `[]`
+   (zero `nn.Linear`, fully zero-DSP forward) and play credibly vs negamax: 83% of all cells (trained or
+   untrained) score ≥0.6, range 0.35–0.975. **This substrate result stands independently of the prior-learning
+   question** — the fully-tropical net is competitive via search depth regardless of whether training helps.
+
+2. **No collapse.** Every recipe — including bare perceptron+SignSGD — sits in 0.6–0.9 everywhere. There is no
+   catastrophic policy collapse to "solve" in this clean run (the partial run's perceptron 0.025 @100 is not
+   reproduced; see Correction).
+
+3. **Training's low-sim benefit is recipe-specific and weak, not a general property.** Of 7 recipes, exactly
+   **one — `ce` + entropy 0.1 — shows a real low-sim gain**: it beats untrained in 6/6 cells, its mean Δ
+   (+0.188) clears ~4σ, the gap is largest precisely at the sim=100 diagnostic, and its *trained* net is the
+   strongest in the litter (above the cross-recipe trained mean in all 6 cells). Even so, **its headline margin
+   is inflated by an unusually weak untrained baseline** (untrained @100 d3 = 0.350, the single lowest cell);
+   controlled against the median untrained baseline the true effect is closer to **~+0.15–0.19**, not the raw
+   +0.36–0.48. All other recipes are within noise, negative, or baseline-confounded.
+
+4. **`ce`+target-temp 2.0 is NOT a training win** despite its +0.256 mean Δ. Its *trained* scores are below the
+   cross-recipe trained mean at the sim=100 diagnostic; the gap is driven entirely by a pathologically weak
+   *untrained* baseline (worst at every grid point). This is a bad-comparator artifact, not a learned prior.
+
+5. **The ordering is dominated by seed/baseline noise.** Nominally-identical untrained nets spread **0.350**
+   across recipes @100 d2 (>2× the per-cell noise band) — so the untrained comparator is not a fixed yardstick,
+   and most per-cell trained-vs-untrained deltas (33/42 within the single-comparison 2σ band) are noise. Only
+   recipe-level 6-cell aggregates are trustworthy, and only `ce`+entropy 0.1 survives as a clean training win.
+
+**Honest bottom line:** a trained multiply-free prior *can* help at low sims, but only under one specific recipe
+(`ce`+entropy 0.1) and only weakly — it is **not** the general collapse-and-rescue phenomenon the prior commit
+claimed. This converges with the board-scaling verdict (substrate scales structurally; the prior-learning win is
+narrow and compute-/seed-limited, and is shown supervised, not robustly in the self-play loop).
+
+## Correction to commit `d380b0f` (the partial run)
+
+Two headline numbers from the partial sweep do **not** survive the clean, thread-pinned, apples-to-apples re-run:
+
+- **REFUTED — "perceptron collapses to 0.025 @100."** Clean trained perceptron @100 = (0.975, 0.588), the single
+  best cell in the table. There is no collapse; the collapse-and-rescue framing rests on a number that did not
+  reproduce.
+- **REFUTED — "`ce`+entropy 0.3 wins @0.90, beating untrained ~0.787."** Clean `ce`+entropy 0.3 trained @100 =
+  (0.675, 0.613), which **loses to its own untrained baseline** (0.875, 0.65) on both depths (6-cell mean
+  Δ = −0.016). It is neither a 0.90 winner nor a winner at all; the honest standout is `ce`+entropy 0.1.
+
+The loss-design work the partial run motivated is unaffected and stands on its own: the row-balanced,
+closure-faithful `tropical_cross_entropy` (softmax row-sum scattered at the target so `sum(grad)==0` for exact
+*and* shift-LUT) and the entropy/temperature levers are sound engineering, and the sign-training gradient-row-bias
+failure mode is real and documented elsewhere (the Shakespeare LM bakeoff: shift-softmax gradient-bias collapse,
+found and fixed). It simply did not dominate this Connect4 self-play setting.
 
 ## Caveats (honest)
 
-- **Partial data.** The runaway below killed the sweep before it wrote complete JSONs: we have trained @
-  100/200 (not 400) and **not** a per-recipe untrained baseline — the ~0.787 untrained is cross-run (same
-  config, prior run), so trained-vs-untrained mixes runs. n≈30–40 games/cell (±~0.08). The *direction*
-  (collapse fixed; best recipes beat untrained) is robust and consistent across all six; the exact margins
-  are not yet apples-to-apples. A clean, thread-pinned re-run (trained+untrained per recipe, full grid) is
-  the confirmation to-do.
-- **OPS MISTAKE (recorded so it doesn't recur).** The 6 recipes ran concurrently but each `main` used
-  torch's *default* thread count (= 36), so the eval phase oversubscribed ~200 threads onto 36 cores —
-  the run took **~13 h (~$20)** instead of ~30 min. Fix: pin `torch.set_num_threads` per process for
-  parallel sweeps (`--threads`, added). Always pin threads when fanning processes on one box.
+- **Single n=40 run, no seed replication, no within-cell CIs.** Every cell is one draw; SE figures are worst-case
+  Bernoulli. The 0.350 spread among nominally-identical untrained baselines shows seed variance is first-order.
+  Resolving the real ~0.05–0.15 effects needs **hundreds of games/cell** and, critically, a **fixed shared
+  (same-seed) untrained baseline** so the comparison is paired rather than seed-confounded. That paired design is
+  the natural next confirmation; this run pins the apples-to-apples table but not the small effect sizes.
+- **Multiple comparisons.** 42 trained-vs-untrained cell-deltas screened with no correction (~2 false 2σ hits
+  expected); a genuine *negative* 2σ outlier (perceptron+entropy 0.1 @400, −0.200) confirms the noise is real and
+  two-sided. Over-read only the largest recipe-level aggregate (`ce`+entropy 0.1).
+- **No clean sim-efficiency trend.** A learned prior buying search efficiency should show the trained−untrained
+  gap *shrinking* as sims grow; across [100,200,400] the gaps are noisy/non-monotone for most recipes
+  (perceptron-only even sign-flips @200). `ce`+entropy 0.1 is the partial exception (largest gap at sim=100).
+- **Scope.** "Beats untrained" is a relative claim about prior quality at a fixed search budget vs a fixed
+  (non-improving) negamax opponent. It is **not** evidence the multiply-free substrate matches a dense MuZero
+  prior — the capacity verdict (dense 1.5–1.7× better on smooth/oblique value) still stands.
 
-_Reproduce: `scripts/run_fully_tropical_connect4.py --policy-loss ce --entropy-coef 0.3 [--threads 1]`._
+_Reproduce: `bash scripts/run_connect4_prior_sweep_ec2.sh setup && bash scripts/run_connect4_prior_sweep_ec2.sh launch`
+(or one recipe locally: `PYTHONPATH=. python3 scripts/run_fully_tropical_connect4.py --policy-loss ce --entropy-coef 0.1 --threads 1`)._

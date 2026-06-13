@@ -1,0 +1,43 @@
+{
+  "note": "FULLY multiplier-free Connect4 (dyadic cores+heads, soft-CE/perceptron + entropy/temp + L1 + SignSGD, AlphaZero tree). closure_violations must be []. score=win+0.5draw, 40 games.",
+  "config": {
+    "sims": 256,
+    "iters": 40,
+    "games": 48
+  },
+  "recipe": {
+    "policy_loss": "ce",
+    "entropy_coef": 0.0,
+    "target_temp": 1.0,
+    "lr": 0.003
+  },
+  "closure_violations": [],
+  "trained": {
+    "100": {
+      "2": 0.713,
+      "3": 0.512
+    },
+    "200": {
+      "2": 0.775,
+      "3": 0.85
+    },
+    "400": {
+      "2": 0.912,
+      "3": 0.8
+    }
+  },
+  "untrained": {
+    "100": {
+      "2": 0.812,
+      "3": 0.6
+    },
+    "200": {
+      "2": 0.812,
+      "3": 0.675
+    },
+    "400": {
+      "2": 0.938,
+      "3": 0.688
+    }
+  }
+}

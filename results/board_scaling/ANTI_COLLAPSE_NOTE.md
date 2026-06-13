@@ -36,20 +36,27 @@ balanced gradient = subtraction + **scatter** of the scalar $s$; entropy/tempera
 sign-product — times a power-of-two $\eta$. **No hardware multiplier anywhere**, so the recipe that *learns*
 a useful prior runs on the same zero-DSP fabric as inference.
 
-## Empirical (Connect4, fully-tropical net; partial — see caveat)
+## Empirical (Connect4, fully-tropical net — clean apples-to-apples run)
 
-Trained policy prior @ 100 MCTS sims vs negamax-d2 (perceptron-only collapsed to 0.025; untrained ≈ 0.787):
+The mechanisms above are real and load-bearing in the **LM** setting (the Shakespeare bakeoff: shift-softmax
+gradient-bias collapse, found and fixed by the balanced `tropical_cross_entropy`). In the **Connect4 self-play**
+setting, a clean, thread-pinned, same-run trained-vs-untrained sweep (7 recipes × [100,200,400] sims × d2/d3,
+n=40/cell; `CONNECT4_PRIOR_SWEEP.md`) gives a more measured result:
 
-| recipe | trained @100 d2 |
-|---|---|
-| perceptron (argmax) | 0.025 (collapse) |
-| soft-CE | 0.60 |
-| soft-CE + entropy 0.3 | **0.90** |
-| soft-CE + target-temp 2.0 | 0.875 |
-| perceptron + entropy 0.1 | 0.838 |
+- **The multiply-free substrate is competitive** — all 7 recipes audit closure `[]` and score 0.6–0.9 vs
+  negamax (83% of cells ≥0.6). This holds independently of the prior-learning question.
+- **No dramatic collapse here.** Bare perceptron+SignSGD does **not** collapse in the clean run (trained @100 =
+  0.975/0.588, the best cell), so the catastrophic 0.025 of the earlier partial run was a seed/run artifact, not
+  a stable property. The gradient-bias collapse the balanced loss guards against is the one **observed in the LM
+  setting**, where it is decisive; in Connect4 self-play it did not dominate.
+- **A learned prior helps at low sims only narrowly:** of 7 recipes, one — soft-CE + entropy 0.1 — shows a real
+  6/6-cell trained-over-untrained gain (mean Δ +0.188, largest at sim=100), and even that is partly inflated by a
+  weak untrained baseline (true effect ~+0.15–0.19). soft-CE + entropy 0.3 (the partial run's "0.90 winner")
+  actually **loses** to its own untrained baseline @100; soft-CE + target-temp 2.0's headline gain is a
+  weak-baseline artifact. The trained-vs-untrained ordering is otherwise seed/noise-dominated.
 
-Every anti-collapse recipe fixes the collapse; the strong ones (entropy/temperature) make the multiply-free
-trained prior **beat** untrained at low sims (i.e., it buys sim-efficiency). **Caveat:** these are partial
-(trained @100/200 only; untrained baseline cross-run; n≈30–40/cell) — direction robust, exact apples-to-apples
-margins pending a clean run (see CONNECT4_PRIOR_SWEEP.md; the confirmation run is an open TODO that needs a
-properly-engineered EC2 harness, not ad-hoc boxes).
+**Takeaway for the manuscript:** the contribution is the *machinery* — a closure-faithful balanced gradient +
+entropy/temperature levers + `mode_frac` detector that let you train a tropical prior on the **same zero-DSP
+fabric as inference**, with the gradient-bias collapse demonstrated and cured in the LM setting. The Connect4
+self-play prior-learning gain is real but recipe-specific and weak (best: soft-CE + entropy 0.1); resolving the
+small effect sizes needs a paired same-seed baseline and hundreds of games/cell.
