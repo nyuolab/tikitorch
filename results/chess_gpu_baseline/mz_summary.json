@@ -1,0 +1,18 @@
+{
+  "instance_window_s": 705.9,
+  "selfplay_moves_per_s": 1.418,
+  "train_steps_per_s": 0.4264,
+  "train_samples_per_s": 54.58,
+  "games_per_s": 0.0184,
+  "batch_size": 128,
+  "num_simulations": 50,
+  "num_workers": 12,
+  "net": "resnet_b6_c64",
+  "final_counts": {
+    "training_step": 301,
+    "num_played_steps": 1001,
+    "num_played_games": 13,
+    "elapsed": 886.1
+  },
+  "warmup_skipped_s": 180
+}

@@ -61,28 +61,37 @@ yet the trained agent is *weaker than its untrained control* vs a random mover. 
 
 ---
 
-## Axis 2 — WALL-CLOCK + THROUGHPUT  `[to-measure]`
+## Axis 2 — WALL-CLOCK + THROUGHPUT
 
 MuZero has **two** throughputs that map to the FPGA actor/learner split — we report **both** for every arm.
+**Cross-arm caution:** the GPU arm runs a resnet (b6c64); the FPGA arm a tiny dyadic projection net — model
+sizes differ by orders of magnitude, so do NOT directly compare their samples/s as a like-for-like speedup.
 
 | arm | self-play moves/s (actor) | train samples/s (learner) | provenance |
 |---|---|---|---|
-| TikiTorch multiply-free, **CPU** (own true-MuZero chess loop) | TBD | TBD | `[to-measure]` local/EC2 CPU (free) |
-| **reference MuZero, single GPU** (A10G g5.xlarge) | TBD | TBD | `[to-measure]` this plan's GPU run |
-| TikiTorch chess forward kernel, **FPGA** | TBD (serial; no PIPELINE pragma exists) | n/a | `[projected]` from chess-scale C-synth |
+| TikiTorch multiply-free, **CPU** (own true-MuZero chess loop) | TBD | TBD | `[to-measure]` EC2 CPU (free) |
+| **reference MuZero, A10G** (g5.4xlarge, resnet b6c64, 50 sims, 12 workers) | **1.42** | **54.6** (0.43 steps/s × b128) | `[measured]` GPU idle 93% — self-play is CPU-bound (mz_summary.json) |
+| TikiTorch chess kernel, **FPGA** (serial, single instance, no PIPELINE) | fwd: **78.7 inf/s** (12.70 ms) | **30.3** /s (33.05 ms, batch=1) | `[C-synth-derived]` from the axis-4 latencies; NOT silicon, NOT pipelined |
 | _anchor: MiniZero, single box (Othello, **not** chess)_ | ~5 board-games/s (378.5 s / 2000-game iter, 4×1080Ti) | — | `[citable]` arXiv:2310.11305 |
 | _anchor: AlphaZero search rate_ | ~80k positions/s | — | `[citable]` arXiv:1712.01815 |
 
 ---
 
-## Axis 3 — ENERGY (mJ/move; mirror `run_lm_gpu_baseline.sh` methodology)  `[to-measure]`/`[projected]`
+## Axis 3 — ENERGY (mirror `run_lm_gpu_baseline.sh` methodology)
 
-| arm | energy/move | method | provenance |
+| arm | energy | method | provenance |
 |---|---|---|---|
-| reference MuZero, A10G | TBD (report **both** end-to-end **and** GPU-active-window bounds) | nvidia-smi power×dt @≥5 Hz, utilization-gated | `[to-measure]` |
-| TikiTorch chess kernel, FPGA | ~0.7–1.7 mJ-class **IF it routed** (serial, no PIPELINE pragma; extrapolated from gridworld 2.14 cyc/MAC; **no MuZero kernel has ever been P&R/AFI-routed**) | latency × board power, *derived only* | `[projected]` |
-| TikiTorch, CPU | optional package/RAPL estimate (ROUGH) | — | `[to-measure]`/`[projected]` |
+| **reference MuZero, A10G** | **end-to-end 47.6 J/move (1237 mJ/sample)** ‖ **GPU-active 3.7 J/move (96.8 mJ/sample)** | nvidia-smi power×dt @5 Hz; 67.5 W whole-window / 73.7 W GPU-active | `[measured]` (power.csv) |
+| TikiTorch chess kernel, FPGA | **NONE** — no P&R/AFI ⇒ no post-route latency or power rail to derive from; any mJ would be fabrication | — | `[missing]` (gated behind P&R→AFI, behind strength) |
+| TikiTorch, CPU | not measured | — | `[to-measure]`/`[projected]` |
 | DeepMind | not published per-move | — | `[missing]` |
+
+_The two GPU bounds are both load-bearing and honest: the **GPU was idle 93% of the window** (chess self-play
+is CPU-bound), so **end-to-end** mJ/move (whole-box power × wall-clock) is dominated by idle time and is the
+**pessimistic** bound; **GPU-active** (active-power × active-time) is the optimistic compute-only bound — the
+LM A10G row reports the same active-avg vs whole-window split. NB: I earlier (axis-3 placeholder) floated a
+"~0.7–1.7 mJ-class IF it routed" FPGA figure; that is withdrawn — no MuZero kernel was ever P&R/AFI-routed, so
+there is **no** defensible board-FPGA energy number, only the [missing] above._
 
 _The GPU energy caveat is load-bearing: in a Python MuZero loop, CPU-side MCTS dominates wall-clock, so
 end-to-end mJ/move over-attributes energy to the GPU. We commit to reporting **both** the end-to-end number
