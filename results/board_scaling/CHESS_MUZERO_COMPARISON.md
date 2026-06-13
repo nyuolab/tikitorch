@@ -95,20 +95,26 @@ active-avg vs whole-window (1.46–1.49 mJ)._
 
 | arm | metric | value | provenance |
 |---|---|---|---|
-| **TikiTorch MuZero forward kernel (today, gridworld-scale)** | DSP, latency, area | **DSP=0; 25,539 cyc = 0.102 ms @250 MHz; LUT 109,165 / FF 60,552** | `[measured]` (Vitis **C-synth**, xcvu47p = F2 part) forge_train_step_muzero_csynth.rpt |
-| TikiTorch MuZero **train** kernel (today) | bounded train-step latency | **UNRESOLVED `?`** — data-dependent `nearest_pow2` loop | `[to-measure]` after fixed-iter loop bound (roadmap M2) |
-| TikiTorch **chess-scale** forward kernel | DSP, bounded latency | TBD (4096-way policy head is the new dominant cost + P&R risk; expect DSP=0 to survive) | `[to-measure]` C-synth with chess buffer header (OBS=769,L=64,A=4096,K=5) |
-| any TikiTorch MuZero **AFI / P&R** | timing closure, power-rail energy | **NEVER routed**; only routed sibling (char-LM) failed WNS −1.557 ns before closing v6 | `[missing]` — gated behind a strength result |
+| **TikiTorch chess-scale FORWARD kernel** (initial inference) | DSP, latency, area @250 MHz | **DSP=0; 3,173,888 cyc = 12.70 ms; LUT 83,485 (6%) / FF 46,558 (1%); 9 BRAM; 0 URAM** | `[measured]` Vitis **C-synth**, xcvu47p (F2 part); forge_train_step_muzero_CHESS_csynth.rpt |
+| **TikiTorch chess-scale TRAIN kernel** (bwd + SignSGD) | bounded train-step latency, area | **DSP=1 (~0 of 9024); 8,262,161 cyc = 33.05 ms; LUT 89,759 (6%) / FF 39,544 (1%); 16 BRAM; 0 URAM** | `[measured]` Vitis **C-synth**; the `?` is now RESOLVED (bounded the `nearest_pow2` loop, roadmap M2); forge_train_step_muzero_train_CHESS_csynth.rpt |
+| _(reference: gridworld-scale forward, prior)_ | DSP, latency | DSP=0; 25,539 cyc = 0.102 ms; LUT 109,165 | `[measured]` C-synth (small net; superseded by the chess-scale rows above) |
+| any TikiTorch MuZero **AFI / P&R / on-silicon power** | timing closure, power-rail energy | **NEVER routed**; csynth-timing-met ≠ silicon (the only routed sibling, char-LM, failed WNS −1.557 ns before closing v6) | `[missing]` — gated behind a strength result |
 | reference GPU / DeepMind | DSP/area | N/A — different substrate (that asymmetry *is* the point) | `[missing]` |
+
+_Axis-4 caveats: both numbers are Vitis HLS **C-synthesis estimates** at chess dims (OBS=769, L=64, A=4096),
+**serial (no PIPELINE pragma)**, on the F2 part at 250 MHz. They are NOT place-and-route, NOT silicon, NOT an
+AFI — csynth timing-met does **not** imply silicon closure (the char-LM precedent). The ~zero-DSP result
+(forward DSP=0; train DSP=1/9024) is the load-bearing, defensible claim; the latency/area are estimates._
 
 ---
 
 ## What's grounded now vs what each remaining run produces
 
 - **Grounded now (this doc):** Axis 1 entirely (DeepMind ceiling + TikiTorch measured, with the honest
-  decoupling); Axis 4 *today* row (real C-synth, gridworld-scale).
+  decoupling); **Axis 4 (silicon) COMPLETE at chess scale** — forward (12.70 ms, DSP=0) + train (33.05 ms,
+  DSP=1/9024), both C-synth on the F2 part, timing met (DONE 2026-06-13).
 - **`[to-measure]`, ~free, fast:** Axis 2 CPU row (wrap TikiTorch's own chess loop in a moves/s + samples/s
-  counter — it already runs); Axis 4 chess-scale C-synth + bounding the train loop (hours).
+  counter — it already runs).
 - **`[to-measure]`, ~$0.5–2, ~0.5–2 GPU-h:** Axis 2+3 GPU rows — a dense MuZero board loop on one A10G
   (g5.xlarge), instrumented for moves/s, samples/s, and mJ/move (nvidia-smi), reusing the
   `run_lm_gpu_baseline.sh` lifecycle. **Throughput+energy only — not run to strength.**
