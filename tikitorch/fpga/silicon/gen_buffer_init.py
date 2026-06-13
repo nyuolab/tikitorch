@@ -58,6 +58,7 @@ WORDS_TARGETS    = ML_L_SEQ                   # 128
 WORDS_GRAD_LOGIT = ML_L_SEQ * ML_V            # 16384
 WORDS_PRED       = ML_L_SEQ                   # 128
 WORDS_CFG        = 2
+WORDS_CE_LUT     = 256   # host-staged exp2 table (FT_CE_EXP2_Q16)
 
 # ---- Cumulative offsets (word indices) ----
 OFF_EMBED      = 0
@@ -79,9 +80,10 @@ OFF_TARGETS    = OFF_TOKENS     + WORDS_TOKENS      # 417920
 OFF_GRAD_LOGIT = OFF_TARGETS    + WORDS_TARGETS     # 418048
 OFF_PRED       = OFF_GRAD_LOGIT + WORDS_GRAD_LOGIT  # 434432
 OFF_CFG        = OFF_PRED       + WORDS_PRED        # 434560
+OFF_CE_LUT     = OFF_CFG        + WORDS_CFG         # 434562
 
-ML_BUFFER_WORDS = OFF_CFG + WORDS_CFG              # 434562
-ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4             # 1738248
+ML_BUFFER_WORDS = OFF_CE_LUT + WORDS_CE_LUT        # 434818
+ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4             # 1739272
 
 # ---- CFG: balanced LUT cross-entropy path (matches the reference validator) ----
 CFG_LOSS_KIND = 1   # 1 = balanced LUT-CE; 0 = 2-hot perceptron
@@ -152,6 +154,13 @@ def build_init(seed=0):
     # CFG (read by do_fwd_loss): balanced LUT cross-entropy.
     buf[OFF_CFG + 0] = CFG_LOSS_KIND
     buf[OFF_CFG + 1] = CFG_CE_ZSHIFT
+
+    # exp2 table for the balanced CE gradient, host-staged at OFF_CE_LUT so the
+    # kernel does not depend on a synthesized-ROM init (which read all-zero on
+    # the F2 AFI). FT_CE_EXP2_Q16[i] = round(65536 * 2^(-i/16)) -- verified
+    # bit-identical to forge_ce_lut.hpp for all 256 entries.
+    for i in range(WORDS_CE_LUT):
+        buf[OFF_CE_LUT + i] = round(65536 * 2.0 ** (-i / 16.0))
 
     return buf
 

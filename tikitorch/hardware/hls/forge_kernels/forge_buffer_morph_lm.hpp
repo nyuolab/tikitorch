@@ -92,9 +92,15 @@ constexpr int ML_DIL_CAP  = 64;    // cap on per-layer dilation d_l = min(2^l, c
 constexpr int ML_LOG2_D   = 7;     // log2(ML_D) -> 128
 
 // Mode codes (match forge_train_step.cpp dispatcher style).
-constexpr int ML_MODE_FWD     = 0;
-constexpr int ML_MODE_BWD     = 1;
-constexpr int ML_MODE_SIGNSGD = 2;
+constexpr int ML_MODE_FWD       = 0;
+constexpr int ML_MODE_BWD       = 1;
+constexpr int ML_MODE_SIGNSGD   = 2;
+// Mode 3: fused whole-run on-fabric trainer — runs arg1 optimizer steps
+// (each: zero-BS, fwd 0..L-1, zero-grads+BS, bwd L-1..0 reverse, signsgd
+// arg2=lr/arg3=threshold) entirely in-kernel, tokens/targets read from the
+// resident buffer, weights reloaded once per sweep (resident across positions).
+// One host kick trains the whole window; arithmetic identical to looping 0/1/2.
+constexpr int ML_MODE_TRAIN_RUN = 3;
 
 // =============================================================================
 // Per-tensor word counts
@@ -144,6 +150,12 @@ constexpr int WORDS_PRED       = ML_L_SEQ;            // argmax-predicted token 
 // NOTE: LUT-CE gradients are Q16 (<= 65536), not +/-1; pass a proportionally
 // larger threshold to do_signsgd (mode 2, arg2).
 constexpr int WORDS_CFG        = 2;
+// exp2 LUT for the balanced CE gradient, STAGED BY THE HOST into the buffer
+// (256 words = FT_CE_EXP2_Q16). The kernel reads the table from here instead of
+// a `static const` ROM: on the F2 AFI the synthesized ROM's init contents did
+// NOT survive (CE grads read all-zero on silicon — see fpga/silicon/
+// SILICON_FINDINGS.md); host-staging the table guarantees it is present.
+constexpr int WORDS_CE_LUT     = 256;
 
 // =============================================================================
 // Cumulative offsets (word indices into the flat int32 buffer).
@@ -174,8 +186,9 @@ constexpr int OFF_GRAD_LOGIT = OFF_TARGETS    + WORDS_TARGETS;
 constexpr int OFF_PRED       = OFF_GRAD_LOGIT + WORDS_GRAD_LOGIT;
 
 constexpr int OFF_CFG        = OFF_PRED       + WORDS_PRED;
+constexpr int OFF_CE_LUT     = OFF_CFG        + WORDS_CFG;   // host-staged exp2 table
 
-constexpr int ML_BUFFER_WORDS = OFF_CFG       + WORDS_CFG;
+constexpr int ML_BUFFER_WORDS = OFF_CE_LUT    + WORDS_CE_LUT;
 constexpr int ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4;
 
 // -----------------------------------------------------------------------------

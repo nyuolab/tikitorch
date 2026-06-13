@@ -158,6 +158,37 @@ def main(argv):
     write_region(lib, h, dbuf, 0, init)  # full buffer (weights, CFG, tok/tgt)
 
     L_SEQ = L.ML_L_SEQ
+
+    # ---- FUSED whole-run path (TT_FUSED_STEPS set): the WHOLE training runs on
+    # fabric in ONE kick (mode 3). The host stages once, kicks once, reads the
+    # final weights once. Wall-clock of that single kick IS the on-fabric
+    # training time -> the honest, host-overhead-free tok/s. Final {wcrc,preds16}
+    # must equal the host golden's fused line (bit-exact). ----
+    fused = os.environ.get("TT_FUSED_STEPS")
+    if fused:
+        n = int(fused)
+        t0 = time.time()
+        run(lib, h, dbuf, 3, n, SGD_LR, SGD_THR)     # mode 3, ONE kick, whole run
+        wall = time.time() - t0
+        preds = read_region(lib, h, dbuf, L.OFF_PRED, L_SEQ)
+        correct = sum(1 for m in range(L_SEQ) if preds[m] == tgts[m])
+        shadow = [0] * L.ML_BUFFER_WORDS
+        for off, nw in ((L.OFF_EMBED, L.WORDS_EMBED), (L.OFF_MH, L.WORDS_MH),
+                        (L.OFF_MP, L.WORDS_MP), (L.OFF_MB, L.WORDS_MB),
+                        (L.OFF_W_HEAD, L.WORDS_W_HEAD)):
+            shadow[off:off + nw] = read_region(lib, h, dbuf, off, nw)
+        wcrc = weight_crc(shadow)
+        preds16 = ",".join(str(int(preds[m])) for m in range(16))
+        sys.stdout.write('{"fused_steps":%d,"acc":%.6f,"wcrc":%d,"preds16":[%s]}\n'
+                         % (n, correct / float(L_SEQ), wcrc, preds16))
+        sys.stdout.flush()
+        toks_done = n * L_SEQ
+        sys.stderr.write(
+            "silicon FUSED: %d steps in ONE kick, wall %.4f s, %.0f tok/s "
+            "(%d tokens, fwd+bwd+signsgd entirely on fabric)\n"
+            % (n, wall, toks_done / wall if wall > 0 else 0, toks_done))
+        return 0
+
     inner_tokens = 0       # fwd+bwd token-positions processed (for tok/s)
     t_inner = 0.0
     t0_wall = time.time()

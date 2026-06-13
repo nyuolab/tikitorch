@@ -109,21 +109,30 @@ BS_SUB: for (int d = 0; d < ML_D; d++) {
 // =============================================================================
 // Mode 0: do_fwd_loss — embed -> morph layers -> head -> loss grad, position m.
 // =============================================================================
-static int do_fwd_loss(int32_t* buffer, int m, int token, int target) {
+static int do_fwd_loss(int32_t* buffer, int m, int token, int target, int reload) {
 #pragma HLS INLINE off
     if (m < 0 || m >= ML_L_SEQ)          return 1;
     if (token < 0 || token >= ML_V)      return 2;
     if (target < 0 || target >= ML_V)    return 3;
 
-    // Weights (loaded per call, like forge_train_step.cpp's per-position loads).
+    // Weights live in static (BRAM/URAM-resident) arrays; reload from the buffer
+    // only when `reload` is set — once per forward sweep in the fused trainer
+    // (mode 3), every call in the per-position mode (mode 0). do_signsgd writes
+    // updated weights back to the buffer, so each sweep's first call refreshes
+    // them. ce_lut is the host-staged exp2 table (OFF_CE_LUT), read here instead
+    // of the static-const ROM (whose init read all-zero on the F2 AFI).
     static int32_t mh_buf[WORDS_MH];
     static int32_t mb_buf[WORDS_MB];
-    static int32_t mp_buf[WORDS_MP];      // URAM-class; loaded once per call
+    static int32_t mp_buf[WORDS_MP];      // URAM-class
     static int32_t wh_buf[WORDS_W_HEAD];
-    burst_load_words(buffer, OFF_MH, mh_buf, WORDS_MH);
-    burst_load_words(buffer, OFF_MB, mb_buf, WORDS_MB);
-    burst_load_words(buffer, OFF_MP, mp_buf, WORDS_MP);
-    burst_load_words(buffer, OFF_W_HEAD, wh_buf, WORDS_W_HEAD);
+    static int32_t ce_lut[WORDS_CE_LUT];
+    if (reload) {
+        burst_load_words(buffer, OFF_MH, mh_buf, WORDS_MH);
+        burst_load_words(buffer, OFF_MB, mb_buf, WORDS_MB);
+        burst_load_words(buffer, OFF_MP, mp_buf, WORDS_MP);
+        burst_load_words(buffer, OFF_W_HEAD, wh_buf, WORDS_W_HEAD);
+        burst_load_words(buffer, OFF_CE_LUT, ce_lut, WORDS_CE_LUT);
+    }
 
     // Embed gather: R = EMBED[token].
     static data_t R[ML_D];
@@ -290,7 +299,7 @@ CE_E:   for (int v = 0; v < ML_V; v++) {
             int32_t zneg = (int32_t)logits[pred] - (int32_t)logits[v];   // >= 0
             int idx = (int)(zneg >> zshift);
             if (idx > 255) idx = 255;
-            e_row[v] = FT_CE_EXP2_Q16[idx];
+            e_row[v] = ce_lut[idx];      // host-staged exp2 table (see OFF_CE_LUT)
             S += e_row[v];
         }
         int sh = 0;                          // ceil_log2(S) - 16, bounded by 7
@@ -446,7 +455,7 @@ static void signsgd_region_wide(int32_t* buffer,
     int w_wide_off = w_off_words >> 4;
     int g_wide_off = g_off_words >> 4;
     ap_int<16> lr16 = (ap_int<16>)lr;
-    ap_int<16> th16 = (ap_int<16>)threshold;
+    ap_int<32> th32 = (ap_int<32>)threshold;   // full int32: CE Q16 grads exceed 32767
 
 WORD_LOOP: for (int wi = 0; wi < n_wide; wi++) {
 #pragma HLS PIPELINE II=1
@@ -465,7 +474,7 @@ LANE_PREP: for (int lane = 0; lane < 16; lane++) {
             ap_int<32> g32 = (ap_int<32>) g_word.range(hi, lo);
             ap_int<32> abs_g = (g32 < 0) ? (ap_int<32>)(-g32) : g32;
             ap_int<16> step = 0;
-            if (abs_g > (ap_int<32>)th16) {
+            if (abs_g > th32) {
                 if      (g32 > 0) step =  lr16;
                 else if (g32 < 0) step = -lr16;
             }
@@ -524,6 +533,64 @@ static int do_signsgd(int32_t* buffer, int lr, int threshold) {
 }
 
 // =============================================================================
+// In-kernel region zero (wide stores). All grad/BS regions are 16-word aligned
+// in both offset and length, so the wide path covers them exactly.
+// =============================================================================
+static void zero_region_wide(int32_t* buffer, int off_words, int n_words) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    wide_t* wide_buf = reinterpret_cast<wide_t*>(buffer);
+    int n_wide = n_words >> 4;
+    int wide_off = off_words >> 4;
+ZERO_W: for (int w = 0; w < n_wide; w++) {
+#pragma HLS PIPELINE II=1
+        wide_buf[wide_off + w] = (wide_t)0;
+    }
+#else
+    for (int i = 0; i < n_words; i++) buffer[off_words + i] = 0;
+#endif
+}
+
+// =============================================================================
+// Mode 3: do_train_run — the WHOLE training run on fabric. One host kick runs
+// `n_steps` optimizer steps over the resident window; tokens/targets/weights/
+// LUT all live in the buffer (no host round-trips per position). Weights are
+// reloaded into the resident static arrays once per forward sweep (m==0).
+// Arithmetic is IDENTICAL to host-looping modes 0/1/2, so it is bit-exact to
+// the per-position golden — the host CSIM build verifies this.
+// =============================================================================
+static int do_train_run(int32_t* buffer, int n_steps, int lr, int threshold) {
+#pragma HLS INLINE off
+    static int32_t toks[ML_L_SEQ];
+    static int32_t tgts[ML_L_SEQ];
+    burst_load_words(buffer, OFF_TOKENS,  toks, ML_L_SEQ);   // ML_L_SEQ=128 (16-aligned)
+    burst_load_words(buffer, OFF_TARGETS, tgts, ML_L_SEQ);
+
+STEP_LOOP: for (int s = 0; s < n_steps; s++) {
+        // (1) zero the rolling BS stream before the forward sweep.
+        zero_region_wide(buffer, OFF_BS_STREAM, WORDS_BS_STREAM);
+        // (2) FORWARD m = 0..L-1 ; reload weights+LUT once (m==0), resident after.
+        FWD_SWEEP: for (int m = 0; m < ML_L_SEQ; m++) {
+            do_fwd_loss(buffer, m, (int)toks[m], (int)tgts[m], (m == 0) ? 1 : 0);
+        }
+        // (3) zero all 5 grad regions AND re-zero BS (now the grad_BS accumulator).
+        zero_region_wide(buffer, OFF_G_EMBED,  WORDS_G_EMBED);
+        zero_region_wide(buffer, OFF_G_MH,     WORDS_G_MH);
+        zero_region_wide(buffer, OFF_G_MP,     WORDS_G_MP);
+        zero_region_wide(buffer, OFF_G_MB,     WORDS_G_MB);
+        zero_region_wide(buffer, OFF_G_W_HEAD, WORDS_G_W_HEAD);
+        zero_region_wide(buffer, OFF_BS_STREAM, WORDS_BS_STREAM);
+        // (4) BACKWARD m = L-1..0 (REVERSE).
+        BWD_SWEEP: for (int m = ML_L_SEQ - 1; m >= 0; m--) {
+            do_bwd(buffer, m, (int)toks[m]);
+        }
+        // (5) SignSGD weight update (writes weights back to the buffer).
+        do_signsgd(buffer, lr, threshold);
+    }
+    return 0;
+}
+
+// =============================================================================
 // Top-level dispatcher — same ABI / pragmas as forge_train_step.cpp.
 // =============================================================================
 extern "C" int forge_train_step_morph_lm(
@@ -545,8 +612,9 @@ extern "C" int forge_train_step_morph_lm(
 #pragma HLS INTERFACE s_axilite  port=buffer  bundle=control
 #pragma HLS INTERFACE s_axilite  port=return  bundle=control
 
-    if (mode == ML_MODE_FWD)     return do_fwd_loss(buffer, arg1, arg2, arg3);
-    if (mode == ML_MODE_BWD)     return do_bwd(buffer, arg1, arg2);
-    if (mode == ML_MODE_SIGNSGD) return do_signsgd(buffer, arg1, arg2);
+    if (mode == ML_MODE_FWD)       return do_fwd_loss(buffer, arg1, arg2, arg3, 1);
+    if (mode == ML_MODE_BWD)       return do_bwd(buffer, arg1, arg2);
+    if (mode == ML_MODE_SIGNSGD)   return do_signsgd(buffer, arg1, arg2);
+    if (mode == ML_MODE_TRAIN_RUN) return do_train_run(buffer, arg1, arg2, arg3);
     return 99;
 }

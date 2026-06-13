@@ -107,6 +107,24 @@ int main(int argc, char** argv) {
         tgts[m] = B[OFF_TARGETS + m];
     }
 
+    // Fused whole-run path (TT_FUSED_STEPS set): one mode-3 call runs the whole
+    // training internally — this is the host reference for the on-fabric kernel.
+    // Its final {wcrc,preds16} MUST equal the per-position loop's last step
+    // (same arithmetic), which is the bit-exactness check for do_train_run.
+    if (const char* fs = std::getenv("TT_FUSED_STEPS")) {
+        int n = std::atoi(fs);
+        int rc = forge_train_step_morph_lm(B, ML_MODE_TRAIN_RUN, n, SGD_LR, SGD_THR);
+        if (rc != 0) { std::fprintf(stderr, "train_run rc=%d\n", rc); return 13; }
+        int correct = 0;
+        for (int m = 0; m < ML_L_SEQ; m++) if (B[OFF_PRED + m] == tgts[m]) correct++;
+        uint64_t wcrc = weight_crc(B);
+        std::printf("{\"fused_steps\":%d,\"acc\":%.6f,\"wcrc\":%llu,\"preds16\":[",
+                    n, (double)correct / ML_L_SEQ, (unsigned long long)wcrc);
+        for (int m = 0; m < 16; m++) std::printf("%d%s", (int)B[OFF_PRED + m], (m == 15 ? "" : ","));
+        std::printf("]}\n");
+        return 0;
+    }
+
     for (int step = 0; step < STEPS; step++) {
         // (1) zero BS stream before the forward sweep (rolling conv cache).
         zero_region(B, OFF_BS_STREAM, WORDS_BS_STREAM);
