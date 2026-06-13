@@ -80,10 +80,12 @@ OFF_TARGETS    = OFF_TOKENS     + WORDS_TOKENS      # 417920
 OFF_GRAD_LOGIT = OFF_TARGETS    + WORDS_TARGETS     # 418048
 OFF_PRED       = OFF_GRAD_LOGIT + WORDS_GRAD_LOGIT  # 434432
 OFF_CFG        = OFF_PRED       + WORDS_PRED        # 434560
-OFF_CE_LUT     = OFF_CFG        + WORDS_CFG         # 434562
+# 16-word aligned (the kernel's wide burst_load truncates the offset to /16; a
+# non-aligned base reads the LUT shifted on silicon — see forge_buffer_morph_lm.hpp)
+OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) // 16) * 16   # 434576
 
-ML_BUFFER_WORDS = OFF_CE_LUT + WORDS_CE_LUT        # 434818
-ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4             # 1739272
+ML_BUFFER_WORDS = OFF_CE_LUT + WORDS_CE_LUT        # 434832
+ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4             # 1739328
 
 # ---- CFG: balanced LUT cross-entropy path (matches the reference validator) ----
 CFG_LOSS_KIND = 1   # 1 = balanced LUT-CE; 0 = 2-hot perceptron

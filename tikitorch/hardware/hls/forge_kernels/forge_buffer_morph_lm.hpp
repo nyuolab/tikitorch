@@ -186,7 +186,12 @@ constexpr int OFF_GRAD_LOGIT = OFF_TARGETS    + WORDS_TARGETS;
 constexpr int OFF_PRED       = OFF_GRAD_LOGIT + WORDS_GRAD_LOGIT;
 
 constexpr int OFF_CFG        = OFF_PRED       + WORDS_PRED;
-constexpr int OFF_CE_LUT     = OFF_CFG        + WORDS_CFG;   // host-staged exp2 table
+// OFF_CE_LUT MUST be 16-word aligned: the kernel reads the table with the wide
+// (512-bit = 16x int32) burst_load, whose offset is (word_off >> 4) — a
+// non-aligned base silently reads the table shifted (it read 2 words early when
+// it sat at OFF_CFG+2, corrupting the CE gradient on silicon while the host
+// scalar path stayed correct). Round up past the 2-word CFG to the next 16.
+constexpr int OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) / 16) * 16;  // host-staged exp2 table
 
 constexpr int ML_BUFFER_WORDS = OFF_CE_LUT    + WORDS_CE_LUT;
 constexpr int ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4;

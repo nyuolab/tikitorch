@@ -612,9 +612,17 @@ extern "C" int forge_train_step_morph_lm(
 #pragma HLS INTERFACE s_axilite  port=buffer  bundle=control
 #pragma HLS INTERFACE s_axilite  port=return  bundle=control
 
+    // On SILICON only the fused whole-run trainer (mode 3) is dispatched. The
+    // per-position modes 0/1/2 are kept for the HOST CSIM golden (which validates
+    // fused == per-position) but excluded from synthesis: dispatching them
+    // standalone makes HLS instantiate a SECOND copy of do_fwd_loss/do_bwd/
+    // do_signsgd (~2x CL area), which congested the signsgd path to -0.346 ns.
+    // do_train_run still calls these functions, so the logic is synthesized once.
+#if !(defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__))
     if (mode == ML_MODE_FWD)       return do_fwd_loss(buffer, arg1, arg2, arg3, 1);
     if (mode == ML_MODE_BWD)       return do_bwd(buffer, arg1, arg2);
     if (mode == ML_MODE_SIGNSGD)   return do_signsgd(buffer, arg1, arg2);
+#endif
     if (mode == ML_MODE_TRAIN_RUN) return do_train_run(buffer, arg1, arg2, arg3);
     return 99;
 }
