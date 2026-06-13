@@ -58,6 +58,37 @@ g++ -O2 -std=c++17 -I.. forge_train_step.cpp forge_train_step_tb.cpp -o tb
 Match it against the PyTorch model run with hard tropical ops (`tau=0`,
 `use_soft=False`) and integer (INT16) quantized weights.
 
+> **WARNING — the host golden does NOT cover the synthesis path.** The `*_tb.cpp`
+> / `golden_*.cpp` harnesses compile the `#else` scalar path (no `__VITIS_HLS__`/
+> `__SYNTHESIS__`). A green bit-exact golden proves the **math**, not the
+> **hardware**: it does NOT exercise the `wide_t`/`ap_int<>` burst path, so it
+> misses the silicon-only bug classes below. Treat the golden as necessary, not
+> sufficient — re-run a CSIM-vs-silicon check (or HLS C/RTL co-sim) after any
+> change to a burst, an offset, an `ap_int<>` width, or a table.
+
+### Silicon-only bug classes (CSIM-invisible) — checklist for new kernels
+
+Three classes bit only on the synthesized AFI; each cost a debug cycle on the
+fully-tropical morph-LM (see `tikitorch/fpga/silicon/SILICON_FINDINGS.md`):
+
+1. **Misaligned wide burst.** `burst_load_words`/`burst_store_words` truncate the
+   offset to `(word_off >> 4)` on the wide path, so a base that is not a multiple
+   of 16 reads/writes SHIFTED on silicon while the scalar golden stays correct.
+   *Guard:* the `static_assert` 16-alignment block in the buffer header
+   (`forge_buffer_morph_lm.hpp` / `forge_buffer_morph_ecg.hpp`) — keep every
+   burst-reached `OFF_*`/`WORDS_*` a multiple of 16; it fails the BUILD, not the bitstream.
+2. **Dead `static const` ROM.** A table declared `static const` can read ALL-ZERO
+   on the packaged AFI (its BRAM init does not survive encrypt + place); CSIM
+   reads it fine. *Fix / pattern:* **host-stage the table into the buffer** and
+   read it like data — reserve a 16-aligned `OFF_<TABLE>` region, have the host
+   write the values once, `burst_load_words` it into a local array. Never index a
+   `static const` ROM on the data path. Reference: `OFF_CE_LUT`/`WORDS_CE_LUT`
+   (staged in `fpga/silicon/gen_buffer_init.py`, read as `ce_lut[]` in
+   `do_fwd_loss` — NOT `FT_CE_EXP2_Q16[]`, which is kept only as the CSIM source).
+3. **`ap_int` width truncation.** An `int` arg truncated to `ap_int<16>` on the
+   synthesis path while the host `int` path is fine (the signsgd `threshold` bug:
+   CE Q16 grads exceed 32767 → use `ap_int<32>`).
+
 ---
 
 ## 3. HLS synthesis (Vitis HLS)
@@ -115,6 +146,12 @@ hung one:
   the OCL AXI-Lite register map; account for the offset when the host reads
   back status/return values, or you will read the wrong register.
 - **Scalar args via s_axilite**, the buffer pointer via the wide AXI master.
+- **Commit the whole HDK CL package.** `hdk/cl_<kernel>/design/*.sv|*.vh`,
+  `design/ip/*.xci`, `build/scripts/gen_ip.tcl` + `synth_cl_*.tcl`, and
+  `build/constraints/*.xdc` are build INPUTS, not regenerable artifacts. An
+  uncommitted CL build is a multi-hour from-scratch reconstruction (it happened
+  once). Build artifacts (checkpoints/.dcp/to_aws tarballs) stay gitignored; the
+  sources do not. See `hdk/cl_forge_morph_lm/README.md`.
 
 ### Reference operating point (from the validated 1- and 2-layer builds)
 

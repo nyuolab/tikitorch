@@ -444,6 +444,24 @@ Measured on AWS EC2 F2 (Virtex UltraScale+ VU47P), validated end-to-end:
 | 1-layer tropical LM | ~1474 tok/s | — | ~-0.20 ns | C + DMA host driver |
 | **2-layer tropical LM** | **~772 tok/s** | **~9.0 mJ/token** (6.98 W) | **-0.197 ns** | first multilayer NN training on FPGA, zero DSPs |
 | 3-layer tropical LM | ~521 tok/s | — | -0.197 ns | depth saturates; width is the next constraint |
+| **fully-tropical morph-LM (config B), fused on-fabric** | **~3,827 tok/s** | **~0.78 mJ/token** (3 W core) | **-0.039 ns** | whole training loop (fwd + CE loss + bwd + signSGD) in ONE host kick, bit-exact to host golden, zero DSPs |
+
+![Multiplier-free tropical LM vs nanoGPT — quality and FPGA-vs-GPU throughput/energy](results/lm_shakespeare/fig_hallmark_lm.png)
+
+*Hallmark result — a language model whose **entire training loop** (forward, CE
+loss, backward, weight update) is machine-audited multiplier-free (Level-B
+closure: adds, compares, shifts, table lookups only). **Left:** at matched
+params/data/tokenizer the strict tropical MorphSSM reaches **2.79 bpb** on
+tiny-shakespeare BPE-1024 vs **2.27 bpb** for a parameter-matched AdamW nanoGPT,
+the strict curve still descending. **Right:** the same update rule trains
+**end-to-end on AWS F2 silicon** — the fully-tropical morph-LM runs the whole
+30-step loop on-fabric in a single host kick at **~3,827 tok/s, DSP=0, 3 W core,
+bit-exact to the host golden** (AFI `cl_forge_morph_lm_v8_aligned`, fused mode 3),
+~28× slower wall-clock than an A10G (107k tok/s) — the honest 3 W-vs-72 W
+tradeoff (no board-to-board energy-win claim; 3 W is the core rail, not the card).
+Full provenance + scope in
+[`results/lm_shakespeare/fig_hallmark_lm.md`](results/lm_shakespeare/fig_hallmark_lm.md);
+regenerate with `python scripts/make_hallmark_figure.py`.*
 
 `tt.hardware.build_guide_path()` points at
 [`tikitorch/hardware/BUILD_GUIDE.md`](tikitorch/hardware/BUILD_GUIDE.md), the

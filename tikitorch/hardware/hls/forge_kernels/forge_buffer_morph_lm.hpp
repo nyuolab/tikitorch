@@ -196,6 +196,42 @@ constexpr int OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) / 16) * 16;  // host-
 constexpr int ML_BUFFER_WORDS = OFF_CE_LUT    + WORDS_CE_LUT;
 constexpr int ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4;
 
+// =============================================================================
+// 16-word (512-bit AXI burst) alignment guard — FAILS THE BUILD, not the bitstream.
+// burst_load_words/burst_store_words truncate the byte offset to (word_off >> 4)
+// on the SYNTHESIS wide_t path, so any burst-reached base that is NOT a multiple
+// of 16 silently reads/writes SHIFTED on silicon while the host scalar (#else)
+// path stays correct — so the bit-exact CSIM golden does NOT catch it. This is
+// exactly bug (a): OFF_CE_LUT once sat at OFF_CFG+2 and read the exp2 LUT 2 words
+// early on the F2 AFI (see fpga/silicon/SILICON_FINDINGS.md). These asserts would
+// have caught it. CFG and PRED are scalar-only (buffer[OFF_CFG+i], buffer[OFF_PRED+m])
+// and are intentionally NOT required to align (WORDS_CFG=2 is deliberately odd).
+static_assert(ML_D     % 16 == 0, "ML_D must be a multiple of 16: per-row bursts are D words");
+static_assert(ML_V     % 16 == 0, "ML_V must be a multiple of 16: head/grad_logit rows are V words");
+static_assert(ML_L_SEQ % 16 == 0, "ML_L_SEQ must be a multiple of 16: TOKENS/TARGETS bursts are L words");
+#define ML_ALIGN16(off, words) \
+    static_assert((off) % 16 == 0, #off " must be 16-word aligned for the 512-bit burst"); \
+    static_assert((words) % 16 == 0, #words " must be a multiple of 16 (whole-region/row burst)")
+ML_ALIGN16(OFF_EMBED,    WORDS_EMBED);
+ML_ALIGN16(OFF_MH,       WORDS_MH);
+ML_ALIGN16(OFF_MP,       WORDS_MP);
+ML_ALIGN16(OFF_MB,       WORDS_MB);
+ML_ALIGN16(OFF_W_HEAD,   WORDS_W_HEAD);
+ML_ALIGN16(OFF_G_EMBED,  WORDS_G_EMBED);
+ML_ALIGN16(OFF_G_MH,     WORDS_G_MH);
+ML_ALIGN16(OFF_G_MP,     WORDS_G_MP);
+ML_ALIGN16(OFF_G_MB,     WORDS_G_MB);
+ML_ALIGN16(OFF_G_W_HEAD, WORDS_G_W_HEAD);
+ML_ALIGN16(OFF_TAP_IDX,  WORDS_TAP_IDX);
+ML_ALIGN16(OFF_PROJ_IDX, WORDS_PROJ_IDX);
+ML_ALIGN16(OFF_AD_HEAD,  WORDS_AD_HEAD);
+ML_ALIGN16(OFF_BS_STREAM, WORDS_BS_STREAM);
+ML_ALIGN16(OFF_TOKENS,   WORDS_TOKENS);
+ML_ALIGN16(OFF_TARGETS,  WORDS_TARGETS);
+ML_ALIGN16(OFF_GRAD_LOGIT, WORDS_GRAD_LOGIT);
+ML_ALIGN16(OFF_CE_LUT,   WORDS_CE_LUT);   // bug-(a) region: aligned base REQUIRED
+#undef ML_ALIGN16
+
 // -----------------------------------------------------------------------------
 // Per-layer / per-position slice helpers — GLOBAL (buffer) word offsets.
 //
