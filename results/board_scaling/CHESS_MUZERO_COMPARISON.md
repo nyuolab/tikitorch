@@ -1,21 +1,31 @@
 # Chess: multiply-free TikiTorch vs MuZero — a 4-axis comparison (quality / throughput / energy / silicon)
 
-> **Status: grounded half populated; systems axes are a labelled scaffold.** Axis 1 (quality) and the
-> *today* row of Axis 4 (silicon) are filled from verified sources. Axes 2–3 (throughput, energy) and the
-> chess-scale rows of Axis 4 are `[to-measure]`/`[projected]` until the runs in "Remaining work" land. This
-> mirrors `results/lm_shakespeare/fig_hallmark_lm.md` and its measured-vs-projected discipline.
+> **Status: all 4 axes measured (2026-06-13); adversarially honesty-audited against source files.** Quality
+> (axis 1, CPU), throughput + energy (axes 2–3, measured GPU + C-synth-derived FPGA), and silicon (axis 4,
+> chess-scale C-synth) are all filled. Mirrors `results/lm_shakespeare/fig_hallmark_lm.md`.
+
+## Executive summary (the honest answer)
+
+Multiply-free TikiTorch chess matches MuZero-on-GPU **only structurally** — it runs the same
+self-play→replay→K-step loop and its kernels synthesize **zero-DSP** — but it does **not win** on any axis as
+measured. **Quality:** chess strength was **not lifted** — the trained agent stays below its untrained control
+(scaffold 0.071 vs 0.393; the AlphaZero-tree + anti-collapse lift gave deltas −0.125 / +0.000 / −0.166, z up
+to ≈−1.7 at n=12: no detectable training benefit), a compute/data gap (~5 orders below DeepMind) plus untried
+levers (legal-move masking), **not** a substrate gap; DeepMind is the literature ceiling only. **Throughput/
+energy:** the only *measured* arm is reference MuZero on one A10G (1.42 self-play moves/s, 54.6 train
+samples/s; end-to-end 47.6 J/move, GPU-active 3.7 J/move — GPU ~93% idle, chess self-play is CPU-bound). The
+FPGA throughput figures (78.7 inf/s fwd, 30.3/s train) are **C-synth-derived, NOT comparable** to the GPU arm
+(tiny dyadic net vs resnet; estimate vs measured) — no FPGA throughput or energy win is proven, and the GPU
+actually wins the learner direction (54.6 vs 30.3 samples/s). **Silicon:** the defensible claim is **DSP=0
+forward inference** (train kernel DSP=1/9024), at chess dims on the F2 part, 250 MHz met — but these are Vitis
+**C-synthesis estimates**, never place-and-routed, no AFI, **no routed energy/power figure of any kind**.
 
 **Honest framing (the standing caption).** This is a **systems comparison, not a strength contest.** The
-chess-quality gap between TikiTorch's multiply-free arm and DeepMind is a **compute/search gap** (TPU-pod
-scale, ~800-sim MCTS, tens of millions of self-play games), **not a substrate gap**: the zero-DSP
-dyadic-tropical net runs the *same* self-play→replay→K-step MuZero loop end-to-end on chess and its training
-loss falls monotonically (27.55→12.00), so the substrate scales structurally. But the trained agent scores
-**0.071 vs a random mover — *worse* than its own untrained control (0.393)** — a loss-down/strength-down
-decoupling we state plainly (search starvation over a 4096-way action space). DeepMind chess is cited **only
-as the quality ceiling.** The reference MuZero-on-GPU run exists **only** to produce a measured
-throughput+energy datapoint on one GPU — it is **not** run to strength. The real, fair comparison lives on
-the **systems axes** (throughput, energy/move, silicon: DSP=0, area, timing) — where a ~3 W zero-multiplier
-fabric can be argued against a ~72 W GPU per frame, exactly as the morph-LM figure argues for LMs.
+chess-quality gap to DeepMind is a **compute/search gap** (TPU-pod scale, ~800-sim MCTS, tens of millions of
+self-play games), **not a substrate gap**: the zero-DSP net runs the same MuZero loop end-to-end on chess and
+its training loss falls monotonically (27.55→12.00). The structural pitch is a **sub-watt-class zero-multiplier
+fabric vs a ~72 W GPU** — but note the FPGA **power/energy is unmeasured** (`[missing]`, no P&R/AFI); any
+specific FPGA-watt number would be fabrication, so the energy case is qualitative + projected, not won.
 
 **Provenance tags:** `[measured]` ran and recorded · `[to-measure]` produced by the runs below ·
 `[citable]` from the literature (source given) · `[projected]` arithmetic extrapolation, not silicon ·
@@ -62,17 +72,21 @@ Connect4-winning levers (true-rules AZ tree + soft-CE + entropy/target-temp; ful
 | `az_ce` (no anti-collapse) | 0.417 | 0.542 | −0.125 | 28.8→14.6 |
 | `az_ent1` (entropy 0.1, temp 1.5) | 0.458 | 0.458 | **+0.000** | 25.9→18.3 |
 | `az_ent3` (entropy 0.3, temp 2.0) | 0.292 | 0.458 | −0.166 | 21.0→14.9 |
+| `mz_ent1` (learned-tree control) | — | — | — | `[missing]` — hung (4096-way learned tree), no matched-sims learned-tree control |
 
-At n=12 the per-cell SE≈0.144 (Δ SE≈0.20), so **all three deltas are within ~1σ of zero — no detectable
-training benefit**, and anti-collapse did not rescue it (entropy made it no better / worse). The
-loss-down/strength-down decoupling **persists under the strong tree**. (The 4th recipe, a learned-tree
-control `mz_ent1`, did not finish — the pure-MuZero tree expands all 4096 actions/node and hung; the
-incremental S3 upload preserved the 3 AZ recipes anyway.)
+At n=12 (draw-heavy, so realistic Δ-SE ≈ 0.10) the deltas are **z ≈ −1.2 / 0.0 / −1.7 — none reaches
+significance**, i.e. **no detectable training benefit** (the strong-entropy recipe `az_ent3` trends negative
+but is still < 2σ); anti-collapse did not rescue it. The loss-down/strength-down decoupling is **not lifted
+under AZ tree + anti-collapse** (probed at 2 entropy settings, n=12). (The 4th recipe, learned-tree control
+`mz_ent1`, did not finish — the pure-MuZero tree expands all 4096 actions/node and hung; incremental S3 upload
+preserved the 3 AZ recipes. So there is **no matched-sims learned-tree control** — see the `[missing]` row.)
 
 **Axis-1 headline — the loss-down / strength-down decoupling, now confirmed under AZ tree + anti-collapse.**
 Training drives the loss down monotonically yet the trained agent does not beat its untrained control. Strength
-comes from **search + legality** (untrained AlphaZero-tree 0.625@200 sims > untrained learned-tree 0.375 >
-trained 0.071/0.29–0.46), NOT from the learned prior. The binding constraint is **compute/data** — 192 games
+comes from **search + legality**, NOT from the learned prior — _suggestively_ (these are at DIFFERENT search
+budgets, **not** a matched ladder): untrained AlphaZero-tree 0.625 @200 sims > untrained learned-tree 0.375
+@200 sims > trained scaffold 0.071 @12 sims ≈ trained lift 0.29–0.46 @48 sims. The only *controlled* comparison
+is the within-table trained-vs-untrained at matched sims=48. The binding constraint is **compute/data** — 192 games
 over a 4096-action space is ~5 orders of magnitude below DeepMind's tens of millions — plus **legal-move
 masking is still untried** (the 4096-way softmax wastes mass on illegal moves). Encoding caveats on every
 TikiTorch chess number: 4096-way `from*64+to` (**underpromotions not representable**), 769-d planes, 80-ply
@@ -89,8 +103,8 @@ sizes differ by orders of magnitude, so do NOT directly compare their samples/s 
 | arm | self-play moves/s (actor) | train samples/s (learner) | provenance |
 |---|---|---|---|
 | TikiTorch multiply-free, **CPU** (own true-MuZero chess loop) | TBD | TBD | `[to-measure]` EC2 CPU (free) |
-| **reference MuZero, A10G** (g5.4xlarge, resnet b6c64, 50 sims, 12 workers) | **1.42** | **54.6** (0.43 steps/s × b128) | `[measured]` GPU idle 93% — self-play is CPU-bound (mz_summary.json) |
-| TikiTorch chess kernel, **FPGA** (serial, single instance, no PIPELINE) | fwd: **78.7 inf/s** (12.70 ms) | **30.3** /s (33.05 ms, batch=1) | `[C-synth-derived]` from the axis-4 latencies; NOT silicon, NOT pipelined |
+| **reference MuZero, A10G** (g5.4xlarge, resnet b6c64, 50 sims, 12 workers) | **1.42** | **54.6** (0.43 steps/s × b128) | `[measured]` GPU compute-idle ~93% (util<5%) — self-play CPU-bound (mz_summary.json) |
+| TikiTorch chess kernel, **FPGA** _(NOT comparable to GPU row →)_ | fwd: **78.7 inf/s** _(est.)_ | **30.3** /s _(est., batch=1)_ | `[C-synth-derived]` from axis-4 latencies (serial, no PIPELINE); tiny dyadic net ≠ resnet; estimate ≠ measured — **implies no FPGA win** |
 | _anchor: MiniZero, single box (Othello, **not** chess)_ | ~5 board-games/s (378.5 s / 2000-game iter, 4×1080Ti) | — | `[citable]` arXiv:2310.11305 |
 | _anchor: AlphaZero search rate_ | ~80k positions/s | — | `[citable]` arXiv:1712.01815 |
 
@@ -105,12 +119,14 @@ sizes differ by orders of magnitude, so do NOT directly compare their samples/s 
 | TikiTorch, CPU | not measured | — | `[to-measure]`/`[projected]` |
 | DeepMind | not published per-move | — | `[missing]` |
 
-_The two GPU bounds are both load-bearing and honest: the **GPU was idle 93% of the window** (chess self-play
-is CPU-bound), so **end-to-end** mJ/move (whole-box power × wall-clock) is dominated by idle time and is the
-**pessimistic** bound; **GPU-active** (active-power × active-time) is the optimistic compute-only bound — the
-LM A10G row reports the same active-avg vs whole-window split. NB: I earlier (axis-3 placeholder) floated a
-"~0.7–1.7 mJ-class IF it routed" FPGA figure; that is withdrawn — no MuZero kernel was ever P&R/AFI-routed, so
-there is **no** defensible board-FPGA energy number, only the [missing] above._
+_Activity gate (so the bounds are reproducible from power.csv): **GPU-active = samples with util ≥ 5%** = 7.2%
+of the window (mean active power 73.7 W); the remaining **~93% is compute-idle** (whole-window mean 67.5 W).
+This gate defines both the 73.7 W figure and the 93%-idle figure — it is distinct from the util==0 fraction
+(67%). The two bounds are both honest: **end-to-end** mJ/move (whole-box power × wall-clock) is dominated by
+idle time = **pessimistic**; **GPU-active** (active-power × active-time) = optimistic compute-only — the LM A10G
+row reports the same split. NB: an earlier placeholder "~0.7–1.7 mJ-class IF it routed" FPGA figure is
+**withdrawn** — no MuZero kernel was ever P&R/AFI-routed, so there is **no** defensible board-FPGA energy
+number, only the [missing] above._
 
 _The GPU energy caveat is load-bearing: in a Python MuZero loop, CPU-side MCTS dominates wall-clock, so
 end-to-end mJ/move over-attributes energy to the GPU. We commit to reporting **both** the end-to-end number
