@@ -5,8 +5,9 @@
 #   vitis_hls -f synth_muzero_chess.tcl
 set proj_dir forge_muzero_chess_proj
 set top      forge_train_step_muzero
-set target_part "xcvu47p-fsvh2892-2L-e"     # the F2 part
-set target_period_ns 4.0                     # 250 MHz
+# target_part = the F2 part (xcvu47p); period 4.0 ns = 250 MHz
+set target_part "xcvu47p-fsvh2892-2L-e"
+set target_period_ns 4.0
 
 open_project -reset $proj_dir
 add_files forge_train_step_muzero.cpp -cflags "-I.. -DMZ_OBS_OVERRIDE=769 -DMZ_L_OVERRIDE=64 -DMZ_A_OVERRIDE=4096"
