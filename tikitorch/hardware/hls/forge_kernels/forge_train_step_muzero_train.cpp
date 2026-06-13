@@ -44,7 +44,12 @@ static inline void nearest_pow2(int w, int& e, int& s) {
     s = (w > 0) ? 1 : -1;
     int a = (w > 0) ? w : -w;            // |w|
     int hi = 0, t = a;
-    while (t > 1) { t >>= 1; hi++; }     // hi = floor(log2|w|)
+    // floor(log2|w|). BOUNDED loop (was `while (t>1)`, data-dependent -> HLS left the train-kernel
+    // latency UNRESOLVED '?'): the shadow weight is int16, so |w| < 2^15 => at most 15 right-shifts.
+    // A fixed 15-trip loop is functionally identical (t pins at 1) and lets HLS resolve the latency.
+    for (int _b = 0; _b < 15; _b++) {
+        if (t > 1) { t >>= 1; hi++; }
+    }
     int lo = 1 << hi, rem = a - lo;
     if ((rem << 1) >= lo) hi++;          // round to nearest pow2 by value-midpoint (shift+compare)
     e = hi;

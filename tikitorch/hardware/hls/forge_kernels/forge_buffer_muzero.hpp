@@ -22,9 +22,24 @@
 
 // --- shape (matches a TropicalMuZeroNet(obs_dim=MZ_OBS, n_actions=MZ_A, latent_dim=MZ_L,
 //     core_kind="dyadic") on the 4x4 GridWorld example; d_intermediate = 2*max(in,out)) ---
+// Base dims are overridable at compile time so the SAME kernel synthesizes at gridworld scale (default)
+// OR chess scale: -DMZ_OBS_OVERRIDE=769 -DMZ_L_OVERRIDE=64 -DMZ_A_OVERRIDE=4096 (matches
+// tikitorch.planning.muzero.chess_game: 769-d obs, latent 64, 4096 from-to actions).
+#ifdef MZ_OBS_OVERRIDE
+constexpr int MZ_OBS  = MZ_OBS_OVERRIDE;
+#else
 constexpr int MZ_OBS  = 48;                 // 3 * 4 * 4 one-hot gridworld obs
+#endif
+#ifdef MZ_L_OVERRIDE
+constexpr int MZ_L    = MZ_L_OVERRIDE;
+#else
 constexpr int MZ_L    = 32;                 // latent_dim
+#endif
+#ifdef MZ_A_OVERRIDE
+constexpr int MZ_A    = MZ_A_OVERRIDE;
+#else
 constexpr int MZ_A    = 4;                  // n_actions
+#endif
 constexpr int MZ_DR   = 2 * (MZ_OBS > MZ_L ? MZ_OBS : MZ_L);   // repr.enc d_intermediate = 96
 constexpr int MZ_DP   = 2 * MZ_L;                              // pred.mix d_intermediate = 64
 
