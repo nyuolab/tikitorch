@@ -53,11 +53,30 @@ _Note the MuZero relativity: no published MuZero-vs-Stockfish chess Elo exists; 
 | vs material(1-ply) grabber (trained) | score, n=14 | 0.50 (all draws) | `[measured]` chess_scaffold.json |
 | training loss | curve over 8 iters | **27.55 → 12.00** (monotonic) | `[measured]` chess_scaffold.json |
 
-**Axis-1 headline — the loss-down / strength-down decoupling:** training drives the loss down monotonically
-yet the trained agent is *weaker than its untrained control* vs a random mover. Strength here comes from
-**search + legality** (untrained AlphaZero-tree 0.625 > untrained learned-tree 0.375 > trained pure-MuZero
-0.071), not from the learned prior. Encoding caveats baked into every TikiTorch chess number: 4096-way
-`from*64+to` actions (**underpromotions not representable**), 769-d planes, 80-ply cap, material adjudication.
+**The lift attempt (2026-06-13): AlphaZero tree + anti-collapse — did NOT lift chess.** Applied the
+Connect4-winning levers (true-rules AZ tree + soft-CE + entropy/target-temp; fully multiply-free, closure
+`[]`) and compared trained vs untrained-control at *matched* sims=48, n=12, 12×16=192 self-play games:
+
+| recipe (AZ tree, matched sims=48) | trained vs random | untrained-control vs random | Δ | loss |
+|---|---|---|---|---|
+| `az_ce` (no anti-collapse) | 0.417 | 0.542 | −0.125 | 28.8→14.6 |
+| `az_ent1` (entropy 0.1, temp 1.5) | 0.458 | 0.458 | **+0.000** | 25.9→18.3 |
+| `az_ent3` (entropy 0.3, temp 2.0) | 0.292 | 0.458 | −0.166 | 21.0→14.9 |
+
+At n=12 the per-cell SE≈0.144 (Δ SE≈0.20), so **all three deltas are within ~1σ of zero — no detectable
+training benefit**, and anti-collapse did not rescue it (entropy made it no better / worse). The
+loss-down/strength-down decoupling **persists under the strong tree**. (The 4th recipe, a learned-tree
+control `mz_ent1`, did not finish — the pure-MuZero tree expands all 4096 actions/node and hung; the
+incremental S3 upload preserved the 3 AZ recipes anyway.)
+
+**Axis-1 headline — the loss-down / strength-down decoupling, now confirmed under AZ tree + anti-collapse.**
+Training drives the loss down monotonically yet the trained agent does not beat its untrained control. Strength
+comes from **search + legality** (untrained AlphaZero-tree 0.625@200 sims > untrained learned-tree 0.375 >
+trained 0.071/0.29–0.46), NOT from the learned prior. The binding constraint is **compute/data** — 192 games
+over a 4096-action space is ~5 orders of magnitude below DeepMind's tens of millions — plus **legal-move
+masking is still untried** (the 4096-way softmax wastes mass on illegal moves). Encoding caveats on every
+TikiTorch chess number: 4096-way `from*64+to` (**underpromotions not representable**), 769-d planes, 80-ply
+cap, material adjudication.
 
 ---
 

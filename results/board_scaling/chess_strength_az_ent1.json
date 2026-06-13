@@ -1,0 +1,62 @@
+{
+  "note": "multiply-free chess (dyadic cores+heads, closure []), trained vs untrained control, SAME tree. score=win+0.5draw. Compare to scaffold: trained-muzero-tree 0.071, untrained-control 0.393, untrained-alphazero-tree 0.625 (chess_alphazero.json).",
+  "config": {
+    "tree": "alphazero",
+    "policy_loss": "ce",
+    "entropy": 0.1,
+    "target_temp": 1.5,
+    "sims": 48,
+    "iters": 12,
+    "games": 16,
+    "eval": 12
+  },
+  "closure_violations": [],
+  "loss_curve": [
+    25.855,
+    23.1656,
+    22.3741,
+    22.0371,
+    21.3525,
+    20.6922,
+    20.1911,
+    19.8299,
+    19.2048,
+    18.9876,
+    18.3846,
+    18.2538
+  ],
+  "best_track_score": 0.5,
+  "trained": {
+    "random": {
+      "opponent": "random",
+      "win": 0.083,
+      "draw": 0.75,
+      "loss": 0.167,
+      "score": 0.458
+    },
+    "material": {
+      "opponent": "material(1-ply)",
+      "win": 0.0,
+      "draw": 1.0,
+      "loss": 0.0,
+      "score": 0.5
+    }
+  },
+  "untrained": {
+    "random": {
+      "opponent": "random",
+      "win": 0.083,
+      "draw": 0.75,
+      "loss": 0.167,
+      "score": 0.458
+    },
+    "material": {
+      "opponent": "material(1-ply)",
+      "win": 0.0,
+      "draw": 0.5,
+      "loss": 0.5,
+      "score": 0.25
+    }
+  },
+  "delta_vs_random": 0.0
+}
