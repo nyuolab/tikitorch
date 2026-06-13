@@ -11,14 +11,15 @@ Honesty notes baked into the figure:
   backward, update) — the same update rule the fabric kernels execute.
 - FPGA numbers: the 2-layer LM kernel trained on F2 silicon (params evolved
   on-chip, DSP=0); its 772 tok/s is measured, its 9.0 mJ/tok is WNS-derived.
-  The fully-tropical morph-LM kernel now TRAINS ON F2 SILICON, MEASURED and
-  bit-exact to the host CSIM golden (AFI cl_forge_morph_lm_v6_bufram,
-  agfi-006127c2d7aaabb42, v2 buffer-RAM, DSP=0): ~3,732 tok/s, learning
-  (acc 0 -> 0.23 in 30 steps), 3 W Vccint core -> ~0.80 mJ/tok core-rail
-  (NOT total-card; not directly comparable to the GPU's board power). It runs
-  the perceptron loss because the LUT-CE exp2 ROM reads zero on this AFI
-  (root-caused; CE needs a ROM-init fix — see fpga/silicon/SILICON_FINDINGS.md);
-  the rest of the datapath is bit-exact. Full-budget from-scratch FPGA training
+  The fully-tropical morph-LM kernel now TRAINS ENTIRELY ON F2 SILICON with the
+  quality-grade CE loss, MEASURED and bit-exact to the host CSIM golden (AFI
+  cl_forge_morph_lm_v8_aligned, agfi-0433370d93cb58a78, fused whole-run mode 3,
+  DSP=0): one host kick runs the whole 30-step loop on the fabric in 1.003 s =
+  ~3,827 tok/s, learning (acc 0 -> 0.30), 3 W Vccint core -> ~0.78 mJ/tok
+  core-rail (NOT total-card; not directly comparable to the GPU's board power).
+  The CE exp2 table is host-staged at a 16-word-aligned offset (the synthesized
+  ROM read zero, and a misaligned wide burst read it shifted — see
+  fpga/silicon/SILICON_FINDINGS.md). Full-budget from-scratch FPGA training
   at quality is open;
   the deployment story is warm-handoff (host-train strict, fabric serve+tune).
 
@@ -104,7 +105,7 @@ def main():
         ("nanoGPT\nA10G CUDA", 107091, "1.46 mJ/tok\nMEASURED (72 W)", "#1f77b4"),
         ("Morph strict\nhost MPS", 1072, "≈23 mJ/tok\n(rough, 25 W)", "#ff7f0e"),
         ("attn-LM\nF2 SILICON", 772, "≈9.0 mJ/tok\n(WNS-derived)", "#2ca02c"),
-        ("morph-LM\nF2 SILICON", 3732, "MEASURED\nbit-exact, DSP=0", "#2ca02c"),
+        ("morph-LM\nF2 SILICON", 3827, "fused CE on-fabric\nMEASURED bit-exact", "#2ca02c"),
     ]
     x = range(len(sys_bars))
     tput = [b[1] for b in sys_bars]
@@ -133,10 +134,11 @@ def main():
              "mJ/tok active/whole-window bounds; g5.xlarge). F2 throughput measured on "
              "silicon (2-layer attention-LM kernel, on-chip training validated, DSP=0); "
              "9.0 mJ/tok is WNS-derived, not power-rail. Fully-tropical morph-LM kernel "
-             "TRAINS ON F2 SILICON (MEASURED, bit-exact to host golden; agfi-006127c2d7aaabb42, "
-             "v2 buffer-RAM, DSP=0): ~3,732 tok/s, acc 0->0.23/30 steps, 3 W Vccint core "
-             "(~0.80 mJ/tok core-rail, NOT total-card). Perceptron loss (CE exp2 ROM reads zero "
-             "on this AFI -- root-caused, see fpga/silicon/SILICON_FINDINGS.md). Morph-MPS energy is a rough package "
+             "TRAINS ENTIRELY ON F2 SILICON with the CE loss, MEASURED + bit-exact to host "
+             "golden (agfi-0433370d93cb58a78, fused mode 3, DSP=0): one kick runs the whole "
+             "30-step loop on-fabric in 1.003 s = ~3,827 tok/s (vs the GPU's 0.036 s for the "
+             "same 3,840 token-updates -> ~28x slower wall, the expected 3 W-vs-72 W tradeoff), "
+             "acc 0->0.30, 3 W Vccint core (~0.78 mJ/tok core-rail, NOT total-card). Morph-MPS energy is a rough package "
              "estimate. Full-budget from-scratch FPGA training at quality remains open "
              "(integer-lattice dichotomy; tikitorch/fpga/LM_FPGA_VS_GPU_PLAN.md); the "
              "deployment design is warm-handoff: host-train strict, stage int16, serve + "

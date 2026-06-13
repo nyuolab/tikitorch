@@ -27,20 +27,24 @@ update rule runs on F2 silicon (on-chip training validated, zero DSP blocks).
 | nanoGPT on Apple GPU (MPS) | 188,492 | ≈0.13 mJ | tok/s measured; energy ROUGH (25 W package assumption, not instrumented) |
 | MorphSSM strict, host MPS | 1,072 | ≈23 mJ | tok/s measured; energy ROUGH (same caveat; no fused tropical kernels — implementation artifact) |
 | 2-layer attention-LM kernel, **F2 silicon** | 772 | ≈9.0 mJ | tok/s measured on silicon (on-chip training validated, DSP=0, AGFI `agfi-0a845113b088cf62e`); energy WNS-derived, not power-rail |
-| **fully-tropical morph-LM kernel (config B), F2 SILICON** | **~3,732** | **0.80 mJ (core)** | **MEASURED on silicon, bit-exact to host golden** (AFI `cl_forge_morph_lm_v6_bufram` `agfi-006127c2d7aaabb42`, v2 buffer-RAM DMA-PCIS↔URAM↔kernel, DSP=0, WNS −0.190 ns). 30-step training run BYTE-IDENTICAL to the host CSIM golden; genuine learning (acc 0→0.23); 3,840 tok fwd+bwd in 1.03 s → 3,732 tok/s; 3 W Vccint core → 0.80 mJ/tok **core-rail** (NOT total-card — not directly comparable to the GPU's board power). Uses the perceptron loss; the LUT-CE exp2 ROM reads zero on this AFI (root-caused, CE needs a ROM-init rebuild — `fpga/silicon/SILICON_FINDINGS.md`). The 2.793-bpb quality number is from host CE training (deploys bit-exact) |
+| **fully-tropical morph-LM (config B), F2 SILICON — fused CE, whole-run on-fabric** | **~3,827** | **0.78 mJ (core)** | **MEASURED on silicon, bit-exact to host golden** (AFI `cl_forge_morph_lm_v8_aligned` `agfi-0433370d93cb58a78`, fused mode 3, DSP=0, WNS −0.039 ns). ONE host kick runs the whole 30-step training loop **entirely on the fabric** (fwd + CE loss + backward + signSGD) in **1.003 s** = 3,827 tok/s, BYTE-IDENTICAL to the host CSIM golden (`wcrc 14650122959732499763`); genuine learning (acc 0→0.30, quality-grade CE — the same loss as the 2.793-bpb model). 3 W Vccint core → 0.78 mJ/tok **core-rail** (NOT total-card; not board-comparable to the GPU). CE exp2 table host-staged at a 16-aligned offset (`fpga/silicon/SILICON_FINDINGS.md`) |
 
-Note (the actual punchline): the fully-tropical morph-LM kernel now **trains
-on F2 silicon, measured and bit-exact** to the host CSIM golden — the first
-end-to-end on-fabric training of this kernel. It runs at ~3,732 tok/s with the
-core (Vccint) rail drawing a flat **3 W** (DSP=0; the rail barely moves
-idle→active). At 3 W that is ~0.80 mJ/tok, but this is the **user-logic core
-rail, NOT total-card power** — the F2 card draws more (transceivers, DDR, shell),
-and fpga-describe does not expose the full rail. So we do **not** claim a
-board-to-board energy win over the GPU's 1.46 mJ/tok (which is total board
-power); the honest, fully-measured claims are: (1) on-silicon training works
-and is bit-exact, (2) DSP=0 / zero multiplies, (3) ~3,732 tok/s, (4) 3 W core.
-A true energy comparison needs external full-card instrumentation (PMBus / FPGA
-card power), which is the remaining measurement. The MorphSSM-float CUDA run
+**Wall-clock (head-to-head):** the same 3,840 token-updates take **1.003 s on the F2** vs **~0.036 s on the A10G** — the FPGA is ~**28× slower in wall-clock**, the direct consequence of 3,827 vs 107,091 tok/s. That is the honest cost of a **3 W zero-multiplier fabric** vs a **72 W GPU**: comparable per-token *core* energy, ~28× the wall time, every multiply eliminated.
+
+Note (the actual punchline): the fully-tropical morph-LM **trains end-to-end on
+F2 silicon with the quality-grade CE loss, measured and bit-exact** to the host
+CSIM golden — the WHOLE training loop (fwd + CE loss + backward + signSGD) runs
+on the fabric in a single host kick (fused mode 3), 30 steps in 1.003 s =
+**3,827 tok/s**, learning (acc 0→0.30). The core (Vccint) rail draws a flat
+**3 W** (DSP=0; the rail barely moves idle→active) → ~0.78 mJ/tok, but this is
+the **user-logic core rail, NOT total-card power** — the F2 card draws more
+(transceivers, DDR, shell), and fpga-describe does not expose the full rail. So
+we do **not** claim a board-to-board energy win over the GPU's 1.46 mJ/tok
+(total board power). The honest, fully-measured claims are: (1) on-silicon
+CE training works, completely on fabric, and is bit-exact; (2) DSP=0 / zero
+multiplies; (3) ~3,827 tok/s (~28× slower wall than the A10G — the 3 W-vs-72 W
+tradeoff); (4) 3 W core. A true energy comparison needs external full-card
+instrumentation (PMBus / FPGA card power), the one remaining measurement. The MorphSSM-float CUDA run
 crashed at startup (results/lm_gpu_baseline/gpu_morph.log) — the tropical-on-CUDA
 datapoint is pending; MPS stands in for that arm.
 

@@ -1,4 +1,37 @@
-# Silicon bring-up: morph-LM training on F2 (AFI cl_forge_morph_lm_v6_bufram)
+# Silicon bring-up: morph-LM training on F2
+
+## FINAL RESULT — fully-tropical CE training runs ENTIRELY on F2 silicon (measured, bit-exact)
+
+AFI `cl_forge_morph_lm_v8_aligned` (`agfi-0433370d93cb58a78`): fused whole-run
+trainer (mode 3), DSP=0, WNS −0.039 ns @250 MHz. One host kick runs the entire
+30-step training loop (fwd + balanced-LUT-CE loss + backward + signSGD) on the
+fabric, tokens/targets/weights/LUT resident in the buffer:
+- silicon JSONL **byte-identical** to the host CSIM golden
+  (`wcrc 14650122959732499763`, acc 0→0.30 quality-grade CE);
+- **1.003 s wall for 30 steps (3,840 token-updates) = ~3,827 tok/s**, one kick,
+  no per-position host round-trips;
+- 3 W Vccint core → ~0.78 mJ/tok core-rail (NOT total card).
+
+Two bugs had to be fixed to get CE working on silicon (both were CSIM-invisible —
+the host scalar path masked them; only the silicon wide path tripped them):
+1. **Dead exp2 ROM.** A `static const` ROM (`FT_CE_EXP2_Q16`) read all-zero on the
+   synthesized AFI → CE grad = 0 → training froze. Fix: host-stage the 256-word
+   table into the buffer (`OFF_CE_LUT`) and read it from there.
+2. **Misaligned wide burst.** `OFF_CE_LUT` sat at `OFF_CFG+2` (not 16-word
+   aligned); the kernel's 512-bit `burst_load` truncates the offset to `>>4`, so
+   it read the LUT shifted by 2 words → wrong CE grad → wrong weights, *while the
+   forward/preds stayed bit-exact* (preds don't use the LUT). Fix: round
+   `OFF_CE_LUT` up to the next 16. Isolated by a 1-step on-silicon run (preds
+   matched golden, weight-crc didn't).
+
+Also: per-position modes 0/1/2 are HOST-only (`#if !SYNTHESIS`) so only fused
+mode 3 synthesizes → CL area 190k→90k LUT, WNS −0.346→−0.039 ns. The whole HDK
+CL build (IP regen via `build/scripts/gen_ip.tcl`, `synth_cl_forge_morph_lm.tcl`)
+is now committed under `tikitorch/hardware/hdk/cl_forge_morph_lm/`.
+
+---
+
+## Earlier milestone — perceptron path (AFI cl_forge_morph_lm_v6_bufram)
 
 AFI `agfi-006127c2d7aaabb42` (v2 buffer-RAM CL: DMA-PCIS↔URAM↔kernel, DSP=0,
 WNS −0.190 ns @250 MHz). Bit-exact gate = silicon JSONL must equal the host
