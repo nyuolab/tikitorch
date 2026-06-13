@@ -11,8 +11,11 @@ Honesty notes baked into the figure:
   backward, update) — the same update rule the fabric kernels execute.
 - FPGA numbers: the 2-layer LM kernel trained on F2 silicon (params evolved
   on-chip, DSP=0); its 772 tok/s is measured, its 9.0 mJ/tok is WNS-derived.
-  The morph-LM kernel's 11.2k tok/s is host CSIM, not silicon. Full-budget
-  from-scratch FPGA training at quality is open (integer-lattice dichotomy);
+  The fully-tropical morph-LM kernel's ~4.2k tok/s and 0.7-1.7 mJ/tok are
+  derived from post-route latency (59,578 cyc/token @250 MHz, DSP=0) and
+  3-7 W power — the v2 buffer-RAM AFI is built (WNS -0.190 ns); the
+  end-to-end silicon training run is the pending upgrade from derived to
+  measured. Full-budget from-scratch FPGA training at quality is open;
   the deployment story is warm-handoff (host-train strict, fabric serve+tune).
 
 Usage: PYTHONPATH=. python scripts/make_hallmark_figure.py
@@ -97,7 +100,7 @@ def main():
         ("nanoGPT\nA10G CUDA", 107091, "1.46 mJ/tok\nMEASURED (72 W)", "#1f77b4"),
         ("Morph strict\nhost MPS", 1072, "≈23 mJ/tok\n(rough, 25 W)", "#ff7f0e"),
         ("attn-LM\nF2 SILICON", 772, "≈9.0 mJ/tok\n(WNS-derived)", "#2ca02c"),
-        ("morph-LM\nCSIM", 11188, "AFI registered:\nDSP=0, WNS+0.007", "#98df8a"),
+        ("morph-LM\nF2 (post-route)", 4196, "≈0.7–1.7 mJ/tok\nDSP=0, derived", "#98df8a"),
     ]
     x = range(len(sys_bars))
     tput = [b[1] for b in sys_bars]
@@ -125,8 +128,10 @@ def main():
              "energy MEASURED (nvidia-smi board power, 5 Hz, active avg 72 W; 1.46-1.49 "
              "mJ/tok active/whole-window bounds; g5.xlarge). F2 throughput measured on "
              "silicon (2-layer attention-LM kernel, on-chip training validated, DSP=0); "
-             "9.0 mJ/tok is WNS-derived, not power-rail. morph-LM kernel is CSIM-validated "
-             "(bit-exact gradients; AFI pending). Morph-MPS energy is a rough package "
+             "9.0 mJ/tok is WNS-derived, not power-rail. Fully-tropical morph-LM kernel: "
+             "~4.2k tok/s and 0.7-1.7 mJ/tok DERIVED from post-route latency (59,578 "
+             "cyc/token @250 MHz) x 3-7 W (gradients CSIM bit-exact; v2 buffer-RAM AFI "
+             "built, WNS -0.190 ns; end-to-end silicon run pending). Morph-MPS energy is a rough package "
              "estimate. Full-budget from-scratch FPGA training at quality remains open "
              "(integer-lattice dichotomy; tikitorch/fpga/LM_FPGA_VS_GPU_PLAN.md); the "
              "deployment design is warm-handoff: host-train strict, stage int16, serve + "
