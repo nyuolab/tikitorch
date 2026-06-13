@@ -47,6 +47,7 @@ ROLE="${ROLE:-tiki-sweep-runner}"              # IAM role == instance-profile na
 # robust machinery, e.g.:  DRIVER=_chess_strength_onbox.sh RESULT_GLOB='chess_strength_*.json' ... launch
 DRIVER="${DRIVER:-_connect4_prior_sweep_onbox.sh}"
 RESULT_GLOB="${RESULT_GLOB:-connect4_fully_tropical_*.json}"
+PIP_EXTRA="${PIP_EXTRA:-}"                      # extra pip pkgs the on-box bootstrap installs (e.g. "chess" for the chess sweep)
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_sweep_state"; mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/run.env"
@@ -198,6 +199,8 @@ for i in 1 2 3; do /opt/venv/bin/pip install -q awscli && break; sleep 10; done
 up
 for i in 1 2 3; do /opt/venv/bin/pip install -q numpy && break; sleep 10; done
 for i in 1 2 3; do /opt/venv/bin/pip install -q torch --index-url https://download.pytorch.org/whl/cpu && break; sleep 15; done
+EXTRA="${PIP_EXTRA}"
+[ -n "\$EXTRA" ] && for i in 1 2 3; do /opt/venv/bin/pip install -q \$EXTRA && break; sleep 10; done
 up
 python3 -c "import torch,numpy;print('torch',torch.__version__,'numpy',numpy.__version__)" || true
 
