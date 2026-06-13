@@ -42,6 +42,11 @@ MAX_MINUTES="${MAX_MINUTES:-120}"              # hard self-terminate deadline (c
 WORKERS="${WORKERS:-4}"                         # self-play workers per recipe (7*4=28 < 36)
 EBS_SIZE="${EBS_SIZE:-30}"                      # GB; torch-cpu + repo fit easily
 ROLE="${ROLE:-tiki-sweep-runner}"              # IAM role == instance-profile name
+# Generalized sweep template: DRIVER = the on-box sweep script (defaults to the Connect4 prior sweep);
+# RESULT_GLOB = which result JSONs fetch pulls back. Override both to drive other sweeps on the same
+# robust machinery, e.g.:  DRIVER=_chess_strength_onbox.sh RESULT_GLOB='chess_strength_*.json' ... launch
+DRIVER="${DRIVER:-_connect4_prior_sweep_onbox.sh}"
+RESULT_GLOB="${RESULT_GLOB:-connect4_fully_tropical_*.json}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_sweep_state"; mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/run.env"
@@ -109,10 +114,8 @@ cmd_launch(){
   git -C "$PROJECT_DIR" archive --format=tar.gz -o "$STATE_DIR/src.tar.gz" HEAD
   ls -lh "$STATE_DIR/src.tar.gz"
   # sanity: the two scripts we depend on must be in the archive
-  tar tzf "$STATE_DIR/src.tar.gz" | grep -qx "scripts/run_fully_tropical_connect4.py" \
-    || { echo "FATAL: run_fully_tropical_connect4.py not in committed tree (commit it first)"; exit 1; }
-  tar tzf "$STATE_DIR/src.tar.gz" | grep -qx "scripts/_connect4_prior_sweep_onbox.sh" \
-    || { echo "FATAL: _connect4_prior_sweep_onbox.sh not in committed tree (commit it first)"; exit 1; }
+  tar tzf "$STATE_DIR/src.tar.gz" | grep -qx "scripts/$DRIVER" \
+    || { echo "FATAL: scripts/$DRIVER not in committed tree (commit it first)"; exit 1; }
 
   echo "== resolving latest Ubuntu 22.04 amd64 AMI from SSM =="
   AMI="$(aws_ ssm get-parameters \
@@ -158,6 +161,7 @@ cmd_launch(){
 
   {
     echo "TAG=$TAG"; echo "INSTANCE_ID=$INSTANCE_ID"; echo "REGION=$REGION"
+    echo "DRIVER=$DRIVER"; echo "RESULT_GLOB=$RESULT_GLOB"
     echo "BUCKET=$BUCKET"; echo "S3_RESULTS=$S3_RESULTS"; echo "AMI=$AMI"
     echo "INSTANCE_TYPE=$INSTANCE_TYPE"; echo "MAX_MINUTES=$MAX_MINUTES"
   } > "$STATE_FILE"
@@ -203,7 +207,7 @@ tar xzf src.tar.gz   # git archive => flat tree (scripts/, tikitorch/ at /opt/ti
 up
 
 export REPO=/opt/tiki S3_RESULTS="\$S3_RESULTS"
-bash scripts/_connect4_prior_sweep_onbox.sh
+bash scripts/${DRIVER}
 rc=\$?
 echo "SWEEP_RC=\$rc \$(date -u)"
 aws s3 cp /var/log/tiki-sweep.log "\$S3_RESULTS/boot.log" --only-show-errors || true
@@ -242,10 +246,10 @@ cmd_fetch(){
   local DEST="$PROJECT_DIR/results/board_scaling"
   mkdir -p "$DEST/_sweep_logs"
   echo "downloading result JSONs -> $DEST"
-  aws_ s3 cp "$S3_RESULTS/" "$DEST/" --recursive --exclude "*" --include "connect4_fully_tropical_*.json" --only-show-errors
+  aws_ s3 cp "$S3_RESULTS/" "$DEST/" --recursive --exclude "*" --include "${RESULT_GLOB:-connect4_fully_tropical_*.json}" --only-show-errors
   aws_ s3 cp "$S3_RESULTS/logs/" "$DEST/_sweep_logs/" --recursive --only-show-errors 2>/dev/null || true
   aws_ s3 cp "$S3_RESULTS/boot.log" "$DEST/_sweep_logs/boot.log" --only-show-errors 2>/dev/null || true
-  echo "== fetched =="; ls -1 "$DEST"/connect4_fully_tropical_*.json 2>/dev/null || echo "(none yet)"
+  echo "== fetched =="; ls -1 "$DEST"/${RESULT_GLOB:-connect4_fully_tropical_*.json} 2>/dev/null || echo "(none yet)"
 }
 
 # ---------------------------------------------------------------------------- terminate / clean
