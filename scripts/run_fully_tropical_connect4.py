@@ -65,12 +65,12 @@ def main(a):
     probe.run(log=lambda s: None)
     untrained = BoardMuZero(Connect4, cfg)
 
-    grid = [100, 200, 400]
+    grid = [int(s) for s in a.grid.split(",")]
     res = {"recipe": dict(policy_loss=a.policy_loss, entropy_coef=a.entropy_coef, target_temp=a.target_temp, lr=a.lr),
            "closure_violations": viol, "trained": {}, "untrained": {}}
     for label, mz in (("trained", probe), ("untrained", untrained)):
         for sims in grid:
-            res[label][sims] = {d: score_vs(mz.net, sims, d) for d in (2, 3)}
+            res[label][sims] = {d: score_vs(mz.net, sims, d, n=a.eval_games) for d in (2, 3)}
             print(f"[{a.tag}]  {label:9s} @ {sims:3d} sims:  d2={res[label][sims][2]}  d3={res[label][sims][3]}", flush=True)
 
     os.makedirs(OUT, exist_ok=True)
@@ -94,5 +94,7 @@ if __name__ == "__main__":
     p.add_argument("--target-temp", dest="target_temp", type=float, default=1.0)
     p.add_argument("--lr", type=float, default=3e-3)
     p.add_argument("--threads", type=int, default=0, help="pin torch threads (use 1 per process in parallel sweeps)")
+    p.add_argument("--eval-games", dest="eval_games", type=int, default=40, help="games per eval cell (manuscript: 40)")
+    p.add_argument("--grid", default="100,200,400", help="eval sim grid (manuscript: 100,200,400)")
     p.add_argument("--tag", default="run")
     main(p.parse_args())

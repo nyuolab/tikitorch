@@ -19,3 +19,6 @@ logs/
 _libtikifpga.*
 # mkdocs build output
 site/
+
+# local EC2 prior-sweep runner state (tarball, user-data, launch.err)
+.tiki_sweep_state/
