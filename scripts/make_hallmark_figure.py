@@ -11,11 +11,15 @@ Honesty notes baked into the figure:
   backward, update) — the same update rule the fabric kernels execute.
 - FPGA numbers: the 2-layer LM kernel trained on F2 silicon (params evolved
   on-chip, DSP=0); its 772 tok/s is measured, its 9.0 mJ/tok is WNS-derived.
-  The fully-tropical morph-LM kernel's ~4.2k tok/s and 0.7-1.7 mJ/tok are
-  derived from post-route latency (59,578 cyc/token @250 MHz, DSP=0) and
-  3-7 W power — the v2 buffer-RAM AFI is built (WNS -0.190 ns); the
-  end-to-end silicon training run is the pending upgrade from derived to
-  measured. Full-budget from-scratch FPGA training at quality is open;
+  The fully-tropical morph-LM kernel now TRAINS ON F2 SILICON, MEASURED and
+  bit-exact to the host CSIM golden (AFI cl_forge_morph_lm_v6_bufram,
+  agfi-006127c2d7aaabb42, v2 buffer-RAM, DSP=0): ~3,732 tok/s, learning
+  (acc 0 -> 0.23 in 30 steps), 3 W Vccint core -> ~0.80 mJ/tok core-rail
+  (NOT total-card; not directly comparable to the GPU's board power). It runs
+  the perceptron loss because the LUT-CE exp2 ROM reads zero on this AFI
+  (root-caused; CE needs a ROM-init fix — see fpga/silicon/SILICON_FINDINGS.md);
+  the rest of the datapath is bit-exact. Full-budget from-scratch FPGA training
+  at quality is open;
   the deployment story is warm-handoff (host-train strict, fabric serve+tune).
 
 Usage: PYTHONPATH=. python scripts/make_hallmark_figure.py
@@ -100,7 +104,7 @@ def main():
         ("nanoGPT\nA10G CUDA", 107091, "1.46 mJ/tok\nMEASURED (72 W)", "#1f77b4"),
         ("Morph strict\nhost MPS", 1072, "≈23 mJ/tok\n(rough, 25 W)", "#ff7f0e"),
         ("attn-LM\nF2 SILICON", 772, "≈9.0 mJ/tok\n(WNS-derived)", "#2ca02c"),
-        ("morph-LM\nF2 (post-route)", 4196, "≈0.7–1.7 mJ/tok\nDSP=0, derived", "#98df8a"),
+        ("morph-LM\nF2 SILICON", 3732, "MEASURED\nbit-exact, DSP=0", "#2ca02c"),
     ]
     x = range(len(sys_bars))
     tput = [b[1] for b in sys_bars]
@@ -128,10 +132,11 @@ def main():
              "energy MEASURED (nvidia-smi board power, 5 Hz, active avg 72 W; 1.46-1.49 "
              "mJ/tok active/whole-window bounds; g5.xlarge). F2 throughput measured on "
              "silicon (2-layer attention-LM kernel, on-chip training validated, DSP=0); "
-             "9.0 mJ/tok is WNS-derived, not power-rail. Fully-tropical morph-LM kernel: "
-             "~4.2k tok/s and 0.7-1.7 mJ/tok DERIVED from post-route latency (59,578 "
-             "cyc/token @250 MHz) x 3-7 W (gradients CSIM bit-exact; v2 buffer-RAM AFI "
-             "built, WNS -0.190 ns; end-to-end silicon run pending). Morph-MPS energy is a rough package "
+             "9.0 mJ/tok is WNS-derived, not power-rail. Fully-tropical morph-LM kernel "
+             "TRAINS ON F2 SILICON (MEASURED, bit-exact to host golden; agfi-006127c2d7aaabb42, "
+             "v2 buffer-RAM, DSP=0): ~3,732 tok/s, acc 0->0.23/30 steps, 3 W Vccint core "
+             "(~0.80 mJ/tok core-rail, NOT total-card). Perceptron loss (CE exp2 ROM reads zero "
+             "on this AFI -- root-caused, see fpga/silicon/SILICON_FINDINGS.md). Morph-MPS energy is a rough package "
              "estimate. Full-budget from-scratch FPGA training at quality remains open "
              "(integer-lattice dichotomy; tikitorch/fpga/LM_FPGA_VS_GPU_PLAN.md); the "
              "deployment design is warm-handoff: host-train strict, stage int16, serve + "

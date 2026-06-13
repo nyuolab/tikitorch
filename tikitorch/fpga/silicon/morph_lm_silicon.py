@@ -34,9 +34,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_buffer_init as L   # noqa: E402
 
 # ---- run parameters — MUST match golden_morph_lm.cpp ----
+# SGD_THR via env TT_SGD_THR (default 2048): CE grads are Q16 (thr=2048); the
+# perceptron loss (CFG loss_kind=0) emits +/-1 grads, so it needs thr=0 to step.
 STEPS   = 30
 SGD_LR  = 1
-SGD_THR = 2048
+SGD_THR = int(os.environ.get("TT_SGD_THR", "2048"))
 
 ENTRY = b"forge_train_step_morph_lm"
 LIB_PATH = os.environ.get("TIKITORCH_FPGA_LIB", "/tmp/_libtikifpga_pci.so")

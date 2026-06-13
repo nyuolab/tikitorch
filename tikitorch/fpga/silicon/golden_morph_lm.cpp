@@ -40,9 +40,10 @@ extern "C" int forge_train_step_morph_lm(int32_t* buffer, int mode,
                                          int a1, int a2, int a3);
 
 // ---- fixed run parameters (must match morph_lm_silicon.py) ----
+// SGD_THR via env TT_SGD_THR (default 2048): CE grads are Q16 (thr=2048); the
+// perceptron loss (CFG loss_kind=0) emits +/-1 grads, so it needs thr=0 to step.
 static const int   STEPS     = 30;     // optimizer steps over the same window
 static const int   SGD_LR    = 1;      // signsgd learning rate (arg1)
-static const int   SGD_THR   = 2048;   // signsgd threshold (arg2); CE grads are Q16
 
 // ---- deterministic weight-region checksum (FNV-1a over int32 words) ----
 // Must be byte-identical to the Python implementation in morph_lm_silicon.py.
@@ -81,6 +82,7 @@ int main(int argc, char** argv) {
         return 2;
     }
     const char* path = argv[1];
+    const int SGD_THR = std::getenv("TT_SGD_THR") ? std::atoi(std::getenv("TT_SGD_THR")) : 2048;
 
     // ---- load the SHARED ground-truth buffer ----
     std::vector<int32_t> buf(ML_BUFFER_WORDS);

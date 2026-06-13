@@ -27,20 +27,22 @@ update rule runs on F2 silicon (on-chip training validated, zero DSP blocks).
 | nanoGPT on Apple GPU (MPS) | 188,492 | ≈0.13 mJ | tok/s measured; energy ROUGH (25 W package assumption, not instrumented) |
 | MorphSSM strict, host MPS | 1,072 | ≈23 mJ | tok/s measured; energy ROUGH (same caveat; no fused tropical kernels — implementation artifact) |
 | 2-layer attention-LM kernel, **F2 silicon** | 772 | ≈9.0 mJ | tok/s measured on silicon (on-chip training validated, DSP=0, AGFI `agfi-0a845113b088cf62e`); energy WNS-derived, not power-rail |
-| **fully-tropical morph-LM kernel (config B), F2** | **~4,196** | **≈0.7–1.7 mJ** | **tok/s DERIVED from post-route latency** (59,578 cyc/token @250 MHz: 128×[fwd 18,908 + bwd 37,950] + signsgd 348,184, per 128-token seq; DSP=0); energy = latency × 3 W measured-idle floor → ~7 W active (repo-consistent). Gradients CSIM bit-exact (→ identical quality on silicon). v2 buffer-RAM AFI built (`cl_forge_morph_lm_v6_bufram`, WNS −0.190 ns); **end-to-end silicon training run pending** (upgrades this row derived→measured) |
+| **fully-tropical morph-LM kernel (config B), F2 SILICON** | **~3,732** | **0.80 mJ (core)** | **MEASURED on silicon, bit-exact to host golden** (AFI `cl_forge_morph_lm_v6_bufram` `agfi-006127c2d7aaabb42`, v2 buffer-RAM DMA-PCIS↔URAM↔kernel, DSP=0, WNS −0.190 ns). 30-step training run BYTE-IDENTICAL to the host CSIM golden; genuine learning (acc 0→0.23); 3,840 tok fwd+bwd in 1.03 s → 3,732 tok/s; 3 W Vccint core → 0.80 mJ/tok **core-rail** (NOT total-card — not directly comparable to the GPU's board power). Uses the perceptron loss; the LUT-CE exp2 ROM reads zero on this AFI (root-caused, CE needs a ROM-init rebuild — `fpga/silicon/SILICON_FINDINGS.md`). The 2.793-bpb quality number is from host CE training (deploys bit-exact) |
 
-Note: the older 2-layer attention kernel lagged the GPU ~6× on per-token
-energy (9.0 mJ vs 1.46 mJ), but the fully-tropical morph-LM kernel's
-post-route-derived figure (~0.7–1.7 mJ/tok at 3–7 W) is **comparable to the
-A10G** — a 3 W zero-multiplier fabric matching a 72 W GPU on energy/token,
-at ~25× lower throughput (the GPU's win is batched parallelism, not
-per-token efficiency). This is the head-to-head's actual punchline, and the
-reason the pending end-to-end silicon run matters: it converts ~0.7–1.7 mJ
-(derived) into a single measured number. Caveat: the FPGA energy is derived
-(post-route latency × assumed power), not power-rail measured, until that run
-lands. The MorphSSM-float CUDA run crashed at startup (no traceback;
-results/lm_gpu_baseline/gpu_morph.log) — the tropical-on-CUDA datapoint is
-pending; MPS stands in for that arm.
+Note (the actual punchline): the fully-tropical morph-LM kernel now **trains
+on F2 silicon, measured and bit-exact** to the host CSIM golden — the first
+end-to-end on-fabric training of this kernel. It runs at ~3,732 tok/s with the
+core (Vccint) rail drawing a flat **3 W** (DSP=0; the rail barely moves
+idle→active). At 3 W that is ~0.80 mJ/tok, but this is the **user-logic core
+rail, NOT total-card power** — the F2 card draws more (transceivers, DDR, shell),
+and fpga-describe does not expose the full rail. So we do **not** claim a
+board-to-board energy win over the GPU's 1.46 mJ/tok (which is total board
+power); the honest, fully-measured claims are: (1) on-silicon training works
+and is bit-exact, (2) DSP=0 / zero multiplies, (3) ~3,732 tok/s, (4) 3 W core.
+A true energy comparison needs external full-card instrumentation (PMBus / FPGA
+card power), which is the remaining measurement. The MorphSSM-float CUDA run
+crashed at startup (results/lm_gpu_baseline/gpu_morph.log) — the tropical-on-CUDA
+datapoint is pending; MPS stands in for that arm.
 
 ## What the figure does and does not claim
 
