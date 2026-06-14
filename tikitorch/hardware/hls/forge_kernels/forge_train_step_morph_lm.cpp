@@ -33,6 +33,15 @@ typedef ap_uint<512> wide_t;
 static const acc_t ML_NEG_INF = acc_t(-2147483647LL);
 static const acc_t ML_POS_INF = acc_t( 2147483647LL);
 
+// --- throughput knobs (compile-time; default = the validated baseline) ---
+// TT_WIDE_LANES: lanes per cycle in the max-plus projection (PJ) and LM head
+// reductions. 8 = baseline. 16/32/64 widen the add+compare tree (more LUT, needs
+// mp_buf/wh_buf banked). MUST divide ML_D (=128). Bit-exact for any value: the
+// balanced strict-'>' tree always keeps the lowest index among equal maxima.
+#ifndef TT_WIDE_LANES
+#define TT_WIDE_LANES 8
+#endif
+
 // =============================================================================
 // Common helpers — verbatim from forge_train_step_morph.cpp.
 // =============================================================================
@@ -126,6 +135,13 @@ static int do_fwd_loss(int32_t* buffer, int m, int token, int target, int reload
     static int32_t mp_buf[WORDS_MP];      // URAM-class
     static int32_t wh_buf[WORDS_W_HEAD];
     static int32_t ce_lut[WORDS_CE_LUT];
+#if TT_WIDE_LANES > 8
+    // Bank the projection/head weight arrays so the widened reductions get
+    // TT_WIDE_LANES contiguous reads/cycle (else the wide tree bottlenecks on
+    // a single memory port). Default (8) leaves the baseline mapping untouched.
+#pragma HLS ARRAY_PARTITION variable=mp_buf cyclic factor=TT_WIDE_LANES dim=1
+#pragma HLS ARRAY_PARTITION variable=wh_buf cyclic factor=TT_WIDE_LANES dim=1
+#endif
     if (reload) {
         burst_load_words(buffer, OFF_MH, mh_buf, WORDS_MH);
         burst_load_words(buffer, OFF_MB, mb_buf, WORDS_MB);
@@ -204,20 +220,20 @@ MC_K: for (int k = 0; k < ML_K; k++) {
 PJ_J: for (int j = 0; j < ML_D; j++) {
             acc_t best = ML_NEG_INF;
             int   istar = 0;
-PJ_I: for (int i = 0; i < ML_D; i += 8) {
+PJ_I: for (int i = 0; i < ML_D; i += TT_WIDE_LANES) {
 #pragma HLS PIPELINE II=1
-                acc_t cand[8]; int cidx[8];
+                acc_t cand[TT_WIDE_LANES]; int cidx[TT_WIDE_LANES];
 #pragma HLS ARRAY_PARTITION variable=cand complete
 #pragma HLS ARRAY_PARTITION variable=cidx complete
-PJ_LANE: for (int u = 0; u < 8; u++) {
+PJ_LANE: for (int u = 0; u < TT_WIDE_LANES; u++) {
 #pragma HLS UNROLL
                     data_t pji = (data_t)(int16_t)(mp_buf[pbase + j * ML_D + i + u] & 0xFFFF);
                     cand[u] = (acc_t)pji + (acc_t)MC[i + u];
                     cidx[u] = i + u;
                 }
-PJ_TREE: for (int st = 1; st < 8; st <<= 1) {
+PJ_TREE: for (int st = 1; st < TT_WIDE_LANES; st <<= 1) {
 #pragma HLS UNROLL
-                    for (int u = 0; u < 8; u += (st << 1)) {
+                    for (int u = 0; u < TT_WIDE_LANES; u += (st << 1)) {
 #pragma HLS UNROLL
                         if (cand[u + st] > cand[u]) { cand[u] = cand[u + st]; cidx[u] = cidx[u + st]; }
                     }
@@ -245,20 +261,20 @@ RES: for (int j = 0; j < ML_D; j++) {
 HEAD_V: for (int v = 0; v < ML_V; v++) {
         acc_t mx = ML_NEG_INF;
         int   idx_d = 0;
-HEAD_D: for (int d = 0; d < ML_D; d += 8) {
+HEAD_D: for (int d = 0; d < ML_D; d += TT_WIDE_LANES) {
 #pragma HLS PIPELINE II=1
-            acc_t cand[8]; int cidx[8];
+            acc_t cand[TT_WIDE_LANES]; int cidx[TT_WIDE_LANES];
 #pragma HLS ARRAY_PARTITION variable=cand complete
 #pragma HLS ARRAY_PARTITION variable=cidx complete
-HD_LANE: for (int u = 0; u < 8; u++) {
+HD_LANE: for (int u = 0; u < TT_WIDE_LANES; u++) {
 #pragma HLS UNROLL
                 data_t W_vd = (data_t)(int16_t)(wh_buf[v * ML_D + d + u] & 0xFFFF);
                 cand[u] = (acc_t)W_vd + (acc_t)R[d + u];
                 cidx[u] = d + u;
             }
-HD_TREE: for (int st = 1; st < 8; st <<= 1) {
+HD_TREE: for (int st = 1; st < TT_WIDE_LANES; st <<= 1) {
 #pragma HLS UNROLL
-                for (int u = 0; u < 8; u += (st << 1)) {
+                for (int u = 0; u < TT_WIDE_LANES; u += (st << 1)) {
 #pragma HLS UNROLL
                     if (cand[u + st] > cand[u]) { cand[u] = cand[u + st]; cidx[u] = cidx[u + st]; }
                 }
@@ -573,12 +589,18 @@ STEP_LOOP: for (int s = 0; s < n_steps; s++) {
         FWD_SWEEP: for (int m = 0; m < ML_L_SEQ; m++) {
             do_fwd_loss(buffer, m, (int)toks[m], (int)tgts[m], (m == 0) ? 1 : 0);
         }
-        // (3) zero all 5 grad regions AND re-zero BS (now the grad_BS accumulator).
+        // (3) zero the 5 grad regions AND re-zero BS (now the grad_BS accumulator).
+#ifndef TT_DROP_GRAD_ZERO
+        // These grad-zeros are redundant: do_signsgd zeros all 5 grad regions at
+        // the end of every step, and the init buffer zeros them for step 0. The
+        // BS re-zero below is NOT redundant (it clears the fwd activations so BS
+        // can serve as the grad_BS accumulator). TT_DROP_GRAD_ZERO drops the 5.
         zero_region_wide(buffer, OFF_G_EMBED,  WORDS_G_EMBED);
         zero_region_wide(buffer, OFF_G_MH,     WORDS_G_MH);
         zero_region_wide(buffer, OFF_G_MP,     WORDS_G_MP);
         zero_region_wide(buffer, OFF_G_MB,     WORDS_G_MB);
         zero_region_wide(buffer, OFF_G_W_HEAD, WORDS_G_W_HEAD);
+#endif
         zero_region_wide(buffer, OFF_BS_STREAM, WORDS_BS_STREAM);
         // (4) BACKWARD m = L-1..0 (REVERSE).
         BWD_SWEEP: for (int m = ML_L_SEQ - 1; m >= 0; m--) {
