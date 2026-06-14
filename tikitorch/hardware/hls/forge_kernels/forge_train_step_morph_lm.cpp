@@ -87,6 +87,36 @@ static int32_t wh_buf[WORDS_W_HEAD];
 static int32_t ce_lut[WORDS_CE_LUT];
 #endif
 
+// --- BATCH parallelism (TT_BATCH; requires TT_ONCHIP_GRAD + TT_RESIDENT_W) ---
+// do_train_run loops the fwd/bwd over b in 0..ML_BATCH-1. The B sequences share
+// the resident weights (read-only in fwd) and SUM their gradients into the
+// shared g_*_oc accumulators; ONE signsgd per step. do_fwd_loss/do_bwd take a
+// `b` argument selecting that sequence's per-seq buffer scratch (BS stream /
+// saved argmax routes / grad_logit / pred) via the off_*_b(b,...) helpers; the
+// arithmetic is otherwise IDENTICAL to single-sequence (a constant b-stride on
+// the per-seq addresses), so each sequence's grad contribution is bit-exact to
+// running that sequence alone => summed-batched == sum-of-per-sequence. The
+// per-seq region OFFSETS below collapse to the single-seq ones at b=0 (non-batch
+// builds pass b=0 and the helpers reduce to off_bs/off_tap/... unchanged).
+#ifdef TT_BATCH
+#if !defined(TT_ONCHIP_GRAD) || !defined(TT_RESIDENT_W)
+#error "TT_BATCH requires TT_ONCHIP_GRAD + TT_RESIDENT_W (shared on-chip grads + resident shared weights)"
+#endif
+#define ML_OFF_BS(l, m)    off_bs_b(b, l, m)
+#define ML_OFF_TAP(l, m)   off_tap_b(b, l, m)
+#define ML_OFF_PROJ(l, m)  off_proj_b(b, l, m)
+#define ML_OFF_HEAD(m)     off_head_b(b, m)
+#define ML_OFF_GLOGIT(m)   off_grad_logit_b(b, m)
+#define ML_OFF_PRED        off_pred_b(b)
+#else
+#define ML_OFF_BS(l, m)    off_bs(l, m)
+#define ML_OFF_TAP(l, m)   off_tap(l, m)
+#define ML_OFF_PROJ(l, m)  off_proj(l, m)
+#define ML_OFF_HEAD(m)     off_head(m)
+#define ML_OFF_GLOGIT(m)   off_grad_logit(m)
+#define ML_OFF_PRED        OFF_PRED
+#endif
+
 // =============================================================================
 // Common helpers — verbatim from forge_train_step_morph.cpp.
 // =============================================================================
@@ -163,8 +193,9 @@ BS_SUB: for (int d = 0; d < ML_D; d++) {
 // =============================================================================
 // Mode 0: do_fwd_loss — embed -> morph layers -> head -> loss grad, position m.
 // =============================================================================
-static int do_fwd_loss(int32_t* buffer, int m, int token, int target, int reload) {
+static int do_fwd_loss(int32_t* buffer, int b, int m, int token, int target, int reload) {
 #pragma HLS INLINE off
+    (void)b;   // non-batch: b==0; per-seq offsets via ML_OFF_* (b-aware under TT_BATCH)
     if (m < 0 || m >= ML_L_SEQ)          return 1;
     if (token < 0 || token >= ML_V)      return 2;
     if (target < 0 || target >= ML_V)    return 3;
@@ -236,7 +267,7 @@ BS32: for (int d = 0; d < ML_D; d++) {
 #pragma HLS PIPELINE II=1
             bs32[d] = (int32_t)(int16_t)BS_row[d];
         }
-        burst_store_words(bs32, buffer, off_bs(l, m), ML_D);
+        burst_store_words(bs32, buffer, ML_OFF_BS(l, m), ML_D);
 
         // ---- causal depthwise morph conv over the BS stream ----
         // Tap k reads BS_l[m - k*dil]; out-of-range taps (t_in < 0) EXCLUDED
@@ -246,7 +277,7 @@ BS32: for (int d = 0; d < ML_D; d++) {
 TAPS: for (int k = 1; k < ML_K; k++) {
             int t_in = m - (k << dsh);
             if (t_in >= 0) {
-                burst_load_words(buffer, off_bs(l, t_in), taps32[k], ML_D);
+                burst_load_words(buffer, ML_OFF_BS(l, t_in), taps32[k], ML_D);
             }
         }
 MC_C: for (int c = 0; c < ML_D; c++) {
@@ -306,8 +337,8 @@ RES: for (int j = 0; j < ML_D; j++) {
             R[j] = sat16((acc_t)R[j] + (acc_t)PJ[j]);
         }
 
-        burst_store_words(tap_row,  buffer, off_tap(l, m),  ML_D);
-        burst_store_words(proj_row, buffer, off_proj(l, m), ML_D);
+        burst_store_words(tap_row,  buffer, ML_OFF_TAP(l, m),  ML_D);
+        burst_store_words(proj_row, buffer, ML_OFF_PROJ(l, m), ML_D);
     }
 
     // ---- LM head: logits[v] = max_d(W_HEAD[v][d] + R[d]) ----
@@ -394,9 +425,9 @@ CE_G:   for (int v = 0; v < ML_V; v++) {
         grad_logit_row[target] = -1;
     }
 
-    burst_store_words(ad_head_row,    buffer, off_head(m),       ML_V);
-    burst_store_words(grad_logit_row, buffer, off_grad_logit(m), ML_V);
-    buffer[OFF_PRED + m] = pred;
+    burst_store_words(ad_head_row,    buffer, ML_OFF_HEAD(m),    ML_V);
+    burst_store_words(grad_logit_row, buffer, ML_OFF_GLOGIT(m),  ML_V);
+    buffer[ML_OFF_PRED + m] = pred;
 
     return 0;
 }
@@ -407,15 +438,16 @@ CE_G:   for (int v = 0; v < ML_V; v++) {
 // complete when read (see buffer header). Scalar read-modify-write into the
 // gradient regions (the backward is sparse: <= V + 3*L*D touched words).
 // =============================================================================
-static int do_bwd(int32_t* buffer, int m, int token) {
+static int do_bwd(int32_t* buffer, int b, int m, int token) {
 #pragma HLS INLINE off
+    (void)b;   // non-batch: b==0; per-seq offsets via ML_OFF_* (b-aware under TT_BATCH)
     if (m < 0 || m >= ML_L_SEQ)          return 1;
     if (token < 0 || token >= ML_V)      return 2;
 
     static int32_t grad_logit_row[ML_V];
     static int32_t ad_head_row[ML_V];
-    burst_load_words(buffer, off_grad_logit(m), grad_logit_row, ML_V);
-    burst_load_words(buffer, off_head(m),       ad_head_row,    ML_V);
+    burst_load_words(buffer, ML_OFF_GLOGIT(m), grad_logit_row, ML_V);
+    burst_load_words(buffer, ML_OFF_HEAD(m),   ad_head_row,    ML_V);
 
     // ---- head backward: scatter grad_logit through ad_head ----
     static acc_t gR[ML_D];
@@ -445,8 +477,8 @@ BWD_LAYER: for (int lr = 0; lr < ML_N_LAYERS; lr++) {
         const int pbase = l * (ML_D * ML_D);
         const int hbase = l * (ML_D * ML_K);
 
-        burst_load_words(buffer, off_tap(l, m),  tap_row,  ML_D);
-        burst_load_words(buffer, off_proj(l, m), proj_row, ML_D);
+        burst_load_words(buffer, ML_OFF_TAP(l, m),  tap_row,  ML_D);
+        burst_load_words(buffer, ML_OFF_PROJ(l, m), proj_row, ML_D);
 
         // ---- residual split: grad_PJ = gR; the skip path keeps gR ----
         // ---- projection backward (incl. additive bias grad) ----
@@ -478,13 +510,13 @@ MC_BWD: for (int c = 0; c < ML_D; c++) {
             int t_in = m - (kstar << dsh);
             if (t_in < 0) continue;
             GMH(hbase + c * ML_K + kstar) += (int32_t)g;
-            buffer[off_bs(l, t_in) + c]                 += (int32_t)g;
+            buffer[ML_OFF_BS(l, t_in) + c]              += (int32_t)g;
         }
 
         // ---- batch_shift backward over the (complete) own grad_BS slot ----
         // grad_R[c] += grad_BS[c] - (sum_c grad_BS) >> LOG2_D, on top of the
         // residual skip already in gR.
-        burst_load_words(buffer, off_bs(l, m), gbs32, ML_D);
+        burst_load_words(buffer, ML_OFF_BS(l, m), gbs32, ML_D);
         acc_t sum = 0;
 BS_BWD_SUM: for (int c = 0; c < ML_D; c++) {
 #pragma HLS UNROLL factor=8
@@ -666,10 +698,20 @@ ZERO_W: for (int w = 0; w < n_wide; w++) {
 // =============================================================================
 static int do_train_run(int32_t* buffer, int n_steps, int lr, int threshold) {
 #pragma HLS INLINE off
+#ifdef TT_BATCH
+    // BATCH: ML_BATCH independent sequences, each with its own tokens/targets.
+    static int32_t toks_b[ML_BATCH_N][ML_L_SEQ];
+    static int32_t tgts_b[ML_BATCH_N][ML_L_SEQ];
+    for (int b = 0; b < ML_BATCH_N; b++) {
+        burst_load_words(buffer, off_tokens_b(b),  toks_b[b], ML_L_SEQ);
+        burst_load_words(buffer, off_targets_b(b), tgts_b[b], ML_L_SEQ);
+    }
+#else
     static int32_t toks[ML_L_SEQ];
     static int32_t tgts[ML_L_SEQ];
     burst_load_words(buffer, OFF_TOKENS,  toks, ML_L_SEQ);   // ML_L_SEQ=128 (16-aligned)
     burst_load_words(buffer, OFF_TARGETS, tgts, ML_L_SEQ);
+#endif
 
 #ifdef TT_RESIDENT_W
     // Load ALL weights + the exp2 LUT into resident on-chip arrays ONCE; zero the
@@ -688,12 +730,24 @@ static int do_train_run(int32_t* buffer, int n_steps, int lr, int threshold) {
 #endif
 
 STEP_LOOP: for (int s = 0; s < n_steps; s++) {
-        // (1) zero the rolling BS stream before the forward sweep.
+        // (1) zero the rolling BS stream(s) before the forward sweep. Under
+        // TT_BATCH WORDS_BS_STREAM already spans ALL B per-seq streams, so this
+        // one wide zero clears every sequence's rolling cache.
         zero_region_wide(buffer, OFF_BS_STREAM, WORDS_BS_STREAM);
+#ifdef TT_BATCH
+        // (2) FORWARD over the B sequences (shared resident weights, per-seq scratch).
+        // reload=0: TT_RESIDENT_W keeps weights+LUT resident (loaded once below).
+        FWD_SWEEP_B: for (int b = 0; b < ML_BATCH_N; b++) {
+            for (int m = 0; m < ML_L_SEQ; m++) {
+                do_fwd_loss(buffer, b, m, (int)toks_b[b][m], (int)tgts_b[b][m], 0);
+            }
+        }
+#else
         // (2) FORWARD m = 0..L-1 ; reload weights+LUT once (m==0), resident after.
         FWD_SWEEP: for (int m = 0; m < ML_L_SEQ; m++) {
-            do_fwd_loss(buffer, m, (int)toks[m], (int)tgts[m], (m == 0) ? 1 : 0);
+            do_fwd_loss(buffer, 0, m, (int)toks[m], (int)tgts[m], (m == 0) ? 1 : 0);
         }
+#endif
         // (3) zero the 5 grad regions AND re-zero BS (now the grad_BS accumulator).
 #if defined(TT_RESIDENT_W)
         // grads zeroed once before the loop; signsgd zeros them on-chip each step.
@@ -716,10 +770,24 @@ GZ_W: for (int i = 0; i < WORDS_G_W_HEAD; i++) { GWHEAD(i) = 0; }
         zero_region_wide(buffer, OFF_G_W_HEAD, WORDS_G_W_HEAD);
 #endif
         zero_region_wide(buffer, OFF_BS_STREAM, WORDS_BS_STREAM);
+#ifdef TT_BATCH
+        // (4) BACKWARD over B sequences, REVERSE position per sequence; each
+        // sequence's weight grads SUM into the shared g_*_oc accumulators (the
+        // GMH/GMP/GMB/GWHEAD/GEMBED macros), and its conv grad scatters into its
+        // OWN per-seq grad_BS slot (off_bs_b(b,...)). The accumulation order
+        // (b-outer, m-reverse-inner) is a fixed permutation of integer adds =>
+        // bit-exact to summing the per-sequence runs.
+        BWD_SWEEP_B: for (int b = 0; b < ML_BATCH_N; b++) {
+            for (int m = ML_L_SEQ - 1; m >= 0; m--) {
+                do_bwd(buffer, b, m, (int)toks_b[b][m]);
+            }
+        }
+#else
         // (4) BACKWARD m = L-1..0 (REVERSE).
         BWD_SWEEP: for (int m = ML_L_SEQ - 1; m >= 0; m--) {
-            do_bwd(buffer, m, (int)toks[m]);
+            do_bwd(buffer, 0, m, (int)toks[m]);
         }
+#endif
 #if defined(TT_ONCHIP_GRAD) && !defined(TT_RESIDENT_W)
         // flush on-chip grads -> buffer (one wide burst each) so signsgd is unchanged.
         burst_store_words(g_embed_oc, buffer, OFF_G_EMBED,  WORDS_G_EMBED);
@@ -771,8 +839,11 @@ extern "C" int forge_train_step_morph_lm(
     // do_signsgd (~2x CL area), which congested the signsgd path to -0.346 ns.
     // do_train_run still calls these functions, so the logic is synthesized once.
 #if !(defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__))
-    if (mode == ML_MODE_FWD)       return do_fwd_loss(buffer, arg1, arg2, arg3, 1);
-    if (mode == ML_MODE_BWD)       return do_bwd(buffer, arg1, arg2);
+    // Per-position host-CSIM modes operate on sequence 0 (b=0). Under TT_BATCH the
+    // golden drives a per-sequence reference by re-staging each sequence into the
+    // b=0 slot — see golden_morph_lm.cpp's per-seq schedule.
+    if (mode == ML_MODE_FWD)       return do_fwd_loss(buffer, 0, arg1, arg2, arg3, 1);
+    if (mode == ML_MODE_BWD)       return do_bwd(buffer, 0, arg1, arg2);
     if (mode == ML_MODE_SIGNSGD)   return do_signsgd(buffer, arg1, arg2);
 #endif
     if (mode == ML_MODE_TRAIN_RUN) return do_train_run(buffer, arg1, arg2, arg3);

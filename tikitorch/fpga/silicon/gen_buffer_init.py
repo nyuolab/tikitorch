@@ -26,6 +26,7 @@ balanced LUT cross-entropy path (loss_kind=1, zshift=4).
 Usage:
     python3 gen_buffer_init.py /tmp/buffer_init.bin
 """
+import os
 import struct
 import sys
 
@@ -38,7 +39,25 @@ ML_K        = 7
 ML_LOG2_D   = 7
 ML_DIL_CAP  = 64
 
-# ---- Per-tensor word counts ----
+# ---- BATCH parallelism (mirror header TT_BATCH / ML_BATCH_N) ----
+# ML_BATCH = number of INDEPENDENT sequences a fused step processes. MUST match
+# the kernel build (-DTT_BATCH -DML_BATCH=N). Default 1 => the shipped (non-batch)
+# layout, byte-identical to the AFI buffer. Override via env ML_BATCH (so the
+# golden harness and this generator stay in lockstep) or the 3rd CLI arg.
+ML_BATCH = int(os.environ.get("ML_BATCH", "1"))
+assert ML_BATCH >= 1, "ML_BATCH must be >= 1"
+
+# ---- Per-sequence region strides (one sequence's worth of words) ----
+STRIDE_TAP_IDX    = ML_N_LAYERS * ML_L_SEQ * ML_D   # 65536
+STRIDE_PROJ_IDX   = ML_N_LAYERS * ML_L_SEQ * ML_D   # 65536
+STRIDE_AD_HEAD    = ML_L_SEQ * ML_V                 # 16384
+STRIDE_BS_STREAM  = ML_N_LAYERS * ML_L_SEQ * ML_D   # 65536
+STRIDE_TOKENS     = ML_L_SEQ                        # 128
+STRIDE_TARGETS    = ML_L_SEQ                        # 128
+STRIDE_GRAD_LOGIT = ML_L_SEQ * ML_V                 # 16384
+STRIDE_PRED       = ML_L_SEQ                        # 128
+
+# ---- Per-tensor word counts (per-seq regions grown by ML_BATCH) ----
 WORDS_EMBED    = ML_V * ML_D                 # 16384
 WORDS_MH       = ML_N_LAYERS * ML_D * ML_K   # 3584
 WORDS_MP       = ML_N_LAYERS * ML_D * ML_D   # 65536
@@ -49,43 +68,47 @@ WORDS_G_MH     = WORDS_MH
 WORDS_G_MP     = WORDS_MP
 WORDS_G_MB     = WORDS_MB
 WORDS_G_W_HEAD = WORDS_W_HEAD
-WORDS_TAP_IDX  = ML_N_LAYERS * ML_L_SEQ * ML_D   # 65536
-WORDS_PROJ_IDX = ML_N_LAYERS * ML_L_SEQ * ML_D   # 65536
-WORDS_AD_HEAD  = ML_L_SEQ * ML_V                 # 16384
-WORDS_BS_STREAM = ML_N_LAYERS * ML_L_SEQ * ML_D  # 65536
-WORDS_TOKENS     = ML_L_SEQ                   # 128
-WORDS_TARGETS    = ML_L_SEQ                   # 128
-WORDS_GRAD_LOGIT = ML_L_SEQ * ML_V            # 16384
-WORDS_PRED       = ML_L_SEQ                   # 128
+WORDS_TAP_IDX  = ML_BATCH * STRIDE_TAP_IDX
+WORDS_PROJ_IDX = ML_BATCH * STRIDE_PROJ_IDX
+WORDS_AD_HEAD  = ML_BATCH * STRIDE_AD_HEAD
+WORDS_BS_STREAM = ML_BATCH * STRIDE_BS_STREAM
+WORDS_TOKENS     = ML_BATCH * STRIDE_TOKENS
+WORDS_TARGETS    = ML_BATCH * STRIDE_TARGETS
+WORDS_GRAD_LOGIT = ML_BATCH * STRIDE_GRAD_LOGIT
+WORDS_PRED       = ML_BATCH * STRIDE_PRED
 WORDS_CFG        = 2
 WORDS_CE_LUT     = 256   # host-staged exp2 table (FT_CE_EXP2_Q16)
 
 # ---- Cumulative offsets (word indices) ----
 OFF_EMBED      = 0
-OFF_MH         = OFF_EMBED      + WORDS_EMBED       # 16384
-OFF_MP         = OFF_MH         + WORDS_MH          # 19968
-OFF_MB         = OFF_MP         + WORDS_MP          # 85504
-OFF_W_HEAD     = OFF_MB         + WORDS_MB          # 86016
-OFF_G_EMBED    = OFF_W_HEAD     + WORDS_W_HEAD      # 102400
-OFF_G_MH       = OFF_G_EMBED    + WORDS_G_EMBED     # 118784
-OFF_G_MP       = OFF_G_MH       + WORDS_G_MH        # 122368
-OFF_G_MB       = OFF_G_MP       + WORDS_G_MP        # 187904
-OFF_G_W_HEAD   = OFF_G_MB       + WORDS_G_MB        # 188416
-OFF_TAP_IDX    = OFF_G_W_HEAD   + WORDS_G_W_HEAD    # 204800
-OFF_PROJ_IDX   = OFF_TAP_IDX    + WORDS_TAP_IDX     # 270336
-OFF_AD_HEAD    = OFF_PROJ_IDX   + WORDS_PROJ_IDX    # 335872
-OFF_BS_STREAM  = OFF_AD_HEAD    + WORDS_AD_HEAD     # 352256
-OFF_TOKENS     = OFF_BS_STREAM  + WORDS_BS_STREAM   # 417792
-OFF_TARGETS    = OFF_TOKENS     + WORDS_TOKENS      # 417920
-OFF_GRAD_LOGIT = OFF_TARGETS    + WORDS_TARGETS     # 418048
-OFF_PRED       = OFF_GRAD_LOGIT + WORDS_GRAD_LOGIT  # 434432
-OFF_CFG        = OFF_PRED       + WORDS_PRED        # 434560
+OFF_MH         = OFF_EMBED      + WORDS_EMBED
+OFF_MP         = OFF_MH         + WORDS_MH
+OFF_MB         = OFF_MP         + WORDS_MP
+OFF_W_HEAD     = OFF_MB         + WORDS_MB
+OFF_G_EMBED    = OFF_W_HEAD     + WORDS_W_HEAD
+OFF_G_MH       = OFF_G_EMBED    + WORDS_G_EMBED
+OFF_G_MP       = OFF_G_MH       + WORDS_G_MH
+OFF_G_MB       = OFF_G_MP       + WORDS_G_MP
+OFF_G_W_HEAD   = OFF_G_MB       + WORDS_G_MB
+OFF_TAP_IDX    = OFF_G_W_HEAD   + WORDS_G_W_HEAD
+OFF_PROJ_IDX   = OFF_TAP_IDX    + WORDS_TAP_IDX
+OFF_AD_HEAD    = OFF_PROJ_IDX   + WORDS_PROJ_IDX
+OFF_BS_STREAM  = OFF_AD_HEAD    + WORDS_AD_HEAD
+OFF_TOKENS     = OFF_BS_STREAM  + WORDS_BS_STREAM
+OFF_TARGETS    = OFF_TOKENS     + WORDS_TOKENS
+OFF_GRAD_LOGIT = OFF_TARGETS    + WORDS_TARGETS
+OFF_PRED       = OFF_GRAD_LOGIT + WORDS_GRAD_LOGIT
+OFF_CFG        = OFF_PRED       + WORDS_PRED
 # 16-word aligned (the kernel's wide burst_load truncates the offset to /16; a
 # non-aligned base reads the LUT shifted on silicon — see forge_buffer_morph_lm.hpp)
-OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) // 16) * 16   # 434576
+OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) // 16) * 16
 
-ML_BUFFER_WORDS = OFF_CE_LUT + WORDS_CE_LUT        # 434832
-ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4             # 1739328
+ML_BUFFER_WORDS = OFF_CE_LUT + WORDS_CE_LUT
+ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4
+
+# Per-sequence offset helpers (mirror off_tokens_b / off_targets_b in the header).
+def off_tokens_b(b):  return OFF_TOKENS  + b * STRIDE_TOKENS
+def off_targets_b(b): return OFF_TARGETS + b * STRIDE_TARGETS
 
 # ---- CFG: balanced LUT cross-entropy path (matches the reference validator) ----
 CFG_LOSS_KIND = 1   # 1 = balanced LUT-CE; 0 = 2-hot perceptron
@@ -144,14 +167,23 @@ def build_init(seed=0):
     # all stay zero (already 0). The host schedule zeroes BS stream + grads at
     # the proper points anyway; zero-init here keeps the very first step clean.
 
-    # Learnable next-char stream. tokens[m] = char m of the repeated text
-    # (clipped < ML_V); targets[m] = tokens[m+1] (next-char), with the last
-    # target set to tokens[0] (wrap) so it is in-range and deterministic.
-    ids = [min(ord(TRAIN_TEXT[i % len(TRAIN_TEXT)]), ML_V - 1)
-           for i in range(ML_L_SEQ + 1)]
-    for m in range(ML_L_SEQ):
-        buf[OFF_TOKENS  + m] = ids[m]
-        buf[OFF_TARGETS + m] = ids[m + 1]   # next-char target
+    # Learnable next-char stream(s). For each of the ML_BATCH sequences b, take a
+    # DISTINCT shifted slice of the repeated training text so the sequences differ
+    # (each b sees a different phase of the same low-entropy auto-correlated text,
+    # so each is genuinely learnable AND distinct => the per-sequence grads differ,
+    # which is what makes the summed-grad bit-exactness check meaningful). Within a
+    # sequence: tokens[m] = char (b_shift+m), targets[m] = tokens[m+1] (next-char).
+    # Sequence b lives at OFF_TOKENS + b*STRIDE_TOKENS / OFF_TARGETS + b*STRIDE.
+    T = len(TRAIN_TEXT)
+    for b in range(ML_BATCH):
+        shift = (b * 7) % T   # coprime-ish phase per sequence (T=40); distinct b
+        ids = [min(ord(TRAIN_TEXT[(shift + i) % T]), ML_V - 1)
+               for i in range(ML_L_SEQ + 1)]
+        ot = off_tokens_b(b)
+        og = off_targets_b(b)
+        for m in range(ML_L_SEQ):
+            buf[ot + m] = ids[m]
+            buf[og + m] = ids[m + 1]   # next-char target
 
     # CFG (read by do_fwd_loss): balanced LUT cross-entropy.
     buf[OFF_CFG + 0] = CFG_LOSS_KIND
@@ -187,11 +219,11 @@ def main(argv):
     nbytes = write_bin(out, buf)
     assert nbytes == ML_BUFFER_BYTES, (nbytes, ML_BUFFER_BYTES)
     sys.stderr.write(
-        "wrote %s: %d words, %d bytes (ML_BUFFER_WORDS=%d) seed=%d\n"
-        % (out, len(buf), nbytes, ML_BUFFER_WORDS, seed))
+        "wrote %s: %d words, %d bytes (ML_BUFFER_WORDS=%d) ML_BATCH=%d seed=%d\n"
+        % (out, len(buf), nbytes, ML_BUFFER_WORDS, ML_BATCH, seed))
     sys.stderr.write(
-        "  OFF_TOKENS=%d OFF_TARGETS=%d OFF_CFG=%d (loss_kind=%d zshift=%d)\n"
-        % (OFF_TOKENS, OFF_TARGETS, OFF_CFG, CFG_LOSS_KIND, CFG_CE_ZSHIFT))
+        "  OFF_TOKENS=%d OFF_TARGETS=%d OFF_CFG=%d OFF_CE_LUT=%d (loss_kind=%d zshift=%d)\n"
+        % (OFF_TOKENS, OFF_TARGETS, OFF_CFG, OFF_CE_LUT, CFG_LOSS_KIND, CFG_CE_ZSHIFT))
     return 0
 
 

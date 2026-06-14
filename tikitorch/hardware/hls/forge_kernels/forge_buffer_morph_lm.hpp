@@ -87,6 +87,27 @@ constexpr int ML_N_LAYERS = 4;     // number of morph SSM layers
 constexpr int ML_K        = 7;     // morph conv kernel taps
 constexpr int ML_DIL_CAP  = 64;    // cap on per-layer dilation d_l = min(2^l, cap)
 
+// =============================================================================
+// BATCH parallelism (TT_BATCH). ML_BATCH = number of INDEPENDENT sequences a
+// single fused training step processes data-parallel: the weights (and resident
+// weight arrays + the on-chip grad accumulators) are SHARED; each sequence keeps
+// its OWN activation scratch (BS stream / saved argmax routes / grad_logit /
+// pred) and its OWN tokens+targets; the per-step gradients SUM across the B
+// sequences into the shared accumulators; ONE SignSGD update per step. ML_BATCH
+// is 1 in non-batch builds so the shipped buffer layout (and AFI) is UNCHANGED;
+// under TT_BATCH it grows every per-sequence region by ML_BATCH (the shared
+// weight/grad regions stay one copy). See forge_train_step_morph_lm.cpp's
+// do_train_run TT_BATCH path and the off_*(b, ...) helpers below.
+#ifdef TT_BATCH
+#ifndef ML_BATCH
+#define ML_BATCH 8
+#endif
+constexpr int ML_BATCH_N = ML_BATCH;
+#else
+constexpr int ML_BATCH_N = 1;
+#endif
+static_assert(ML_BATCH_N >= 1, "ML_BATCH must be >= 1");
+
 // log2 helpers for the mean-subtract (>>) normalization. D is a power of two so
 // the per-token divide-by-D collapses to an arithmetic shift.
 constexpr int ML_LOG2_D   = 7;     // log2(ML_D) -> 128
@@ -119,11 +140,25 @@ constexpr int WORDS_G_MP     = WORDS_MP;
 constexpr int WORDS_G_MB     = WORDS_MB;
 constexpr int WORDS_G_W_HEAD = WORDS_W_HEAD;
 
+// Per-sequence region STRIDES (one sequence's worth of words). Under TT_BATCH
+// the buffer holds ML_BATCH_N of each of these back-to-back; sequence b lives at
+// OFF_<region> + b * <region>_STRIDE. In non-batch builds ML_BATCH_N==1 so the
+// region == its stride and the layout is byte-identical to the shipped buffer.
+constexpr int STRIDE_TAP_IDX   = ML_N_LAYERS * ML_L_SEQ * ML_D;   // [l][m][c]
+constexpr int STRIDE_PROJ_IDX  = ML_N_LAYERS * ML_L_SEQ * ML_D;   // [l][m][j]
+constexpr int STRIDE_AD_HEAD   = ML_L_SEQ * ML_V;                 // [m][v]
+constexpr int STRIDE_BS_STREAM = ML_N_LAYERS * ML_L_SEQ * ML_D;   // [l][m][d]
+constexpr int STRIDE_TOKENS     = ML_L_SEQ;                       // [m]
+constexpr int STRIDE_TARGETS    = ML_L_SEQ;                       // [m]
+constexpr int STRIDE_GRAD_LOGIT = ML_L_SEQ * ML_V;               // [m][v]
+constexpr int STRIDE_PRED       = ML_L_SEQ;                       // [m]
+
 // Saved argmax index arrays — POSITION-MAJOR ([l][m][.]) so each per-position
 // row is D (or V) contiguous words, matching the position-by-position kernel.
-constexpr int WORDS_TAP_IDX  = ML_N_LAYERS * ML_L_SEQ * ML_D;   // [l][m][c]
-constexpr int WORDS_PROJ_IDX = ML_N_LAYERS * ML_L_SEQ * ML_D;   // [l][m][j]
-constexpr int WORDS_AD_HEAD  = ML_L_SEQ * ML_V;                 // [m][v]
+// PER-SEQUENCE under TT_BATCH (grown by ML_BATCH_N).
+constexpr int WORDS_TAP_IDX  = ML_BATCH_N * STRIDE_TAP_IDX;    // [b][l][m][c]
+constexpr int WORDS_PROJ_IDX = ML_BATCH_N * STRIDE_PROJ_IDX;   // [b][l][m][j]
+constexpr int WORDS_AD_HEAD  = ML_BATCH_N * STRIDE_AD_HEAD;    // [b][m][v]
 
 // Per-layer post-norm activation stream BS_l[m][d]. DOUBLES as the backward
 // grad_BS accumulator (host zeroes it between the fwd and bwd loops — exactly
@@ -131,13 +166,17 @@ constexpr int WORDS_AD_HEAD  = ML_L_SEQ * ML_V;                 // [m][v]
 // reads BS_l[m-k*dil] (the rolling causal-conv cache); backward scatters
 // grad_MC_l[m] into grad_BS_l[m-k*dil] and consumes grad_BS_l[m] in the
 // batch_shift backward.
-constexpr int WORDS_BS_STREAM = ML_N_LAYERS * ML_L_SEQ * ML_D;  // [l][m][d]
+// PER-SEQUENCE under TT_BATCH (grown by ML_BATCH_N).
+constexpr int WORDS_BS_STREAM = ML_BATCH_N * STRIDE_BS_STREAM;  // [b][l][m][d]
 
-// Host <-> kernel I/O:
-constexpr int WORDS_TOKENS     = ML_L_SEQ;            // input token id per position
-constexpr int WORDS_TARGETS    = ML_L_SEQ;            // target token id per position
-constexpr int WORDS_GRAD_LOGIT = ML_L_SEQ * ML_V;     // loss grad wrt logits [m][v]
-constexpr int WORDS_PRED       = ML_L_SEQ;            // argmax-predicted token per position
+// Host <-> kernel I/O — PER-SEQUENCE under TT_BATCH (grown by ML_BATCH_N).
+// The shipped buffer holds only ONE sequence's TOKENS/TARGETS; staging B streams
+// naively would let seq1's tokens overwrite seq0's targets — so each of these
+// grows to ML_BATCH_N * stride and sequence b lives at OFF_* + b*stride.
+constexpr int WORDS_TOKENS     = ML_BATCH_N * STRIDE_TOKENS;     // [b][m]
+constexpr int WORDS_TARGETS    = ML_BATCH_N * STRIDE_TARGETS;    // [b][m]
+constexpr int WORDS_GRAD_LOGIT = ML_BATCH_N * STRIDE_GRAD_LOGIT; // [b][m][v]
+constexpr int WORDS_PRED       = ML_BATCH_N * STRIDE_PRED;       // [b][m]
 
 // Host-written config words, read by do_fwd_loss (mirrors forge_buffer.hpp's
 // OFF_CFG convention exactly):
@@ -259,6 +298,22 @@ static inline int off_head(int m)        { return OFF_AD_HEAD   + m * ML_V; }
 static inline int off_bs(int l, int m)   { return OFF_BS_STREAM + l * (ML_L_SEQ * ML_D) + m * ML_D; }
 // per-position logit grad row
 static inline int off_grad_logit(int m)  { return OFF_GRAD_LOGIT + m * ML_V; }
+
+// -----------------------------------------------------------------------------
+// PER-SEQUENCE (batch-b) offset helpers. Sequence b's per-seq region begins at
+// OFF_<region> + b * STRIDE_<region>; within it the layout is IDENTICAL to the
+// single-sequence layout above (so passing b=0 reproduces the non-batch helper
+// exactly, and the per-sequence arithmetic in do_fwd_loss/do_bwd is unchanged
+// modulo the constant b-stride => bit-exact to running that sequence alone).
+// -----------------------------------------------------------------------------
+static inline int off_tap_b(int b, int l, int m)  { return OFF_TAP_IDX   + b * STRIDE_TAP_IDX   + l * (ML_L_SEQ * ML_D) + m * ML_D; }
+static inline int off_proj_b(int b, int l, int m) { return OFF_PROJ_IDX  + b * STRIDE_PROJ_IDX  + l * (ML_L_SEQ * ML_D) + m * ML_D; }
+static inline int off_head_b(int b, int m)        { return OFF_AD_HEAD   + b * STRIDE_AD_HEAD   + m * ML_V; }
+static inline int off_bs_b(int b, int l, int m)   { return OFF_BS_STREAM + b * STRIDE_BS_STREAM + l * (ML_L_SEQ * ML_D) + m * ML_D; }
+static inline int off_grad_logit_b(int b, int m)  { return OFF_GRAD_LOGIT + b * STRIDE_GRAD_LOGIT + m * ML_V; }
+static inline int off_tokens_b(int b)             { return OFF_TOKENS  + b * STRIDE_TOKENS; }
+static inline int off_targets_b(int b)            { return OFF_TARGETS + b * STRIDE_TARGETS; }
+static inline int off_pred_b(int b)               { return OFF_PRED    + b * STRIDE_PRED; }
 
 // dilation for layer l (capped power-of-two). Compile/host-time helper; the
 // kernel multiplies the small loop-counter k by this (address arithmetic on
