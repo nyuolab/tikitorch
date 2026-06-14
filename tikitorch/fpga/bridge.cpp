@@ -295,4 +295,34 @@ int tt_fpga_run(void* h, const char* entry, void* buf, int mode,
 #endif
 }
 
+// --- N-way replicated CL helpers (v3 multi-kernel) -------------------------
+// The N-way CL BROADCASTS OCL control writes to all kernels and MUXes reads by
+// the control-address window (64 KB stride, bits [17:16] select the instance).
+// tt_fpga_kick pokes mode/args + AP_START at window 0 -> broadcast -> all N
+// instances start at once (non-blocking; caller polls). tt_fpga_done reads the
+// AP_CTRL of instance `inst` via its 64 KB window and returns its ap_done bit.
+void tt_fpga_kick(void* h, int mode, int a1, int a2, int a3) {
+#if defined(TT_FPGA_PCI)
+    TtCtx* ctx = static_cast<TtCtx*>(h);
+    fpga_pci_poke(ctx->bar0, TT_ADDR_MODE, (uint32_t)mode);
+    fpga_pci_poke(ctx->bar0, TT_ADDR_ARG1, (uint32_t)a1);
+    fpga_pci_poke(ctx->bar0, TT_ADDR_ARG2, (uint32_t)a2);
+    fpga_pci_poke(ctx->bar0, TT_ADDR_ARG3, (uint32_t)a3);
+    fpga_pci_poke(ctx->bar0, TT_ADDR_AP_CTRL, TT_AP_START);
+#else
+    (void)h; (void)mode; (void)a1; (void)a2; (void)a3;
+#endif
+}
+
+int tt_fpga_done(void* h, int inst) {
+#if defined(TT_FPGA_PCI)
+    TtCtx* ctx = static_cast<TtCtx*>(h);
+    uint32_t ctrl = 0;
+    fpga_pci_peek(ctx->bar0, (uint64_t)inst * 0x10000ULL + TT_ADDR_AP_CTRL, &ctrl);
+    return (ctrl & TT_AP_DONE) ? 1 : 0;
+#else
+    (void)h; (void)inst; return 1;
+#endif
+}
+
 }  // extern "C"

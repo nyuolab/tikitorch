@@ -5,6 +5,7 @@ print "Reading + synthesizing CL IP blocks (regenerated this build)"
 read_ip $::env(CL_DIR)/design/ip/axi_register_slice_light/axi_register_slice_light.xci
 read_ip $::env(CL_DIR)/design/ip/axi_bram_ctrl_dma/axi_bram_ctrl_dma.xci
 read_ip $::env(CL_DIR)/design/ip/axi_bram_ctrl_krn/axi_bram_ctrl_krn.xci
+read_ip $::env(CL_DIR)/design/ip/axi_crossbar_dma/axi_crossbar_dma.xci
 generate_target all [get_ips]
 synth_ip [get_ips]
 print "Reading user constraints"
