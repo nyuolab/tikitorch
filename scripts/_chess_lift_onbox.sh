@@ -20,12 +20,16 @@ cd "$REPO" || exit 2
 export PYTHONPATH="$REPO" PYTHONUNBUFFERED=1
 mkdir -p logs results/board_scaling
 
-ITERS=40; GAMES=32; SIMS=64; STEPS=40; EVAL=30; ETRACK=10; EEVERY=10
+# CONSERVATIVE + reliable (prior run was under-sized: serial tracking eval -> recipe 1 exceeded the backstop).
+# Now: parallel tracking AND final eval, modest 480-game scale-up (2.5x the 192 baseline), sims 48. The
+# per-phase timing prints in run_chess_strength.py reveal the real cost so a later scale-up is sized, not guessed.
+ITERS=20; GAMES=24; SIMS=48; STEPS=40; EVAL=20; ETRACK=10; EEVERY=10
 
+# 2 recipes only (the key comparison): isolate masking at a fixed self-play budget. The learned-tree control
+# (mz) is dropped here (slow 4096-way tree; run it separately if needed).
 recipes=(
   "lift_az_mask|--tree alphazero --policy-loss ce --entropy 0.1 --target-temp 1.5 --legal-mask"
   "lift_az_nomask|--tree alphazero --policy-loss ce --entropy 0.1 --target-temp 1.5"
-  "lift_mz_mask|--tree muzero --policy-loss ce --entropy 0.1 --target-temp 1.5 --legal-mask"
 )
 
 run_one(){

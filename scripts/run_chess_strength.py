@@ -119,25 +119,31 @@ def main(a):
           f"temp={a.target_temp} | {a.sims} sims, {a.iters}x{a.games} games, {a.workers} workers", flush=True)
 
     # ---- train with best-snapshot tracking (MuZero oscillates; keep the best-vs-random net) ----
+    import time as _time
+    ew = a.eval_workers if a.eval_workers > 0 else a.workers
     best_score, best_state, loss_curve = -1.0, None, []
+    t_sp = t_ev = 0.0
     for it in range(cfg.iters):
         frac = it / max(cfg.iters - 1, 1)
         mz.current_tau = cfg.tau_start + (cfg.tau_end - cfg.tau_start) * frac
         mz.net.set_tau(mz.current_tau)
-        mz.self_play(temperature=1.0, base_seed=1 + it * 1000)
+        _t = _time.time(); mz.self_play(temperature=1.0, base_seed=1 + it * 1000); t_sp += _time.time() - _t
         losses = [mz.train_step() for _ in range(cfg.train_steps_per_iter)] if len(mz.buffer) else []
         avg = sum(losses) / len(losses) if losses else float("nan")
         loss_curve.append(round(avg, 4))
         mf = getattr(mz, "last_mode_frac", float("nan"))
         if it % a.eval_every == 0 or it == cfg.iters - 1:
             mz.net.eval()
-            sc = eval_vs(mz, random_agent, a.eval_track, "random (track)", a.tag)["score"]
+            _t = _time.time()
+            sc = (eval_vs_par(mz, "random", a.eval_track, "random (track)", a.tag, ew) if ew > 1
+                  else eval_vs(mz, random_agent, a.eval_track, "random (track)", a.tag))["score"]
+            t_ev += _time.time() - _t
             if sc > best_score:
                 best_score = sc
                 best_state = {k: v.detach().cpu().clone() for k, v in mz.net.state_dict().items()}
             mz.net.train()
         print(f"[{a.tag}] iter {it:3d}: games={len(mz.buffer)} loss={avg:.4f} mode_frac={mf:.3f} "
-              f"best_track={best_score:.2f}", flush=True)
+              f"best_track={best_score:.2f} | cum self-play={t_sp/60:.1f}m eval={t_ev/60:.1f}m", flush=True)
     if best_state is not None:
         mz.net.load_state_dict(best_state)
     mz.net.eval()

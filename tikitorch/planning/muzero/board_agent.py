@@ -225,11 +225,14 @@ class BoardMuZero:
         is bit-equivalent in its updates; ce's softmax/log is the one host transcendental (LUT on-chip)."""
         import torch.nn.functional as F
         c = self.cfg
-        if legal is not None and c.legal_mask:         # mask illegal logits (select, multiply-free)
-            logits = logits.masked_fill(legal == 0, torch.finfo(logits.dtype).min / 2)
-        if c.target_temp != 1.0:                       # temper the target: t^(1/T) renormalized
+        if c.target_temp != 1.0:                       # temper the target FIRST: t^(1/T) renormalized
             t = target_dist.clamp_min(1e-9) ** (1.0 / c.target_temp)
             target_dist = t / t.sum(-1, keepdim=True)
+        if legal is not None and c.legal_mask:         # mask illegal moves: logits AND target (so the CE lives
+            logits = logits.masked_fill(legal == 0, -1e9)            # purely on legal moves). Without masking the
+            target_dist = target_dist.masked_fill(legal == 0, 0.0)   # target, target_temp's clamp_min(1e-9) leaks
+            target_dist = target_dist / target_dist.sum(-1, keepdim=True).clamp_min(1e-9)  # mass onto illegal x -1e9 logits
+            # -> a large spurious loss. masked_fill is a select; the renorm is host-side loss math (not the net).
         if c.policy_loss == "perceptron":
             base = tropical_perceptron_loss(logits, target_dist.argmax(-1))
         elif c.policy_loss == "tropce":
