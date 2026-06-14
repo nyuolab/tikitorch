@@ -42,6 +42,32 @@ static const acc_t ML_POS_INF = acc_t( 2147483647LL);
 #define TT_WIDE_LANES 8
 #endif
 
+// --- #3 on-chip weight-grad accumulators (TT_ONCHIP_GRAD) ---
+// do_bwd's grad scatters are buffer (m_axi) read-modify-writes with data-dependent
+// indices -> HLS serializes them at II=4. Accumulating into on-chip static arrays
+// (II=1 RMW) removes that. do_train_run zeros them each step and flushes them to
+// the buffer once (a wide burst) before do_signsgd, so signsgd stays unchanged.
+// Bit-exact: same per-position adds, same order (integer adds associative); the
+// CSIM fused golden validates. Default OFF -> shipped buffer-backed path.
+#ifdef TT_ONCHIP_GRAD
+static int32_t g_embed_oc[WORDS_G_EMBED];
+static int32_t g_mh_oc[WORDS_G_MH];
+static int32_t g_mp_oc[WORDS_G_MP];
+static int32_t g_mb_oc[WORDS_G_MB];
+static int32_t g_whead_oc[WORDS_G_W_HEAD];
+#define GEMBED(i) g_embed_oc[i]
+#define GMH(i)    g_mh_oc[i]
+#define GMP(i)    g_mp_oc[i]
+#define GMB(i)    g_mb_oc[i]
+#define GWHEAD(i) g_whead_oc[i]
+#else
+#define GEMBED(i) buffer[OFF_G_EMBED + (i)]
+#define GMH(i)    buffer[OFF_G_MH + (i)]
+#define GMP(i)    buffer[OFF_G_MP + (i)]
+#define GMB(i)    buffer[OFF_G_MB + (i)]
+#define GWHEAD(i) buffer[OFF_G_W_HEAD + (i)]
+#endif
+
 // =============================================================================
 // Common helpers — verbatim from forge_train_step_morph.cpp.
 // =============================================================================
@@ -374,7 +400,7 @@ HEAD_BWD: for (int v = 0; v < ML_V; v++) {
         if (g == 0) continue;
         int dstar = ad_head_row[v];
         if (dstar < 0 || dstar >= ML_D) continue;
-        buffer[OFF_G_W_HEAD + v * ML_D + dstar] += (int32_t)g;
+        GWHEAD(v * ML_D + dstar) += (int32_t)g;
         gR[dstar] += g;
     }
 
@@ -403,10 +429,10 @@ PJ_BWD: for (int j = 0; j < ML_D; j++) {
 #pragma HLS PIPELINE II=4
             acc_t g = gR[j];
             if (g == 0) continue;
-            buffer[OFF_G_MB + l * ML_D + j] += (int32_t)g;   // bias: post-max add
+            GMB(l * ML_D + j) += (int32_t)g;   // bias: post-max add
             int istar = proj_row[j];
             if (istar < 0 || istar >= ML_D) continue;
-            buffer[OFF_G_MP + pbase + j * ML_D + istar] += (int32_t)g;
+            GMP(pbase + j * ML_D + istar) += (int32_t)g;
             grad_MC[istar] += g;
         }
 
@@ -422,7 +448,7 @@ MC_BWD: for (int c = 0; c < ML_D; c++) {
             if (kstar < 0 || kstar >= ML_K) continue;
             int t_in = m - (kstar << dsh);
             if (t_in < 0) continue;
-            buffer[OFF_G_MH + hbase + c * ML_K + kstar] += (int32_t)g;
+            GMH(hbase + c * ML_K + kstar) += (int32_t)g;
             buffer[off_bs(l, t_in) + c]                 += (int32_t)g;
         }
 
@@ -448,7 +474,7 @@ BS_BWD_ADD: for (int c = 0; c < ML_D; c++) {
 EMB_BWD: for (int d = 0; d < ML_D; d++) {
 #pragma HLS PIPELINE II=2
         if (gR[d] != 0) {
-            buffer[off_g_embed(token) + d] += (int32_t)gR[d];
+            GEMBED(token * ML_D + d) += (int32_t)gR[d];
         }
     }
 
@@ -590,7 +616,14 @@ STEP_LOOP: for (int s = 0; s < n_steps; s++) {
             do_fwd_loss(buffer, m, (int)toks[m], (int)tgts[m], (m == 0) ? 1 : 0);
         }
         // (3) zero the 5 grad regions AND re-zero BS (now the grad_BS accumulator).
-#ifndef TT_DROP_GRAD_ZERO
+#if defined(TT_ONCHIP_GRAD)
+        // grads live on-chip; zero the accumulators (signsgd zeros only the buffer copy).
+GZ_E: for (int i = 0; i < WORDS_G_EMBED;  i++) { GEMBED(i) = 0; }
+GZ_H: for (int i = 0; i < WORDS_G_MH;     i++) { GMH(i)    = 0; }
+GZ_P: for (int i = 0; i < WORDS_G_MP;     i++) { GMP(i)    = 0; }
+GZ_B: for (int i = 0; i < WORDS_G_MB;     i++) { GMB(i)    = 0; }
+GZ_W: for (int i = 0; i < WORDS_G_W_HEAD; i++) { GWHEAD(i) = 0; }
+#elif !defined(TT_DROP_GRAD_ZERO)
         // These grad-zeros are redundant: do_signsgd zeros all 5 grad regions at
         // the end of every step, and the init buffer zeros them for step 0. The
         // BS re-zero below is NOT redundant (it clears the fwd activations so BS
@@ -606,6 +639,14 @@ STEP_LOOP: for (int s = 0; s < n_steps; s++) {
         BWD_SWEEP: for (int m = ML_L_SEQ - 1; m >= 0; m--) {
             do_bwd(buffer, m, (int)toks[m]);
         }
+#ifdef TT_ONCHIP_GRAD
+        // flush on-chip grads -> buffer (one wide burst each) so signsgd is unchanged.
+        burst_store_words(g_embed_oc, buffer, OFF_G_EMBED,  WORDS_G_EMBED);
+        burst_store_words(g_mh_oc,    buffer, OFF_G_MH,     WORDS_G_MH);
+        burst_store_words(g_mp_oc,    buffer, OFF_G_MP,     WORDS_G_MP);
+        burst_store_words(g_mb_oc,    buffer, OFF_G_MB,     WORDS_G_MB);
+        burst_store_words(g_whead_oc, buffer, OFF_G_W_HEAD, WORDS_G_W_HEAD);
+#endif
         // (5) SignSGD weight update (writes weights back to the buffer).
         do_signsgd(buffer, lr, threshold);
     }
