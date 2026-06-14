@@ -16,9 +16,16 @@ __all__ = ["play_game", "play_board_game"]
 def _sample_action(visit_policy, temperature, gen):
     if temperature <= 1e-3:
         return int(visit_policy.argmax())
-    logits = visit_policy.clamp_min(1e-8).log() / temperature
-    probs = torch.softmax(logits, dim=-1)
-    return int(torch.multinomial(probs, 1, generator=gen).item())
+    # AlphaZero visit-count sampling: pi(a) ∝ N(a)^(1/tau). Zero-visit (illegal / unexplored) moves keep
+    # EXACTLY zero probability. The old softmax(log(N)/tau) floored zeros to 1e-8 via clamp_min, giving
+    # illegal moves tiny mass -> multinomial would occasionally sample an illegal move -> apply()'s
+    # "push() expects move to be pseudo-legal" assertion. For nonzero visits this is identical
+    # (softmax(log N/tau) == N^(1/tau)/Z), so legal-move sampling is unchanged.
+    probs = visit_policy.clamp_min(0).pow(1.0 / temperature)
+    s = float(probs.sum())
+    if s <= 0:
+        return int(visit_policy.argmax())
+    return int(torch.multinomial(probs / s, 1, generator=gen).item())
 
 
 def play_game(net, env, *, num_simulations=50, c_puct=1.25, gamma=1.0,
@@ -83,10 +90,14 @@ def play_board_game(net, board_game, *, num_simulations=50, c_puct=1.25, backup=
         visit_policy, _ = mcts.run(state)
         a = _sample_action(visit_policy, temperature, gen)
         board, tp = state
+        legal = board_game.legal_actions(board)
+        if a not in legal:                              # defensive: NEVER apply an illegal move (the AZ-tree
+            am = int(visit_policy.argmax())             # masks, but guard any prior leak -> apply() would assert)
+            a = am if am in legal else legal[0]
         mv = (board_game.obs(state), a, visit_policy, tp)
         if legal_mask:                                  # record the legal-move mask for masked-CE training
             m = torch.zeros(board_game.n_actions, dtype=torch.uint8)
-            m[board_game.legal_actions(board)] = 1
+            m[legal] = 1
             mv = mv + (m,)
         moves.append(mv)
         state = (board_game.apply(board, a, tp), 3 - tp)
