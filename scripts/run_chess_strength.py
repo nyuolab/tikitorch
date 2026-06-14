@@ -57,6 +57,7 @@ def main(a):
     cfg = BoardConfig(net_kind="tropical", core_kind="dyadic", dyadic_heads=True,
                       tree_model=a.tree, policy_loss=a.policy_loss,
                       policy_entropy_coef=a.entropy, target_temp=a.target_temp,
+                      legal_mask=a.legal_mask,
                       optimizer="tropicalsgd", latent_dim=64,
                       num_simulations=a.sims, iters=a.iters, games_per_iter=a.games,
                       train_steps_per_iter=a.steps, batch=128, unroll=3, num_workers=a.workers,
@@ -123,6 +124,8 @@ if __name__ == "__main__":
     p.add_argument("--policy-loss", dest="policy_loss", default="ce", choices=["ce", "perceptron", "tropce"])
     p.add_argument("--entropy", dest="entropy", type=float, default=0.1)
     p.add_argument("--target-temp", dest="target_temp", type=float, default=1.5)
+    p.add_argument("--legal-mask", dest="legal_mask", action="store_true",
+                   help="mask illegal-move logits in the policy loss (canonical AlphaZero/MuZero; multiply-free)")
     p.add_argument("--sims", type=int, default=64)
     p.add_argument("--iters", type=int, default=20)
     p.add_argument("--games", type=int, default=24)

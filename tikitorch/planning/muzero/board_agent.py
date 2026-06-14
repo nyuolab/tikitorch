@@ -68,7 +68,8 @@ def _run_worker(seed):
     # crossing the Pool boundary as torch tensors makes each a shared-memory object -> fd-overflow
     # ('ancdata') or mmap exhaustion ('Cannot allocate memory') at high worker counts. numpy pickles
     # as ordinary bytes; BoardReplay.save normalizes back to torch. (No tensor sharing at all.)
-    return [(o.numpy(), a, p.numpy(), v) for (o, a, p, v) in records]
+    # records are (obs, a, pol, v) or (obs, a, pol, v, legal_mask) when cfg.legal_mask; carry the mask
+    return [(r[0].numpy(), r[1], r[2].numpy(), r[3]) + ((r[4].numpy(),) if len(r) > 4 else ()) for r in records]
 
 
 @dataclass
@@ -80,6 +81,10 @@ class BoardConfig:
     policy_loss: str = "ce"             # "ce" (full-distribution soft x-ent) | "perceptron" (argmax-only)
     policy_entropy_coef: float = 0.0    # >0 adds an entropy bonus to the policy (anti prior-collapse)
     target_temp: float = 1.0            # >1 softens the visit target before distillation (anti-collapse)
+    legal_mask: bool = False            # mask illegal-move logits in the policy loss (canonical AlphaZero/MuZero
+                                        # does this; multiply-free: a select to a large-negative before the
+                                        # shift-softmax). The AZ-tree already masks at search; this fixes TRAINING
+                                        # so a tiny net doesn't burn capacity suppressing ~4066 illegal chess logits.
     optimizer: str = "tropicalsgd"      # closed (multiply-free) by default
     latent_dim: int = 64
     dense_hidden_mult: int = 3          # widen dense cores to param-match the tropical net
@@ -126,7 +131,8 @@ class BoardReplay:
         if records:
             # normalize to torch (serial self-play yields tensors; parallel workers yield numpy --
             # see _run_worker). torch.as_tensor is a no-op on tensors, a cheap wrap on numpy.
-            self.games.append([(torch.as_tensor(o), a, torch.as_tensor(p), v) for (o, a, p, v) in records])
+            self.games.append([(torch.as_tensor(r[0]), r[1], torch.as_tensor(r[2]), r[3])
+                                + ((torch.as_tensor(r[4]),) if len(r) > 4 else ()) for r in records])
         if len(self.games) > self.capacity:
             self.games.pop(0)
 
@@ -138,9 +144,11 @@ class BoardReplay:
         (B,K+1,A). Reward target is 0 throughout (board games). Past game end is
         padded absorbing (value 0, action 0, uniform policy)."""
         A = self.A
+        has_mask = bool(self.games) and len(self.games[0][0]) > 4   # records carry a legal mask?
+        ones = torch.ones(A, dtype=torch.uint8)                      # padding / no-mask = no constraint
         lengths = [len(g) for g in self.games]
         tot = sum(lengths)
-        obs0, acts, vts, pts = [], [], [], []
+        obs0, acts, vts, pts, lts = [], [], [], [], []
         for _ in range(batch):
             r = int(torch.randint(0, max(tot, 1), (1,), generator=gen).item())
             gi = 0
@@ -150,15 +158,19 @@ class BoardReplay:
             g, pos = self.games[gi], r
             obs0.append(g[pos][0])
             a_k, v_k, p_k = [], [g[pos][3]], [g[pos][2]]
+            m_k = [g[pos][4] if has_mask else ones]
             for k in range(1, unroll + 1):
                 p = pos + k
                 a_k.append(g[p - 1][1] if p - 1 < len(g) else 0)
                 v_k.append(g[p][3] if p < len(g) else 0.0)
                 p_k.append(g[p][2] if p < len(g) else torch.full((A,), 1.0 / A))
+                m_k.append(g[p][4] if (has_mask and p < len(g)) else ones)
             acts.append(torch.tensor(a_k, dtype=torch.long))
             vts.append(torch.tensor(v_k))
             pts.append(torch.stack(p_k))
-        return torch.stack(obs0), torch.stack(acts), torch.stack(vts), torch.stack(pts)
+            lts.append(torch.stack(m_k))
+        legal = torch.stack(lts) if has_mask else None              # (B, K+1, A) uint8, or None
+        return torch.stack(obs0), torch.stack(acts), torch.stack(vts), torch.stack(pts), legal
 
 
 class BoardMuZero:
@@ -181,7 +193,8 @@ class BoardMuZero:
         c = self.cfg
         sp = dict(num_simulations=c.num_simulations, c_puct=c.c_puct, backup=c.backup,
                   root_exploration_frac=c.root_exploration_frac,
-                  dirichlet_alpha=c.dirichlet_alpha, temperature=temperature, tree_model=c.tree_model)
+                  dirichlet_alpha=c.dirichlet_alpha, temperature=temperature, tree_model=c.tree_model,
+                  legal_mask=c.legal_mask)
         if c.num_workers <= 1:
             for i in range(c.games_per_iter):
                 records, _ = play_board_game(self.net, self.game, seed=base_seed + i, **sp)
@@ -199,16 +212,21 @@ class BoardMuZero:
                 self.buffer.save(records)
 
     # ---------------------------------------------------------------- training
-    def _policy_loss(self, logits, target_dist):
+    def _policy_loss(self, logits, target_dist, legal=None):
         """Distill the MCTS visit distribution into the policy head. Levers against prior-collapse:
           * policy_loss: "ce" = full-distribution soft cross-entropy (calibrated softmax gradient,
             keeps the whole distribution) vs "perceptron" = argmax-only (overconfident -> collapses).
           * target_temp > 1: soften the visit target (flatter prior, harder to over-sharpen).
           * policy_entropy_coef > 0: add an entropy BONUS (maximize policy entropy) -> anti-collapse.
+          * legal (mask, cfg.legal_mask): set illegal-move logits to a large-negative BEFORE the softmax
+            so the distribution lives on legal moves only (canonical AlphaZero/MuZero). masked_fill is a
+            SELECT (no multiply) -> stays zero-DSP; on-fabric it is shift_softmax with masked exp2 -> ~0.
         For SignSGD the update is sign(grad), so the on-fabric realization (shift_softmax / sign-product)
         is bit-equivalent in its updates; ce's softmax/log is the one host transcendental (LUT on-chip)."""
         import torch.nn.functional as F
         c = self.cfg
+        if legal is not None and c.legal_mask:         # mask illegal logits (select, multiply-free)
+            logits = logits.masked_fill(legal == 0, torch.finfo(logits.dtype).min / 2)
         if c.target_temp != 1.0:                       # temper the target: t^(1/T) renormalized
             t = target_dist.clamp_min(1e-9) ** (1.0 / c.target_temp)
             target_dist = t / t.sum(-1, keepdim=True)
@@ -231,17 +249,17 @@ class BoardMuZero:
 
     def train_step(self):
         c = self.cfg
-        obs0, acts, vt, pt = self.buffer.sample_batch(c.batch, c.unroll, self.gen)
+        obs0, acts, vt, pt, lm = self.buffer.sample_batch(c.batch, c.unroll, self.gen)
         vh = self.net.pred.value_head
         h, p, v = self.net.initial(obs0)
         # mode-frac collapse detector: mean prob mass on the policy's argmax. A healthy prior over A
         # actions sits well below 1; -> ~1 means the prior is collapsing to a (often wrong) spike, which
         # this catches hundreds of steps before the eval/loss curve does. Stored for the loop to monitor.
         self.last_mode_frac = float(p.detach().softmax(-1).max(-1).values.mean())
-        loss = c.value_loss_weight * vh.loss(v, vt[:, 0]) + self._policy_loss(p, pt[:, 0])
+        loss = c.value_loss_weight * vh.loss(v, vt[:, 0]) + self._policy_loss(p, pt[:, 0], None if lm is None else lm[:, 0])
         for k in range(c.unroll):
             h, r, p, v = self.net.recurrent(h, acts[:, k])
-            loss = loss + c.value_loss_weight * vh.loss(v, vt[:, k + 1]) + self._policy_loss(p, pt[:, k + 1])
+            loss = loss + c.value_loss_weight * vh.loss(v, vt[:, k + 1]) + self._policy_loss(p, pt[:, k + 1], None if lm is None else lm[:, k + 1])
         self.opt.zero_grad()
         loss.backward()
         self.opt.step()

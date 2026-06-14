@@ -54,7 +54,7 @@ def play_game(net, env, *, num_simulations=50, c_puct=1.25, gamma=1.0,
 
 def play_board_game(net, board_game, *, num_simulations=50, c_puct=1.25, backup="mean",
                     root_exploration_frac=0.25, dirichlet_alpha=0.3, temperature=1.0, seed=0,
-                    tree_model="muzero"):
+                    tree_model="muzero", legal_mask=False):
     """Two-player self-play with the learned net (the agent plays BOTH sides via
     negamax MCTS). Returns ``(records, winner)`` where each record is
     ``(obs, action, mcts_policy, value_target)`` with the value target the final
@@ -83,7 +83,12 @@ def play_board_game(net, board_game, *, num_simulations=50, c_puct=1.25, backup=
         visit_policy, _ = mcts.run(state)
         a = _sample_action(visit_policy, temperature, gen)
         board, tp = state
-        moves.append((board_game.obs(state), a, visit_policy, tp))
+        mv = (board_game.obs(state), a, visit_policy, tp)
+        if legal_mask:                                  # record the legal-move mask for masked-CE training
+            m = torch.zeros(board_game.n_actions, dtype=torch.uint8)
+            m[board_game.legal_actions(board)] = 1
+            mv = mv + (m,)
+        moves.append(mv)
         state = (board_game.apply(board, a, tp), 3 - tp)
 
     # outcome from the final state. A game stopped at the ply cap (not truly terminal) gets a
@@ -94,6 +99,6 @@ def play_board_game(net, board_game, *, num_simulations=50, c_puct=1.25, backup=
         w = board_game.adjudicate(state[0])
     else:
         w = board_game.winner(state[0])
-    records = [(obs, a, pol, (0.0 if w == 0 else (1.0 if w == tp else -1.0)))
-               for (obs, a, pol, tp) in moves]
+    records = [(mv[0], mv[1], mv[2], (0.0 if w == 0 else (1.0 if w == mv[3] else -1.0))) + tuple(mv[4:])
+               for mv in moves]
     return records, w
