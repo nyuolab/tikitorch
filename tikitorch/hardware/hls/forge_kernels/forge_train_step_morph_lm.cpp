@@ -68,6 +68,25 @@ static int32_t g_whead_oc[WORDS_G_W_HEAD];
 #define GWHEAD(i) buffer[OFF_G_W_HEAD + (i)]
 #endif
 
+// --- resident weights + on-chip signsgd (TT_RESIDENT_W; requires TT_ONCHIP_GRAD) ---
+// signsgd's m_axi weight RMW is the recurring critical path (-0.252/-0.592 ns) AND
+// ~13% of the step. Make ALL weights resident on-chip: do_train_run loads them once
+// before the step loop and writes them back once after; signsgd updates them on-chip
+// (reading g_*_oc); do_fwd_loss reads them directly (no per-step reload). Removes the
+// m_axi signsgd path (timing) and the per-step weight reload. Bit-exact: same values,
+// same update; CSIM fused golden validates. Default OFF.
+#ifdef TT_RESIDENT_W
+#ifndef TT_ONCHIP_GRAD
+#error "TT_RESIDENT_W requires TT_ONCHIP_GRAD (signsgd reads g_*_oc on-chip)"
+#endif
+static int32_t embed_oc[WORDS_EMBED];
+static int32_t mh_buf[WORDS_MH];
+static int32_t mb_buf[WORDS_MB];
+static int32_t mp_buf[WORDS_MP];
+static int32_t wh_buf[WORDS_W_HEAD];
+static int32_t ce_lut[WORDS_CE_LUT];
+#endif
+
 // =============================================================================
 // Common helpers — verbatim from forge_train_step_morph.cpp.
 // =============================================================================
@@ -156,11 +175,13 @@ static int do_fwd_loss(int32_t* buffer, int m, int token, int target, int reload
     // updated weights back to the buffer, so each sweep's first call refreshes
     // them. ce_lut is the host-staged exp2 table (OFF_CE_LUT), read here instead
     // of the static-const ROM (whose init read all-zero on the F2 AFI).
+#ifndef TT_RESIDENT_W
     static int32_t mh_buf[WORDS_MH];
     static int32_t mb_buf[WORDS_MB];
     static int32_t mp_buf[WORDS_MP];      // URAM-class
     static int32_t wh_buf[WORDS_W_HEAD];
     static int32_t ce_lut[WORDS_CE_LUT];
+#endif
 #if TT_WIDE_LANES > 8
     // Bank the projection/head weight arrays so the widened reductions get
     // TT_WIDE_LANES contiguous reads/cycle (else the wide tree bottlenecks on
@@ -168,6 +189,7 @@ static int do_fwd_loss(int32_t* buffer, int m, int token, int target, int reload
 #pragma HLS ARRAY_PARTITION variable=mp_buf cyclic factor=TT_WIDE_LANES dim=1
 #pragma HLS ARRAY_PARTITION variable=wh_buf cyclic factor=TT_WIDE_LANES dim=1
 #endif
+#ifndef TT_RESIDENT_W
     if (reload) {
         burst_load_words(buffer, OFF_MH, mh_buf, WORDS_MH);
         burst_load_words(buffer, OFF_MB, mb_buf, WORDS_MB);
@@ -175,11 +197,18 @@ static int do_fwd_loss(int32_t* buffer, int m, int token, int target, int reload
         burst_load_words(buffer, OFF_W_HEAD, wh_buf, WORDS_W_HEAD);
         burst_load_words(buffer, OFF_CE_LUT, ce_lut, WORDS_CE_LUT);
     }
+#else
+    (void)reload;   // resident: weights+LUT loaded once by do_train_run
+#endif
 
     // Embed gather: R = EMBED[token].
     static data_t R[ML_D];
     static int32_t row32[ML_D];
+#ifdef TT_RESIDENT_W
+    for (int d = 0; d < ML_D; d++) row32[d] = embed_oc[token * ML_D + d];
+#else
     burst_load_words(buffer, off_embed(token), row32, ML_D);
+#endif
 EMB: for (int d = 0; d < ML_D; d++) {
 #pragma HLS PIPELINE II=1
         R[d] = (data_t)(int16_t)(row32[d] & 0xFFFF);
@@ -564,13 +593,47 @@ LANE_SAT: for (int lane = 0; lane < 16; lane++) {
 #endif
 }
 
+#ifdef TT_RESIDENT_W
+// On-chip signsgd: weight and grad both resident -> no m_axi (removes the signsgd
+// critical path). Scalar int (matches the host #else path of signsgd_region_wide
+// exactly -> bit-exact). Zeros the grad as it consumes it (so no separate per-step
+// grad-zero is needed; do_train_run zeros once before the first step).
+static void signsgd_region_oc(int32_t* w_oc, int32_t* g_oc, int n, int lr, int threshold) {
+#pragma HLS INLINE off
+SGOC: for (int i = 0; i < n; i++) {
+#pragma HLS PIPELINE II=1
+        int32_t g = g_oc[i];
+        int32_t abs_g = (g < 0) ? -g : g;
+        int32_t step = 0;
+        if (abs_g > threshold) { step = (g > 0) ? lr : -lr; }
+        if (step != 0) {
+            int16_t w = (int16_t)(w_oc[i] & 0xFFFF);
+            int32_t wn = (int32_t)w - step;
+            if (wn >  32767) wn =  32767;
+            if (wn < -32768) wn = -32768;
+            w_oc[i] = (int32_t)(int16_t)wn;
+        }
+        g_oc[i] = 0;
+    }
+}
+#endif
+
 static int do_signsgd(int32_t* buffer, int lr, int threshold) {
 #pragma HLS INLINE off
+#ifdef TT_RESIDENT_W
+    signsgd_region_oc(embed_oc, g_embed_oc,  WORDS_EMBED,  lr, threshold);
+    signsgd_region_oc(mh_buf,   g_mh_oc,     WORDS_MH,     lr, threshold);
+    signsgd_region_oc(mp_buf,   g_mp_oc,     WORDS_MP,     lr, threshold);
+    signsgd_region_oc(mb_buf,   g_mb_oc,     WORDS_MB,     lr, threshold);
+    signsgd_region_oc(wh_buf,   g_whead_oc,  WORDS_W_HEAD, lr, threshold);
+    (void)buffer;
+#else
     signsgd_region_wide(buffer, OFF_EMBED,  OFF_G_EMBED,  WORDS_EMBED,  lr, threshold);
     signsgd_region_wide(buffer, OFF_MH,     OFF_G_MH,     WORDS_MH,     lr, threshold);
     signsgd_region_wide(buffer, OFF_MP,     OFF_G_MP,     WORDS_MP,     lr, threshold);
     signsgd_region_wide(buffer, OFF_MB,     OFF_G_MB,     WORDS_MB,     lr, threshold);
     signsgd_region_wide(buffer, OFF_W_HEAD, OFF_G_W_HEAD, WORDS_W_HEAD, lr, threshold);
+#endif
     return 0;
 }
 
@@ -608,6 +671,22 @@ static int do_train_run(int32_t* buffer, int n_steps, int lr, int threshold) {
     burst_load_words(buffer, OFF_TOKENS,  toks, ML_L_SEQ);   // ML_L_SEQ=128 (16-aligned)
     burst_load_words(buffer, OFF_TARGETS, tgts, ML_L_SEQ);
 
+#ifdef TT_RESIDENT_W
+    // Load ALL weights + the exp2 LUT into resident on-chip arrays ONCE; zero the
+    // on-chip grad accumulators once (signsgd zeros them each step thereafter).
+    burst_load_words(buffer, OFF_EMBED,  embed_oc, WORDS_EMBED);
+    burst_load_words(buffer, OFF_MH,     mh_buf,   WORDS_MH);
+    burst_load_words(buffer, OFF_MB,     mb_buf,   WORDS_MB);
+    burst_load_words(buffer, OFF_MP,     mp_buf,   WORDS_MP);
+    burst_load_words(buffer, OFF_W_HEAD, wh_buf,   WORDS_W_HEAD);
+    burst_load_words(buffer, OFF_CE_LUT, ce_lut,   WORDS_CE_LUT);
+    for (int i = 0; i < WORDS_G_EMBED;  i++) g_embed_oc[i] = 0;
+    for (int i = 0; i < WORDS_G_MH;     i++) g_mh_oc[i]    = 0;
+    for (int i = 0; i < WORDS_G_MP;     i++) g_mp_oc[i]    = 0;
+    for (int i = 0; i < WORDS_G_MB;     i++) g_mb_oc[i]    = 0;
+    for (int i = 0; i < WORDS_G_W_HEAD; i++) g_whead_oc[i] = 0;
+#endif
+
 STEP_LOOP: for (int s = 0; s < n_steps; s++) {
         // (1) zero the rolling BS stream before the forward sweep.
         zero_region_wide(buffer, OFF_BS_STREAM, WORDS_BS_STREAM);
@@ -616,7 +695,9 @@ STEP_LOOP: for (int s = 0; s < n_steps; s++) {
             do_fwd_loss(buffer, m, (int)toks[m], (int)tgts[m], (m == 0) ? 1 : 0);
         }
         // (3) zero the 5 grad regions AND re-zero BS (now the grad_BS accumulator).
-#if defined(TT_ONCHIP_GRAD)
+#if defined(TT_RESIDENT_W)
+        // grads zeroed once before the loop; signsgd zeros them on-chip each step.
+#elif defined(TT_ONCHIP_GRAD)
         // grads live on-chip; zero the accumulators (signsgd zeros only the buffer copy).
 GZ_E: for (int i = 0; i < WORDS_G_EMBED;  i++) { GEMBED(i) = 0; }
 GZ_H: for (int i = 0; i < WORDS_G_MH;     i++) { GMH(i)    = 0; }
@@ -639,7 +720,7 @@ GZ_W: for (int i = 0; i < WORDS_G_W_HEAD; i++) { GWHEAD(i) = 0; }
         BWD_SWEEP: for (int m = ML_L_SEQ - 1; m >= 0; m--) {
             do_bwd(buffer, m, (int)toks[m]);
         }
-#ifdef TT_ONCHIP_GRAD
+#if defined(TT_ONCHIP_GRAD) && !defined(TT_RESIDENT_W)
         // flush on-chip grads -> buffer (one wide burst each) so signsgd is unchanged.
         burst_store_words(g_embed_oc, buffer, OFF_G_EMBED,  WORDS_G_EMBED);
         burst_store_words(g_mh_oc,    buffer, OFF_G_MH,     WORDS_G_MH);
@@ -647,9 +728,17 @@ GZ_W: for (int i = 0; i < WORDS_G_W_HEAD; i++) { GWHEAD(i) = 0; }
         burst_store_words(g_mb_oc,    buffer, OFF_G_MB,     WORDS_G_MB);
         burst_store_words(g_whead_oc, buffer, OFF_G_W_HEAD, WORDS_G_W_HEAD);
 #endif
-        // (5) SignSGD weight update (writes weights back to the buffer).
+        // (5) SignSGD weight update (resident: on-chip; else writes weights to buffer).
         do_signsgd(buffer, lr, threshold);
     }
+#ifdef TT_RESIDENT_W
+    // write resident weights back to the buffer for host read-back / next AFI run.
+    burst_store_words(embed_oc, buffer, OFF_EMBED,  WORDS_EMBED);
+    burst_store_words(mh_buf,   buffer, OFF_MH,     WORDS_MH);
+    burst_store_words(mb_buf,   buffer, OFF_MB,     WORDS_MB);
+    burst_store_words(mp_buf,   buffer, OFF_MP,     WORDS_MP);
+    burst_store_words(wh_buf,   buffer, OFF_W_HEAD, WORDS_W_HEAD);
+#endif
     return 0;
 }
 
