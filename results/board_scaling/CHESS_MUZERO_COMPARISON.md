@@ -73,6 +73,17 @@ Connect4-winning levers (true-rules AZ tree + soft-CE + entropy/target-temp; ful
 | `az_ent1` (entropy 0.1, temp 1.5) | 0.458 | 0.458 | **+0.000** | 25.9→18.3 |
 | `az_ent3` (entropy 0.3, temp 2.0) | 0.292 | 0.458 | −0.166 | 21.0→14.9 |
 | `mz_ent1` (learned-tree control) | — | — | — | `[missing]` — hung (4096-way learned tree), no matched-sims learned-tree control |
+| **`az_mask` (+ LEGAL MASKING + 2.5× self-play: 480 games, sims48, n=20)** | **0.475** | **0.500** | **−0.025** | 12.8→8.5 |
+
+**Follow-up (2026-06-14): the faithful setup (legal masking) + 2.5× self-play STILL does not lift chess.**
+Added canonical AlphaZero/MuZero legal-move masking to training (multiply-free; closure `[]`) — the
+`az_mask` row above — and scaled self-play 2.5× (480 games). Trained 0.475 vs its untrained control 0.500
+(Δ −0.025, within noise at n=20); no collapse (mode_frac ~0.01). So **even with the same setup as default
+MuZero (masking) and more compute, the trained prior does not beat untrained** — the compute/data wall holds.
+Calibrated cost: 480 games = 59 min self-play + 11 min eval ≈ 92 min/recipe on a 36-vCPU box; lifting to
+~5k games would be ~10 h/$15+ per config, vs DeepMind's tens of millions. (The `az_nomask` same-budget
+control was cut by the 180-min backstop — `az_mask` vs the prior no-mask `az_ent1` (Δ +0.000) already shows
+masking didn't change the verdict.)
 
 At n=12 (draw-heavy, so realistic Δ-SE ≈ 0.10) the deltas are **z ≈ −1.2 / 0.0 / −1.7 — none reaches
 significance**, i.e. **no detectable training benefit** (the strong-entropy recipe `az_ent3` trends negative
