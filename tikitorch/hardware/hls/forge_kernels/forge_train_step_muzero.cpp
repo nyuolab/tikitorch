@@ -24,16 +24,41 @@ static inline data_t sat16(acc_t a) {
     return (data_t)a;
 }
 
+// 512-bit (16-word) aligned burst read of n_words from buffer[word_off]. word_off MUST be 16-aligned.
+// Under Vitis this is one wide AXI beat per 16 words (HBM streaming); under g++ a plain copy (CSIM).
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+typedef ap_uint<512> wide_t;
+#endif
+static inline void burst_load16(int32_t* buffer, int word_off, int32_t* dst) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    wide_t* wb = reinterpret_cast<wide_t*>(buffer);
+    wide_t beat = wb[word_off >> 4];
+LANE: for (int lane = 0; lane < 16; lane++) {
+#pragma HLS UNROLL
+        dst[lane] = (int32_t)(int)(ap_int<32>)beat.range(lane * 32 + 31, lane * 32);
+    }
+#else
+    for (int lane = 0; lane < 16; lane++) dst[lane] = buffer[word_off + lane];
+#endif
+}
+
 // y[o] = sat16( bias[o] + sum_i dyadic_mac(x[i], exp[o,i], sgn[o,i]) ) — a shift+add-tree matmul.
-static void dyadic_linear(const int32_t* exp, const int32_t* sgn, const int32_t* bias,
+// STREAMING: the weights (~MB) live in HBM and are read as flat 16-word aligned bursts (off_exp/off_sgn
+// must be 16-aligned); only the small activations x/y stay on-chip. Bit-exact to the scalar matmul:
+// the flat index idx == o*IN+i is read in the same order, just 16 words per AXI beat.
+static void dyadic_linear(int32_t* buffer, int off_exp, int off_sgn, const int32_t* bias,
                           const data_t* x, data_t* y, int OUT, int IN) {
-    for (int o = 0; o < OUT; o++) {
-        acc_t acc = (acc_t)bias[o];
-        for (int i = 0; i < IN; i++) {
-            int idx = o * IN + i;
-            acc += dyadic_mac(x[i], (int)exp[idx], (int)sgn[idx]);
-        }
-        y[o] = sat16(acc);
+    int32_t eb[16], sb[16];
+    int lane = 16;                              // force a beat load on the first iteration
+    int o = 0, i = 0, total = OUT * IN;
+    acc_t acc = (acc_t)bias[0];
+    DL: for (int idx = 0; idx < total; idx++) {
+#pragma HLS PIPELINE II=1
+        if (lane == 16) { burst_load16(buffer, off_exp + idx, eb); burst_load16(buffer, off_sgn + idx, sb); lane = 0; }
+        acc += dyadic_mac(x[i], eb[lane], sb[lane]);
+        lane++; i++;
+        if (i == IN) { y[o] = sat16(acc); o++; i = 0; if (o < OUT) acc = (acc_t)bias[o]; }
     }
 }
 
@@ -55,20 +80,20 @@ static int do_fwd(int32_t* buffer) {
     for (int i = 0; i < MZ_OBS; i++) obs[i] = (data_t)buffer[OFF_OBS + i];
 
     // representation: DyadicLin1 (OBS->DR) -> relu -> DyadicLin2 (DR->L) -> subtract-mean
-    dyadic_linear(&buffer[OFF_R1_EXP], &buffer[OFF_R1_SGN], &buffer[OFF_B_R1], obs, tdr, MZ_DR, MZ_OBS);
+    dyadic_linear(buffer, OFF_R1_EXP, OFF_R1_SGN, &buffer[OFF_B_R1], obs, tdr, MZ_DR, MZ_OBS);
     relu(tdr, MZ_DR);
-    dyadic_linear(&buffer[OFF_R2_EXP], &buffer[OFF_R2_SGN], &buffer[OFF_B_R2], tdr, h, MZ_L, MZ_DR);
+    dyadic_linear(buffer, OFF_R2_EXP, OFF_R2_SGN, &buffer[OFF_B_R2], tdr, h, MZ_L, MZ_DR);
     submean(h, MZ_L);
     for (int i = 0; i < MZ_L; i++) buffer[OFF_H + i] = h[i];
 
     // prediction: DyadicLin1 (L->DP) -> relu -> DyadicLin2 (DP->L) -> dyadic heads
-    dyadic_linear(&buffer[OFF_P1_EXP], &buffer[OFF_P1_SGN], &buffer[OFF_B_P1], h, tdp, MZ_DP, MZ_L);
+    dyadic_linear(buffer, OFF_P1_EXP, OFF_P1_SGN, &buffer[OFF_B_P1], h, tdp, MZ_DP, MZ_L);
     relu(tdp, MZ_DP);
-    dyadic_linear(&buffer[OFF_P2_EXP], &buffer[OFF_P2_SGN], &buffer[OFF_B_P2], tdp, z, MZ_L, MZ_DP);
+    dyadic_linear(buffer, OFF_P2_EXP, OFF_P2_SGN, &buffer[OFF_B_P2], tdp, z, MZ_L, MZ_DP);
     for (int i = 0; i < MZ_L; i++) buffer[OFF_TMP_L + i] = z[i];
 
-    dyadic_linear(&buffer[OFF_PH_EXP], &buffer[OFF_PH_SGN], &buffer[OFF_B_PH], z, pol, MZ_A, MZ_L);
-    dyadic_linear(&buffer[OFF_VH_EXP], &buffer[OFF_VH_SGN], &buffer[OFF_B_VH], z, val, 1, MZ_L);
+    dyadic_linear(buffer, OFF_PH_EXP, OFF_PH_SGN, &buffer[OFF_B_PH], z, pol, MZ_A, MZ_L);
+    dyadic_linear(buffer, OFF_VH_EXP, OFF_VH_SGN, &buffer[OFF_B_VH], z, val, 1, MZ_L);
     for (int i = 0; i < MZ_A; i++) buffer[OFF_POLICY + i] = pol[i];
     buffer[OFF_VALUE] = val[0];
     return 0;

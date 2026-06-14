@@ -71,33 +71,46 @@ constexpr int WORDS_TMP_DP = MZ_DP;      // intermediate (pred lin1 -> relu)
 constexpr int WORDS_TMP_L  = MZ_L;       // intermediate (pred mix output)
 
 // --- cumulative offsets ---
+// Every region base is rounded UP to a 16-word (512-bit) boundary so the kernel can read each
+// region with aligned 512-bit AXI bursts from HBM (chess weights are ~12 MB -> can't be resident;
+// they stream from HBM in 16-word beats). R16 leaves small inter-region gaps (allocated padding the
+// last beat of a region may harmlessly overread into). The host export reads OFF_* via the kernel's
+// layout introspection, so it tracks these automatically.
+constexpr int R16(int x) { return (x + 15) & ~15; }
 constexpr int OFF_R1_EXP = 0;
-constexpr int OFF_R1_SGN = OFF_R1_EXP + WORDS_R1_EXP;
-constexpr int OFF_R2_EXP = OFF_R1_SGN + WORDS_R1_SGN;
-constexpr int OFF_R2_SGN = OFF_R2_EXP + WORDS_R2_EXP;
-constexpr int OFF_P1_EXP = OFF_R2_SGN + WORDS_R2_SGN;
-constexpr int OFF_P1_SGN = OFF_P1_EXP + WORDS_P1_EXP;
-constexpr int OFF_P2_EXP = OFF_P1_SGN + WORDS_P1_SGN;
-constexpr int OFF_P2_SGN = OFF_P2_EXP + WORDS_P2_EXP;
-constexpr int OFF_PH_EXP = OFF_P2_SGN + WORDS_P2_SGN;
-constexpr int OFF_PH_SGN = OFF_PH_EXP + WORDS_PH_EXP;
-constexpr int OFF_VH_EXP = OFF_PH_SGN + WORDS_PH_SGN;
-constexpr int OFF_VH_SGN = OFF_VH_EXP + WORDS_VH_EXP;
-constexpr int OFF_B_R1   = OFF_VH_SGN + WORDS_VH_SGN;
-constexpr int OFF_B_R2   = OFF_B_R1   + WORDS_B_R1;
-constexpr int OFF_B_P1   = OFF_B_R2   + WORDS_B_R2;
-constexpr int OFF_B_P2   = OFF_B_P1   + WORDS_B_P1;
-constexpr int OFF_B_PH   = OFF_B_P2   + WORDS_B_P2;
-constexpr int OFF_B_VH   = OFF_B_PH   + WORDS_B_PH;
-constexpr int OFF_OBS    = OFF_B_VH   + WORDS_B_VH;
-constexpr int OFF_H      = OFF_OBS    + WORDS_OBS;
-constexpr int OFF_TMP_DR = OFF_H      + WORDS_H;
-constexpr int OFF_TMP_DP = OFF_TMP_DR + WORDS_TMP_DR;
-constexpr int OFF_TMP_L  = OFF_TMP_DP + WORDS_TMP_DP;
-constexpr int OFF_POLICY = OFF_TMP_L  + WORDS_TMP_L;
-constexpr int OFF_VALUE  = OFF_POLICY + WORDS_POLICY;
+constexpr int OFF_R1_SGN = R16(OFF_R1_EXP + WORDS_R1_EXP);
+constexpr int OFF_R2_EXP = R16(OFF_R1_SGN + WORDS_R1_SGN);
+constexpr int OFF_R2_SGN = R16(OFF_R2_EXP + WORDS_R2_EXP);
+constexpr int OFF_P1_EXP = R16(OFF_R2_SGN + WORDS_R2_SGN);
+constexpr int OFF_P1_SGN = R16(OFF_P1_EXP + WORDS_P1_EXP);
+constexpr int OFF_P2_EXP = R16(OFF_P1_SGN + WORDS_P1_SGN);
+constexpr int OFF_P2_SGN = R16(OFF_P2_EXP + WORDS_P2_EXP);
+constexpr int OFF_PH_EXP = R16(OFF_P2_SGN + WORDS_P2_SGN);
+constexpr int OFF_PH_SGN = R16(OFF_PH_EXP + WORDS_PH_EXP);
+constexpr int OFF_VH_EXP = R16(OFF_PH_SGN + WORDS_PH_SGN);
+constexpr int OFF_VH_SGN = R16(OFF_VH_EXP + WORDS_VH_EXP);
+constexpr int OFF_B_R1   = R16(OFF_VH_SGN + WORDS_VH_SGN);
+constexpr int OFF_B_R2   = R16(OFF_B_R1   + WORDS_B_R1);
+constexpr int OFF_B_P1   = R16(OFF_B_R2   + WORDS_B_R2);
+constexpr int OFF_B_P2   = R16(OFF_B_P1   + WORDS_B_P1);
+constexpr int OFF_B_PH   = R16(OFF_B_P2   + WORDS_B_P2);
+constexpr int OFF_B_VH   = R16(OFF_B_PH   + WORDS_B_PH);
+constexpr int OFF_OBS    = R16(OFF_B_VH   + WORDS_B_VH);
+constexpr int OFF_H      = R16(OFF_OBS    + WORDS_OBS);
+constexpr int OFF_TMP_DR = R16(OFF_H      + WORDS_H);
+constexpr int OFF_TMP_DP = R16(OFF_TMP_DR + WORDS_TMP_DR);
+constexpr int OFF_TMP_L  = R16(OFF_TMP_DP + WORDS_TMP_DP);
+constexpr int OFF_POLICY = R16(OFF_TMP_L  + WORDS_TMP_L);
+constexpr int OFF_VALUE  = R16(OFF_POLICY + WORDS_POLICY);
 
-constexpr int MZ_BUFFER_WORDS = OFF_VALUE + WORDS_VALUE;
+constexpr int MZ_BUFFER_WORDS = R16(OFF_VALUE + WORDS_VALUE);  // total padded to a whole beat
 constexpr int MZ_BUFFER_BYTES = MZ_BUFFER_WORDS * 4;
+
+// Silicon bug-class guard: every weight/IO region base MUST be 16-word aligned for the 512-bit burst
+// (a misaligned base reads the wrong words on the AFI — the silicon-only bug the morph-LM CE-LUT hit).
+static_assert(OFF_R1_EXP % 16 == 0 && OFF_R1_SGN % 16 == 0 && OFF_R2_EXP % 16 == 0 && OFF_R2_SGN % 16 == 0, "R-region bases must be 16-aligned");
+static_assert(OFF_P1_EXP % 16 == 0 && OFF_P1_SGN % 16 == 0 && OFF_P2_EXP % 16 == 0 && OFF_P2_SGN % 16 == 0, "P-region bases must be 16-aligned");
+static_assert(OFF_PH_EXP % 16 == 0 && OFF_PH_SGN % 16 == 0 && OFF_VH_EXP % 16 == 0 && OFF_VH_SGN % 16 == 0, "head bases must be 16-aligned");
+static_assert(OFF_OBS % 16 == 0 && OFF_POLICY % 16 == 0 && OFF_VALUE % 16 == 0, "IO bases must be 16-aligned");
 
 #endif  // FORGE_BUFFER_MUZERO_HPP
