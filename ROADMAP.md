@@ -158,7 +158,39 @@ a research problem, not a hardware one — and it's the next thing to investigat
 
 ### Quality-gap investigation plan
 
-_Gap-localization study (2026-06-15), all numbers verified against `results/lm_shakespeare/*.jsonl`._
+**Framing (2026-06-15):** the target is *our best tropical model vs nanoGPT-on-GPU*, NOT morphssm-internal
+ablations. nanoGPT's edge IS attention, so a true tropical *transformer* (working tropical attention) is
+the strategic lever — **but** the data says tropical attention is currently the *worst* tropical component,
+not the cheapest win:
+
+| model | mixer | char bpb |
+|---|---|---|
+| dense GPT | real attention | 2.51 |
+| MorphSSM | conv/morph (no attention) | ~2.80 |
+| best tropical attention (hilbert) | tropical attention | 3.53 |
+
+~6 tropical-attention variants already exist (`hilbert/dot_product/l_inf/asym/value_pull[+topk/min]`,
+`tikitorch/nn/__init__.py`); all lose to the conv mixer by ~0.7 bpb — **MorphSSM exists because tropical
+attention failed.** The catch: the bakeoff is seq_len 96, where attention has little to do that a conv
+can't; attention's real edge (data-dependent global routing, long-range, in-context retrieval) only shows
+at long context/scale — exactly where a fixed-receptive-field conv/SSM mixer plateaus and where we'd
+actually compete. So tropical attention is plausibly *necessary at scale* yet *invisibly so* on the toy
+benchmark.
+
+**Gate before investing in tropical attention (cheap, dense-only, no tropical research):** train
+dense-attention vs dense-conv-twin across context length {96, 512, 2048} (and scale). If the gap WIDENS
+with context → attention is the load-bearing thing to tropicalize (prize quantified, do the hard work);
+if conv keeps pace → MorphSSM is the substrate and tropical attention is a trap.
+
+**If go — the tropical-attention research problem (sharp):** softmax attention = soft convex *averaging*
+of values by *dot-product* similarity (both multiplicative). Max-plus makes it hard max-alignment +
+winner-take-all selection (picks ~one value, not a blend) with sparse max/argmax gradients (the collapse).
+The tau-softmax relaxation trains but degrades at hard deploy. The unsolved core: **recover soft,
+multi-value blending + smooth gradients in a multiplier-free op** — what none of the 6 variants cracked.
+
+_The morphssm-internal localization below is now a secondary deconfounder (run the cheap matched-budget
+float ref + dense-SignSGD control to bank ~0.25–0.30 bpb), not the main thrust. Gap-localization study
+(2026-06-15), numbers verified against `results/lm_shakespeare/*.jsonl`:_
 
 **Where the 0.52 bpb actually lives** (corrects two stale leads — attention is NOT the broken piece
 at BPE scale, and capacity is NOT binding):
