@@ -224,6 +224,42 @@ dyadic w — **ablation only** (finding-3: the blend, not score geometry, is the
       collapse); shift-normalized attention; τ-floor as a *destination* (still the smoothed-max ceiling,
       not a convex blend); entmax/sparsemax; LFSR-Gumbel; iter-top-k sum-blend.
 
+#### PURELY-TROPICAL all-pairs communication — routing, not averaging (2026-06-15, 29-agent vet)
+
+Reframe (user): attention's *function* is data-dependent all-pairs communication to find signal;
+its *mechanism* (softmax averaging) is incidental. The tropical (max-plus) semiring **is** the
+shortest/longest-path & DP algebra, so all-pairs communication is **native**: all-pairs best-path =
+max-plus matrix powers (Bellman–Ford / Floyd–Warshall). This is the **purely-tropical (idempotent)**
+path — the north-star ideal, NO relaxation — and it fills MorphSSM's exact gap (fixed receptive field →
+no content-addressed long-range retrieval).
+
+**Winner: iterated best-path closure / Bellman–Ford diffusion.** Build `S[i,j]=max_d(Q_id+K_jd)` once;
+iterate the STATE `H⁽ᵗ⁺¹⁾[i,d] = max(H⁽ᵗ⁾[i,d], max_j(S[i,j]+H⁽ᵗ⁾[j,d]))` for T rounds. Inner = existing
+`TropicalValuePull`; outer = +0 self-loop. All idempotent max-plus (+/max/gather/negate). T rounds =
+≤T-hop all-pairs routing; full closure in log T via repeated squaring. The 2-hop induction path
+(match-by-content → read-successor) is exact here and **impossible for any conv**.
+*Note:* `max_plus_matmul`/`floyd_warshall` already exist (`algorithmic.py`, `planning/`) but were NEVER
+wired as a sequence mixer — the closure engine is ready.
+
+**Why it may train where single-hop (2.45) collapsed:** weight-tied S → `grad_S = Σ_t` over all hops
+(denser); the `max(H,·)` self-loop is an always-alive residual (non-argmax-gated). Depth densifies the
+gradient structurally, not by relaxing the algebra.
+
+**Honest open question (make-or-break):** per-entry backward still routes through ONE argmax; depth
+densifies the *aggregate* gradient but not per-entry sparsity (~0.90–0.95, the Viterbi sparsity that
+collapsed single-hop). Trainability is ARGUED, not measured.
+
+- [ ] **PROTOTYPE (tiny):** add `n_hops` (T=2–4, k=1) loop around the pull in `TropicalAttention.forward`
+      (`nn/__init__.py:~1277`), reusing `_tropical_score` + `_tropical_aggregate`; `h=max(h,pull)` self-loop.
+      Screen: char tiny-shakespeare, d=256, 1500 steps, n=3 seeds, vs MorphSSM 1.934 / dense-conv 1.702 /
+      single-hop 2.45. Success = clears the 2.45 bigram band; real win = beats MorphSSM 1.934 (routing >
+      fixed conv); 2.0–2.2 = first evidence routing ≠ averaging-mimicry.
+- [ ] **Purity boundary / fallback:** if hard-argmax won't train it, the minimal patch is τ-warmup →
+      deploy-hard (τ=0) — keeps the DEPLOYED forward purely tropical (soft crutch at train time only).
+      Renormalize per round (additive `x − ½(λmax+λmin)`, closure-clean) to prevent max-cycle saturation
+      (`planning/bellman.py:113`). This couples to the fixed-τ sweep above (how much soft-gradient help
+      routing needs at train time).
+
 _The morphssm-internal localization below is now a secondary deconfounder (run the cheap matched-budget
 float ref + dense-SignSGD control to bank ~0.25–0.30 bpb), not the main thrust. Gap-localization study
 (2026-06-15), numbers verified against `results/lm_shakespeare/*.jsonl`:_
