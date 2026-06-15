@@ -45,6 +45,11 @@ module cl_forge_morph_lm
   // -------------------------------------------------------------------------
   // Replication factor. N independent training kernels + staging URAMs.
   // (Must match axi_crossbar_dma NUM_MI in gen_ip.tcl.)
+  // With TT_URAM_W the per-kernel BRAM drops 423->190 (grads+weights in URAM),
+  // so 2-3 kernels fit one SLR and N can scale past 3 toward GPU-parity (~8).
+  // N=4 is the SLR-local max on this part: per-kernel ~122 URAM (58 resident +
+  // 64 staging) vs CL pblock URAM per SLR = 176/192/~320 (SLR0/1/2) -> 1+1+2=4.
+  // N>4 needs URAM/BRAM rebalancing (the shell reserves most SLR0/SLR1 URAM).
   // -------------------------------------------------------------------------
   localparam int NK = 4;
 
@@ -298,29 +303,80 @@ module cl_forge_morph_lm
       else             rst_pipe <= {rst_pipe[2:0], 1'b1};
     wire rst_n_local = rst_pipe[3];
 
-    // ---- kernel: control = broadcast writes + muxed reads ----
+    // ---- OCL register slice (control): broadcast/mux drives the slice s_axi
+    // (central, near OCL_REG_SLC); the slice m_axi drives THIS kernel. Excluded
+    // from the kernel pblock so it floats to the SLR boundary -> the slice's
+    // registered output crosses to the kernel reg-to-reg (the OCL readback path
+    // kernel->OCL_REG_SLC was the residual -1.147 ns inter-SLR crossing).
+    logic [31:0] rso_awaddr, rso_araddr, rso_wdata, rso_rdata;
+    logic  [3:0] rso_wstrb;
+    logic  [1:0] rso_bresp, rso_rresp;
+    logic        rso_awvalid, rso_awready, rso_wvalid, rso_wready;
+    logic        rso_bvalid, rso_bready, rso_arvalid, rso_arready, rso_rvalid, rso_rready;
+    axi_register_slice_light RS_OCL (
+      .aclk          (clk_main_a0),
+      .aresetn       (rst_n_local),
+      .s_axi_awaddr  (ocl_aw_addr_pre),
+      .s_axi_awprot  (3'h0),
+      .s_axi_awvalid (ocl_aw_valid_pre),
+      .s_axi_awready (k_awready[gi]),
+      .s_axi_wdata   (ocl_w_data_pre),
+      .s_axi_wstrb   (ocl_w_strb_pre),
+      .s_axi_wvalid  (ocl_w_valid_pre),
+      .s_axi_wready  (k_wready[gi]),
+      .s_axi_bresp   (k_bresp[gi]),
+      .s_axi_bvalid  (k_bvalid[gi]),
+      .s_axi_bready  (ocl_b_ready_pre),
+      .s_axi_araddr  (ocl_ar_addr_pre),
+      .s_axi_arvalid (k_arvalid[gi]),
+      .s_axi_arready (k_arready[gi]),
+      .s_axi_rdata   (k_rdata[gi]),
+      .s_axi_rresp   (k_rresp[gi]),
+      .s_axi_rvalid  (k_rvalid[gi]),
+      .s_axi_rready  (k_rready[gi]),
+      .m_axi_awaddr  (rso_awaddr),
+      .m_axi_awprot  (),
+      .m_axi_awvalid (rso_awvalid),
+      .m_axi_awready (rso_awready),
+      .m_axi_wdata   (rso_wdata),
+      .m_axi_wstrb   (rso_wstrb),
+      .m_axi_wvalid  (rso_wvalid),
+      .m_axi_wready  (rso_wready),
+      .m_axi_bresp   (rso_bresp),
+      .m_axi_bvalid  (rso_bvalid),
+      .m_axi_bready  (rso_bready),
+      .m_axi_araddr  (rso_araddr),
+      .m_axi_arvalid (rso_arvalid),
+      .m_axi_arready (rso_arready),
+      .m_axi_rdata   (rso_rdata),
+      .m_axi_rresp   (rso_rresp),
+      .m_axi_rvalid  (rso_rvalid),
+      .m_axi_rready  (rso_rready)
+    );
+
+    // ---- kernel: control via per-instance OCL register slice ----
     forge_train_step_morph_lm u_train (
       .ap_clk     (clk_main_a0),
       .ap_rst_n   (rst_n_local),
       .interrupt  (krn_irq),
 
-      .s_axi_control_AWADDR  (ocl_aw_addr_pre[12:0]),
-      .s_axi_control_AWVALID (ocl_aw_valid_pre),
-      .s_axi_control_AWREADY (k_awready[gi]),
-      .s_axi_control_WDATA   (ocl_w_data_pre),
-      .s_axi_control_WSTRB   (ocl_w_strb_pre),
-      .s_axi_control_WVALID  (ocl_w_valid_pre),
-      .s_axi_control_WREADY  (k_wready[gi]),
-      .s_axi_control_BRESP   (k_bresp[gi]),
-      .s_axi_control_BVALID  (k_bvalid[gi]),
-      .s_axi_control_BREADY  (ocl_b_ready_pre),
-      .s_axi_control_ARADDR  (ocl_ar_addr_pre[12:0]),
-      .s_axi_control_ARVALID (k_arvalid[gi]),
-      .s_axi_control_ARREADY (k_arready[gi]),
-      .s_axi_control_RDATA   (k_rdata[gi]),
-      .s_axi_control_RRESP   (k_rresp[gi]),
-      .s_axi_control_RVALID  (k_rvalid[gi]),
-      .s_axi_control_RREADY  (k_rready[gi]),
+      .s_axi_control_AWADDR  (rso_awaddr[12:0]),
+      .s_axi_control_AWVALID (rso_awvalid),
+      .s_axi_control_AWREADY (rso_awready),
+      .s_axi_control_WDATA   (rso_wdata),
+      .s_axi_control_WSTRB   (rso_wstrb),
+      .s_axi_control_WVALID  (rso_wvalid),
+      .s_axi_control_WREADY  (rso_wready),
+      .s_axi_control_BRESP   (rso_bresp),
+      .s_axi_control_BVALID  (rso_bvalid),
+      .s_axi_control_BREADY  (rso_bready),
+      .s_axi_control_ARADDR  (rso_araddr[12:0]),
+      .s_axi_control_ARVALID (rso_arvalid),
+      .s_axi_control_ARREADY (rso_arready),
+      .s_axi_control_RDATA   (rso_rdata),
+      .s_axi_control_RRESP   (rso_rresp),
+      .s_axi_control_RVALID  (rso_rvalid),
+      .s_axi_control_RREADY  (rso_rready),
 
       .m_axi_gmem_AWADDR  (krn_awaddr),
       .m_axi_gmem_AWLEN   (krn_awlen),
@@ -369,18 +425,37 @@ module cl_forge_morph_lm
       .m_axi_gmem_RREADY  (krn_rready)
     );
 
-    // ---- DMA-side BRAM controller (crossbar MI i -> URAM port A) ----
-    axi_bram_ctrl_dma BRAM_CTL_DMA (
-      .s_axi_aclk    (clk_main_a0),
-      .s_axi_aresetn (rst_n_local),
+    // ---- SLR-crossing register slice: crossbar MI i -> (reg) -> BRAM_CTL_DMA.
+    // Lives in this instance's pblock (KINST[gi].*), so the long hop from the
+    // shared crossbar (STRATEGY=2, registered outputs) to here is reg-to-reg and
+    // Vivado can route it through Laguna. Fixes the inter-SLR -1.75 ns failure
+    // into BRAM_CTL_DMA's bram_addr/bram_wrdata input registers.
+    logic [15:0]  rsd_awid, rsd_arid, rsd_bid, rsd_rid;
+    logic [63:0]  rsd_awaddr, rsd_araddr;
+    logic  [7:0]  rsd_awlen, rsd_arlen;
+    logic  [2:0]  rsd_awsize, rsd_arsize, rsd_awprot, rsd_arprot;
+    logic  [1:0]  rsd_awburst, rsd_arburst, rsd_bresp, rsd_rresp;
+    logic         rsd_awlock, rsd_arlock;
+    logic  [3:0]  rsd_awcache, rsd_arcache;
+    logic         rsd_awvalid, rsd_awready, rsd_arvalid, rsd_arready;
+    logic [511:0] rsd_wdata, rsd_rdata;
+    logic  [63:0] rsd_wstrb;
+    logic         rsd_wlast, rsd_wvalid, rsd_wready;
+    logic         rsd_bvalid, rsd_bready, rsd_rlast, rsd_rvalid, rsd_rready;
+
+    axi_register_slice_dma RS_DMA (
+      .aclk    (clk_main_a0),
+      .aresetn (rst_n_local),
       .s_axi_awid    (xd_awid[gi*16 +: 16]),
-      .s_axi_awaddr  (xd_awaddr[gi*64 +: 21]),
+      .s_axi_awaddr  (xd_awaddr[gi*64 +: 64]),
       .s_axi_awlen   (xd_awlen[gi*8 +: 8]),
       .s_axi_awsize  (xd_awsize[gi*3 +: 3]),
       .s_axi_awburst (xd_awburst[gi*2 +: 2]),
       .s_axi_awlock  (xd_awlock[gi]),
       .s_axi_awcache (xd_awcache[gi*4 +: 4]),
       .s_axi_awprot  (xd_awprot[gi*3 +: 3]),
+      .s_axi_awregion(4'h0),
+      .s_axi_awqos   (4'h0),
       .s_axi_awvalid (xd_awvalid[gi]),
       .s_axi_awready (xd_awready[gi]),
       .s_axi_wdata   (xd_wdata[gi*512 +: 512]),
@@ -393,13 +468,15 @@ module cl_forge_morph_lm
       .s_axi_bvalid  (xd_bvalid[gi]),
       .s_axi_bready  (xd_bready[gi]),
       .s_axi_arid    (xd_arid[gi*16 +: 16]),
-      .s_axi_araddr  (xd_araddr[gi*64 +: 21]),
+      .s_axi_araddr  (xd_araddr[gi*64 +: 64]),
       .s_axi_arlen   (xd_arlen[gi*8 +: 8]),
       .s_axi_arsize  (xd_arsize[gi*3 +: 3]),
       .s_axi_arburst (xd_arburst[gi*2 +: 2]),
       .s_axi_arlock  (xd_arlock[gi]),
       .s_axi_arcache (xd_arcache[gi*4 +: 4]),
       .s_axi_arprot  (xd_arprot[gi*3 +: 3]),
+      .s_axi_arregion(4'h0),
+      .s_axi_arqos   (4'h0),
       .s_axi_arvalid (xd_arvalid[gi]),
       .s_axi_arready (xd_arready[gi]),
       .s_axi_rid     (xd_rid[gi*16 +: 16]),
@@ -408,6 +485,87 @@ module cl_forge_morph_lm
       .s_axi_rlast   (xd_rlast[gi]),
       .s_axi_rvalid  (xd_rvalid[gi]),
       .s_axi_rready  (xd_rready[gi]),
+
+      .m_axi_awid    (rsd_awid),
+      .m_axi_awaddr  (rsd_awaddr),
+      .m_axi_awlen   (rsd_awlen),
+      .m_axi_awsize  (rsd_awsize),
+      .m_axi_awburst (rsd_awburst),
+      .m_axi_awlock  (rsd_awlock),
+      .m_axi_awcache (rsd_awcache),
+      .m_axi_awprot  (rsd_awprot),
+      .m_axi_awregion(),
+      .m_axi_awqos   (),
+      .m_axi_awvalid (rsd_awvalid),
+      .m_axi_awready (rsd_awready),
+      .m_axi_wdata   (rsd_wdata),
+      .m_axi_wstrb   (rsd_wstrb),
+      .m_axi_wlast   (rsd_wlast),
+      .m_axi_wvalid  (rsd_wvalid),
+      .m_axi_wready  (rsd_wready),
+      .m_axi_bid     (rsd_bid),
+      .m_axi_bresp   (rsd_bresp),
+      .m_axi_bvalid  (rsd_bvalid),
+      .m_axi_bready  (rsd_bready),
+      .m_axi_arid    (rsd_arid),
+      .m_axi_araddr  (rsd_araddr),
+      .m_axi_arlen   (rsd_arlen),
+      .m_axi_arsize  (rsd_arsize),
+      .m_axi_arburst (rsd_arburst),
+      .m_axi_arlock  (rsd_arlock),
+      .m_axi_arcache (rsd_arcache),
+      .m_axi_arprot  (rsd_arprot),
+      .m_axi_arregion(),
+      .m_axi_arqos   (),
+      .m_axi_arvalid (rsd_arvalid),
+      .m_axi_arready (rsd_arready),
+      .m_axi_rid     (rsd_rid),
+      .m_axi_rdata   (rsd_rdata),
+      .m_axi_rresp   (rsd_rresp),
+      .m_axi_rlast   (rsd_rlast),
+      .m_axi_rvalid  (rsd_rvalid),
+      .m_axi_rready  (rsd_rready)
+    );
+
+    // ---- DMA-side BRAM controller (reg slice -> URAM port A) ----
+    axi_bram_ctrl_dma BRAM_CTL_DMA (
+      .s_axi_aclk    (clk_main_a0),
+      .s_axi_aresetn (rst_n_local),
+      .s_axi_awid    (rsd_awid),
+      .s_axi_awaddr  (rsd_awaddr[20:0]),
+      .s_axi_awlen   (rsd_awlen),
+      .s_axi_awsize  (rsd_awsize),
+      .s_axi_awburst (rsd_awburst),
+      .s_axi_awlock  (rsd_awlock),
+      .s_axi_awcache (rsd_awcache),
+      .s_axi_awprot  (rsd_awprot),
+      .s_axi_awvalid (rsd_awvalid),
+      .s_axi_awready (rsd_awready),
+      .s_axi_wdata   (rsd_wdata),
+      .s_axi_wstrb   (rsd_wstrb),
+      .s_axi_wlast   (rsd_wlast),
+      .s_axi_wvalid  (rsd_wvalid),
+      .s_axi_wready  (rsd_wready),
+      .s_axi_bid     (rsd_bid),
+      .s_axi_bresp   (rsd_bresp),
+      .s_axi_bvalid  (rsd_bvalid),
+      .s_axi_bready  (rsd_bready),
+      .s_axi_arid    (rsd_arid),
+      .s_axi_araddr  (rsd_araddr[20:0]),
+      .s_axi_arlen   (rsd_arlen),
+      .s_axi_arsize  (rsd_arsize),
+      .s_axi_arburst (rsd_arburst),
+      .s_axi_arlock  (rsd_arlock),
+      .s_axi_arcache (rsd_arcache),
+      .s_axi_arprot  (rsd_arprot),
+      .s_axi_arvalid (rsd_arvalid),
+      .s_axi_arready (rsd_arready),
+      .s_axi_rid     (rsd_rid),
+      .s_axi_rdata   (rsd_rdata),
+      .s_axi_rresp   (rsd_rresp),
+      .s_axi_rlast   (rsd_rlast),
+      .s_axi_rvalid  (rsd_rvalid),
+      .s_axi_rready  (rsd_rready),
       .bram_rst_a    (bram_a_rst),
       .bram_clk_a    (),
       .bram_en_a     (bram_a_en),

@@ -698,6 +698,25 @@ ZERO_W: for (int w = 0; w < n_wide; w++) {
 // =============================================================================
 static int do_train_run(int32_t* buffer, int n_steps, int lr, int threshold) {
 #pragma HLS INLINE off
+#if defined(TT_RESIDENT_W) && defined(TT_URAM_W)
+    // GPU-parity replication enabler: move the read-mostly resident weights off
+    // BRAM into URAM so per-kernel BRAM shrinks enough for 2 kernels per SLR
+    // (BRAM-bound at ~354 tiles/kernel; URAM is ~0% used otherwise). These four
+    // are NOT wide-partitioned (mp_buf/wh_buf stay BRAM for the TT_WIDE_LANES
+    // reads) and NOT in the bwd RMW path (grads stay BRAM for II=1 scatter), so
+    // URAM's fixed latency costs nothing here. Bit-exact: same int32 storage.
+#pragma HLS bind_storage variable=embed_oc type=RAM_T2P impl=URAM
+#pragma HLS bind_storage variable=mh_buf   type=RAM_T2P impl=URAM
+#pragma HLS bind_storage variable=mb_buf   type=RAM_T2P impl=URAM
+#pragma HLS bind_storage variable=ce_lut   type=RAM_T2P impl=URAM
+    // The grads dominate BRAM (V*D g_embed/g_whead). Move them to URAM too; they
+    // are scatter-RMW'd in the bwd, so verify the bwd II + tok/s on silicon.
+#pragma HLS bind_storage variable=g_embed_oc type=RAM_T2P impl=URAM
+#pragma HLS bind_storage variable=g_mh_oc    type=RAM_T2P impl=URAM
+#pragma HLS bind_storage variable=g_mp_oc    type=RAM_T2P impl=URAM
+#pragma HLS bind_storage variable=g_mb_oc    type=RAM_T2P impl=URAM
+#pragma HLS bind_storage variable=g_whead_oc type=RAM_T2P impl=URAM
+#endif
 #ifdef TT_BATCH
     // BATCH: ML_BATCH independent sequences, each with its own tokens/targets.
     static int32_t toks_b[ML_BATCH_N][ML_L_SEQ];
