@@ -23,11 +23,12 @@ throughput or energy win is proven, and the GPU actually wins the learner direct
 **zero-DSP FORWARD inference kernel** — chess-scale C-synth DSP=0, LUT 61.5k (14% of one SLR), timing met with
 margin (est 2.920 ns vs 4.00 ns target), 7.92 ms — silicon-ready and the AFI target. The **TRAIN kernel is NOT
 AFI-viable**: its chess-scale streaming rewrite C-synths at 170% of one SLR's LUT (740k → mandatorily
-multi-SLR) and **misses C-synth timing** (5.427 ns); it also surfaced DSP=195 from runtime address-stride
-multiplies (`o*IN` with non-pow2 chess `IN`), fixed bit-exactly to DSP=0 (templated the workers on compile-time
-dims; CSIM-confirmed, csynth re-confirm in flight) — but DSP=0 does not resolve the area/timing blockers. All
-silicon numbers are Vitis **C-synthesis estimates**, never place-and-routed, no AFI, **no routed energy/power
-figure of any kind**.
+multi-SLR) and **misses C-synth timing** (5.427 ns); it also surfaced DSP=195 from integer address-stride
+multiplies (`o*IN`). A zero-DSP fix (pointer-walk the address arithmetic + force mul→LUT-fabric at synthesis)
+is committed and CSIM bit-exact, but **DSP=0 is not yet csynth-confirmed** (a first templating-only attempt did
+NOT reduce it — HLS binds even constant multiplies to a DSP48 by default); regardless, DSP=0 would not resolve
+the area/timing blockers. All silicon numbers are Vitis **C-synthesis estimates**, never place-and-routed, no
+AFI, **no routed energy/power figure of any kind**.
 
 **Honest framing (the standing caption).** This is a **systems comparison, not a strength contest.** The
 chess-quality gap to DeepMind is a **compute/search gap** (TPU-pod scale, ~800-sim MCTS, tens of millions of
@@ -160,7 +161,7 @@ active-avg vs whole-window (1.46–1.49 mJ)._
 | arm | metric | value | provenance |
 |---|---|---|---|
 | **TikiTorch chess-scale FORWARD kernel** (initial inference) — **silicon-ready** | DSP, latency, area, timing | **DSP=0; 1,980,319 cyc = 7.92 ms; LUT 61,542 (14% of one SLR) / FF 26,167 (3%); 133 BRAM (9.9%); 0 URAM; est 2.920 ns < 4.00 ns target (timing MET, margin)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite), xcvu47p (F2 part); forge_train_step_muzero_CHESS_csynth.rpt |
-| **TikiTorch chess-scale TRAIN kernel** (bwd + SignSGD) — **research-track, NOT AFI-viable** | DSP, latency, area, timing | **DSP=0 after fix** (was 195 — runtime address-stride mults, templated to compile-time dims; CSIM bit-exact, csynth re-confirm in flight); **4,580,159 cyc = 24.86 ms; LUT 740,242 (170% of one SLR) / FF 261,666 (30%); 324 BRAM (24%); 65 URAM (20%); est 5.427 ns > 4.00 ns target (timing MISS)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite); forge_train_step_muzero_train_CHESS_csynth.rpt |
+| **TikiTorch chess-scale TRAIN kernel** (bwd + SignSGD) — **research-track, NOT AFI-viable** | DSP, latency, area, timing | **DSP=195 as-synthesized** (integer address-stride `o*IN` mults; zero-DSP fix = pointer-walk + `config_op mul -impl fabric`, committed + CSIM bit-exact, **csynth DSP=0 not yet confirmed** — a first templating-only attempt did NOT reduce it, HLS binds const-mults to DSP); **4,580,159 cyc = 24.86 ms; LUT 740,242 (170% of one SLR) / FF 261,666 (30%); 324 BRAM (24%); 65 URAM (20%); est 5.427 ns > 4.00 ns target (timing MISS)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite); forge_train_step_muzero_train_CHESS_csynth.rpt |
 | _(reference: pre-streaming chess kernels, 2026-06-13, superseded)_ | DSP, latency, LUT | fwd DSP=0 / 12.70 ms / 83,485 LUT · train DSP=1 / 33.05 ms / 89,759 LUT | `[measured]` C-synth; small-area but per-element HBM access, not the deployable streaming kernel — superseded by the streaming rows above |
 | any TikiTorch MuZero **AFI / P&R / on-silicon power** | timing closure, power-rail energy | **NEVER routed**; csynth-timing-met ≠ silicon (the only routed sibling, char-LM, failed WNS −1.557 ns before closing v6) | `[missing]` — gated behind a strength result |
 | reference GPU / DeepMind | DSP/area | N/A — different substrate (that asymmetry *is* the point) | `[missing]` |
@@ -181,7 +182,8 @@ the zero-DSP claim for training but does NOT change the area/timing verdict (DSP
 
 - **Grounded now (this doc):** Axis 1 entirely (DeepMind ceiling + TikiTorch measured, with the honest
   decoupling); **Axis 4 (silicon): FORWARD kernel C-synth silicon-ready** (DSP=0, 7.92 ms, 14%-SLR LUT, timing
-  met with margin) — the AFI target; **TRAIN kernel research-track** (DSP=0 after the address-stride fix, but
+  met with margin) — the AFI target; **TRAIN kernel research-track** (as-synth DSP=195; zero-DSP fix committed +
+  CSIM bit-exact but csynth-unconfirmed, and DSP=0 is LUT-neutral anyway —
   170%-SLR LUT + C-synth timing miss → not AFI-viable without an area/partition rewrite). Streaming-kernel
   re-audit 2026-06-15 **supersedes** the earlier "Axis 4 COMPLETE / timing met" claim (those were the
   pre-streaming per-element-HBM kernels).
