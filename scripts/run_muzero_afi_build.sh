@@ -70,13 +70,19 @@ trap up EXIT
 # continuous log uploader (every 60s) so a synth failure is visible without SSH
 ( while true; do sleep 60; up; done ) &
 echo "BOOT \$(date -u)"; hostname; nproc; free -g
+# cloud-init runs as root with HOME unset -> Vivado's realTime.tcl chokes expanding ~/.oasys
+# ("Failed to load feature 'vivado'"). Set HOME before any Vivado/Vitis invocation.
+export HOME=/root; mkdir -p /root/.oasys /root/.Xilinx
+# git-lfs is NOT preinstalled on the AMI; the shell DCP/manifest are LFS objects, so without it
+# 'git lfs pull' is a no-op and P&R links against pointer stubs. Install it first.
+( command -v git-lfs >/dev/null 2>&1 || apt-get update -y && apt-get install -y git-lfs || yum install -y git-lfs ) || true
 # --- locate aws-fpga + tools ---
 AF=""; for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /home/*/aws-fpga /opt/aws-fpga; do [ -d "\$p/hdk" ] && AF="\$p" && break; done
 [ -z "\$AF" ] && { AF=/opt/aws-fpga; git clone https://github.com/aws/aws-fpga.git "\$AF"; }
 echo "AWS_FPGA=\$AF"
 for s in /opt/Xilinx/Vivado/*/settings64.sh; do [ -f "\$s" ] && source "\$s"; done
 for s in /opt/Xilinx/Vitis_HLS/*/settings64.sh; do [ -f "\$s" ] && source "\$s"; done
-( cd "\$AF" && git lfs install && git lfs pull ) || true
+( cd "\$AF" && git lfs install && git lfs pull ) > /tmp/lfs.txt 2>&1 || true
 cd "\$AF" && source hdk_setup.sh || true
 echo "HDK_DIR=\$HDK_DIR HDK_SHELL_DIR=\$HDK_SHELL_DIR"
 # --- EARLY DIAGNOSTICS to S3 (so even a failure teaches the box layout) ---
@@ -98,8 +104,8 @@ ls -la "\$KVDIR" | head; ls "\$KVDIR" | wc -l
 up
 # --- 2. scaffold the CL from the HDK template (prefer the minimal cl_template; fall back to an example) ---
 TPL=""
-for cand in cl_template cl_dram_dma cl_mem_perf cl_hello_world; do
-  hit="\$(find "\$AF" -path "*\$cand*build/scripts/aws_build_dcp_from_cl.py" 2>/dev/null | head -1)"
+for cand in CL_TEMPLATE cl_template cl_dram_hbm_dma cl_dram_dma cl_mem_perf; do
+  hit="\$(find "\$AF" -path "*/\$cand/build/scripts/aws_build_dcp_from_cl.py" 2>/dev/null | head -1)"
   [ -n "\$hit" ] && { TPL="\$(cd "\$(dirname "\$hit")/../.." && pwd)"; break; }
 done
 [ -z "\$TPL" ] && { echo "FATAL: no CL template with aws_build_dcp_from_cl.py found"; aws s3 cp /tmp/diag.txt "\$S3_RESULTS/diag.txt" --only-show-errors; shutdown -h now; }
@@ -117,13 +123,16 @@ aws s3 cp /tmp/diag.txt "\$S3_RESULTS/diag.txt" --only-show-errors || true
 up
 # --- 3. gen IP ---
 echo "=== gen_ip START \$(date -u) ==="
-vivado -mode batch -source "\$CLROOT/build/scripts/gen_ip.tcl" -tclargs "\$CLROOT/design/ip" 2>&1 | tail -20
-up
+vivado -mode batch -source "\$CLROOT/build/scripts/gen_ip.tcl" -tclargs "\$CLROOT/design/ip" 2>&1 | tail -30
+echo "== gen_ip produced =="; ls -la "\$CLROOT/design/ip" 2>&1 | head -20; up
 # --- 4. synth + P&R via the HDK harness (FAIL-FAST at synth ~20m before the ~3h P&R) ---
 export CL_DIR="\$CLROOT"
-cd "\$CLROOT/build/scripts"
+BUILD_PY="\$(find "\$CLROOT/build" -name aws_build_dcp_from_cl.py 2>/dev/null | head -1)"
+echo "BUILD_PY=\$BUILD_PY"; [ -z "\$BUILD_PY" ] && { echo "FATAL: aws_build_dcp_from_cl.py absent in CL"; ls -R "\$CLROOT/build" | head -60; }
+chmod +x "\$BUILD_PY" 2>/dev/null
+cd "\$(dirname "\$BUILD_PY")"
 echo "=== aws_build_dcp_from_cl START \$(date -u) ==="
-./aws_build_dcp_from_cl.py --cl "\$CL" --no-encrypt 2>&1 | tail -60 || echo "BUILD_RC=\$?"
+./aws_build_dcp_from_cl.py --cl "\$CL" --no-encrypt 2>&1 | tail -80 ; echo "BUILD_RC=\${PIPESTATUS[0]}"
 echo "=== build done \$(date -u) ==="
 # --- 5. collect outputs ---
 aws s3 cp "\$CLROOT/build/checkpoints/to_aws/" "\$S3_RESULTS/to_aws/" --recursive --only-show-errors 2>/dev/null || true
