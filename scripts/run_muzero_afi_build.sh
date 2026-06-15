@@ -35,8 +35,8 @@ cmd_launch(){
   S3_SRC="s3://${BUCKET}/${TAG}/src.tar.gz"; S3_RESULTS="s3://${BUCKET}/${TAG}/results"
   echo "== source tarball (git archive HEAD) =="
   git -C "$PROJECT_DIR" archive --format=tar.gz -o "$STATE_DIR/src.tar.gz" HEAD
-  tar tzf "$STATE_DIR/src.tar.gz" | grep -qx "$PKG_REL/design/cl_forge_muzero.sv" \
-    || { echo "FATAL: $PKG_REL/design/cl_forge_muzero.sv not in committed tree"; exit 1; }
+  tar tzf "$STATE_DIR/src.tar.gz" | grep -qx "$PKG_REL/design/$CL.sv" \
+    || { echo "FATAL: $PKG_REL/design/$CL.sv not in committed tree"; exit 1; }
   UD="$STATE_DIR/user-data.sh"; render_user_data "$S3_SRC" "$S3_RESULTS" > "$UD"
   if [ "${DRY_RUN:-0}" = "1" ]; then echo "DRY_RUN -> UD:"; cat "$UD"; return 0; fi
   echo "== upload source -> $S3_SRC =="; aws_ s3 cp "$STATE_DIR/src.tar.gz" "$S3_SRC" --only-show-errors
