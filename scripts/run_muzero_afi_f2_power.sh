@@ -30,7 +30,7 @@ cmd_launch(){
   local ACCT BUCKET TAG S3_RESULTS UD INSTANCE_ID
   ACCT="$(aws_ sts get-caller-identity --query Account --output text)"; BUCKET="tiki-sweep-${ACCT}"
   aws_ s3api head-bucket --bucket "$BUCKET" 2>/dev/null || { echo "no bucket $BUCKET"; exit 1; }
-  aws_ ec2 describe-fpga-images --fpga-image-global-ids "$AGFI" --query 'FpgaImages[0].State.Code' --output text 2>/dev/null | grep -qx available \
+  aws_ ec2 describe-fpga-images --filters "Name=fpga-image-global-id,Values=$AGFI" --query 'FpgaImages[0].State.Code' --output text 2>/dev/null | grep -qx available \
     || { echo "FATAL: $AGFI not available"; exit 1; }
   TAG="f2power-$(date -u +%Y%m%dT%H%M%SZ)"
   S3_RESULTS="s3://${BUCKET}/${TAG}/results"
