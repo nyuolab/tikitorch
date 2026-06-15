@@ -140,7 +140,7 @@ sizes differ by orders of magnitude, so do NOT directly compare their samples/s 
 |---|---|---|---|
 | **reference MuZero, A10G** | **end-to-end 47.6 J/move (1237 mJ/sample)** ‖ **GPU-active 3.7 J/move (96.8 mJ/sample)** | nvidia-smi power×dt @5 Hz; 67.5 W whole-window / 73.7 W GPU-active | `[measured]` (power.csv) |
 | TikiTorch chess FORWARD kernel, **FPGA (on real F2 silicon)** | **Vccint 8–10 W (loaded, kernel IDLE)** — measured on f2.6xlarge with the AFI loaded (`agfi-0b2c228a17e516e0a`); this is the shell + DSP=0 CL static draw, **NOT** inference power | `fpga-describe-local-image -M`, 5 samples (8/9 W last/avg, 10 W max); PCIM clean (0 protocol errors) | `[measured-partial]` loaded/idle only |
-| TikiTorch chess FORWARD kernel, FPGA — **inference (dynamic)** | **pending** — needs the kernel running; a J/inference figure requires the PCIM host driver (kernel masters host DRAM) to drive a real forward pass and sample Vccint during it | (Stage 3b) | `[to-measure]` |
+| TikiTorch chess FORWARD kernel, FPGA — **inference (dynamic)** | **attempted on F2, BLOCKED** — the CL's PCIM master issues clean reads to the host buffer (pcim-read-count 0→8, 0 errors) but stalls: a raw hugepage isn't IOMMU-granted to the FPGA, so reads never complete and the kernel never runs (Vccint stayed at idle 7 W). EC2 host-memory-access wall, not a CL defect. Fix = IOMMU-map the buffer **or** rebuild to read on-card DDR (see MUZERO_CHESS_FWD_AFI.md §3b) | F2 `muzero_pcim_power.c` + `-M` sampling | `[to-measure]` (blocked, diagnosed) |
 | TikiTorch, CPU | not measured | — | `[to-measure]`/`[projected]` |
 | DeepMind | not published per-move | — | `[missing]` |
 

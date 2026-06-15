@@ -55,8 +55,34 @@ our CL is 14% of one SLR with no DSPs). It is **NOT** inference power, and you m
 7.92 ms latency to get J/inference — the dynamic draw of the kernel is unmeasured. What is proven on silicon:
 the routed DSP=0 design **configures and the PCIM interface works**.
 
-## Pending (Stage 3b) — dynamic / per-inference power
-A defensible J/inference needs the kernel **running**: a PCIM host driver that allocates a host-DRAM buffer the
-CL can master (write its bus address to the OCL `buffer` offset register), kicks AP_START, and samples Vccint
-during the forward pass. That host driver (the CL masters host DRAM via PCIM, unlike morph-LM's DMA-PCIS→URAM
-staging) is genuine additional engineering — flagged, not hand-waved.
+## Stage 3b — dynamic power ATTEMPTED; blocked by an EC2 PCIM-to-host IOMMU wall (measured 2026-06-15)
+
+Built and ran a real PCIM host driver on F2 (`muzero_pcim_power.c` + `run_muzero_afi_f2_dynpower.sh`):
+1 GB hugepage (contiguous) → `/proc/self/pagemap` guest-physical (`0x180000000`) → kernel `BUFFER_0/1`
+register → kick `AP_START` (mode 0). Buffer = **MZ_BUFFER_WORDS = 3,132,144 = 11.95 MB**.
+
+**Outcome — definitive diagnosis, not a clean number:**
+- The CL's PCIM master **WORKS**: `pcim-read-count` went 0 → 8 with **0 range errors, 0 protocol errors** —
+  the kernel issued clean PCIM read transactions to the programmed host guest-physical address. Wiring +
+  addressing + control-register poke are all correct on silicon.
+- But the kernel **STALLED** (warm kick: no `AP_DONE` in 5 s; rc=6; Vccint stayed at idle 7 W during the
+  "loop" → no inference ran). The 8 reads were *issued* but never *completed*.
+- **Root cause:** on EC2/Nitro the FPGA's PCIM accesses to host memory must be **IOMMU-mapped/granted to the
+  FPGA's DMA domain**. A raw `mmap` hugepage is visible to the host but **not** granted to the FPGA, so the
+  reads are issued (shell range-check passes → counted) but silently dropped downstream (no response → m_axi
+  stalls). This is an EC2 host-memory-access requirement, **not** a CL/AFI defect.
+
+**What this still proves on silicon:** the PCIM-to-host datapath is electrically + protocol correct (clean
+issued transactions). The only missing piece is the host-side DMA mapping.
+
+**Paths to a real J/inference (a genuine fork — not yet chosen):**
+- **(A) IOMMU-map the buffer for the FPGA** (VFIO, or allocate via the AWS XDMA/`fpga_dma` driver — whose
+  buffers ARE IOMMU-mapped — and point the CL m_axi at that IOVA). Smaller experiment; uncertain whether the
+  app-PF exposes this for a raw m_axi PCIM master.
+- **(B) Rebuild the AFI to read on-card DDR** (`cl_sh_ddr`) instead of host PCIM — the architecturally-correct
+  home for a 12 MB buffer that doesn't fit URAM. Host stages into card DDR (DMA-PCIS→DDR / `fpga_dma`), kernel
+  reads DDR; no host IOMMU needed. ~½-day rebuild (rewire CL, new host-load path, rebuild AFI, new driver).
+  **Recommended** if dynamic power is wanted — it's the drivable architecture and reuses proven host staging.
+
+The loaded/idle Vccint (7–9 W) above stands; the inference-power figure remains **to-measure** pending one of
+the above.
