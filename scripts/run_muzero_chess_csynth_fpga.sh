@@ -16,7 +16,8 @@ PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"
 REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null || echo us-east-1)}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-z1d.2xlarge}"            # AWS-recommended Vitis build instance (~$0.74/hr)
 AMI="${AMI:-ami-092fc5deb8f3c0f7d}"                       # FPGA Developer AMI (Ubuntu) 1.16.1, Vitis 2024.1 (proven by existing reports)
-MAX_MINUTES="${MAX_MINUTES:-75}"                          # csynth ~10-25 min; backstop 75
+MAX_MINUTES="${MAX_MINUTES:-75}"                          # csynth ~10-25 min; backstop 75 (train kernel needs more)
+CSYNTH_ONLY="${CSYNTH_ONLY:-both}"                        # forward | train | both (train is the slow one)
 ROLE="${ROLE:-tiki-sweep-runner}"                         # reuse the instance-profile from the prior runs
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_csynth_state"; mkdir -p "$STATE_DIR"
@@ -75,13 +76,23 @@ VHLS="\$(command -v vitis_hls || ls /opt/Xilinx/Vitis_HLS/*/bin/vitis_hls 2>/dev
 echo "VITIS_HLS=\$VHLS"; \$VHLS -version 2>&1 | head -2 || true
 up
 cd /opt/tiki/tikitorch/hardware/hls/forge_kernels
-echo "=== csynth FORWARD (chess) ==="; "\$VHLS" -f synth_muzero_chess.tcl 2>&1 | tail -30
-echo "=== csynth TRAIN (chess) ==="; "\$VHLS" -f synth_muzero_train_chess.tcl 2>&1 | tail -30
-# upload reports (renamed _CHESS_ so they don't collide with the gridworld ones)
-aws s3 cp forge_muzero_chess_proj/solution1/syn/report/forge_train_step_muzero_csynth.rpt "\$S3_RESULTS/forge_train_step_muzero_CHESS_csynth.rpt" --only-show-errors || true
-aws s3 cp forge_muzero_train_chess_proj/solution1/syn/report/forge_train_step_muzero_train_csynth.rpt "\$S3_RESULTS/forge_train_step_muzero_train_CHESS_csynth.rpt" --only-show-errors || true
-aws s3 cp vitis_hls.log "\$S3_RESULTS/vitis_hls.log" --only-show-errors || true
-up
+# Per-kernel: run csynth, then upload its report + log IMMEDIATELY (so a slow/hung kernel never loses the
+# one that finished). CSYNTH_ONLY=forward|train|both selects which to run (train is the slow one).
+ONLY="${CSYNTH_ONLY}"
+if [ "\$ONLY" != "train" ]; then
+  echo "=== csynth FORWARD (chess) START \$(date -u) ==="; "\$VHLS" -f synth_muzero_chess.tcl 2>&1 | tail -20
+  echo "=== csynth FORWARD done \$(date -u) ==="
+  aws s3 cp forge_muzero_chess_proj/solution1/syn/report/forge_train_step_muzero_csynth.rpt "\$S3_RESULTS/forge_train_step_muzero_CHESS_csynth.rpt" --only-show-errors || true
+  aws s3 cp vitis_hls.log "\$S3_RESULTS/vitis_hls_forward.log" --only-show-errors || true
+  up
+fi
+if [ "\$ONLY" != "forward" ]; then
+  echo "=== csynth TRAIN (chess) START \$(date -u) ==="; "\$VHLS" -f synth_muzero_train_chess.tcl 2>&1 | tail -20
+  echo "=== csynth TRAIN done \$(date -u) ==="
+  aws s3 cp forge_muzero_train_chess_proj/solution1/syn/report/forge_train_step_muzero_train_csynth.rpt "\$S3_RESULTS/forge_train_step_muzero_train_CHESS_csynth.rpt" --only-show-errors || true
+  aws s3 cp vitis_hls.log "\$S3_RESULTS/vitis_hls_train.log" --only-show-errors || true
+  up
+fi
 echo "rc done=\$(date -u)" | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 shutdown -h now
 UDEOF
