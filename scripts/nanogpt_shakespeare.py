@@ -319,16 +319,18 @@ def sample(model, data, prompt, n_chars, seq_len, device, temperature=0.8, seed=
     return data.decode(ids[0].tolist())
 
 
-def tau_at(step, steps, tau0, anneal):
-    """Hold tau0 for the first half, linear decay to 0 by 90% of training."""
+def tau_at(step, steps, tau0, anneal, floor=0.0):
+    """Hold tau0 for the first half, linear decay to `floor` by 90% of training.
+    floor>0 deploys the soft (log-semiring) attention at a FIXED nonzero tau
+    instead of annealing into the hard max-plus corner (the dead band)."""
     if not anneal:
-        return tau0
+        return max(tau0, floor)
     a, b = 0.5 * steps, 0.9 * steps
     if step < a:
-        return tau0
+        return max(tau0, floor)
     if step >= b:
-        return 0.0
-    return tau0 * (1.0 - (step - a) / (b - a))
+        return floor
+    return max(tau0 * (1.0 - (step - a) / (b - a)), floor)
 
 
 # ---------------------------------------------------------------------------
@@ -364,6 +366,13 @@ def build_model(kind, data, args):
                        else "dot_product"),
         max_seq_len=args.seq_len, task_type="lm", vocab_size=data.vocab)
     apply_variant(model, data.vocab, args)
+    if getattr(args, "n_hops", 1) > 1:
+        from tikitorch.nn import TropicalAttention
+        attns = [m for m in model.modules() if isinstance(m, TropicalAttention)]
+        for m in attns:
+            m.n_hops = args.n_hops
+        print(f"[n_hops] Bellman-Ford diffusion n_hops={args.n_hops} on "
+              f"{len(attns)} TropicalAttention module(s)")
     return model
 
 
@@ -474,7 +483,7 @@ def train_run(kind, data, args, log_path):
 
     for step in range(args.steps):
         if anneal:
-            model.set_tau(tau_at(step, args.steps, args.tau, True))
+            model.set_tau(tau_at(step, args.steps, args.tau, True, args.tau_floor))
         if args.lr_decay_every and step > 0 and step % args.lr_decay_every == 0:
             # Bit-shift lr decay: halve the power-of-2 step. Closure-clean (the
             # step stays an exact power of two); works for the shift-based
@@ -506,7 +515,7 @@ def train_run(kind, data, args, log_path):
                    "wall_s": round(time.time() - t0, 1),
                    "tok_per_s": round(tokens_seen / max(time.time() - t0, 1e-9))}
             if is_tropical:
-                cur_tau = tau_at(step, args.steps, args.tau, anneal)
+                cur_tau = tau_at(step, args.steps, args.tau, anneal, args.tau_floor)
                 ce, acc = evaluate(model, data, args.batch_size, args.seq_len,
                                    args.eval_batches, args.seed + 1, device)
                 row.update(val_ce_soft=ce, val_acc_soft=acc, tau=cur_tau)
@@ -595,6 +604,16 @@ def main():
     p.add_argument("--n-heads", type=int, default=4)
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--tau", type=float, default=0.5)
+    p.add_argument("--tau-floor", type=float, default=0.0,
+                   help="clamp the annealed soft tau to this floor — deploy soft "
+                        "attention at a FIXED nonzero tau instead of the hard "
+                        "max-plus corner. Use powers of 2 (0.5/0.25/0.125) for "
+                        "fabric-legal shifts. 0.0 = original anneal-to-hard.")
+    p.add_argument("--n-hops", type=int, default=1,
+                   help="tropical attention Bellman-Ford diffusion hops: 1 = "
+                        "single-hop (current); 2-4 = multi-hop all-pairs best-path "
+                        "routing over the content score graph (purely max-plus). "
+                        "Tests routing (not averaging) as attention's mechanism.")
     p.add_argument("--variant", type=str, default="baseline", choices=VARIANTS,
                    help="tropical-arm architecture variant (ignored for dense)")
     p.add_argument("--pos-embed", action="store_true",

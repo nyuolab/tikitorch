@@ -174,6 +174,9 @@ def _tropical_aggregate(v, scores, variant, tau, topk_k, rank_bias, value_topk_k
 
 
 __all__ = [
+    # predictive coding (local, backprop-free)
+    "TropicalPCLayer",
+    "TropicalPCNet",
     # soft relaxations
     "TropicalSoftMin",
     "TropicalSoftMax",
@@ -1174,7 +1177,8 @@ class TropicalAttention(nn.Module):
                  value_topk_k: int = 1,
                  proj_init_identity: bool = False,
                  agg_variant: str = "argmax",
-                 agg_topk_k: int = 2):
+                 agg_topk_k: int = 2,
+                 n_hops: int = 1):
         super().__init__()
         assert d_model % n_heads == 0
         assert score_variant in _SCORE_VARIANTS, score_variant
@@ -1210,6 +1214,13 @@ class TropicalAttention(nn.Module):
         # exclusion top-k, SUM-combined -- strictly multiplier-free, denser grad).
         self.agg_variant = agg_variant
         self.agg_topk_k = agg_topk_k
+        # n_hops>1: Bellman-Ford diffusion — iterate the value state through the
+        # content score graph S for n_hops rounds so information routes along best
+        # PATHS of length <= n_hops between every token pair (tropical matrix
+        # powers / shortest-path closure). Purely max-plus, data-dependent,
+        # all-pairs; fills the conv mixer's fixed-receptive-field gap. n_hops=1 is
+        # the historical single-hop attention (bit-exact).
+        self.n_hops = n_hops
         # Closed learnable per-rank additive offset for iter_topk (b_0 := 0).
         self.rank_bias = (nn.Parameter(torch.zeros(agg_topk_k))
                           if agg_variant == "iter_topk" else None)
@@ -1276,9 +1287,19 @@ class TropicalAttention(nn.Module):
         # masking is applied INSIDE _tropical_aggregate so it is semiring-correct
         # (max-plus masks with -inf; min-plus must mask with +inf, else min picks
         # the masked key).
-        out = _tropical_aggregate(v, scores, self.agg_variant, self.tau,
-                                  self.agg_topk_k, self.rank_bias, self.value_topk_k,
-                                  causal=causal_mask)
+        # Value routing. Single-hop (n_hops<=1) = the historical 1-hop pull. Multi-
+        # hop = Bellman-Ford diffusion: H^(t+1) = max(H^(t), max_j(S[i,j]+H^(t)[j,d]))
+        # over a FIXED content graph S, so token i receives the best path of length
+        # <= n_hops from any j (purely max-plus all-pairs routing). The max(H,.)
+        # self-loop is an always-alive residual gradient path; S is shared across
+        # hops so its gradient accumulates over every relaxation.
+        h = v
+        for _hop in range(max(1, self.n_hops)):
+            pull = _tropical_aggregate(h, scores, self.agg_variant, self.tau,
+                                       self.agg_topk_k, self.rank_bias, self.value_topk_k,
+                                       causal=causal_mask)
+            h = pull if self.n_hops <= 1 else torch.maximum(h, pull)
+        out = h
         # out: (B, H, L, Dh) — each (i, d) picks its own j* (or its k best).
 
         out = out.transpose(1, 2).reshape(B, L, D)
@@ -2199,3 +2220,9 @@ class TropicalRNN(nn.Module):
 
 BatchShift = TropicalBatchShift
 MorphConv1d = DepthwiseMorphConv1d
+
+# ---------------------------------------------------------------------------
+# Predictive coding (local, backprop-free) — see tikitorch.nn.predictive_coding
+# ---------------------------------------------------------------------------
+
+from tikitorch.nn.predictive_coding import TropicalPCLayer, TropicalPCNet  # noqa: E402,F401
