@@ -76,8 +76,12 @@ static inline void sgd_update(int32_t* w, int delta) {   // SignSGD: w <- clamp1
 }
 
 // y[o] = sat16( bias[o] + sum_i q(W[o,i]) . x[i] ) — shadow-weight dyadic forward.
-static void fwd_linear(const int32_t* W, const int32_t* bias, const data_t* x,
-                       data_t* y, int OUT, int IN) {
+// OUT/IN are TEMPLATE (compile-time) params so o*IN strength-reduces to a shift (zero DSP).
+// At chess scale runtime IN=769/1538 are non-pow2; passing them as int args made HLS build a
+// var*var multiplier farm under the unroll (the chess csynth DSP=195). All call sites pass
+// constexpr MZ_* dims, so this is a pure addressing change — bit-exact.
+template <int OUT, int IN>
+static void fwd_linear(const int32_t* W, const int32_t* bias, const data_t* x, data_t* y) {
     for (int o = 0; o < OUT; o++) {
         acc_t acc = (acc_t)bias[o];
         for (int i = 0; i < IN; i++) {
@@ -89,7 +93,10 @@ static void fwd_linear(const int32_t* W, const int32_t* bias, const data_t* x,
 }
 
 // g_in[i] = sum_o q(W[o,i]) . g_out[o] — backprop of input grad through the pow2 weights.
-static void bwd_input(const int32_t* W, const acc_t* g_out, acc_t* g_in, int OUT, int IN) {
+// OUT/IN template params (see fwd_linear): the transposed read W[o*IN+i] was the largest DSP
+// cluster at chess scale; compile-time IN makes o*IN a shift. Bit-exact.
+template <int OUT, int IN>
+static void bwd_input(const int32_t* W, const acc_t* g_out, acc_t* g_in) {
     for (int i = 0; i < IN; i++) {
         acc_t g = 0;
         for (int o = 0; o < OUT; o++) {
@@ -101,8 +108,9 @@ static void bwd_input(const int32_t* W, const acc_t* g_out, acc_t* g_in, int OUT
 }
 
 // SignSGD weight+bias update: W[o,i] -= lr*sign(g_out[o])*sign(x[i]); bias[o] -= lr*sign(g_out[o]).
-static void sgd_layer(int32_t* W, int32_t* bias, const acc_t* g_out, const data_t* x,
-                      int OUT, int IN, int lr) {
+// OUT/IN template params (see fwd_linear) so the W[o*IN+i] update index is a shift. Bit-exact.
+template <int OUT, int IN>
+static void sgd_layer(int32_t* W, int32_t* bias, const acc_t* g_out, const data_t* x, int lr) {
     for (int o = 0; o < OUT; o++) {
         int go = isign(g_out[o]);
         for (int i = 0; i < IN; i++)
@@ -119,10 +127,12 @@ static void burst_load_words(int32_t* buffer, int word_off, int32_t* dst, int n_
 #pragma HLS INLINE off
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
     wide_t* wb = reinterpret_cast<wide_t*>(buffer); int nw = n_words >> 4, wo = word_off >> 4;
+    int32_t* dp = dst;                       // pointer-walk: dst[w*16+l] -> dp[l], dp+=16 (add, not w*16 mul)
     for (int w = 0; w < nw; w++) {
 #pragma HLS PIPELINE II=1
         wide_t b = wb[wo + w];
-        for (int l = 0; l < 16; l++) { dst[w*16+l] = (int32_t)(int)(ap_int<32>)b.range(l*32+31, l*32); }
+        for (int l = 0; l < 16; l++) { dp[l] = (int32_t)(int)(ap_int<32>)b.range((l<<5)+31, (l<<5)); }
+        dp += 16;
     }
 #else
     for (int i = 0; i < n_words; i++) dst[i] = buffer[word_off + i];
@@ -132,11 +142,13 @@ static void burst_store_words(int32_t* src, int32_t* buffer, int word_off, int n
 #pragma HLS INLINE off
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
     wide_t* wb = reinterpret_cast<wide_t*>(buffer); int nw = n_words >> 4, wo = word_off >> 4;
+    int32_t* sp = src;                       // pointer-walk: src[w*16+l] -> sp[l], sp+=16 (add, not w*16 mul)
     for (int w = 0; w < nw; w++) {
 #pragma HLS PIPELINE II=1
         wide_t b = 0;
-        for (int l = 0; l < 16; l++) { b.range(l*32+31, l*32) = (ap_uint<32>)(ap_int<32>)src[w*16+l]; }
+        for (int l = 0; l < 16; l++) { b.range((l<<5)+31, (l<<5)) = (ap_uint<32>)(ap_int<32>)sp[l]; }
         wb[wo + w] = b;
+        sp += 16;
     }
 #else
     for (int i = 0; i < n_words; i++) buffer[word_off + i] = src[i];
@@ -145,8 +157,10 @@ static void burst_store_words(int32_t* src, int32_t* buffer, int word_off, int n
 
 // R1 forward, streamed: q(shadow) . x with WR1 read in 16-word-aligned CHUNK tiles (chunked+pipelined,
 // same fast pattern as the forward kernel). Bit-exact to fwd_linear on WR1.
+// OUT/IN template params so total=OUT*IN folds to a compile-time constant (no var*var DSP).
+template <int OUT, int IN>
 static void fwd_linear_stream(int32_t* buffer, int off_W, const int32_t* bias,
-                              const data_t* x, data_t* y, int OUT, int IN) {
+                              const data_t* x, data_t* y) {
     const int CH = 4096; int32_t wt[CH];
     int o = 0, i = 0, total = OUT * IN; acc_t acc = (acc_t)bias[0];
     for (int base = 0; base < total; base += CH) {
@@ -162,8 +176,10 @@ static void fwd_linear_stream(int32_t* buffer, int off_W, const int32_t* bias,
 }
 
 // R1 SignSGD, streamed read-modify-write: chunk-load WR1 tile, sign-update in place, write the tile back.
+// OUT/IN template params so total=OUT*IN folds to a compile-time constant (no var*var DSP).
+template <int OUT, int IN>
 static void sgd_layer_stream(int32_t* buffer, int off_W, int32_t* bias,
-                             const acc_t* g_out, const data_t* x, int OUT, int IN, int lr) {
+                             const acc_t* g_out, const data_t* x, int lr) {
     const int CH = 4096; int32_t wt[CH];
     int o = 0, i = 0, total = OUT * IN, go = isign(g_out[0]);
     for (int base = 0; base < total; base += CH) {
@@ -201,18 +217,18 @@ static int train_step(int32_t* buf, int lr) {
     data_t zr1[MZ_DR], h[MZ_L], zp1[MZ_DP], z[MZ_L], pol[MZ_A], val[1];
     data_t hraw[MZ_L], pre[MZ_DR > MZ_DP ? MZ_DR : MZ_DP];
 
-    fwd_linear_stream(buf, TOFF_W_R1, BR1, obs, pre, MZ_DR, MZ_OBS);  // repr lin1 (R1 streamed from HBM)
+    fwd_linear_stream<MZ_DR, MZ_OBS>(buf, TOFF_W_R1, BR1, obs, pre);  // repr lin1 (R1 streamed from HBM)
     for (int i = 0; i < MZ_DR; i++) zr1[i] = pre[i] > 0 ? pre[i] : (data_t)0;   // relu
-    fwd_linear(WR2, BR2, zr1, hraw, MZ_L, MZ_DR);                  // repr lin2
+    fwd_linear<MZ_L, MZ_DR>(WR2, BR2, zr1, hraw);                  // repr lin2
     acc_t sm = 0; for (int i = 0; i < MZ_L; i++) sm += hraw[i];
     data_t mean = (data_t)(sm / MZ_L);                            // /L = shift (L pow2)
     for (int i = 0; i < MZ_L; i++) h[i] = sat16((acc_t)hraw[i] - mean);  // submean -> latent
 
-    fwd_linear(WP1, BP1, h, pre, MZ_DP, MZ_L);                    // pred lin1
+    fwd_linear<MZ_DP, MZ_L>(WP1, BP1, h, pre);                    // pred lin1
     for (int i = 0; i < MZ_DP; i++) zp1[i] = pre[i] > 0 ? pre[i] : (data_t)0;   // relu
-    fwd_linear(WP2, BP2, zp1, z, MZ_L, MZ_DP);                    // pred lin2
-    fwd_linear(WPH, BPH, z, pol, MZ_A, MZ_L);                     // policy head
-    fwd_linear(WVH, BVH, z, val, 1, MZ_L);                        // value head
+    fwd_linear<MZ_L, MZ_DP>(WP2, BP2, zp1, z);                    // pred lin2
+    fwd_linear<MZ_A, MZ_L>(WPH, BPH, z, pol);                     // policy head
+    fwd_linear<1, MZ_L>(WVH, BVH, z, val);                        // value head
 
     for (int o = 0; o < MZ_A; o++) buf[TOFF_POL + o] = pol[o];
     buf[TOFF_VAL] = val[0];
@@ -231,32 +247,33 @@ static int train_step(int32_t* buf, int lr) {
     acc_t gz[MZ_L];                                               // grad wrt z (heads' input)
     for (int i = 0; i < MZ_L; i++) {
         int e, s; acc_t g = 0;
-        for (int o = 0; o < MZ_A; o++) { nearest_pow2((int)WPH[o * MZ_L + i], e, s); g += dyq_apply(e, s, gpol[o]); }
+        const int32_t* wp = WPH + i;        // pointer-walk: WPH[o*MZ_L+i] -> *wp, wp+=MZ_L (add, not o*MZ_L)
+        for (int o = 0; o < MZ_A; o++) { nearest_pow2((int)*wp, e, s); g += dyq_apply(e, s, gpol[o]); wp += MZ_L; }
         nearest_pow2((int)WVH[i], e, s); g += dyq_apply(e, s, gval);
         gz[i] = g;
     }
-    sgd_layer(WPH, BPH, gpol, z, MZ_A, MZ_L, lr);
-    { acc_t gv1[1] = {gval}; sgd_layer(WVH, BVH, gv1, z, 1, MZ_L, lr); }
+    sgd_layer<MZ_A, MZ_L>(WPH, BPH, gpol, z, lr);
+    { acc_t gv1[1] = {gval}; sgd_layer<1, MZ_L>(WVH, BVH, gv1, z, lr); }
 
     acc_t gzp1[MZ_DP];                                            // through pred lin2 (P2)
-    bwd_input(WP2, gz, gzp1, MZ_L, MZ_DP);
-    sgd_layer(WP2, BP2, gz, zp1, MZ_L, MZ_DP, lr);
+    bwd_input<MZ_L, MZ_DP>(WP2, gz, gzp1);
+    sgd_layer<MZ_L, MZ_DP>(WP2, BP2, gz, zp1, lr);
     for (int j = 0; j < MZ_DP; j++) if (zp1[j] <= 0) gzp1[j] = 0;       // relu mask
 
     acc_t gh[MZ_L];                                              // through pred lin1 (P1)
-    bwd_input(WP1, gzp1, gh, MZ_DP, MZ_L);
-    sgd_layer(WP1, BP1, gzp1, h, MZ_DP, MZ_L, lr);
+    bwd_input<MZ_DP, MZ_L>(WP1, gzp1, gh);
+    sgd_layer<MZ_DP, MZ_L>(WP1, BP1, gzp1, h, lr);
 
     acc_t gsum = 0; for (int i = 0; i < MZ_L; i++) gsum += gh[i];       // submean backward
     acc_t gmean = gsum / MZ_L;                                          // /L = shift
     acc_t ghraw[MZ_L]; for (int i = 0; i < MZ_L; i++) ghraw[i] = gh[i] - gmean;
 
     acc_t gzr1[MZ_DR];                                          // through repr lin2 (R2)
-    bwd_input(WR2, ghraw, gzr1, MZ_L, MZ_DR);
-    sgd_layer(WR2, BR2, ghraw, zr1, MZ_L, MZ_DR, lr);
+    bwd_input<MZ_L, MZ_DR>(WR2, ghraw, gzr1);
+    sgd_layer<MZ_L, MZ_DR>(WR2, BR2, ghraw, zr1, lr);
     for (int m = 0; m < MZ_DR; m++) if (zr1[m] <= 0) gzr1[m] = 0;       // relu mask
 
-    sgd_layer_stream(buf, TOFF_W_R1, BR1, gzr1, obs, MZ_DR, MZ_OBS, lr);  // R1 streamed RMW (writes WR1 back)
+    sgd_layer_stream<MZ_DR, MZ_OBS>(buf, TOFF_W_R1, BR1, gzr1, obs, lr);  // R1 streamed RMW (writes WR1 back)
 
     // ---- write the updated RESIDENT weights + all biases back to HBM (WR1 already written by the stream) ----
     burst_store_words(WR2, buf, TOFF_W_R2, TW_R2); burst_store_words(WP1, buf, TOFF_W_P1, TW_P1);
