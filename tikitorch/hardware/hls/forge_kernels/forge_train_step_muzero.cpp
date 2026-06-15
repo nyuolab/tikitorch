@@ -24,41 +24,51 @@ static inline data_t sat16(acc_t a) {
     return (data_t)a;
 }
 
-// 512-bit (16-word) aligned burst read of n_words from buffer[word_off]. word_off MUST be 16-aligned.
-// Under Vitis this is one wide AXI beat per 16 words (HBM streaming); under g++ a plain copy (CSIM).
+// 512-bit (16-word) aligned burst read of n_words (a multiple of 16) from buffer[word_off] (16-aligned)
+// into an on-chip tile. One wide AXI beat per 16 words under Vitis (HBM streaming); plain copy under g++.
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
 typedef ap_uint<512> wide_t;
 #endif
-static inline void burst_load16(int32_t* buffer, int word_off, int32_t* dst) {
+static void burst_load_words(int32_t* buffer, int word_off, int32_t* dst, int n_words) {
 #pragma HLS INLINE off
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
     wide_t* wb = reinterpret_cast<wide_t*>(buffer);
-    wide_t beat = wb[word_off >> 4];
-LANE: for (int lane = 0; lane < 16; lane++) {
+    int n_wide = n_words >> 4, woff = word_off >> 4;
+LOAD_W: for (int w = 0; w < n_wide; w++) {
+#pragma HLS PIPELINE II=1
+        wide_t beat = wb[woff + w];
+        for (int lane = 0; lane < 16; lane++) {
 #pragma HLS UNROLL
-        dst[lane] = (int32_t)(int)(ap_int<32>)beat.range(lane * 32 + 31, lane * 32);
+            dst[w * 16 + lane] = (int32_t)(int)(ap_int<32>)beat.range(lane * 32 + 31, lane * 32);
+        }
     }
 #else
-    for (int lane = 0; lane < 16; lane++) dst[lane] = buffer[word_off + lane];
+    for (int i = 0; i < n_words; i++) dst[i] = buffer[word_off + i];
 #endif
 }
 
 // y[o] = sat16( bias[o] + sum_i dyadic_mac(x[i], exp[o,i], sgn[o,i]) ) — a shift+add-tree matmul.
-// STREAMING: the weights (~MB) live in HBM and are read as flat 16-word aligned bursts (off_exp/off_sgn
-// must be 16-aligned); only the small activations x/y stay on-chip. Bit-exact to the scalar matmul:
-// the flat index idx == o*IN+i is read in the same order, just 16 words per AXI beat.
+// STREAMING (HBM): weights (~MB) don't fit on-chip, so read them in 16-word-aligned CHUNK tiles and run a
+// CLEANLY-PIPELINED compute pass over each tile (II=1; the burst is its own pipelined pass). This is the
+// fast form — the per-element conditional-reload version stalled the pipeline (~28 cyc/MAC). Bit-exact to
+// the scalar matmul: flat idx == o*IN+i, same order. Only the small activations x/y stay on-chip.
 static void dyadic_linear(int32_t* buffer, int off_exp, int off_sgn, const int32_t* bias,
                           const data_t* x, data_t* y, int OUT, int IN) {
-    int32_t eb[16], sb[16];
-    int lane = 16;                              // force a beat load on the first iteration
+    const int CH = 4096;                        // 16-word-multiple tile (16 KB/array on-chip)
+    int32_t et[CH], st[CH];
     int o = 0, i = 0, total = OUT * IN;
     acc_t acc = (acc_t)bias[0];
-    DL: for (int idx = 0; idx < total; idx++) {
+    CHUNK: for (int base = 0; base < total; base += CH) {
+        int n = (total - base < CH) ? (total - base) : CH;
+        int nrd = (n + 15) & ~15;               // whole beats (last beat overreads into the 16-aligned gap)
+        burst_load_words(buffer, off_exp + base, et, nrd);
+        burst_load_words(buffer, off_sgn + base, st, nrd);
+        COMPUTE: for (int k = 0; k < n; k++) {
 #pragma HLS PIPELINE II=1
-        if (lane == 16) { burst_load16(buffer, off_exp + idx, eb); burst_load16(buffer, off_sgn + idx, sb); lane = 0; }
-        acc += dyadic_mac(x[i], eb[lane], sb[lane]);
-        lane++; i++;
-        if (i == IN) { y[o] = sat16(acc); o++; i = 0; if (o < OUT) acc = (acc_t)bias[o]; }
+            acc += dyadic_mac(x[i], et[k], st[k]);
+            i++;
+            if (i == IN) { y[o] = sat16(acc); o++; i = 0; if (o < OUT) acc = (acc_t)bias[o]; }
+        }
     }
 }
 
