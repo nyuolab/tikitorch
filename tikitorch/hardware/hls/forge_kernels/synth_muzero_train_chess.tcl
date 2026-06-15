@@ -14,6 +14,12 @@ open_solution -reset solution1
 set_top $top
 set_part $target_part
 create_clock -period $target_period_ns
+# ZERO-DSP GUARANTEE: this is a multiply-FREE datapath (dyadic shift+add, SignSGD sign-select). The only
+# multiplies HLS can find are integer ADDRESS arithmetic (o*IN), which it maps to a DSP48 BY DEFAULT — even
+# when IN is a compile-time constant. Force ALL mul ops to LUT fabric so DSP=0 is guaranteed at synthesis,
+# independent of HLS's binding heuristics. The source pointer-walks already remove o*IN, so this is a backstop
+# (nothing left to map); it is the correct constraint to DECLARE for a zero-DSP design.
+config_op mul -impl fabric
 csynth_design
 
 puts "==== chess-scale train csynth report ===="

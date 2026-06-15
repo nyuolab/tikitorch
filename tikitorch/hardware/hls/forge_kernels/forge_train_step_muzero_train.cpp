@@ -82,13 +82,15 @@ static inline void sgd_update(int32_t* w, int delta) {   // SignSGD: w <- clamp1
 // constexpr MZ_* dims, so this is a pure addressing change — bit-exact.
 template <int OUT, int IN>
 static void fwd_linear(const int32_t* W, const int32_t* bias, const data_t* x, data_t* y) {
-    for (int o = 0; o < OUT; o++) {
-        acc_t acc = (acc_t)bias[o];
+    const int32_t* Wrow = W;                 // pointer-walk: Wrow += IN (add), NOT W[o*IN+i]. HLS maps even a
+    for (int o = 0; o < OUT; o++) {          // CONSTANT mul (o*IN, IN compile-time) to a DSP48 by default, so
+        acc_t acc = (acc_t)bias[o];          // templating alone left DSP=195 — the mul must be GONE from source.
         for (int i = 0; i < IN; i++) {
-            int e, s; nearest_pow2((int)W[o * IN + i], e, s);
+            int e, s; nearest_pow2((int)Wrow[i], e, s);
             acc += dyq_apply(e, s, (acc_t)x[i]);
         }
         y[o] = sat16(acc);
+        Wrow += IN;
     }
 }
 
@@ -99,9 +101,11 @@ template <int OUT, int IN>
 static void bwd_input(const int32_t* W, const acc_t* g_out, acc_t* g_in) {
     for (int i = 0; i < IN; i++) {
         acc_t g = 0;
+        const int32_t* Wp = W + i;           // transposed read: Wp += IN per o (add), NOT W[o*IN+i] (DSP mul)
         for (int o = 0; o < OUT; o++) {
-            int e, s; nearest_pow2((int)W[o * IN + i], e, s);
+            int e, s; nearest_pow2((int)*Wp, e, s);
             g += dyq_apply(e, s, g_out[o]);
+            Wp += IN;
         }
         g_in[i] = g;
     }
@@ -111,11 +115,13 @@ static void bwd_input(const int32_t* W, const acc_t* g_out, acc_t* g_in) {
 // OUT/IN template params (see fwd_linear) so the W[o*IN+i] update index is a shift. Bit-exact.
 template <int OUT, int IN>
 static void sgd_layer(int32_t* W, int32_t* bias, const acc_t* g_out, const data_t* x, int lr) {
+    int32_t* Wrow = W;                        // pointer-walk: Wrow += IN (add), NOT W[o*IN+i] (DSP mul)
     for (int o = 0; o < OUT; o++) {
         int go = isign(g_out[o]);
         for (int i = 0; i < IN; i++)
-            sgd_update(&W[o * IN + i], lrstep(lr, sgnprod((acc_t)go, (acc_t)x[i])));
+            sgd_update(&Wrow[i], lrstep(lr, sgnprod((acc_t)go, (acc_t)x[i])));
         sgd_update(&bias[o], lrstep(lr, go));
+        Wrow += IN;
     }
 }
 
