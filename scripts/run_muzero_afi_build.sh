@@ -137,10 +137,16 @@ echo "BUILD_PY=\$BUILD_PY"; [ -z "\$BUILD_PY" ] && { echo "FATAL: aws_build_dcp_
 chmod +x "\$BUILD_PY" 2>/dev/null
 cd "\$(dirname "\$BUILD_PY")"
 echo "=== aws_build_dcp_from_cl START \$(date -u) ==="
-./aws_build_dcp_from_cl.py --cl "\$CL" --no-encrypt 2>&1 | tail -80 ; echo "BUILD_RC=\${PIPESTATUS[0]}"
+# capture the FULL build output (tail -80 previously hid generate_dcp_tarball); upload it whole
+./aws_build_dcp_from_cl.py --cl "\$CL" --no-encrypt > /tmp/aws_build.full.log 2>&1; echo "BUILD_RC=\$?"
+tail -100 /tmp/aws_build.full.log
+aws s3 cp /tmp/aws_build.full.log "\$S3_RESULTS/aws_build.full.log" --only-show-errors || true
 echo "=== build done \$(date -u) ==="
 # --- 5. collect outputs ---
-aws s3 cp "\$CLROOT/build/checkpoints/to_aws/" "\$S3_RESULTS/to_aws/" --recursive --only-show-errors 2>/dev/null || true
+# The tarball create-fpga-image needs is checkpoints/<tag>.Developer_CL.tar (the script tars ./to_aws then
+# DELETES to_aws/, so upload the .tar itself + the post_route DCP as backup), plus a checkpoints listing.
+ls -la "\$CLROOT/build/checkpoints/" "\$CLROOT/build/checkpoints/to_aws/" 2>&1 | aws s3 cp - "\$S3_RESULTS/checkpoints_listing.txt" --only-show-errors || true
+aws s3 cp "\$CLROOT/build/checkpoints/" "\$S3_RESULTS/to_aws/" --recursive --exclude "*" --include "*Developer_CL.tar" --include "*.tar" --include "*post_route*.dcp" --only-show-errors 2>/dev/null || true
 for r in \$(find "\$CLROOT/build" -name "*.rpt" -o -name "*timing*summary*" 2>/dev/null); do aws s3 cp "\$r" "\$S3_RESULTS/reports/\$(basename "\$r")" --only-show-errors 2>/dev/null || true; done
 aws s3 cp "\$CLROOT/build/scripts/" "\$S3_RESULTS/scriptlogs/" --recursive --exclude "*" --include "*.log" --only-show-errors 2>/dev/null || true
 echo "rc done=\$(date -u)" | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
