@@ -16,4 +16,13 @@ read_ip [glob $CL_DIR/design/ip/axi_register_slice_pcim/axi_register_slice_pcim.
 synth_ip [get_ips axi_register_slice_light]
 synth_ip [get_ips axi_register_slice_pcim]
 
+# Synthesize the CL (verbatim flags from synth_CL_TEMPLATE.tcl). MUST be here, not the footer —
+# the footer's first command is write_checkpoint, which needs an already-synthesized open design.
+# (The prior run proved read_verilog elaborated cl_forge_muzero + the PCIM wiring with 0 errors.)
+synth_design -mode out_of_context \
+             -top ${CL} \
+             -verilog_define XSDB_SLV_DIS \
+             -part ${DEVICE_TYPE} \
+             -keep_equivalent_registers
+
 source ${HDK_SHELL_DIR}/build/scripts/synth_cl_footer.tcl
