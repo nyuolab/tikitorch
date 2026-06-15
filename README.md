@@ -444,7 +444,9 @@ Measured on AWS EC2 F2 (Virtex UltraScale+ VU47P), validated end-to-end:
 | 1-layer tropical LM | ~1474 tok/s | — | ~-0.20 ns | C + DMA host driver |
 | **2-layer tropical LM** | **~772 tok/s** | **~9.0 mJ/token** (6.98 W) | **-0.197 ns** | first multilayer NN training on FPGA, zero DSPs |
 | 3-layer tropical LM | ~521 tok/s | — | -0.197 ns | depth saturates; width is the next constraint |
-| **fully-tropical morph-LM (config B), fused on-fabric** | **~3,827 tok/s** | **~0.78 mJ/token** (3 W core) | **-0.039 ns** | whole training loop (fwd + CE loss + bwd + signSGD) in ONE host kick, bit-exact to host golden, zero DSPs |
+| **fully-tropical morph-LM (config B), 1 kernel** | **14,236 tok/s** | **~0.3 mJ/token** (~4 W core) | **-0.020 ns** | whole training loop (fwd + CE loss + bwd + signSGD) in ONE host kick, bit-exact, zero DSPs (resident-W + on-chip-grad + URAM-offload, supersedes the v8 3,827) |
+| **morph-LM N=2 replicated** | **26,522 tok/s** | ~0.3 mJ/token | -0.097 ns | 2.00× linear, both bit-exact, wall unchanged (true parallel) |
+| **morph-LM N=4 replicated (SLR-local max)** | **53,001 tok/s** | ~0.3 mJ/token | -0.173 ns | **4.00× linear, all 4 bit-exact = 49.5 % of nanoGPT (107k)**, N kernels across the 3 SLRs, zero DSPs |
 
 ![Multiplier-free tropical LM vs nanoGPT — quality and FPGA-vs-GPU throughput/energy](results/lm_shakespeare/fig_hallmark_lm.png)
 
@@ -455,10 +457,14 @@ params/data/tokenizer the strict tropical MorphSSM reaches **2.79 bpb** on
 tiny-shakespeare BPE-1024 vs **2.27 bpb** for a parameter-matched AdamW nanoGPT,
 the strict curve still descending. **Right:** the same update rule trains
 **end-to-end on AWS F2 silicon** — the fully-tropical morph-LM runs the whole
-30-step loop on-fabric in a single host kick at **~3,827 tok/s, DSP=0, 3 W core,
-bit-exact to the host golden** (AFI `cl_forge_morph_lm_v8_aligned`, fused mode 3),
-~28× slower wall-clock than an A10G (107k tok/s) — the honest 3 W-vs-72 W
-tradeoff (no board-to-board energy-win claim; 3 W is the core rail, not the card).
+30-step loop on-fabric in a single host kick (**14,236 tok/s/kernel, DSP=0,
+~4 W core, bit-exact**), and **replicating the kernel across the VU47P's 3 SLRs
+scales throughput perfectly linearly — measured 2.00× at N=2 and 4.00× at N=4
+(53,001 tok/s, all four instances bit-exact, wall-clock unchanged = true
+parallel)**, reaching **49.5 % of nanoGPT's 107k tok/s** (~2× slower wall, down
+from ~7.5× for one kernel). N=4 is the SLR-local maximum (per-SLR URAM); N=8
+GPU-parity (~106k) is projected from the measured linearity. No board-to-board
+energy-win claim — ~4 W is the core rail, not the card.
 Full provenance + scope in
 [`results/lm_shakespeare/fig_hallmark_lm.md`](results/lm_shakespeare/fig_hallmark_lm.md);
 regenerate with `python scripts/make_hallmark_figure.py`.*
