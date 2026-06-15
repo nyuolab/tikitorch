@@ -1,8 +1,11 @@
 # Chess: multiply-free TikiTorch vs MuZero — a 4-axis comparison (quality / throughput / energy / silicon)
 
-> **Status: all 4 axes measured (2026-06-13); adversarially honesty-audited against source files.** Quality
-> (axis 1, CPU), throughput + energy (axes 2–3, measured GPU + C-synth-derived FPGA), and silicon (axis 4,
-> chess-scale C-synth) are all filled. Mirrors `results/lm_shakespeare/fig_hallmark_lm.md`.
+> **Status: all 4 axes measured; adversarially honesty-audited against source files (silicon axis re-audited
+> 2026-06-15 after the 512-bit streaming-kernel rewrite).** Quality (axis 1, CPU), throughput + energy
+> (axes 2–3, measured GPU + C-synth-derived FPGA), and silicon (axis 4, chess-scale C-synth) are all filled.
+> **Silicon headline: the FORWARD kernel is C-synth silicon-ready (DSP=0, 14%-of-SLR LUT, timing met with
+> margin); the TRAIN kernel is research-track (170%-of-SLR LUT + C-synth timing miss, even at DSP=0).**
+> Mirrors `results/lm_shakespeare/fig_hallmark_lm.md`.
 
 ## Executive summary (the honest answer)
 
@@ -16,9 +19,15 @@ energy:** the only *measured* arm is reference MuZero on one A10G (1.42 self-pla
 samples/s; end-to-end 47.6 J/move, GPU-active 3.7 J/move — GPU ~93% idle, chess self-play is CPU-bound). The
 FPGA throughput figures (78.7 inf/s fwd, 30.3/s train) are **C-synth-derived, NOT comparable** to the GPU arm
 (tiny dyadic net vs resnet; estimate vs measured) — no FPGA throughput or energy win is proven, and the GPU
-actually wins the learner direction (54.6 vs 30.3 samples/s). **Silicon:** the defensible claim is **DSP=0
-forward inference** (train kernel DSP=1/9024), at chess dims on the F2 part, 250 MHz met — but these are Vitis
-**C-synthesis estimates**, never place-and-routed, no AFI, **no routed energy/power figure of any kind**.
+actually wins the learner direction (54.6 vs 30.3 samples/s). **Silicon:** the defensible claim is the
+**zero-DSP FORWARD inference kernel** — chess-scale C-synth DSP=0, LUT 61.5k (14% of one SLR), timing met with
+margin (est 2.920 ns vs 4.00 ns target), 7.92 ms — silicon-ready and the AFI target. The **TRAIN kernel is NOT
+AFI-viable**: its chess-scale streaming rewrite C-synths at 170% of one SLR's LUT (740k → mandatorily
+multi-SLR) and **misses C-synth timing** (5.427 ns); it also surfaced DSP=195 from runtime address-stride
+multiplies (`o*IN` with non-pow2 chess `IN`), fixed bit-exactly to DSP=0 (templated the workers on compile-time
+dims; CSIM-confirmed, csynth re-confirm in flight) — but DSP=0 does not resolve the area/timing blockers. All
+silicon numbers are Vitis **C-synthesis estimates**, never place-and-routed, no AFI, **no routed energy/power
+figure of any kind**.
 
 **Honest framing (the standing caption).** This is a **systems comparison, not a strength contest.** The
 chess-quality gap to DeepMind is a **compute/search gap** (TPU-pod scale, ~800-sim MCTS, tens of millions of
@@ -115,7 +124,7 @@ sizes differ by orders of magnitude, so do NOT directly compare their samples/s 
 |---|---|---|---|
 | TikiTorch multiply-free, **CPU** (own true-MuZero chess loop) | TBD | TBD | `[to-measure]` EC2 CPU (free) |
 | **reference MuZero, A10G** (g5.4xlarge, resnet b6c64, 50 sims, 12 workers) | **1.42** | **54.6** (0.43 steps/s × b128) | `[measured]` GPU compute-idle ~93% (util<5%) — self-play CPU-bound (mz_summary.json) |
-| TikiTorch chess kernel, **FPGA** _(NOT comparable to GPU row →)_ | fwd: **78.7 inf/s** _(est.)_ | **30.3** /s _(est., batch=1)_ | `[C-synth-derived]` from axis-4 latencies (serial, no PIPELINE); tiny dyadic net ≠ resnet; estimate ≠ measured — **implies no FPGA win** |
+| TikiTorch chess kernel, **FPGA** _(NOT comparable to GPU row →)_ | fwd: **126 inf/s** _(est.)_ | **40** /s _(est., batch=1)_ | `[C-synth-derived]` from axis-4 streaming latencies (fwd 7.92 ms; train 24.86 ms); tiny dyadic net ≠ resnet; estimate ≠ measured — **implies no FPGA win** (and the train kernel is not AFI-viable; see axis 4) |
 | _anchor: MiniZero, single box (Othello, **not** chess)_ | ~5 board-games/s (378.5 s / 2000-game iter, 4×1080Ti) | — | `[citable]` arXiv:2310.11305 |
 | _anchor: AlphaZero search rate_ | ~80k positions/s | — | `[citable]` arXiv:1712.01815 |
 
@@ -150,24 +159,32 @@ active-avg vs whole-window (1.46–1.49 mJ)._
 
 | arm | metric | value | provenance |
 |---|---|---|---|
-| **TikiTorch chess-scale FORWARD kernel** (initial inference) | DSP, latency, area @250 MHz | **DSP=0; 3,173,888 cyc = 12.70 ms; LUT 83,485 (6%) / FF 46,558 (1%); 9 BRAM; 0 URAM** | `[measured]` Vitis **C-synth**, xcvu47p (F2 part); forge_train_step_muzero_CHESS_csynth.rpt |
-| **TikiTorch chess-scale TRAIN kernel** (bwd + SignSGD) | bounded train-step latency, area | **DSP=1 (~0 of 9024); 8,262,161 cyc = 33.05 ms; LUT 89,759 (6%) / FF 39,544 (1%); 16 BRAM; 0 URAM** | `[measured]` Vitis **C-synth**; the `?` is now RESOLVED (bounded the `nearest_pow2` loop, roadmap M2); forge_train_step_muzero_train_CHESS_csynth.rpt |
-| _(reference: gridworld-scale forward, prior)_ | DSP, latency | DSP=0; 25,539 cyc = 0.102 ms; LUT 109,165 | `[measured]` C-synth (small net; superseded by the chess-scale rows above) |
+| **TikiTorch chess-scale FORWARD kernel** (initial inference) — **silicon-ready** | DSP, latency, area, timing | **DSP=0; 1,980,319 cyc = 7.92 ms; LUT 61,542 (14% of one SLR) / FF 26,167 (3%); 133 BRAM (10%); 0 URAM; est 2.920 ns < 4.00 ns target (timing MET, margin)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite), xcvu47p (F2 part); forge_train_step_muzero_CHESS_csynth.rpt |
+| **TikiTorch chess-scale TRAIN kernel** (bwd + SignSGD) — **research-track, NOT AFI-viable** | DSP, latency, area, timing | **DSP=0 after fix** (was 195 — runtime address-stride mults, templated to compile-time dims; CSIM bit-exact, csynth re-confirm in flight); **4,580,159 cyc = 24.86 ms; LUT 740,242 (170% of one SLR) / FF 261,666 (30%); 324 BRAM (24%); 65 URAM (20%); est 5.427 ns > 4.00 ns target (timing MISS)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite); forge_train_step_muzero_train_CHESS_csynth.rpt |
+| _(reference: pre-streaming chess kernels, 2026-06-13, superseded)_ | DSP, latency, LUT | fwd DSP=0 / 12.70 ms / 83,485 LUT · train DSP=1 / 33.05 ms / 89,759 LUT | `[measured]` C-synth; small-area but per-element HBM access, not the deployable streaming kernel — superseded by the streaming rows above |
 | any TikiTorch MuZero **AFI / P&R / on-silicon power** | timing closure, power-rail energy | **NEVER routed**; csynth-timing-met ≠ silicon (the only routed sibling, char-LM, failed WNS −1.557 ns before closing v6) | `[missing]` — gated behind a strength result |
 | reference GPU / DeepMind | DSP/area | N/A — different substrate (that asymmetry *is* the point) | `[missing]` |
 
-_Axis-4 caveats: both numbers are Vitis HLS **C-synthesis estimates** at chess dims (OBS=769, L=64, A=4096),
-**serial (no PIPELINE pragma)**, on the F2 part at 250 MHz. They are NOT place-and-route, NOT silicon, NOT an
-AFI — csynth timing-met does **not** imply silicon closure (the char-LM precedent). The ~zero-DSP result
-(forward DSP=0; train DSP=1/9024) is the load-bearing, defensible claim; the latency/area are estimates._
+_Axis-4 caveats: all numbers are Vitis HLS **C-synthesis estimates** at chess dims (OBS=769, L=64, A=4096) on
+the F2 part (xcvu47p), 4.00 ns / 250 MHz target. They are NOT place-and-route, NOT silicon, NOT an AFI — and
+csynth-timing-met does **not** imply silicon closure (the char-LM precedent: WNS −1.557 ns appeared only at
+route). **The forward kernel is the defensible silicon claim** (DSP=0, 14%-SLR LUT, timing met with margin —
+comfortable single-SLR fit). **The train kernel is research-track**: even at DSP=0 its 170%-of-SLR LUT is
+mandatorily multi-SLR (HLS will not auto-partition a single C function across SLRs) and it misses C-synth
+timing — it needs an area+partition rewrite (URAM-stage the resident matrices, II-fold the 4096-way head, or
+split into SLR-sized `hls::stream`/FIFO sub-kernels) before it is a silicon target. The DSP=195→0 fix restores
+the zero-DSP claim for training but does NOT change the area/timing verdict (DSP removal is LUT-neutral)._
 
 ---
 
 ## What's grounded now vs what each remaining run produces
 
 - **Grounded now (this doc):** Axis 1 entirely (DeepMind ceiling + TikiTorch measured, with the honest
-  decoupling); **Axis 4 (silicon) COMPLETE at chess scale** — forward (12.70 ms, DSP=0) + train (33.05 ms,
-  DSP=1/9024), both C-synth on the F2 part, timing met (DONE 2026-06-13).
+  decoupling); **Axis 4 (silicon): FORWARD kernel C-synth silicon-ready** (DSP=0, 7.92 ms, 14%-SLR LUT, timing
+  met with margin) — the AFI target; **TRAIN kernel research-track** (DSP=0 after the address-stride fix, but
+  170%-SLR LUT + C-synth timing miss → not AFI-viable without an area/partition rewrite). Streaming-kernel
+  re-audit 2026-06-15 **supersedes** the earlier "Axis 4 COMPLETE / timing met" claim (those were the
+  pre-streaming per-element-HBM kernels).
 - **`[to-measure]`, ~free, fast:** Axis 2 CPU row (wrap TikiTorch's own chess loop in a moves/s + samples/s
   counter — it already runs).
 - **`[to-measure]`, ~$0.5–2, ~0.5–2 GPU-h:** Axis 2+3 GPU rows — a dense MuZero board loop on one A10G
