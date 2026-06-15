@@ -69,23 +69,26 @@ NOT committed (gitignored, regenerable): `build/checkpoints/`, `*.dcp`,
 `*.vivado.log`, `build/src_post_encryption/`, `to_aws/` tarballs, generated
 `design/ip/*` (rebuilt by `gen_ip.tcl`).
 
-## What needs the F2 build box ("F2-VALIDATION REQUIRED")
+## PCIM wiring — RESOLVED (probed against the F2 shell, 2026-06-15)
 
-The PCIM signal contract — exact port names, vector widths, and `*user` fields —
-is defined in the HDK's `cl_ports.vh` + `unused_*_template.inc`, which ship with
-the shell **on the build box, not in this repo**. The `.sv` PCIM section is
-written to the standard AWS HDK PCIM names (`cl_sh_pcim_*` out / `sh_cl_pcim_*`
-in) and left **commented out** with an explicit reconciliation checklist inline.
-On the F2 box, before the first build:
+The PCIM signal contract was extracted from the real F2 shell on a build box
+(`run_f2_hdk_probe.sh` → `results/fpga_silicon/hdk_probe/`): aws-fpga **rc/2.3.2**,
+`HDK_SHELL_DIR=.../hdk/common/shell_stable`. Ground truth that shaped the wiring:
 
-1. Open the HDK `cl_ports.vh` and confirm the PCIM port names/widths (the 2026
-   shell renamed OCL to `ocl_cl_*`/`cl_ocl_*`; verify whether PCIM was also
-   touched and whether `unused_dma_pcis_template.inc` is the correct unused
-   include name for DMA-PCIS).
-2. Uncomment the `PCIM_REG_SLC` instance, reconcile names, widen kernel ID 1→6,
-   tie `cl_sh_pcim_awuser/aruser` to the shell default.
-3. This is a ~30-line edit, **not a redesign** — everything else (IDs, status,
-   reset sync, OCL slice, kernel control) is the proven morph-LM wiring.
+- PCIM ports are `cl_sh_pcim_*` (CL→shell out) / `sh_cl_pcim_*` (in), **ID width
+  16** (`cl_sh_pcim_awid/arid [15:0]`) — the kernel's 1-bit `m_axi` ID is
+  zero-extended to 16 (`{15'h0, krn_awid}`); `gen_ip.tcl` sets `ID_WIDTH=16`.
+- `cl_sh_pcim_awuser/aruser` are **55-bit** ([54:0]); the shell also exposes
+  `cl_sh_pcim_wid [15:0]` + `wuser [63:0]` that an AXI4 master doesn't drive —
+  all four are tied to 0 in the `.sv`.
+- OCL is the renamed F2 family `ocl_cl_*`/`cl_ocl_*` (already used).
+- `unused_dma_pcis_template.inc` **is** the correct DMA-PCIS tie-off include
+  (confirmed present in the shell's `design/interfaces/`).
+
+The `PCIM_REG_SLC` instance is now wired (not a sketch). **Still do a synth-only
+smoke first** (fast) before the ~3 h P&R, to catch any `axi_register_slice` IP
+port-list mismatch. Everything else (IDs, status, reset sync, OCL slice, kernel
+control) is the proven morph-LM wiring.
 
 ## Rebuild recipe (fresh F2 box)
 

@@ -34,15 +34,12 @@
 //   family (May-era ocl_* names synthesize with a FLOATING control plane; see
 //   SILICON_FINDINGS.md). PCIM keeps the cl_sh_pcim_* / sh_cl_pcim_* family.
 //
-// !!! F2-VALIDATION REQUIRED (see README §"What needs the F2 build box") !!!
-//   The PCIM section below is written to the standard AWS HDK PCIM signal names
-//   and widths. The EXACT port names / vector widths / *user fields for the 2026
-//   F2 shell are defined in `cl_ports.vh` + the `unused_*_template.inc` files,
-//   which ship with the HDK on the build box (NOT in this repo). Reconcile this
-//   section against that `cl_ports.vh` on the F2 box before the first build —
-//   that reconciliation is a ~30-line edit, not a redesign. Everything ABOVE the
-//   PCIM section (IDs, status, reset sync, OCL slice, kernel control) is the
-//   proven morph-LM wiring and should synthesize as-is.
+// PCIM wiring RESOLVED 2026-06-15: reconciled against the F2 shell_stable
+//   cl_ports.vh (aws-fpga rc/2.3.2), probed to results/fpga_silicon/hdk_probe/.
+//   PCIM ID width = 16 (gen_ip ID_WIDTH=16, kernel 1-bit ID zero-extended);
+//   awuser/aruser = 55-bit, wid/wuser tied off (AXI4 master doesn't drive them).
+//   DMA-PCIS tied off via unused_dma_pcis_template.inc (confirmed present in the
+//   F2 HDK interfaces). Synth-smoke before P&R is still wise (IP port-list match).
 // =============================================================================
 
 `include "cl_forge_muzero_defines.vh"
@@ -234,72 +231,76 @@ module cl_forge_muzero
 
   // =========================================================================
   // PCIM path: kernel m_axi gmem --[axi_register_slice_pcim]--> shell PCIM.
-  // ========================== F2-VALIDATION REQUIRED =======================
-  // The slice's m_axi_* side connects to the shell PCIM ports (cl_sh_pcim_* out,
-  // sh_cl_pcim_* in). The names/widths below follow the standard AWS HDK PCIM
-  // contract; CONFIRM each against the F2 `cl_ports.vh` on the build box (the
-  // 2026 shell may rename/resize *user fields and the ID width). The kernel side
-  // is the local `krn_*` nets above and is correct as written.
-  //
-  //   - Kernel AWID/ARID are 1 bit; PCIM ID width is 6 (gen_ip.tcl ID_WIDTH=6).
-  //     Zero-extend kernel->slice ({5'h0, krn_awid}) and drop the high bits on
-  //     the response (slice->kernel) — a single in-flight ID, so this is safe.
-  //   - cl_sh_pcim_awuser/aruser: tie to the shell's required default (0 unless
-  //     the F2 shell documents a non-zero data-mover encoding).
-  //   - The shell PCIM address space maps to host DRAM; the host passes the
-  //     buffer's PCIM bus address into the kernel via the OCL `buffer` offset
-  //     register (offset=slave), so no address translation is done in the CL.
-  //
-  // Sketch (UNCOMMENT + reconcile names on the F2 box):
-  //
-  //   axi_register_slice_pcim PCIM_REG_SLC (
-  //     .aclk    (clk_main_a0),
-  //     .aresetn (rst_n_local),
-  //     // ---- slave side: kernel master (widen ID 1 -> 6) ----
-  //     .s_axi_awid    ({5'h0, krn_awid}),  .s_axi_awaddr (krn_awaddr),
-  //     .s_axi_awlen   (krn_awlen),         .s_axi_awsize (krn_awsize),
-  //     .s_axi_awburst (krn_awburst),       .s_axi_awcache(krn_awcache),
-  //     .s_axi_awprot  (krn_awprot),        .s_axi_awlock (krn_awlock[0]),
-  //     .s_axi_awvalid (krn_awvalid),       .s_axi_awready(krn_awready),
-  //     .s_axi_wdata   (krn_wdata),         .s_axi_wstrb  (krn_wstrb),
-  //     .s_axi_wlast   (krn_wlast),         .s_axi_wvalid (krn_wvalid),
-  //     .s_axi_wready  (krn_wready),
-  //     .s_axi_bid     (/*-> krn_bid*/),    .s_axi_bresp  (krn_bresp),
-  //     .s_axi_bvalid  (krn_bvalid),        .s_axi_bready (krn_bready),
-  //     .s_axi_arid    ({5'h0, krn_arid}),  .s_axi_araddr (krn_araddr),
-  //     .s_axi_arlen   (krn_arlen),         .s_axi_arsize (krn_arsize),
-  //     .s_axi_arburst (krn_arburst),       .s_axi_arcache(krn_arcache),
-  //     .s_axi_arprot  (krn_arprot),        .s_axi_arlock (krn_arlock[0]),
-  //     .s_axi_arvalid (krn_arvalid),       .s_axi_arready(krn_arready),
-  //     .s_axi_rid     (/*-> krn_rid*/),    .s_axi_rdata  (krn_rdata),
-  //     .s_axi_rresp   (krn_rresp),         .s_axi_rlast  (krn_rlast),
-  //     .s_axi_rvalid  (krn_rvalid),        .s_axi_rready (krn_rready),
-  //     // ---- master side: shell PCIM (confirm exact F2 names/widths) ----
-  //     .m_axi_awid    (cl_sh_pcim_awid),   .m_axi_awaddr (cl_sh_pcim_awaddr),
-  //     .m_axi_awlen   (cl_sh_pcim_awlen),  .m_axi_awsize (cl_sh_pcim_awsize),
-  //     .m_axi_awburst (cl_sh_pcim_awburst),.m_axi_awcache(cl_sh_pcim_awcache),
-  //     .m_axi_awprot  (cl_sh_pcim_awprot), .m_axi_awvalid(cl_sh_pcim_awvalid),
-  //     .m_axi_awready (sh_cl_pcim_awready),
-  //     .m_axi_wdata   (cl_sh_pcim_wdata),  .m_axi_wstrb  (cl_sh_pcim_wstrb),
-  //     .m_axi_wlast   (cl_sh_pcim_wlast),  .m_axi_wvalid (cl_sh_pcim_wvalid),
-  //     .m_axi_wready  (sh_cl_pcim_wready),
-  //     .m_axi_bid     (sh_cl_pcim_bid),    .m_axi_bresp  (sh_cl_pcim_bresp),
-  //     .m_axi_bvalid  (sh_cl_pcim_bvalid), .m_axi_bready (cl_sh_pcim_bready),
-  //     .m_axi_arid    (cl_sh_pcim_arid),   .m_axi_araddr (cl_sh_pcim_araddr),
-  //     .m_axi_arlen   (cl_sh_pcim_arlen),  .m_axi_arsize (cl_sh_pcim_arsize),
-  //     .m_axi_arburst (cl_sh_pcim_arburst),.m_axi_arcache(cl_sh_pcim_arcache),
-  //     .m_axi_arprot  (cl_sh_pcim_arprot), .m_axi_arvalid(cl_sh_pcim_arvalid),
-  //     .m_axi_arready (sh_cl_pcim_arready),
-  //     .m_axi_rid     (sh_cl_pcim_rid),    .m_axi_rdata  (sh_cl_pcim_rdata),
-  //     .m_axi_rresp   (sh_cl_pcim_rresp),  .m_axi_rlast  (sh_cl_pcim_rlast),
-  //     .m_axi_rvalid  (sh_cl_pcim_rvalid), .m_axi_rready (cl_sh_pcim_rready)
-  //   );
-  //   assign cl_sh_pcim_awuser = '0;   // confirm field exists/width on F2
-  //   assign cl_sh_pcim_aruser = '0;
-  //
-  // Until the PCIM slice is wired on the F2 box, the kernel master nets are left
-  // unconnected on their far side (krn_*ready stay low) — the kernel will stall,
-  // which is the intended "not yet wired" state for a synth-only smoke check.
+  // WIRED against the F2 shell_stable cl_ports.vh (aws-fpga rc/2.3.2), probed
+  // 2026-06-15 (results/fpga_silicon/hdk_probe/). Ground-truth facts that drove
+  // this (they differ from the earlier sketch): PCIM ID width = **16**
+  // (cl_sh_pcim_awid/arid [15:0]); awuser/aruser = **55-bit** [54:0]; the shell
+  // also exposes cl_sh_pcim_wid [15:0] + wuser [63:0] that an AXI4 master does
+  // not drive. The register slice (axi_register_slice_pcim, ID_WIDTH=16) breaks
+  // the long hop to the shell PCIe DMA engine (the shell-boundary path the
+  // morph-LM bring-up found needs a registered crossing).
+  //   - Kernel AWID/ARID are 1 bit; widen to the 16-bit PCIM ID ({15'h0, ...}).
+  //     Responses carry a single in-flight ID, so the high bits are don't-care
+  //     (we take bit 0 back into the kernel's 1-bit RID/BID).
+  //   - The host passes the buffer's PCIM bus address into the kernel via the OCL
+  //     `buffer` offset register (offset=slave); no address translation in the CL.
   // =========================================================================
+  logic [15:0] pcim_bid, pcim_rid;          // 16-bit slice<->kernel response IDs (kernel uses bit 0)
+  assign krn_bid = pcim_bid[0];
+  assign krn_rid = pcim_rid[0];
+
+  axi_register_slice_pcim PCIM_REG_SLC (
+    .aclk    (clk_main_a0),
+    .aresetn (rst_n_local),
+    // ---- slave side: the kernel master (widen ID 1 -> 16; no region/qos from HLS) ----
+    .s_axi_awid    ({15'h0, krn_awid}), .s_axi_awaddr  (krn_awaddr),
+    .s_axi_awlen   (krn_awlen),         .s_axi_awsize  (krn_awsize),
+    .s_axi_awburst (krn_awburst),       .s_axi_awlock  (krn_awlock[0]),
+    .s_axi_awcache (krn_awcache),       .s_axi_awprot  (krn_awprot),
+    .s_axi_awregion(4'h0),              .s_axi_awqos   (krn_awqos),
+    .s_axi_awvalid (krn_awvalid),       .s_axi_awready (krn_awready),
+    .s_axi_wdata   (krn_wdata),         .s_axi_wstrb   (krn_wstrb),
+    .s_axi_wlast   (krn_wlast),         .s_axi_wvalid  (krn_wvalid),
+    .s_axi_wready  (krn_wready),
+    .s_axi_bid     (pcim_bid),          .s_axi_bresp   (krn_bresp),
+    .s_axi_bvalid  (krn_bvalid),        .s_axi_bready  (krn_bready),
+    .s_axi_arid    ({15'h0, krn_arid}), .s_axi_araddr  (krn_araddr),
+    .s_axi_arlen   (krn_arlen),         .s_axi_arsize  (krn_arsize),
+    .s_axi_arburst (krn_arburst),       .s_axi_arlock  (krn_arlock[0]),
+    .s_axi_arcache (krn_arcache),       .s_axi_arprot  (krn_arprot),
+    .s_axi_arregion(4'h0),              .s_axi_arqos   (krn_arqos),
+    .s_axi_arvalid (krn_arvalid),       .s_axi_arready (krn_arready),
+    .s_axi_rid     (pcim_rid),          .s_axi_rdata   (krn_rdata),
+    .s_axi_rresp   (krn_rresp),         .s_axi_rlast   (krn_rlast),
+    .s_axi_rvalid  (krn_rvalid),        .s_axi_rready  (krn_rready),
+    // ---- master side: shell PCIM (cl_sh_pcim_* out / sh_cl_pcim_* in) ----
+    .m_axi_awid    (cl_sh_pcim_awid),   .m_axi_awaddr  (cl_sh_pcim_awaddr),
+    .m_axi_awlen   (cl_sh_pcim_awlen),  .m_axi_awsize  (cl_sh_pcim_awsize),
+    .m_axi_awburst (cl_sh_pcim_awburst),.m_axi_awlock  (cl_sh_pcim_awlock),
+    .m_axi_awcache (cl_sh_pcim_awcache),.m_axi_awprot  (cl_sh_pcim_awprot),
+    .m_axi_awregion(),                  .m_axi_awqos   (cl_sh_pcim_awqos),
+    .m_axi_awvalid (cl_sh_pcim_awvalid),.m_axi_awready (sh_cl_pcim_awready),
+    .m_axi_wdata   (cl_sh_pcim_wdata),  .m_axi_wstrb   (cl_sh_pcim_wstrb),
+    .m_axi_wlast   (cl_sh_pcim_wlast),  .m_axi_wvalid  (cl_sh_pcim_wvalid),
+    .m_axi_wready  (sh_cl_pcim_wready),
+    .m_axi_bid     (sh_cl_pcim_bid),    .m_axi_bresp   (sh_cl_pcim_bresp),
+    .m_axi_bvalid  (sh_cl_pcim_bvalid), .m_axi_bready  (cl_sh_pcim_bready),
+    .m_axi_arid    (cl_sh_pcim_arid),   .m_axi_araddr  (cl_sh_pcim_araddr),
+    .m_axi_arlen   (cl_sh_pcim_arlen),  .m_axi_arsize  (cl_sh_pcim_arsize),
+    .m_axi_arburst (cl_sh_pcim_arburst),.m_axi_arlock  (cl_sh_pcim_arlock),
+    .m_axi_arcache (cl_sh_pcim_arcache),.m_axi_arprot  (cl_sh_pcim_arprot),
+    .m_axi_arregion(),                  .m_axi_arqos   (cl_sh_pcim_arqos),
+    .m_axi_arvalid (cl_sh_pcim_arvalid),.m_axi_arready (sh_cl_pcim_arready),
+    .m_axi_rid     (sh_cl_pcim_rid),    .m_axi_rdata   (sh_cl_pcim_rdata),
+    .m_axi_rresp   (sh_cl_pcim_rresp),  .m_axi_rlast   (sh_cl_pcim_rlast),
+    .m_axi_rvalid  (sh_cl_pcim_rvalid), .m_axi_rready  (cl_sh_pcim_rready)
+  );
+
+  // Shell PCIM signals an AXI4 master does not drive (tie off): the 55-bit
+  // aw/ar user (no data-mover hint), and the AXI3-style wid + 64-bit wuser.
+  assign cl_sh_pcim_awuser = 55'b0;
+  assign cl_sh_pcim_aruser = 55'b0;
+  assign cl_sh_pcim_wid    = 16'b0;
+  assign cl_sh_pcim_wuser  = 64'b0;
 
 endmodule

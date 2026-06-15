@@ -7,7 +7,9 @@ set ipdir [lindex $argv 0]
 create_project -in_memory -part $part
 create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name axi_register_slice_light -dir $ipdir
 set_property -dict [list CONFIG.PROTOCOL {AXI4LITE} CONFIG.ADDR_WIDTH {32} CONFIG.DATA_WIDTH {32}] [get_ips axi_register_slice_light]
-# full AXI4 512b register slice on the kernel m_axi -> PCIM path (helps timing across to the shell PCIM)
+# full AXI4 512b register slice on the kernel m_axi -> PCIM path (helps timing across to the shell PCIM).
+# ID_WIDTH=16 to match the F2 shell PCIM (cl_sh_pcim_awid/arid [15:0], probed from shell_stable cl_ports.vh,
+# aws-fpga rc/2.3.2). The kernel's 1-bit m_axi ID is zero-extended to 16 in cl_forge_muzero.sv.
 create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name axi_register_slice_pcim -dir $ipdir
-set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.ADDR_WIDTH {64} CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {6}] [get_ips axi_register_slice_pcim]
+set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.ADDR_WIDTH {64} CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {16}] [get_ips axi_register_slice_pcim]
 generate_target all [get_ips]
