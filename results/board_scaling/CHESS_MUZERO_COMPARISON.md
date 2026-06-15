@@ -3,7 +3,7 @@
 > **Status: all 4 axes measured; adversarially honesty-audited against source files (silicon axis re-audited
 > 2026-06-15 after the 512-bit streaming-kernel rewrite).** Quality (axis 1, CPU), throughput + energy
 > (axes 2–3, measured GPU + C-synth-derived FPGA), and silicon (axis 4, chess-scale C-synth) are all filled.
-> **Silicon headline: the FORWARD kernel is C-synth silicon-ready (DSP=0, 14%-of-SLR LUT, timing met with
+> **Silicon headline: the FORWARD kernel is PLACED-AND-ROUTED + AFI-REGISTERED (DSP=0, WNS +0.123 ns post-route, agfi-0b2c228a17e516e0a; on-silicon power pending). C-synth: 14%-of-SLR LUT, timing met with
 > margin); the TRAIN kernel is research-track (DSP=0 confirmed, but 184%-of-SLR LUT + C-synth timing miss).**
 > Mirrors `results/lm_shakespeare/fig_hallmark_lm.md`.
 
@@ -28,7 +28,10 @@ multiplies (`o*IN`), now **fixed to DSP=0 — csynth-CONFIRMED** (pointer-walk t
 `config_op mul -impl fabric`; a first templating-only attempt did NOT reduce it because HLS binds even constant
 multiplies to a DSP48 by default). But DSP=0 here is **LUT-positive** (740k→804k, +63k → 184% of one SLR; the address muls
 move to fabric) and does not touch the timing miss — train stays research-track. All silicon numbers are Vitis
-**C-synthesis estimates**, never place-and-routed, no AFI, **no routed energy/power figure of any kind**.
+**C-synthesis estimates** EXCEPT the forward kernel, which is now **place-and-routed (WNS +0.123 ns,
+post-route) and AFI-registered** (`afi-0ae3ac657a1fbbc7e` / `agfi-0b2c228a17e516e0a`, 2026-06-15); the train
+kernel remains C-synth-only. On-silicon **load + Vccint power is still pending** (Stage 3) — so there is still
+**no routed energy/power figure yet**, but the routed-timing-met claim is no longer a C-synth estimate.
 
 **Honest framing (the standing caption).** This is a **systems comparison, not a strength contest.** The
 chess-quality gap to DeepMind is a **compute/search gap** (TPU-pod scale, ~800-sim MCTS, tens of millions of
@@ -160,7 +163,7 @@ active-avg vs whole-window (1.46–1.49 mJ)._
 
 | arm | metric | value | provenance |
 |---|---|---|---|
-| **TikiTorch chess-scale FORWARD kernel** (initial inference) — **silicon-ready** | DSP, latency, area, timing | **DSP=0; 1,980,319 cyc = 7.92 ms; LUT 61,542 (14% of one SLR) / FF 26,167 (3%); 133 BRAM (9.9%); 0 URAM; est 2.920 ns < 4.00 ns target (timing MET, margin)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite), xcvu47p (F2 part); forge_train_step_muzero_CHESS_csynth.rpt |
+| **TikiTorch chess-scale FORWARD kernel** (initial inference) — **ROUTED + AFI-registered** | DSP, area, timing (P&R) | **DSP=0; LUT 61,542 (14% of one SLR) / FF 26,167; 133 BRAM; 0 URAM; C-synth latency 1,980,319 cyc = 7.92 ms / est 2.920 ns; POST-ROUTE WNS = +0.123 ns (MET, first-pass) on xcvu47p; AFI agfi-0b2c228a17e516e0a** | `[measured]` Vitis C-synth + **Vivado P&R** (post_route_timing.rpt); AFI via create-fpga-image; MUZERO_CHESS_FWD_AFI.md |
 | **TikiTorch chess-scale TRAIN kernel** (bwd + SignSGD) — **research-track, NOT AFI-viable** | DSP, latency, area, timing | **DSP=0** (csynth-CONFIRMED via pointer-walk + `config_op mul -impl fabric`; the DSP=195 as-synth was integer address-stride `o*IN` mults — a templating-only attempt left it at 195, HLS binds const-mults to DSP); **4,580,220 cyc = 24.86 ms; LUT 803,743 (184% of one SLR — DSP=0 moved the address muls to fabric, +63k vs the 195-DSP build) / FF 268,643 (31%); 324 BRAM (24%); 65 URAM (20%); est 5.427 ns > 4.00 ns target (timing MISS)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite, zero-DSP build); forge_train_step_muzero_train_CHESS_csynth.rpt |
 | _(reference: pre-streaming chess kernels, 2026-06-13, superseded)_ | DSP, latency, LUT | fwd DSP=0 / 12.70 ms / 83,485 LUT · train DSP=1 / 33.05 ms / 89,759 LUT | `[measured]` C-synth; small-area but per-element HBM access, not the deployable streaming kernel — superseded by the streaming rows above |
 | any TikiTorch MuZero **AFI / P&R / on-silicon power** | timing closure, power-rail energy | **NEVER routed**; csynth-timing-met ≠ silicon (the only routed sibling, char-LM, failed WNS −1.557 ns before closing v6) | `[missing]` — gated behind a strength result |
@@ -183,8 +186,8 @@ timing still misses._
 ## What's grounded now vs what each remaining run produces
 
 - **Grounded now (this doc):** Axis 1 entirely (DeepMind ceiling + TikiTorch measured, with the honest
-  decoupling); **Axis 4 (silicon): FORWARD kernel C-synth silicon-ready** (DSP=0, 7.92 ms, 14%-SLR LUT, timing
-  met with margin) — the AFI target; **TRAIN kernel research-track** (DSP=0 csynth-confirmed via pointer-walk +
+  decoupling); **Axis 4 (silicon): FORWARD kernel ROUTED + AFI-REGISTERED** (DSP=0, post-route WNS +0.123 ns
+  first-pass, agfi-0b2c228a17e516e0a; on-silicon power = Stage 3 pending); **TRAIN kernel research-track** (DSP=0 csynth-confirmed via pointer-walk +
   `config_op mul -impl fabric`, but that is LUT-positive → 184%-SLR, and C-synth timing still misses → not
   AFI-viable without an area/partition rewrite). Streaming-kernel
   re-audit 2026-06-15 **supersedes** the earlier "Axis 4 COMPLETE / timing met" claim (those were the
