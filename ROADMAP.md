@@ -80,3 +80,144 @@ FPGA path. So the gaps that matter are *ergonomics + the moat*, not core-framewo
 
 _Source: a 6-dimension TikiTorch-vs-PyTorch gap analysis (nn/models, training stack, data/IO,
 backend/device, the closure moat, docs/packaging) with anti-cargo-cult + adoption-leverage filtering._
+
+---
+
+# Silicon / FPGA-vs-GPU research track
+
+> Separate from the library roadmap above (which stays deliberately single-board). This is the
+> *research* program: can a multiplier-free tropical substrate **compete with GPUs on training**?
+
+## Where we are (measured, 2026-06-15)
+
+The whole tropical LM training loop (fwd + CE loss + backward + signSGD) runs end-to-end on AWS F2
+silicon, bit-exact to the host golden, and **replication scales it LINEARLY**:
+
+| config | tok/s | scaling | vs nanoGPT A10G (107,091) |
+|---|---|---|---|
+| 1 kernel | 14,236 | 1.00× | 13% |
+| N=2 | 26,522 | 2.00× | 25% |
+| **N=4 (SLR-local max)** | **53,001** | **4.00×** | **49.5%** |
+| N=8 | ~106,000 | proj. | ~100% (parity) |
+
+All bit-exact, DSP=0, ~4 W core, wall-clock unchanged (true parallel). N=4 is the SLR-local max
+(per-SLR CL URAM 176/192/~320 → 1+1+2). Recipe + ceiling in `tikitorch/fpga/silicon/SILICON_FINDINGS.md`.
+
+## CONSTRAINT CLARIFICATION — the invariant is MULTIPLIER-FREE, not DSP=0
+
+**DSP blocks are fine — just not in multiply mode.** The closure guarantee is *no hardware multiply*
+in fwd/loss/bwd/update. A DSP48 used as an **adder / subtractor / comparator / accumulator / wide-MUX**
+(not its multiplier) is fully closure-clean and is exactly what a max-plus PE wants. We over-constrained
+the silicon work to literal `DSP=0` as a conservative proxy — which left the VU47P's **~9,024 DSP48s
+completely idle**. For throughput, *use them as hardened add-max ALUs* (≈10× more max-plus units than
+the LUT-only fabric we measured). Action items:
+- [ ] **Throughput build that uses DSPs as add/compare ALUs** (drop the `DSP=0` synthesis constraint;
+      keep the *multiply-free* invariant). Re-measure tok/s/kernel — expect a large jump.
+- [ ] **Audit fix:** the closure check should flag DSPs in **multiply mode** (report `DSP_MULT=0`), not
+      `DSP=0`. Update `audit.py` / the HLS report parse + the manuscript wording ("zero multipliers",
+      not "zero DSPs"). This also likely relaxes the MuZero-chess train-kernel area problem (it was
+      forced LUT-only; DSP-adders may fix the 184%-of-SLR blowup — see [[muzero-board-scaling]]).
+
+## On-FPGA throughput track (single board → competitive per-watt)
+
+- [ ] **DSP-as-add-max ALUs** (above) — the biggest near-term lever.
+- [ ] **Hardened systolic add-max array** (TPU-MXU-shaped, but add-max PEs). Max-plus PE = int16 adder +
+      comparator — intrinsically cheaper than an FP16 multiply-add, so pack more PEs at higher util.
+- [ ] **HBM weight streaming** for models that don't fit on-chip URAM (we kept tiny models resident).
+- [ ] **N=8 GPU-parity** on the current part: staging-buffer compaction (drop the 5 grad regions —
+      confirmed dead in the staging buffer) + grads→BRAM rebalance so 2 kernels fit the URAM-poor
+      SLR0/SLR1. Projected ~106k from the measured 4× linearity.
+- [ ] **Newer silicon:** Versal (VP1902 / AI-Edge) — far more LUTs + AI Engines (VLIW-SIMD maps to max-plus).
+
+## Cluster track (where tropical is structurally advantaged)
+
+Large-model training is increasingly **communication-bound** — tropical's edge:
+- [ ] **1-bit SignSGD all-reduce.** The update needs only the *sign* of the summed gradient → 1 bit/
+      weight vs 16–32 for dense FP = a **16–32× smaller all-reduce**, attacking the exact multi-GPU
+      bottleneck. (signSGD-with-majority-vote, free here because the kernel is already sign-based.)
+- [ ] **On-fabric reduction + transceiver pipeline parallelism.** Do the 1-bit majority-vote in hardware
+      on the link (no NCCL/host round-trip); stream layer *i* → layer *i+1* across chips over Aurora/GTY.
+      FPGAs' home turf. (Note: AWS F2 cross-FPGA is host-PCIe only — this needs on-prem transceiver links.)
+- Independent replication (population training / sweeps / serve-many-models) is embarrassingly parallel —
+  linear across boards, no comm bottleneck — already true today.
+
+## ASIC endgame
+
+The real prize: a chip with **no FP multipliers**, a massive int8/16 **add-max array** + on-fabric 1-bit
+all-reduce. Tropical discards the GPU's moat (the FP multiplier), so a dedicated tropical ASIC could
+plausibly beat GPUs on **tokens/joule and tokens/dollar at cluster scale**. The FPGA work is the
+silicon-validated de-risking (the algorithm trains, bit-exact, multiplier-free, scales linearly).
+
+## ⚠️ The gating risk — model QUALITY at scale
+
+Everything above is moot unless tropical models reach **GPU-class quality**. Today they don't: strict
+multiplier-free MorphSSM = **2.79 bpb** vs dense nanoGPT **2.27 bpb** (tiny-shakespeare BPE-1024), and
+tropical *attention* is the known-broken piece. "Compete on large models" **requires closing this gap**,
+and whether the gap **closes or widens with scale** is the go/no-go question for the whole track. This is
+a research problem, not a hardware one — and it's the next thing to investigate.
+
+### Quality-gap investigation plan
+
+_Gap-localization study (2026-06-15), all numbers verified against `results/lm_shakespeare/*.jsonl`._
+
+**Where the 0.52 bpb actually lives** (corrects two stale leads — attention is NOT the broken piece
+at BPE scale, and capacity is NOT binding):
+
+| source | bpb | confidence | evidence |
+|---|---|---|---|
+| int16 quant + LUT-CE + shift-norm | ~0.00 | HIGH | all sims float32; `diag_lut_balanced` 2.500 ≤ `tropical_ce` 2.523 |
+| **substrate** (real→max-plus, AdamW held) | **~0.15** | MED-HIGH | denseconv 2.351 → morphssm-float 2.498 |
+| mixer (attn→conv) | +0.078 | LOW (seed noise) | bpeA_dense→denseconv; **net-negative — attention off the critical path** |
+| **optimizer** (AdamW→sign update) | **~0.13** | MED | +0.201 nats char (full_morphssm→full_closed) |
+| anneal-drop | ~0.16 | MED | +0.245 nats char; **the deployed arm keeps the anneal** |
+| **budget + lr-schedule confound** | **~0.15–0.29** | LOW | dense 1.5k/0.77M vs strict 6k/1.0M; strict still descending |
+
+- **Capacity is NOT the limit at this scale:** `full_morphssm_L3` (238k params) 1.9388 *beats* `L7` (512k)
+  1.9475 — the morph stack saturates. The L3→L7 saturation is the leading **warning sign** for the
+  scale question below.
+- The biggest single logged number (+0.573 float→strict at equal 1.5k budget) is the **most confounded**
+  in the corpus (budget + params + optimizer all vary) — do not read closure as owning the whole gap.
+- The measured 0.52 is an **under-estimate** of the substrate cost: morphssm has 1.3× the params (1.0M vs
+  dense 0.77M).
+
+**Decisive first experiment — matched-budget float reference (overnight, ~4 h ×2):** MorphSSM-**float**
++ AdamW + anneal, **6000 steps**, same data/seq/seed/params as `strictH_bpe_anneal_s9decay_6k`, with and
+without lr-decay. Deconfounds budget from closure (the largest, most-confounded chunk). Reading: float-6k
+≈ 2.30–2.45 → closure tax is small, gap is mostly budget+optimizer (**fixable**); float-6k ≈ 2.498 →
+substrate floor ~0.22; float-no-decay also degrades post-anneal → the lr-decay benefit is generic, un-book
+the 1.01-bpb no-decay swing from closure.
+
+**Ordered sequence (each gated on the prior):**
+1. [ ] Matched-budget float reference (above) — splits budget from closure.
+2. [ ] **Dense-net SignSGD control** — `--opt signsgd0` on the dense arm (one CLI flag, ~30 s; the dense
+       path is NOT AdamW-hardwired). Is the sign-tax generic or tropical-landscape-specific?
+3. [ ] lr-schedule sweep on the strict arm at fixed 6k (`--lr-decay-every {0,250,500,1000,1500}`) —
+       deconfounds lr-decay from the wall-clock artifact in the existing uncontrolled pair.
+4. [ ] **Dyadic channel-mixer DONE RIGHT** (highest-leverage + the fundamental-vs-fixable settler): add
+       `out_proj_type=="dyadic"` → `DyadicTropicalProjection` (2-line `elif` at `tikitorch/nn/__init__.py`
+       ~1086; class at nn:610 has `set_tau` parity). The only LM dyadic attempt used the *bare*
+       `DyadicLinear` and collapsed (`full_morphssm_dyadic` 3.355) — the MuZero-validated 2-layer
+       construction was never tried in the deep-residual LM slot. **Track residual-branch activation std
+       per layer** (collapse signature = std explodes ~100× under AdamW, per the bakeoff).
+5. [ ] Tropicalize-one-piece-at-a-time on the dense-conv twin (swap only the channel-mix linear → max-plus,
+       then only the conv) — isolates which sub-component carries the ~0.15 substrate tax.
+6. [ ] Param-match audit — build a ~1.0M dense (or shrink morphssm to ~0.77M) and re-measure.
+
+**Go/no-go — does the gap close or widen with scale?** Paired dense-AdamW vs morphssm-float sweep over
+~0.25M / 1M / 4M params (≥2 seeds), each run to near-convergence (matched-budget protocol), plot
+**(morphssm_bpb − dense_bpb) vs params**. Shrinks → **GO** (substrate tax amortizes, tropical competes at
+scale); constant → conditional go (~0.15 fixed penalty, viable if the DSP-free silicon win pays for it);
+widens → **NO-GO for parity** (small-model/edge play only). L3→L7 saturation says this is the real risk.
+
+**Fundamental vs fixable:** the risk concentrates in the **max-plus-linear channel mixer**
+(`TropicalDilationModule`, nn:276) — `y_j = max_i(W[j,i]+x[i])`, axis-aligned selectors, no oblique/smooth
+normals (the exact primitive the MuZero §2a study showed underfits, and that dyadic ±2^k *fixed* there).
+Step 4 settles it: trains-without-collapse-and-closes-gap → **fixable** (pursue dyadic mixers); trains-but-
+no-gain → capacity isn't the issue (training-side fix); **collapses again (residual std explodes) →
+constraint is STABILITY not expressivity** (max-plus gain-boundedness is load-bearing; need a new
+closure-clean normalization admitting oblique normals — the one outcome pointing "fundamental," and it
+says exactly what to invent rather than abandon).
+
+**Recommendation:** run #1 (overnight) + #2 (minutes) first — together they cheaply attribute ~0.25–0.30
+bpb (budget + sign tax) and will likely shrink the apparent gap well below 0.52; then #4 settles the one
+genuinely-fundamental risk for a 2-line edit + a 4 h run.
