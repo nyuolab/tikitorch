@@ -188,6 +188,42 @@ winner-take-all selection (picks ~one value, not a blend) with sparse max/argmax
 The tau-softmax relaxation trains but degrades at hard deploy. The unsolved core: **recover soft,
 multi-value blending + smooth gradients in a multiplier-free op** — what none of the 6 variants cracked.
 
+#### Brainstorm verdict (2026-06-15, 31-agent generate→adversarial-vet→synthesize)
+
+**The decisive finding:** every "broken tropical attention" number (2.45–2.74 bpb) is a **τ=0 (hard
+max-plus) number** — `nanogpt_shakespeare.py:tau_at` anneals τ→0 and deploys hard. The SOFT path already
+exists (`functional.py: tropical_softmax_*`, `tropical_softmax_value_pull`) but is **thrown away at
+deploy**. **Nobody has measured a fixed-nonzero-τ deployed attention LM** — the largest untested lever,
+~free to test.
+
+**Purity verdict (ranked purity-first per the north star):** soft value-blending appears to **require
+leaving idempotent max-plus** — pure-max-plus blend-recovery ideas were adversarially killed: Gumbel/
+stochastic-hardmax (forward still argmax; repo measured injected noise HURTS, breaks bit-exact gate),
+top-k dyadic sum-blend (data-INDEPENDENT weights, not input-conditioned; unbounded sum), shift-normalized
+soft attention (= the `shift_softmax` row-sum∈[0.5,1] that CAUSED the collapse), entmax/sparsemax (needs
+sort+cumsum the fabric lacks). Idempotency (`max(a,a)=a`) is the opposite of averaging; non-idempotency
+(`logsumexp(a,a)=a+log2`) is exactly what enables blend. So **purely-tropical attention hits a real wall
+on the blend specifically**; the working candidate is multiplier-free but not max-plus.
+
+**Shortlist:** (#1) **fixed-τ log-semiring attention** [floor, not max-plus] — deploy the existing soft
+path at τ=2^−s; the prior variants ARE this at τ=0. (#2) tropical linear-attention SSM (log-domain
+recurrence, power-of-2 additive decay — mandatory or it saturates). (#3) additive Bahdanau score w/
+dyadic w — **ablation only** (finding-3: the blend, not score geometry, is the bottleneck).
+
+- [ ] **DECISIVE FIRST BUILD (free, no new forward code):** clamp `tau_at` to a power-of-2 floor (2^−2)
+      for the attention path; eval at that fixed τ (not τ=0); sweep τ∈{2^−1,2^−2,2^−3}, char, 1500 steps,
+      ~min on MPS. **Breaks the 2.45–2.74 band → blend was binding, log-semiring is the path (attention
+      leaves pure max-plus, rest stays max-plus); doesn't move → finding-3 wins, blend was never the
+      bottleneck and purely-tropical attention stays alive via score-side fixes.** Decides whether we're
+      forced off pure max-plus at all.
+- [ ] **The math that must hold:** `τ·logsumexp_j(z_j/τ)` with τ=2^−s = `{max,+,−,shift, one 1-input
+      LUT}`; the LUT is a NEW `g(δ)=log1p(exp(−δ))` table (the only new silicon ask; today only the CE
+      exp2 table exists). **Deploy the `logsumexp-of-(V+s)` form, NEVER normalize-then-weighted-sum** —
+      the textbook `Σαⱼ·Vⱼ` form hides an anti-log multiply + the row-sum-divide collapse.
+- [ ] **Do NOT chase** (vetted fatal): LNS explicit `ΣpⱼVⱼ` Hopfield form (anti-log multiply + divide
+      collapse); shift-normalized attention; τ-floor as a *destination* (still the smoothed-max ceiling,
+      not a convex blend); entmax/sparsemax; LFSR-Gumbel; iter-top-k sum-blend.
+
 _The morphssm-internal localization below is now a secondary deconfounder (run the cheap matched-budget
 float ref + dense-SignSGD control to bank ~0.25–0.30 bpb), not the main thrust. Gap-localization study
 (2026-06-15), numbers verified against `results/lm_shakespeare/*.jsonl`:_
