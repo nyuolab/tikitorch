@@ -111,13 +111,88 @@ static void sgd_layer(int32_t* W, int32_t* bias, const acc_t* g_out, const data_
     }
 }
 
+// ---- HBM streaming for WR1 (~4.7 MB, the only matrix too big to keep resident) ----
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+typedef ap_uint<512> wide_t;
+#endif
+static void burst_load_words(int32_t* buffer, int word_off, int32_t* dst, int n_words) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    wide_t* wb = reinterpret_cast<wide_t*>(buffer); int nw = n_words >> 4, wo = word_off >> 4;
+    for (int w = 0; w < nw; w++) {
+#pragma HLS PIPELINE II=1
+        wide_t b = wb[wo + w];
+        for (int l = 0; l < 16; l++) { dst[w*16+l] = (int32_t)(int)(ap_int<32>)b.range(l*32+31, l*32); }
+    }
+#else
+    for (int i = 0; i < n_words; i++) dst[i] = buffer[word_off + i];
+#endif
+}
+static void burst_store_words(int32_t* src, int32_t* buffer, int word_off, int n_words) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    wide_t* wb = reinterpret_cast<wide_t*>(buffer); int nw = n_words >> 4, wo = word_off >> 4;
+    for (int w = 0; w < nw; w++) {
+#pragma HLS PIPELINE II=1
+        wide_t b = 0;
+        for (int l = 0; l < 16; l++) { b.range(l*32+31, l*32) = (ap_uint<32>)(ap_int<32>)src[w*16+l]; }
+        wb[wo + w] = b;
+    }
+#else
+    for (int i = 0; i < n_words; i++) buffer[word_off + i] = src[i];
+#endif
+}
+
+// R1 forward, streamed: q(shadow) . x with WR1 read in 16-word-aligned CHUNK tiles (chunked+pipelined,
+// same fast pattern as the forward kernel). Bit-exact to fwd_linear on WR1.
+static void fwd_linear_stream(int32_t* buffer, int off_W, const int32_t* bias,
+                              const data_t* x, data_t* y, int OUT, int IN) {
+    const int CH = 4096; int32_t wt[CH];
+    int o = 0, i = 0, total = OUT * IN; acc_t acc = (acc_t)bias[0];
+    for (int base = 0; base < total; base += CH) {
+        int n = (total - base < CH) ? (total - base) : CH, nrd = (n + 15) & ~15;
+        burst_load_words(buffer, off_W + base, wt, nrd);
+        for (int k = 0; k < n; k++) {
+#pragma HLS PIPELINE II=1
+            int e, s; nearest_pow2(wt[k], e, s);
+            acc += dyq_apply(e, s, (acc_t)x[i]);
+            i++; if (i == IN) { y[o] = sat16(acc); o++; i = 0; if (o < OUT) acc = (acc_t)bias[o]; }
+        }
+    }
+}
+
+// R1 SignSGD, streamed read-modify-write: chunk-load WR1 tile, sign-update in place, write the tile back.
+static void sgd_layer_stream(int32_t* buffer, int off_W, int32_t* bias,
+                             const acc_t* g_out, const data_t* x, int OUT, int IN, int lr) {
+    const int CH = 4096; int32_t wt[CH];
+    int o = 0, i = 0, total = OUT * IN, go = isign(g_out[0]);
+    for (int base = 0; base < total; base += CH) {
+        int n = (total - base < CH) ? (total - base) : CH, nrd = (n + 15) & ~15;
+        burst_load_words(buffer, off_W + base, wt, nrd);
+        for (int k = 0; k < n; k++) {
+#pragma HLS PIPELINE II=1
+            sgd_update(&wt[k], lrstep(lr, sgnprod((acc_t)go, (acc_t)x[i])));
+            i++; if (i == IN) { sgd_update(&bias[o], lrstep(lr, go)); o++; i = 0; if (o < OUT) go = isign(g_out[o]); }
+        }
+        burst_store_words(wt, buffer, off_W + base, nrd);
+    }
+}
+
 static int train_step(int32_t* buf, int lr) {
-    int32_t* WR1 = &buf[TOFF_W_R1]; int32_t* WR2 = &buf[TOFF_W_R2];
-    int32_t* WP1 = &buf[TOFF_W_P1]; int32_t* WP2 = &buf[TOFF_W_P2];
-    int32_t* WPH = &buf[TOFF_W_PH]; int32_t* WVH = &buf[TOFF_W_VH];
-    int32_t* BR1 = &buf[TOFF_B_R1]; int32_t* BR2 = &buf[TOFF_B_R2];
-    int32_t* BP1 = &buf[TOFF_B_P1]; int32_t* BP2 = &buf[TOFF_B_P2];
-    int32_t* BPH = &buf[TOFF_B_PH]; int32_t* BVH = &buf[TOFF_B_VH];
+    // WR1 (~4.7 MB) stays in HBM and is STREAMED (fwd + SignSGD-RMW); the smaller matrices fit on-chip
+    // (~1.46 MB) and are loaded RESIDENT so their transposed backward reads (bwd_input / the gz loop) are
+    // on-chip random access. Static (not stack) so CSIM doesn't blow the stack on the 1 MB WPH array.
+    static int32_t WR2[TW_R2], WP1[TW_P1], WP2[TW_P2], WPH[TW_PH], WVH[TW_VH];
+    static int32_t BR1[MZ_DR], BR2[MZ_L], BP1[MZ_DP], BP2[MZ_L], BPH[MZ_A], BVH[1];
+    burst_load_words(buf, TOFF_W_R2, WR2, TW_R2); burst_load_words(buf, TOFF_W_P1, WP1, TW_P1);
+    burst_load_words(buf, TOFF_W_P2, WP2, TW_P2); burst_load_words(buf, TOFF_W_PH, WPH, TW_PH);
+    burst_load_words(buf, TOFF_W_VH, WVH, TW_VH);
+    for (int i = 0; i < MZ_DR; i++) BR1[i] = buf[TOFF_B_R1 + i];
+    for (int i = 0; i < MZ_L;  i++) BR2[i] = buf[TOFF_B_R2 + i];
+    for (int i = 0; i < MZ_DP; i++) BP1[i] = buf[TOFF_B_P1 + i];
+    for (int i = 0; i < MZ_L;  i++) BP2[i] = buf[TOFF_B_P2 + i];
+    for (int i = 0; i < MZ_A;  i++) BPH[i] = buf[TOFF_B_PH + i];
+    BVH[0] = buf[TOFF_B_VH];
 
     data_t obs[MZ_OBS];
     for (int i = 0; i < MZ_OBS; i++) obs[i] = (data_t)buf[TOFF_OBS + i];
@@ -126,7 +201,7 @@ static int train_step(int32_t* buf, int lr) {
     data_t zr1[MZ_DR], h[MZ_L], zp1[MZ_DP], z[MZ_L], pol[MZ_A], val[1];
     data_t hraw[MZ_L], pre[MZ_DR > MZ_DP ? MZ_DR : MZ_DP];
 
-    fwd_linear(WR1, BR1, obs, pre, MZ_DR, MZ_OBS);                  // repr lin1
+    fwd_linear_stream(buf, TOFF_W_R1, BR1, obs, pre, MZ_DR, MZ_OBS);  // repr lin1 (R1 streamed from HBM)
     for (int i = 0; i < MZ_DR; i++) zr1[i] = pre[i] > 0 ? pre[i] : (data_t)0;   // relu
     fwd_linear(WR2, BR2, zr1, hraw, MZ_L, MZ_DR);                  // repr lin2
     acc_t sm = 0; for (int i = 0; i < MZ_L; i++) sm += hraw[i];
@@ -181,7 +256,18 @@ static int train_step(int32_t* buf, int lr) {
     sgd_layer(WR2, BR2, ghraw, zr1, MZ_L, MZ_DR, lr);
     for (int m = 0; m < MZ_DR; m++) if (zr1[m] <= 0) gzr1[m] = 0;       // relu mask
 
-    sgd_layer(WR1, BR1, gzr1, obs, MZ_DR, MZ_OBS, lr);          // repr lin1 (R1); no grad past obs
+    sgd_layer_stream(buf, TOFF_W_R1, BR1, gzr1, obs, MZ_DR, MZ_OBS, lr);  // R1 streamed RMW (writes WR1 back)
+
+    // ---- write the updated RESIDENT weights + all biases back to HBM (WR1 already written by the stream) ----
+    burst_store_words(WR2, buf, TOFF_W_R2, TW_R2); burst_store_words(WP1, buf, TOFF_W_P1, TW_P1);
+    burst_store_words(WP2, buf, TOFF_W_P2, TW_P2); burst_store_words(WPH, buf, TOFF_W_PH, TW_PH);
+    burst_store_words(WVH, buf, TOFF_W_VH, TW_VH);
+    for (int i = 0; i < MZ_DR; i++) buf[TOFF_B_R1 + i] = BR1[i];
+    for (int i = 0; i < MZ_L;  i++) buf[TOFF_B_R2 + i] = BR2[i];
+    for (int i = 0; i < MZ_DP; i++) buf[TOFF_B_P1 + i] = BP1[i];
+    for (int i = 0; i < MZ_L;  i++) buf[TOFF_B_P2 + i] = BP2[i];
+    for (int i = 0; i < MZ_A;  i++) buf[TOFF_B_PH + i] = BPH[i];
+    buf[TOFF_B_VH] = BVH[0];
     return 0;
 }
 

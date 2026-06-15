@@ -37,26 +37,31 @@ constexpr int TW_PH = MZ_A  * MZ_L;     // policy head    (L->A)
 constexpr int TW_VH = 1     * MZ_L;     // value head     (L->1)
 
 // --- cumulative offsets: weights, biases, io, targets, outputs ---
+// Every region 16-word (512-bit) aligned (R16 from forge_buffer_muzero.hpp) so the train kernel reads WR1
+// (the only matrix too big to keep resident, ~4.7 MB) and bursts the resident matrices to/from HBM as
+// aligned 512-bit beats. Host export reads TOFF_* via the layout introspection, so it tracks the padding.
 constexpr int TOFF_W_R1 = 0;
-constexpr int TOFF_W_R2 = TOFF_W_R1 + TW_R1;
-constexpr int TOFF_W_P1 = TOFF_W_R2 + TW_R2;
-constexpr int TOFF_W_P2 = TOFF_W_P1 + TW_P1;
-constexpr int TOFF_W_PH = TOFF_W_P2 + TW_P2;
-constexpr int TOFF_W_VH = TOFF_W_PH + TW_PH;
-constexpr int TOFF_B_R1 = TOFF_W_VH + TW_VH;
-constexpr int TOFF_B_R2 = TOFF_B_R1 + MZ_DR;
-constexpr int TOFF_B_P1 = TOFF_B_R2 + MZ_L;
-constexpr int TOFF_B_P2 = TOFF_B_P1 + MZ_DP;
-constexpr int TOFF_B_PH = TOFF_B_P2 + MZ_L;
-constexpr int TOFF_B_VH = TOFF_B_PH + MZ_A;
-constexpr int TOFF_OBS  = TOFF_B_VH + 1;        // input observation  [OBS]
-constexpr int TOFF_PTGT = TOFF_OBS  + MZ_OBS;   // policy target       [A]
-constexpr int TOFF_VTGT = TOFF_PTGT + MZ_A;     // value  target       [1]
-constexpr int TOFF_POL  = TOFF_VTGT + 1;        // forward policy out  [A]
-constexpr int TOFF_VAL  = TOFF_POL  + MZ_A;     // forward value  out  [1]
-constexpr int TOFF_LOSS = TOFF_VAL  + 1;        // scalar L1 loss      [1]
+constexpr int TOFF_W_R2 = R16(TOFF_W_R1 + TW_R1);
+constexpr int TOFF_W_P1 = R16(TOFF_W_R2 + TW_R2);
+constexpr int TOFF_W_P2 = R16(TOFF_W_P1 + TW_P1);
+constexpr int TOFF_W_PH = R16(TOFF_W_P2 + TW_P2);
+constexpr int TOFF_W_VH = R16(TOFF_W_PH + TW_PH);
+constexpr int TOFF_B_R1 = R16(TOFF_W_VH + TW_VH);
+constexpr int TOFF_B_R2 = R16(TOFF_B_R1 + MZ_DR);
+constexpr int TOFF_B_P1 = R16(TOFF_B_R2 + MZ_L);
+constexpr int TOFF_B_P2 = R16(TOFF_B_P1 + MZ_DP);
+constexpr int TOFF_B_PH = R16(TOFF_B_P2 + MZ_L);
+constexpr int TOFF_B_VH = R16(TOFF_B_PH + MZ_A);
+constexpr int TOFF_OBS  = R16(TOFF_B_VH + 1);        // input observation  [OBS]
+constexpr int TOFF_PTGT = R16(TOFF_OBS  + MZ_OBS);   // policy target       [A]
+constexpr int TOFF_VTGT = R16(TOFF_PTGT + MZ_A);     // value  target       [1]
+constexpr int TOFF_POL  = R16(TOFF_VTGT + 1);        // forward policy out  [A]
+constexpr int TOFF_VAL  = R16(TOFF_POL  + MZ_A);     // forward value  out  [1]
+constexpr int TOFF_LOSS = R16(TOFF_VAL  + 1);        // scalar L1 loss      [1]
 
-constexpr int MZT_BUFFER_WORDS = TOFF_LOSS + 1;
+constexpr int MZT_BUFFER_WORDS = R16(TOFF_LOSS + 1);
 constexpr int MZT_BUFFER_BYTES = MZT_BUFFER_WORDS * 4;
+static_assert(TOFF_W_R1 % 16 == 0 && TOFF_W_R2 % 16 == 0 && TOFF_W_PH % 16 == 0 && TOFF_OBS % 16 == 0,
+              "train region bases must be 16-word aligned for 512-bit bursts");
 
 #endif  // FORGE_BUFFER_MUZERO_TRAIN_HPP
