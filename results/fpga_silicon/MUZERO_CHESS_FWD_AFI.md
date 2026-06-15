@@ -39,7 +39,24 @@ silicon (the morph-LM sibling is the only other FORGE AFI).
   CL_TEMPLATE name, dangling symlinks, `mkdir design/ip`, and the synth driver
   (header path / `src_post_enc_dir` / `design/ip` / the `synth_design` call).
 
-## Pending (Stage 3)
-On-silicon **Vccint power** during kernel execution → fills the energy axis of
-`results/board_scaling/CHESS_MUZERO_COMPARISON.md`. Needs an F2 instance + a host
-driver that provides a PCIM-addressable buffer (the kernel masters host DRAM).
+## Stage 3 — ON SILICON (measured on f2.6xlarge, 2026-06-15)
+
+The AFI **loads on a real F2** and the PCIM path is healthy:
+
+| item | value |
+|---|---|
+| load | `agfi-0b2c228a17e516e0a` → slot 0, state **loaded / ok** (device 0xf010 / vendor 0x1d0f) |
+| PCIM health | **0 protocol errors** across 5 samples (`pcim-axi-protocol-error=0`, `pcim-range-error=0`, no timeouts) — the PCIM-to-host-DRAM wiring is clean on hardware |
+| **Vccint power** | **8–10 W** (last/avg 8–9 W, max 10 W) — **loaded, kernel IDLE** |
+| tool | `fpga-describe-local-image -M`, 5 samples; runner `scripts/run_muzero_afi_f2_power.sh` |
+
+**Honest reading:** 8–10 W is the **loaded/idle** Vccint rail = **shell + DSP=0 CL static** (shell-dominated;
+our CL is 14% of one SLR with no DSPs). It is **NOT** inference power, and you must **not** multiply it by the
+7.92 ms latency to get J/inference — the dynamic draw of the kernel is unmeasured. What is proven on silicon:
+the routed DSP=0 design **configures and the PCIM interface works**.
+
+## Pending (Stage 3b) — dynamic / per-inference power
+A defensible J/inference needs the kernel **running**: a PCIM host driver that allocates a host-DRAM buffer the
+CL can master (write its bus address to the OCL `buffer` offset register), kicks AP_START, and samples Vccint
+during the forward pass. That host driver (the CL masters host DRAM via PCIM, unlike morph-LM's DMA-PCIS→URAM
+staging) is genuine additional engineering — flagged, not hand-waved.

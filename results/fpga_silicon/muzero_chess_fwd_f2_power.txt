@@ -1,0 +1,52 @@
+# Forward MuZero chess AFI — on-F2 load + power (agfi-0b2c228a17e516e0a, f2.6xlarge, 2026-06-15)
+
+## load + state
+AFI          0       agfi-0b2c228a17e516e0a  loaded            0        ok               0       0x10212415
+AFIDEVICE    0       0x1d0f      0xf010      0000:34:00.0
+
+## fpga-describe-local-image -M (sample 1: power + PCIM error counters)
+=== metrics sample 1 Mon Jun 15 13:05:23 UTC 2026 ===
+AFI          0       agfi-0b2c228a17e516e0a  loaded            0        ok               0       0x10212415
+AFIDEVICE    0       0x1d0f      0xf010      0000:34:00.0
+virtual-jtag-slave-timeout=0
+ocl-slave-timeout=0
+sda-slave-timeout=0
+dma-pcis-timeout=0
+pcim-range-error=0
+pcim-axi-protocol-error=0
+dma-range-error=0
+pcim-axi-protocol-4K-cross-error=0
+pcim-axi-protocol-bus-master-enable-error=0
+pcim-axi-protocol-request-size-error=0
+pcim-axi-protocol-write-incomplete-error=0
+pcim-axi-protocol-first-byte-enable-error=0
+pcim-axi-protocol-last-byte-enable-error=0
+pcim-axi-protocol-bready-error=0
+pcim-axi-protocol-rready-error=0
+pcim-axi-protocol-wchannel-error=0
+pcim-range-error-addr=0x0
+pcim-range-error-count=0
+pcim-axi-protocol-error-addr=0x0
+pcim-axi-protocol-error-count=0
+pcim-write-count=0
+pcim-read-count=0
+dma-pcis-timeout-addr=0x0
+dma-pcis-timeout-count=0
+ocl-slave-timeout-addr=0x0
+ocl-slave-timeout-count=0
+sda-slave-timeout-addr=0x0
+sda-slave-timeout-count=0
+virtual-jtag-slave-timeout-addr=0x0
+virtual-jtag-slave-timeout-count=0
+virtual-jtag-slave-write-count=0
+virtual-jtag-slave-read-count=0
+DDR0
+   write-count=0
+   read-count=0
+Power consumption (Vccint):
+   Last measured: 9 watts
+   Average: 9 watts
+   Max measured: 10 watts
+Cached agfis:
+   agfi-0b2c228a17e516e0a
+=== metrics sample 2 Mon Jun 15 13:05:26 UTC 2026 ===

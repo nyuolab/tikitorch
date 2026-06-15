@@ -3,7 +3,7 @@
 > **Status: all 4 axes measured; adversarially honesty-audited against source files (silicon axis re-audited
 > 2026-06-15 after the 512-bit streaming-kernel rewrite).** Quality (axis 1, CPU), throughput + energy
 > (axes 2–3, measured GPU + C-synth-derived FPGA), and silicon (axis 4, chess-scale C-synth) are all filled.
-> **Silicon headline: the FORWARD kernel is PLACED-AND-ROUTED + AFI-REGISTERED (DSP=0, WNS +0.123 ns post-route, agfi-0b2c228a17e516e0a; on-silicon power pending). C-synth: 14%-of-SLR LUT, timing met with
+> **Silicon headline: the FORWARD kernel is ROUTED + AFI'd + LOADS ON REAL F2 (DSP=0, WNS +0.123 ns post-route, agfi-0b2c228a17e516e0a; loads on f2.6xlarge, PCIM clean, Vccint 8–10 W loaded/idle; inference-power = to-measure). C-synth: 14%-of-SLR LUT, timing met with
 > margin); the TRAIN kernel is research-track (DSP=0 confirmed, but 184%-of-SLR LUT + C-synth timing miss).**
 > Mirrors `results/lm_shakespeare/fig_hallmark_lm.md`.
 
@@ -139,7 +139,8 @@ sizes differ by orders of magnitude, so do NOT directly compare their samples/s 
 | arm | energy | method | provenance |
 |---|---|---|---|
 | **reference MuZero, A10G** | **end-to-end 47.6 J/move (1237 mJ/sample)** ‖ **GPU-active 3.7 J/move (96.8 mJ/sample)** | nvidia-smi power×dt @5 Hz; 67.5 W whole-window / 73.7 W GPU-active | `[measured]` (power.csv) |
-| TikiTorch chess kernel, FPGA | **NONE** — no P&R/AFI ⇒ no post-route latency or power rail to derive from; any mJ would be fabrication | — | `[missing]` (gated behind P&R→AFI, behind strength) |
+| TikiTorch chess FORWARD kernel, **FPGA (on real F2 silicon)** | **Vccint 8–10 W (loaded, kernel IDLE)** — measured on f2.6xlarge with the AFI loaded (`agfi-0b2c228a17e516e0a`); this is the shell + DSP=0 CL static draw, **NOT** inference power | `fpga-describe-local-image -M`, 5 samples (8/9 W last/avg, 10 W max); PCIM clean (0 protocol errors) | `[measured-partial]` loaded/idle only |
+| TikiTorch chess FORWARD kernel, FPGA — **inference (dynamic)** | **pending** — needs the kernel running; a J/inference figure requires the PCIM host driver (kernel masters host DRAM) to drive a real forward pass and sample Vccint during it | (Stage 3b) | `[to-measure]` |
 | TikiTorch, CPU | not measured | — | `[to-measure]`/`[projected]` |
 | DeepMind | not published per-move | — | `[missing]` |
 
@@ -148,9 +149,13 @@ of the window (mean active power 73.7 W); the remaining **~93% is compute-idle**
 This gate defines both the 73.7 W figure and the 93%-idle figure — it is distinct from the util==0 fraction
 (67%). The two bounds are both honest: **end-to-end** mJ/move (whole-box power × wall-clock) is dominated by
 idle time = **pessimistic**; **GPU-active** (active-power × active-time) = optimistic compute-only — the LM A10G
-row reports the same split. NB: an earlier placeholder "~0.7–1.7 mJ-class IF it routed" FPGA figure is
-**withdrawn** — no MuZero kernel was ever P&R/AFI-routed, so there is **no** defensible board-FPGA energy
-number, only the [missing] above._
+row reports the same split. NB: an earlier placeholder "~0.7–1.7 mJ-class IF it routed" FPGA figure remains
+**withdrawn** — the forward kernel is now P&R'd, AFI'd, and LOADS on real F2 (Vccint 8–10 W idle, PCIM clean),
+but that is the **loaded/idle** rail (shell-dominated), NOT inference power. A defensible board-FPGA J/inference
+still does not exist: it requires running the kernel (Stage 3b, PCIM host driver) and sampling Vccint during
+the forward pass. Do NOT multiply 8–10 W × 7.92 ms — the idle rail is mostly shell static, and dynamic draw of
+the DSP=0 CL is unmeasured. The honest on-silicon claim today is: **the AFI loads and the PCIM path is clean;
+power-per-inference is to-measure.**_
 
 _The GPU energy caveat is load-bearing: in a Python MuZero loop, CPU-side MCTS dominates wall-clock, so
 end-to-end mJ/move over-attributes energy to the GPU. We commit to reporting **both** the end-to-end number
@@ -163,7 +168,7 @@ active-avg vs whole-window (1.46–1.49 mJ)._
 
 | arm | metric | value | provenance |
 |---|---|---|---|
-| **TikiTorch chess-scale FORWARD kernel** (initial inference) — **ROUTED + AFI-registered** | DSP, area, timing (P&R) | **DSP=0; LUT 61,542 (14% of one SLR) / FF 26,167; 133 BRAM; 0 URAM; C-synth latency 1,980,319 cyc = 7.92 ms / est 2.920 ns; POST-ROUTE WNS = +0.123 ns (MET, first-pass) on xcvu47p; AFI agfi-0b2c228a17e516e0a** | `[measured]` Vitis C-synth + **Vivado P&R** (post_route_timing.rpt); AFI via create-fpga-image; MUZERO_CHESS_FWD_AFI.md |
+| **TikiTorch chess-scale FORWARD kernel** (initial inference) — **ROUTED + AFI + LOADS ON F2** | DSP, area, timing, on-silicon | **DSP=0; LUT 61,542 (14% of one SLR) / FF 26,167; 133 BRAM; 0 URAM; C-synth 7.92 ms / est 2.920 ns; POST-ROUTE WNS = +0.123 ns (MET, first-pass); AFI agfi-0b2c228a17e516e0a LOADS on f2.6xlarge (slot ok, PCIM 0 protocol errors, Vccint 8–10 W loaded/idle)** | `[measured]` Vivado P&R (post_route_timing.rpt) + on-F2 `fpga-describe-local-image -M`; MUZERO_CHESS_FWD_AFI.md |
 | **TikiTorch chess-scale TRAIN kernel** (bwd + SignSGD) — **research-track, NOT AFI-viable** | DSP, latency, area, timing | **DSP=0** (csynth-CONFIRMED via pointer-walk + `config_op mul -impl fabric`; the DSP=195 as-synth was integer address-stride `o*IN` mults — a templating-only attempt left it at 195, HLS binds const-mults to DSP); **4,580,220 cyc = 24.86 ms; LUT 803,743 (184% of one SLR — DSP=0 moved the address muls to fabric, +63k vs the 195-DSP build) / FF 268,643 (31%); 324 BRAM (24%); 65 URAM (20%); est 5.427 ns > 4.00 ns target (timing MISS)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite, zero-DSP build); forge_train_step_muzero_train_CHESS_csynth.rpt |
 | _(reference: pre-streaming chess kernels, 2026-06-13, superseded)_ | DSP, latency, LUT | fwd DSP=0 / 12.70 ms / 83,485 LUT · train DSP=1 / 33.05 ms / 89,759 LUT | `[measured]` C-synth; small-area but per-element HBM access, not the deployable streaming kernel — superseded by the streaming rows above |
 | any TikiTorch MuZero **AFI / P&R / on-silicon power** | timing closure, power-rail energy | **NEVER routed**; csynth-timing-met ≠ silicon (the only routed sibling, char-LM, failed WNS −1.557 ns before closing v6) | `[missing]` — gated behind a strength result |
