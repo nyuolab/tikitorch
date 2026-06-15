@@ -112,11 +112,16 @@ done
 echo "TEMPLATE=\$TPL"
 CLROOT="/opt/tiki/CL/\$CL"; mkdir -p "\$CLROOT"
 cp -r "\$TPL"/. "\$CLROOT"/                      # template structure (build/scripts harness, verif, etc.)
+# CL_TEMPLATE's build/ harness uses RELATIVE symlinks into the HDK that dangle after relocation
+# (=> "./aws_build_dcp_from_cl.py: No such file or directory"). Re-copy build/ dereferencing symlinks.
+rm -rf "\$CLROOT"/build && cp -rL "\$TPL/build" "\$CLROOT"/build
 rm -rf "\$CLROOT"/design                          # drop template RTL; use ours
 cp -r "/opt/tiki/\$PKG_REL/design" "\$CLROOT"/design
+mkdir -p "\$CLROOT/design/ip"                      # create_ip -dir requires the dir to exist
 cp -f "/opt/tiki/\$PKG_REL/build/scripts/"*.tcl "\$CLROOT"/build/scripts/ 2>/dev/null || true
 mkdir -p "\$CLROOT/build/constraints"; cp -f "/opt/tiki/\$PKG_REL/build/constraints/"*.xdc "\$CLROOT"/build/constraints/ 2>/dev/null || true
 cp "\$KVDIR"/*.v "\$CLROOT"/design/ 2>/dev/null || true     # flatten HLS verilog into design/
+echo "== aws_build entry (shebang/type) =="; head -3 "\$CLROOT/build/scripts/aws_build_dcp_from_cl.py" 2>/dev/null; file "\$CLROOT/build/scripts/aws_build_dcp_from_cl.py" 2>/dev/null
 echo "== CL design dir =="; ls "\$CLROOT/design" | head -40; ls "\$CLROOT/design"/*.v 2>/dev/null | wc -l
 aws s3 cp /tmp/diag.txt "\$S3_RESULTS/diag.txt" --only-show-errors || true
 { echo "== CLROOT design listing =="; ls -la "\$CLROOT/design"; echo "== build/scripts =="; ls -la "\$CLROOT/build/scripts"; } | aws s3 cp - "\$S3_RESULTS/cl_layout.txt" --only-show-errors || true
