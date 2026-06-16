@@ -366,12 +366,18 @@ def build_model(kind, data, args):
                        else "dot_product"),
         max_seq_len=args.seq_len, task_type="lm", vocab_size=data.vocab)
     apply_variant(model, data.vocab, args)
-    if getattr(args, "n_hops", 1) > 1:
+    if getattr(args, "n_hops", 1) > 1 or getattr(args, "agg_variant", None):
         from tikitorch.nn import TropicalAttention
         attns = [m for m in model.modules() if isinstance(m, TropicalAttention)]
         for m in attns:
-            m.n_hops = args.n_hops
-        print(f"[n_hops] Bellman-Ford diffusion n_hops={args.n_hops} on "
+            if args.n_hops > 1:
+                m.n_hops = args.n_hops
+            if args.agg_variant:
+                m.agg_variant = args.agg_variant   # e.g. "sinkhorn" (assignment routing)
+                m.sink_eps = args.sink_eps
+                m.sink_iters = args.sink_iters
+        print(f"[attn] n_hops={args.n_hops} agg={args.agg_variant or 'default'} "
+              f"sink_eps={args.sink_eps} sink_iters={args.sink_iters} on "
               f"{len(attns)} TropicalAttention module(s)")
     return model
 
@@ -614,6 +620,18 @@ def main():
                         "single-hop (current); 2-4 = multi-hop all-pairs best-path "
                         "routing over the content score graph (purely max-plus). "
                         "Tests routing (not averaging) as attention's mechanism.")
+    p.add_argument("--agg-variant", type=str, default=None,
+                   choices=["argmax", "iter_topk", "min", "maxmin", "sinkhorn"],
+                   help="override tropical attention value-aggregation. 'sinkhorn' = "
+                        "assignment/permutation routing (train soft doubly-stochastic "
+                        "transport -> deploy hard permutation): densifies the gradient "
+                        "(every key carries column mass) AND changes the routing class "
+                        "from value-copy to assignment.")
+    p.add_argument("--sink-eps", type=float, default=1.0,
+                   help="Sinkhorn entropic temperature (smaller = sharper -> closer to "
+                        "a hard permutation; anneal toward 0 for pure-tropical deploy).")
+    p.add_argument("--sink-iters", type=int, default=5,
+                   help="Sinkhorn row/col normalization iterations.")
     p.add_argument("--variant", type=str, default="baseline", choices=VARIANTS,
                    help="tropical-arm architecture variant (ignored for dense)")
     p.add_argument("--pos-embed", action="store_true",

@@ -99,7 +99,7 @@ def _tropical_score(q, k, variant, tau):
     raise ValueError(f"unknown score_variant {variant!r}; expected one of {_SCORE_VARIANTS}")
 
 
-_AGG_VARIANTS = ("argmax", "iter_topk", "min", "maxmin")
+_AGG_VARIANTS = ("argmax", "iter_topk", "min", "maxmin", "sinkhorn")
 
 
 def _max_pull(v, scores, tau, topk_k, rank_bias, value_topk_k):
@@ -129,8 +129,38 @@ def _causal_mask_scores(scores, fill):
     return scores.masked_fill(m, fill)
 
 
+def _sinkhorn_aggregate(v, s_max, tau, sink_eps, sink_iters):
+    """Permutation/assignment routing (densifies the gradient + changes the routing
+    CLASS from value-copy to assignment). Log-domain Sinkhorn normalizes the score
+    graph S into a (causal) doubly-stochastic transport plan P, so EVERY key carries
+    column mass -> dense gradient, no dark routes (vs the per-(i,d) argmax scatter).
+
+      train (tau>0): out = P @ V   (soft transport; the P@V is the only train-time
+                    multiply, deleted at deploy — north-star: train-relaxation OK)
+      deploy (tau=0): out[i] = V[argmax_j logP[i,j]]   (hard gather = a generalized
+                    permutation matrix = the tropical-isometric map, zero multiply)
+
+    s_max is already causal-masked (j>i = -inf) by the caller, which makes the
+    column normalization a triangular partial-OT (inherent to autoregressive masks).
+    Every normalization op is +/-/logsumexp (== tropical_softmax, the on-silicon LUT).
+    """
+    logP = s_max / max(sink_eps, 1e-6)
+    NEG = float("-inf")
+    for _ in range(sink_iters):
+        logP = logP - torch.logsumexp(logP, dim=-1, keepdim=True)   # rows: over keys j
+        col = torch.logsumexp(logP, dim=-2, keepdim=True)           # cols: over queries i
+        logP = logP - torch.nan_to_num(col, neginf=0.0)             # masked cols (all -inf) -> no-op
+    if tau > 0:
+        P = torch.nan_to_num(logP.exp(), nan=0.0)                   # masked entries -> 0
+        return torch.einsum("...ij,...jd->...id", P, v)
+    # deploy: hard per-query assignment (cheap discriminator; auction would enforce
+    # a strict bijection — not needed for the prototype).
+    pi = logP.argmax(dim=-1)                                        # (..., Lq)
+    return torch.gather(v, -2, pi.unsqueeze(-1).expand(*pi.shape, v.shape[-1]))
+
+
 def _tropical_aggregate(v, scores, variant, tau, topk_k, rank_bias, value_topk_k,
-                        causal=False):
+                        causal=False, sink_eps=1.0, sink_iters=5):
     """Aggregate values by tropical attention scores, by variant. tau>0 = soft.
 
     - ``argmax`` (default): per-(query,dim) single argmax (max-plus) over keys
@@ -165,6 +195,8 @@ def _tropical_aggregate(v, scores, variant, tau, topk_k, rank_bias, value_topk_k
         hi = _max_pull(v[..., :h], s_max, tau, 1, None, value_topk_k)
         lo = _min_pull(v[..., h:], s_min, tau)
         return torch.cat([hi, lo], dim=-1)
+    if variant == "sinkhorn":
+        return _sinkhorn_aggregate(v, s_max, tau, sink_eps, sink_iters)
     # "argmax" (default)
     if tau > 0:
         return tropical_softmax_value_pull(v, s_max, tau=tau)
@@ -177,6 +209,7 @@ __all__ = [
     # predictive coding (local, backprop-free)
     "TropicalPCLayer",
     "TropicalPCNet",
+    "DyadicPCNet",
     # soft relaxations
     "TropicalSoftMin",
     "TropicalSoftMax",
@@ -1178,7 +1211,9 @@ class TropicalAttention(nn.Module):
                  proj_init_identity: bool = False,
                  agg_variant: str = "argmax",
                  agg_topk_k: int = 2,
-                 n_hops: int = 1):
+                 n_hops: int = 1,
+                 sink_eps: float = 1.0,
+                 sink_iters: int = 5):
         super().__init__()
         assert d_model % n_heads == 0
         assert score_variant in _SCORE_VARIANTS, score_variant
@@ -1221,6 +1256,10 @@ class TropicalAttention(nn.Module):
         # all-pairs; fills the conv mixer's fixed-receptive-field gap. n_hops=1 is
         # the historical single-hop attention (bit-exact).
         self.n_hops = n_hops
+        # Sinkhorn/assignment routing (agg_variant="sinkhorn"): entropic temperature
+        # + #normalization iterations. train soft transport -> deploy hard permutation.
+        self.sink_eps = sink_eps
+        self.sink_iters = sink_iters
         # Closed learnable per-rank additive offset for iter_topk (b_0 := 0).
         self.rank_bias = (nn.Parameter(torch.zeros(agg_topk_k))
                           if agg_variant == "iter_topk" else None)
@@ -1297,7 +1336,8 @@ class TropicalAttention(nn.Module):
         for _hop in range(max(1, self.n_hops)):
             pull = _tropical_aggregate(h, scores, self.agg_variant, self.tau,
                                        self.agg_topk_k, self.rank_bias, self.value_topk_k,
-                                       causal=causal_mask)
+                                       causal=causal_mask,
+                                       sink_eps=self.sink_eps, sink_iters=self.sink_iters)
             h = pull if self.n_hops <= 1 else torch.maximum(h, pull)
         out = h
         # out: (B, H, L, Dh) — each (i, d) picks its own j* (or its k best).
@@ -2225,4 +2265,6 @@ MorphConv1d = DepthwiseMorphConv1d
 # Predictive coding (local, backprop-free) — see tikitorch.nn.predictive_coding
 # ---------------------------------------------------------------------------
 
-from tikitorch.nn.predictive_coding import TropicalPCLayer, TropicalPCNet  # noqa: E402,F401
+from tikitorch.nn.predictive_coding import (  # noqa: E402,F401
+    TropicalPCLayer, TropicalPCNet, DyadicPCNet,
+)
