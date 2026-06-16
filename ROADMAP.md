@@ -254,6 +254,26 @@ collapsed single-hop). Trainability is ARGUED, not measured.
       Screen: char tiny-shakespeare, d=256, 1500 steps, n=3 seeds, vs MorphSSM 1.934 / dense-conv 1.702 /
       single-hop 2.45. Success = clears the 2.45 bigram band; real win = beats MorphSSM 1.934 (routing >
       fixed conv); 2.0–2.2 = first evidence routing ≠ averaging-mimicry.
+**MEASURED (2026-06-15, char tiny-shakespeare, d=128/L=3, 1500 steps, this harness — nats):**
+- **Fixed-τ (soft-blend): ✗** — τ=0.25 deploy-soft 2.500 / τ=0.5 2.503 vs τ=0 control 2.518 (≈ +0.018,
+  negligible) — stays at the bigram floor (2.482). **Blend is not the lever; no log-semiring relaxation
+  needed → stay purely max-plus (train+deploy τ=0).**
+- **Bellman–Ford diffusion (n_hops, pure max-plus routing): ✗** — n_hops=2 → 2.544, n_hops=4 → 2.548 vs
+  single-hop 2.518 (≈, marginally worse). Multi-hop did NOT overcome per-entry argmax sparsity; no gain
+  from depth. Not a collapse (acc 0.27 > modal 0.15 = bigram-ish lookup), just no added capacity.
+- So tropical attention in EVERY form tested = bigram floor (~2.5); MorphSSM conv mixer (1.934) remains
+  the only working tropical sequence mixer. (Code shipped: `--n-hops`, `--tau-floor`, both committed.)
+
+**CAVEAT — wrong regime for attention.** seq_len=96 is where even *dense* attention beats the dense
+conv-twin by only +0.078 (no long-range signal to route). We measured tropical routing exactly where
+attention has the least to offer → the negative is SCOPED, not fundamental. n_hops=4≈n_hops=2 most likely
+because the task needs no long-range routing, not because the mechanism can't.
+
+- [ ] **DISCRIMINATOR (next, dense-only, cheap):** dense-attention vs dense-conv-twin across context
+      length {96, 512, 2048}. Attention pulls ahead with context → attention IS the lever at scale, re-test
+      tropical routing THERE; conv keeps pace → attention isn't the lever for this data (accept conv
+      substrate, or move to a retrieval-flavored task where attention provably matters). Settles whether
+      the tropical-attention negatives are scope or substance.
 - [ ] **Purity boundary / fallback:** if hard-argmax won't train it, the minimal patch is τ-warmup →
       deploy-hard (τ=0) — keeps the DEPLOYED forward purely tropical (soft crutch at train time only).
       Renormalize per round (additive `x − ½(λmax+λmin)`, closure-clean) to prevent max-cycle saturation
