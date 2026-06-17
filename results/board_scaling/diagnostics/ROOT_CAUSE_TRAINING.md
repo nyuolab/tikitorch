@@ -54,7 +54,8 @@ tested directly.
 
 The decisive test: in the **actual self-play loop**, does swapping the optimizer (or recipe) lift strength
 above the **untrained control**? 3 optimizers × 2 recipes, 14 iters, 40 sims, 60 eval games vs random.
-`lift = trained(soft τ) − untrained_control`. Data: [`online_connect4.json`](online_connect4.json).
+`lift = trained(soft τ) − untrained_control`. (Per-cell data is the table below; the raw JSON was later
+clobbered by the no-tag AZ run before the `--tag` flag existed — the numbers here are from the run log.)
 
 | optimizer / recipe | trained (soft) | untrained ctrl | **lift** | τ-gap (soft−hard) | final mode_frac |
 |---|---|---|---|---|---|
@@ -108,10 +109,34 @@ games. Data: [`online_chess.json`](online_chess.json).
 
 ---
 
+## Experiment D — AZ true-rules tree + headroom + seed replication (the go/no-go)
+
+Does giving the net a *strong, real-rules* search (so learned-model fidelity is not the ceiling) + a
+stronger opponent (negamax-d3, real headroom) let the trained prior beat its untrained control? And does
+it hold across seeds? 16 iters, 48 sims, 80 eval games. Data: `online_connect4_az_s0.json`,
+`online_connect4_azrep_s{1,2,3}.json`.
+
+| seed | trained (soft) | untrained ctrl | **lift** |
+|---|---|---|---|
+| 0 | 0.331 | **0.025** | +0.306 ← weak-baseline OUTLIER |
+| 1 | 0.200 | 0.438 | −0.237 |
+| 2 | 0.250 | 0.569 | −0.319 |
+| 3 | 0.219 | 0.362 | −0.144 |
+| **mean** | | | **−0.099** |
+
+**Reading (this corrected a mid-investigation false positive):** seed 0 alone showed a large +0.306 lift and
+looked like "AZ-tree rescues training." **Replication refuted it** — that seed had an anomalously weak
+untrained baseline (0.025); seeds 1–3, with normal baselines (0.36–0.57), all show training **hurts**
+(−0.14 to −0.32). Mean lift **−0.099**: even with a true-rules tree and real headroom, training the
+zero-DSP prior is **net negative** across seeds. The untrained, spread-out prior is on average *better* for
+shallow-search PUCT than the trained, over-sharpened one (`mode_frac` climbs every run). This is the
+seed-variance-is-first-order caveat made concrete — and a reminder that single-seed lifts here are noise.
+
 ## Verdict
 
 **The binding cause is NOT the optimizer / learning rule. It is self-play prior-collapse driven by an
-uninformative learning target at attainable compute.**
+uninformative learning target at attainable compute — and it is a firm NO-GO on the current recipe,
+replicated across optimizers, tree types, and seeds.**
 
 1. **NOT the optimizer (refuted, both domains).** Swapping the closed sign-optimizer for AdamW does **not**
    rescue strength — Adam is *worse* in the loop and collapses the prior hardest. The pre-investigation
@@ -120,9 +145,13 @@ uninformative learning target at attainable compute.**
 3. **The mechanism is prior-collapse.** The MCTS-visit→policy distillation drives the prior to an
    over-confident spike (mode_frac climbs, entropy falls) regardless of optimizer; a stronger optimizer
    accelerates it. Anti-collapse (entropy bonus, target tempering) only marginally mitigates.
-4. **The deeper constraint is capacity/compute headroom.** Strength comes from MCTS *search*; at
-   workstation compute the learned prior cannot beat raw search, so there is no informative gradient
-   rewarding a *better* (non-collapsed) prior. The learning target itself is too weak to lift play.
+4. **The deeper constraint is capacity/compute headroom — and even true-rules search + headroom +
+   seed replication does NOT rescue it (Experiment D).** Strength comes from MCTS *search*; at workstation
+   compute the trained prior cannot reliably beat the untrained one. Giving the net a strong real-rules
+   AZ tree (removing learned-model fidelity as the ceiling) still yields **mean lift −0.099** across 4
+   seeds — training the prior is net negative. The single seed that looked positive (+0.306) was a
+   weak-baseline artifact, caught by replication. So this is a firm **NO-GO on the current self-play
+   training recipe**, not a "needs the right tree/opponent" issue.
 5. **The closed optimizer is a real but SECONDARY issue:** offline it underfits the smooth value head
    ~2.9× vs Adam (still −69% of error), and a fully zero-DSP magnitude-aware fix is not off-the-shelf
    (best magfree closes ~⅓ of the gap). Worth improving for value fidelity, but it will **not** unblock

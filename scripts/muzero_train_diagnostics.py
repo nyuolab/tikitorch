@@ -344,7 +344,7 @@ def run_online(args):
                 num_simulations=args.sims, num_workers=args.workers, unroll=3, batch=128,
                 games_per_iter=args.games, train_steps_per_iter=args.steps, iters=args.iters,
                 tau_start=1.0, tau_end=0.3, temp_start=1.0, temp_end=0.15,
-                c_puct=1.25, backup="mean", lr=3e-3, seed=0,
+                c_puct=1.25, backup="mean", lr=3e-3, seed=args.seed,
                 legal_mask=args.legal_mask, tree_model=args.tree_model)
     opts = args.optimizers.split(",")
     recs = args.recipes.split(",")
@@ -357,7 +357,7 @@ def run_online(args):
     summary = dict(game=args.game, config=base, opponent=args.opponent, eval_games=args.eval_games,
                    results=[{k: v for k, v in r.items() if k != "trace"} for r in results],
                    traces={f"{r['optimizer']}/{r['recipe']}": r["trace"] for r in results})
-    path = os.path.join(OUT, f"online_{args.game}.json")
+    path = os.path.join(OUT, f"online_{args.game}{('_' + args.tag) if args.tag else ''}.json")
     open(path, "w").write(json.dumps(summary, indent=2))
     print(f"\n[saved] {path}")
     print("\n=== ONLINE READOUT (lift = trained_soft - untrained_control; >0 means training HELPED) ===")
@@ -394,6 +394,8 @@ if __name__ == "__main__":
     on.add_argument("--opponent", choices=["negamax", "random"], default="negamax")
     on.add_argument("--tree-model", dest="tree_model", choices=["muzero", "alphazero"], default="muzero")
     on.add_argument("--legal-mask", dest="legal_mask", action="store_true")
+    on.add_argument("--seed", type=int, default=0)
+    on.add_argument("--tag", default=None, help="suffix for the output json (avoids clobbering)")
     a = ap.parse_args()
     if a.cmd == "optbisect":
         run_optbisect(a)

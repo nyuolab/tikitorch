@@ -1,0 +1,145 @@
+{
+  "game": "connect4",
+  "config": {
+    "net_kind": "tropical",
+    "core_kind": "dyadic",
+    "latent_dim": 64,
+    "num_simulations": 48,
+    "num_workers": 8,
+    "unroll": 3,
+    "batch": 128,
+    "games_per_iter": 20,
+    "train_steps_per_iter": 40,
+    "iters": 16,
+    "tau_start": 1.0,
+    "tau_end": 0.3,
+    "temp_start": 1.0,
+    "temp_end": 0.15,
+    "c_puct": 1.25,
+    "backup": "mean",
+    "lr": 0.003,
+    "seed": 0,
+    "legal_mask": false,
+    "tree_model": "alphazero"
+  },
+  "opponent": "negamax",
+  "eval_games": 80,
+  "results": [
+    {
+      "optimizer": "tropicalsgd",
+      "recipe": "ce",
+      "score_soft": 0.331,
+      "score_hard": 0.331,
+      "score_untrained": 0.025,
+      "lift": 0.306,
+      "tau_gap": 0.0,
+      "final_mode_frac": 0.381
+    },
+    {
+      "optimizer": "tropicalsgd",
+      "recipe": "ce_ent0.1_tt2",
+      "score_soft": 0.15,
+      "score_hard": 0.15,
+      "score_untrained": 0.106,
+      "lift": 0.044,
+      "tau_gap": 0.0,
+      "final_mode_frac": 0.236
+    }
+  ],
+  "traces": {
+    "tropicalsgd/ce": [
+      {
+        "iter": 0,
+        "loss": 8.624,
+        "mode_frac": 0.168,
+        "prior_entropy": 1.939,
+        "kl_to_uniform": 0.007,
+        "value_pred_L1": 0.611,
+        "value_target_std": 1.001
+      },
+      {
+        "iter": 4,
+        "loss": 8.368,
+        "mode_frac": 0.299,
+        "prior_entropy": 1.829,
+        "kl_to_uniform": 0.116,
+        "value_pred_L1": 0.431,
+        "value_target_std": 0.996
+      },
+      {
+        "iter": 8,
+        "loss": 8.257,
+        "mode_frac": 0.344,
+        "prior_entropy": 1.707,
+        "kl_to_uniform": 0.239,
+        "value_pred_L1": 0.52,
+        "value_target_std": 1.001
+      },
+      {
+        "iter": 12,
+        "loss": 8.159,
+        "mode_frac": 0.367,
+        "prior_entropy": 1.657,
+        "kl_to_uniform": 0.289,
+        "value_pred_L1": 0.632,
+        "value_target_std": 1.003
+      },
+      {
+        "iter": 15,
+        "loss": 8.104,
+        "mode_frac": 0.381,
+        "prior_entropy": 1.621,
+        "kl_to_uniform": 0.325,
+        "value_pred_L1": 0.745,
+        "value_target_std": 0.993
+      }
+    ],
+    "tropicalsgd/ce_ent0.1_tt2": [
+      {
+        "iter": 0,
+        "loss": 7.815,
+        "mode_frac": 0.17,
+        "prior_entropy": 1.935,
+        "kl_to_uniform": 0.011,
+        "value_pred_L1": 0.498,
+        "value_target_std": 1.003
+      },
+      {
+        "iter": 4,
+        "loss": 7.741,
+        "mode_frac": 0.204,
+        "prior_entropy": 1.899,
+        "kl_to_uniform": 0.047,
+        "value_pred_L1": 0.55,
+        "value_target_std": 1.001
+      },
+      {
+        "iter": 8,
+        "loss": 7.708,
+        "mode_frac": 0.224,
+        "prior_entropy": 1.893,
+        "kl_to_uniform": 0.052,
+        "value_pred_L1": 0.486,
+        "value_target_std": 1.004
+      },
+      {
+        "iter": 12,
+        "loss": 7.677,
+        "mode_frac": 0.234,
+        "prior_entropy": 1.878,
+        "kl_to_uniform": 0.068,
+        "value_pred_L1": 0.525,
+        "value_target_std": 0.996
+      },
+      {
+        "iter": 15,
+        "loss": 7.65,
+        "mode_frac": 0.236,
+        "prior_entropy": 1.865,
+        "kl_to_uniform": 0.081,
+        "value_pred_L1": 0.578,
+        "value_target_std": 0.988
+      }
+    ]
+  }
+}
