@@ -54,7 +54,7 @@ FD="\$(command -v fpga-describe-local-image)"; FL="\$(command -v fpga-load-local
 sudo \$FC -S 0 || true; sudo \$FL -S 0 -I "\$AGFI"; sleep 4
 echo "== IDLE metrics (pre) =="; sudo \$FD -S 0 -M 2>&1 | tee /tmp/m_idle.txt; up
 mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.tgz && break; sleep 8; done && tar xzf s.tgz
-# compile as C (gcc): fpga_dma.h's C99 `char buf[static N]` is invalid in C++; driver hardcodes the buffer size
+# compile as C (gcc): fpga_dma.h C99 array-param syntax is invalid in C++; driver hardcodes the buffer size
 gcc -O2 -std=gnu11 -I"\$SDK/include" \
     /opt/tiki/tikitorch/fpga/silicon/muzero_ddr_power.c -lfpga_mgmt -o /tmp/muzero_ddr_power 2>&1 | tee /tmp/build.txt
 up
