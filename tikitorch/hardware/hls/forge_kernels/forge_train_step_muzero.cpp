@@ -85,8 +85,23 @@ static void submean(data_t* a, int n) {
     for (int i = 0; i < n; i++) a[i] = sat16((acc_t)a[i] - m);
 }
 
+// prediction half: latent h -> P1 -> relu -> P2 -> dyadic heads -> (policy, value) into the buffer.
+// Shared by do_fwd (h from representation) and do_dyn (h' from dynamics) so a recurrent step also
+// emits its (policy, value) — i.e. one kick yields the full MuZero recurrent_inference (h', r, p, v).
+static void pred_from_h(int32_t* buffer, const data_t* h) {
+    data_t tdp[MZ_DP], z[MZ_L], pol[MZ_A], val[1];
+    dyadic_linear(buffer, OFF_P1_EXP, OFF_P1_SGN, &buffer[OFF_B_P1], h, tdp, MZ_DP, MZ_L);
+    relu(tdp, MZ_DP);
+    dyadic_linear(buffer, OFF_P2_EXP, OFF_P2_SGN, &buffer[OFF_B_P2], tdp, z, MZ_L, MZ_DP);
+    for (int i = 0; i < MZ_L; i++) buffer[OFF_TMP_L + i] = z[i];
+    dyadic_linear(buffer, OFF_PH_EXP, OFF_PH_SGN, &buffer[OFF_B_PH], z, pol, MZ_A, MZ_L);
+    dyadic_linear(buffer, OFF_VH_EXP, OFF_VH_SGN, &buffer[OFF_B_VH], z, val, 1, MZ_L);
+    for (int i = 0; i < MZ_A; i++) buffer[OFF_POLICY + i] = pol[i];
+    buffer[OFF_VALUE] = val[0];
+}
+
 static int do_fwd(int32_t* buffer) {
-    data_t obs[MZ_OBS], tdr[MZ_DR], h[MZ_L], tdp[MZ_DP], z[MZ_L], pol[MZ_A], val[1];
+    data_t obs[MZ_OBS], tdr[MZ_DR], h[MZ_L];
     for (int i = 0; i < MZ_OBS; i++) obs[i] = (data_t)buffer[OFF_OBS + i];
 
     // representation: DyadicLin1 (OBS->DR) -> relu -> DyadicLin2 (DR->L) -> subtract-mean
@@ -95,17 +110,41 @@ static int do_fwd(int32_t* buffer) {
     dyadic_linear(buffer, OFF_R2_EXP, OFF_R2_SGN, &buffer[OFF_B_R2], tdr, h, MZ_L, MZ_DR);
     submean(h, MZ_L);
     for (int i = 0; i < MZ_L; i++) buffer[OFF_H + i] = h[i];
+    pred_from_h(buffer, h);
+    return 0;
+}
 
-    // prediction: DyadicLin1 (L->DP) -> relu -> DyadicLin2 (DP->L) -> dyadic heads
-    dyadic_linear(buffer, OFF_P1_EXP, OFF_P1_SGN, &buffer[OFF_B_P1], h, tdp, MZ_DP, MZ_L);
-    relu(tdp, MZ_DP);
-    dyadic_linear(buffer, OFF_P2_EXP, OFF_P2_SGN, &buffer[OFF_B_P2], tdp, z, MZ_L, MZ_DP);
-    for (int i = 0; i < MZ_L; i++) buffer[OFF_TMP_L + i] = z[i];
+// one tropical dyadic residual block: c = lin2(relu(lin1(z))); z = submean(z + c).
+// (submean replaces TropicalLayerNorm on fabric, mirroring repr/pred — zero DSP throughout.)
+static void dyn_block(int32_t* buffer, int off_a_exp, int off_a_sgn, const int32_t* bias_a,
+                      int off_b_exp, int off_b_sgn, const int32_t* bias_b, data_t* z) {
+    data_t u[MZ_DD], c[MZ_L];
+    dyadic_linear(buffer, off_a_exp, off_a_sgn, bias_a, z, u, MZ_DD, MZ_L);
+    relu(u, MZ_DD);
+    dyadic_linear(buffer, off_b_exp, off_b_sgn, bias_b, u, c, MZ_L, MZ_DD);
+    for (int i = 0; i < MZ_L; i++) z[i] = sat16((acc_t)z[i] + (acc_t)c[i]);   // residual add
+    submean(z, MZ_L);
+}
 
-    dyadic_linear(buffer, OFF_PH_EXP, OFF_PH_SGN, &buffer[OFF_B_PH], z, pol, MZ_A, MZ_L);
-    dyadic_linear(buffer, OFF_VH_EXP, OFF_VH_SGN, &buffer[OFF_B_VH], z, val, 1, MZ_L);
-    for (int i = 0; i < MZ_A; i++) buffer[OFF_POLICY + i] = pol[i];
-    buffer[OFF_VALUE] = val[0];
+// dynamics g(h, a) -> (h', r): action-embedding gather + residual add + 2 dyadic residual blocks +
+// reward head. Reads the running latent from OFF_H, writes h' back to OFF_H (so repeated mode-1 kicks
+// chain the K-step unroll), reward to OFF_REWARD, and (via pred_from_h) policy/value of h'. ZERO DSP:
+// the gather is a table lookup, the rest is shift+add+compare.
+static int do_dyn(int32_t* buffer, int action) {
+    data_t z[MZ_L], emb[MZ_L];
+    if (action < 0) action = 0;
+    if (action >= MZ_A) action = MZ_A - 1;                              // gather bounds safety
+    for (int i = 0; i < MZ_L; i++) {
+        emb[i] = (data_t)buffer[OFF_AEMB + action * MZ_L + i];
+        z[i] = sat16((acc_t)buffer[OFF_H + i] + (acc_t)emb[i]);         // z = h + action_embed(a)
+    }
+    dyn_block(buffer, OFF_D0A_EXP, OFF_D0A_SGN, &buffer[OFF_B_D0A], OFF_D0B_EXP, OFF_D0B_SGN, &buffer[OFF_B_D0B], z);
+    dyn_block(buffer, OFF_D1A_EXP, OFF_D1A_SGN, &buffer[OFF_B_D1A], OFF_D1B_EXP, OFF_D1B_SGN, &buffer[OFF_B_D1B], z);
+    data_t rew[1];
+    dyadic_linear(buffer, OFF_RH_EXP, OFF_RH_SGN, &buffer[OFF_B_RH], z, rew, 1, MZ_L);
+    buffer[OFF_REWARD] = rew[0];
+    for (int i = 0; i < MZ_L; i++) buffer[OFF_H + i] = z[i];            // h' replaces h (chained unroll)
+    pred_from_h(buffer, z);
     return 0;
 }
 
@@ -117,9 +156,10 @@ extern "C" int forge_train_step_muzero(int32_t* buffer, int mode, int arg1, int 
 #pragma HLS INTERFACE s_axilite port=arg2
 #pragma HLS INTERFACE s_axilite port=arg3
 #pragma HLS INTERFACE s_axilite port=return
-    (void)arg1; (void)arg2; (void)arg3;
+    (void)arg2; (void)arg3;
     if (mode == 0) return do_fwd(buffer);
-    return -1;   // bwd / signsgd / dynamics-unroll: next stage
+    if (mode == 1) return do_dyn(buffer, arg1);   // arg1 = action index for the recurrent step
+    return -1;   // bwd / signsgd: next stage
 }
 
 // Layout introspection for the host bit-exact harness (so a Python reference cannot
@@ -129,10 +169,16 @@ extern "C" void forge_muzero_layout(int* out) {
     // [OBS, L, A, DR, DP, OFF_OBS, OFF_H, OFF_TMP_L, OFF_POLICY, OFF_VALUE,
     //  OFF_R1_EXP, OFF_R1_SGN, OFF_R2_EXP, OFF_R2_SGN, OFF_P1_EXP, OFF_P1_SGN,
     //  OFF_P2_EXP, OFF_P2_SGN, OFF_PH_EXP, OFF_PH_SGN, OFF_VH_EXP, OFF_VH_SGN,
-    //  OFF_B_R1, OFF_B_R2, OFF_B_P1, OFF_B_P2, OFF_B_PH, OFF_B_VH]
+    //  OFF_B_R1, OFF_B_R2, OFF_B_P1, OFF_B_P2, OFF_B_PH, OFF_B_VH,   <- forward (unchanged prefix)
+    //  DD, OFF_AEMB, OFF_REWARD, OFF_D0A_EXP, OFF_D0A_SGN, OFF_D0B_EXP, OFF_D0B_SGN,
+    //  OFF_D1A_EXP, OFF_D1A_SGN, OFF_D1B_EXP, OFF_D1B_SGN, OFF_RH_EXP, OFF_RH_SGN,
+    //  OFF_B_D0A, OFF_B_D0B, OFF_B_D1A, OFF_B_D1B, OFF_B_RH]            <- dynamics (appended)
     int v[] = {MZ_OBS, MZ_L, MZ_A, MZ_DR, MZ_DP, OFF_OBS, OFF_H, OFF_TMP_L, OFF_POLICY, OFF_VALUE,
                OFF_R1_EXP, OFF_R1_SGN, OFF_R2_EXP, OFF_R2_SGN, OFF_P1_EXP, OFF_P1_SGN,
                OFF_P2_EXP, OFF_P2_SGN, OFF_PH_EXP, OFF_PH_SGN, OFF_VH_EXP, OFF_VH_SGN,
-               OFF_B_R1, OFF_B_R2, OFF_B_P1, OFF_B_P2, OFF_B_PH, OFF_B_VH};
+               OFF_B_R1, OFF_B_R2, OFF_B_P1, OFF_B_P2, OFF_B_PH, OFF_B_VH,
+               MZ_DD, OFF_AEMB, OFF_REWARD, OFF_D0A_EXP, OFF_D0A_SGN, OFF_D0B_EXP, OFF_D0B_SGN,
+               OFF_D1A_EXP, OFF_D1A_SGN, OFF_D1B_EXP, OFF_D1B_SGN, OFF_RH_EXP, OFF_RH_SGN,
+               OFF_B_D0A, OFF_B_D0B, OFF_B_D1A, OFF_B_D1B, OFF_B_RH};
     for (int i = 0; i < (int)(sizeof(v) / sizeof(int)); i++) out[i] = v[i];
 }
