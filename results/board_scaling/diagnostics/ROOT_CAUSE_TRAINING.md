@@ -54,8 +54,8 @@ tested directly.
 
 The decisive test: in the **actual self-play loop**, does swapping the optimizer (or recipe) lift strength
 above the **untrained control**? 3 optimizers × 2 recipes, 14 iters, 40 sims, 60 eval games vs random.
-`lift = trained(soft τ) − untrained_control`. (Per-cell data is the table below; the raw JSON was later
-clobbered by the no-tag AZ run before the `--tag` flag existed — the numbers here are from the run log.)
+`lift = trained(soft τ) − untrained_control`. Data: [`online_connect4.json`](online_connect4.json)
+(learned-MuZero tree, 6 cells).
 
 | optimizer / recipe | trained (soft) | untrained ctrl | **lift** | τ-gap (soft−hard) | final mode_frac |
 |---|---|---|---|---|---|
