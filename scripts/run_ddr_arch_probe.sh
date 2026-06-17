@@ -58,13 +58,20 @@ cp "\$HDK_SHELL_DIR"/design/interfaces/*ddr*.inc "\$HDK_SHELL_DIR"/design/interf
 # (2) the HDK sh_ddr / DDR-HBM controller modules the CL instantiates
 for n in sh_ddr cl_sh_ddr sh_hbm; do find "\$AF/hdk" -name "\$n.sv" -o -name "\$n.v" 2>/dev/null | head -2 | while read f; do cp "\$f" "\$OUT/mod_\$(basename \$f)"; done; done
 find "\$AF/hdk" -iname "*sh_ddr*" -o -iname "*ddr4*sv" 2>/dev/null | head -20 > \$OUT/ddr_module_index.txt
-# (3) the reference CL designs that USE on-card memory (the architecture to adapt)
+# (3) the reference CL designs + FULL build setup (the proven DDR flow: synth_cl tcl, encrypt/IP, sh_ddr inclusion, filelists)
 for d in cl_dram_hbm_dma cl_mem_perf; do
   D="\$AF/hdk/cl/examples/\$d"
   echo "== \$d design ==" >> \$OUT/ref_index.txt; ls -R "\$D/design" >> \$OUT/ref_index.txt 2>&1
-  for f in \$(find "\$D/design" -name "*.sv" 2>/dev/null | head -10); do cp "\$f" "\$OUT/\${d}_\$(basename \$f)" 2>/dev/null; done
-  for f in \$(find "\$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12); do cp "\$f" "\$OUT/\${d}_build_\$(basename \$f)" 2>/dev/null; done
+  echo "== \$d build ==" >> \$OUT/ref_index.txt; ls -R "\$D/build" >> \$OUT/ref_index.txt 2>&1
+  for f in \$(find "\$D/design" -name "*.sv" 2>/dev/null | head -16); do cp "\$f" "\$OUT/\${d}_\$(basename \$f)" 2>/dev/null; done
+  # the WHOLE build/scripts (synth_cl_*.tcl, encrypt.tcl, *.f filelists, gen IP) + constraints + any IP cfg
+  for f in \$(find "\$D/build" \( -name "*.tcl" -o -name "*.f" -o -name "*.xdc" -o -name "cl_*.vh" -o -name "encrypt*" \) 2>/dev/null | head -40); do cp "\$f" "\$OUT/\${d}_build_\$(basename \$f)" 2>/dev/null; done
+  # how sh_ddr is referenced (read_verilog? read_ip? a filelist? the encrypt list?)
+  grep -rniE "sh_ddr|ddr4|encrypt|read_verilog|read_ip|add_files|aws_v1|\.f\b" "\$D/build/scripts" 2>/dev/null | head -40 >> \$OUT/\${d}_sh_ddr_refs.txt 2>&1
 done
+# the canonical sh_ddr.f / filelist the HDK uses to compile sh_ddr (+ its DDR4 IP)
+find "\$AF/hdk" -name "*.f" 2>/dev/null | grep -iE "ddr|sh_ddr|cl" | head > \$OUT/hdk_filelists.txt
+find "\$AF/hdk/common/shell_stable" -iname "*ddr*" \( -name "*.f" -o -name "*.tcl" -o -name "*.xci" \) 2>/dev/null | head -20 >> \$OUT/hdk_filelists.txt
 # (4) how the host stages into on-card DDR/HBM (the fpga_dma DDR write path the test uses)
 grep -rniE "fpga_dma|0x[0-9a-f]+|XDMA|burst_write|ddr|hbm|init_ddr|sv_map" "\$AF/hdk/cl/examples/cl_mem_perf/software" 2>/dev/null | grep -iE "fpga_dma|burst|ddr|hbm|xdma" | head -40 > \$OUT/host_ddr_stage.txt || true
 aws s3 cp \$OUT/ "\$S3_RESULTS/" --recursive --only-show-errors || true
