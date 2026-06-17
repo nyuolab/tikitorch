@@ -324,12 +324,15 @@ def run_online_cell(game, base_cfg_kw, opt_name, recipe, args):
     mz.net.set_tau(0.0);         s_hard = _score_vs(mz._mcts_agent(), opp, game, args.eval_games, args.open_plies, 777)
     ctrl = BoardMuZero(game, cfg); ctrl.net.load_state_dict(init_sd); ctrl.net.eval()
     ctrl.net.set_tau(cfg.tau_end); s_ctrl = _score_vs(ctrl._mcts_agent(), opp, game, args.eval_games, args.open_plies, 777)
-    res = dict(optimizer=opt_name, recipe=recipe, score_soft=round(s_soft, 3), score_hard=round(s_hard, 3),
-               score_untrained=round(s_ctrl, 3), lift=round(s_soft - s_ctrl, 3),
+    # HEAD-TO-HEAD: trained vs its own untrained self (the ceiling/floor-free "did training help?" metric)
+    mz.net.set_tau(cfg.tau_end)
+    h2h = _score_vs(mz._mcts_agent(), lambda s: ctrl._mcts_agent(), game, args.eval_games, args.open_plies, 4242)
+    res = dict(net=cfg.net_kind, optimizer=opt_name, recipe=recipe, score_soft=round(s_soft, 3), score_hard=round(s_hard, 3),
+               score_untrained=round(s_ctrl, 3), lift=round(s_soft - s_ctrl, 3), h2h_vs_untrained=round(h2h, 3),
                tau_gap=round(s_soft - s_hard, 3), final_mode_frac=log[-1].get("mode_frac") if log else None,
                trace=log)
-    print(f"  => {opt_name:14s}/{recipe:14s}: soft {s_soft:.3f} hard {s_hard:.3f} "
-          f"untrained {s_ctrl:.3f} | LIFT {res['lift']:+.3f} | tau_gap {res['tau_gap']:+.3f}", flush=True)
+    print(f"  => {cfg.net_kind}/{opt_name}/{recipe}: soft {s_soft:.3f} untr {s_ctrl:.3f} LIFT {res['lift']:+.3f} | "
+          f"HEAD-TO-HEAD trained-vs-untrained {h2h:.3f} ({'HELPS' if h2h>0.55 else 'hurts' if h2h<0.45 else 'tie'})", flush=True)
     return res
 
 
@@ -340,7 +343,7 @@ def run_online(args):
     else:
         from tikitorch.planning.muzero.chess_game import Chess
         game = Chess
-    base = dict(net_kind="tropical", core_kind="dyadic", latent_dim=args.latent,
+    base = dict(net_kind=args.net, core_kind="dyadic", latent_dim=args.latent,
                 num_simulations=args.sims, num_workers=args.workers, unroll=3, batch=128,
                 games_per_iter=args.games, train_steps_per_iter=args.steps, iters=args.iters,
                 tau_start=1.0, tau_end=0.3, temp_start=1.0, temp_end=0.15,
@@ -360,12 +363,12 @@ def run_online(args):
     path = os.path.join(OUT, f"online_{args.game}{('_' + args.tag) if args.tag else ''}.json")
     open(path, "w").write(json.dumps(summary, indent=2))
     print(f"\n[saved] {path}")
-    print("\n=== ONLINE READOUT (lift = trained_soft - untrained_control; >0 means training HELPED) ===")
-    for r in sorted(results, key=lambda r: -r["lift"]):
-        flag = "HELPS" if r["lift"] > 0.03 else ("hurts" if r["lift"] < -0.03 else "~flat")
-        print(f"  {r['optimizer']:14s}/{r['recipe']:14s} lift {r['lift']:+.3f} [{flag}] "
-              f"(soft {r['score_soft']:.2f} untr {r['score_untrained']:.2f}) tau_gap {r['tau_gap']:+.3f} "
-              f"mode {r['final_mode_frac']}")
+    print("\n=== ONLINE READOUT (h2h = trained vs its own untrained self; >0.5 means training HELPED) ===")
+    for r in sorted(results, key=lambda r: -r["h2h_vs_untrained"]):
+        flag = "HELPS" if r["h2h_vs_untrained"] > 0.55 else ("hurts" if r["h2h_vs_untrained"] < 0.45 else "tie")
+        print(f"  {r.get('net','?'):8s}/{r['optimizer']:12s}/{r['recipe']:12s} "
+              f"H2H {r['h2h_vs_untrained']:.3f} [{flag}] | vs-opp lift {r['lift']:+.3f} "
+              f"(soft {r['score_soft']:.2f} untr {r['score_untrained']:.2f}) mode {r['final_mode_frac']}")
 
 
 if __name__ == "__main__":
@@ -395,6 +398,7 @@ if __name__ == "__main__":
     on.add_argument("--tree-model", dest="tree_model", choices=["muzero", "alphazero"], default="muzero")
     on.add_argument("--legal-mask", dest="legal_mask", action="store_true")
     on.add_argument("--seed", type=int, default=0)
+    on.add_argument("--net", choices=["tropical", "dense"], default="tropical")
     on.add_argument("--tag", default=None, help="suffix for the output json (avoids clobbering)")
     a = ap.parse_args()
     if a.cmd == "optbisect":
