@@ -132,11 +132,47 @@ zero-DSP prior is **net negative** across seeds. The untrained, spread-out prior
 shallow-search PUCT than the trained, over-sharpened one (`mode_frac` climbs every run). This is the
 seed-variance-is-first-order caveat made concrete — and a reminder that single-seed lifts here are noise.
 
+## Experiment E — dense vs tropical, fair search budget, head-to-head (the substrate-vs-scale test)
+
+Experiments B–D used starved search (16–48 sims) and an external opponent (ceiling/floor confounds). This
+fixes both: 100 sims, true-rules AZ tree, and the confound-free metric **trained vs its OWN untrained self**
+(>0.5 = training helped). Dense MuZero (Adam) is the control: if dense *also* fails to benefit, "doesn't
+play well" is the MuZero-at-scale wall, not the tropical substrate. n=5 seeds each. Data:
+`online_connect4_decisive_{dense,dyadic}_s{0..4}.json`.
+
+| substrate | H2H mean (trained vs untrained) | range | final mode_frac |
+|---|---|---|---|
+| dense (Adam) | **0.505 ± 0.115** | 0.42–0.70 | 0.267 |
+| tropical (TropicalSGD) | **0.500 ± 0.091** | 0.42–0.64 | 0.386 |
+
+**Reading — two big corrections:**
+- **The catastrophe was a STARVED-SEARCH artifact, not a permanent property.** At a fair sim budget the
+  trained-≪-untrained collapse (Experiments B–D) is GONE. Training is now **net-neutral, H2H ≈ 0.50** — it
+  no longer actively hurts. My earlier "firm NO-GO" described the starved regime; it over-generalized.
+- **Dense ≈ tropical — statistically identical (0.505 vs 0.500).** The gold-standard dense substrate is
+  *exactly as unable* to benefit from training at this scale. So "doesn't play well via training" is NOT a
+  tropical defect — it is the well-known MuZero compute/data wall, substrate-independent. (Residual tropical
+  signal: it collapses a bit more, mode_frac 0.39 vs 0.27 — a value-precision gap — but it does not produce
+  a head-to-head disadvantage.)
+- **The `lift`-vs-opponent metric (used in B–D) is unreliable** and partly manufactured the earlier
+  catastrophe. In E it swings ±0.4 across seeds (untrained baseline alone ranges 0.06–0.84) while the
+  shared-opponent-cancelling head-to-head sits stable at ~0.50. So the B–D "trained ≪ untrained" was
+  substantially baseline-variance noise on a bad metric, not only starved search. Head-to-head is the metric
+  to trust.
+
+Net: at workstation iteration/game scale, MuZero training adds **nothing measurable over raw search**, for
+dense OR tropical. Strength rides entirely on search; the learned net is along for the ride. Making training
+*contribute* requires far more self-play (games/iters) — a pure compute problem, where tropical has no
+disadvantage vs dense.
+
 ## Verdict
 
-**The binding cause is NOT the optimizer / learning rule. It is self-play prior-collapse driven by an
-uninformative learning target at attainable compute — and it is a firm NO-GO on the current recipe,
-replicated across optimizers, tree types, and seeds.**
+**"Doesn't play well via training" is the MuZero compute/data wall — substrate-independent (dense ≈
+tropical) — NOT a tropical defect, NOT the optimizer, and NOT a permanent collapse. The training effect is
+search-budget-dependent: harmful when search is starved, neutral (H2H ≈ 0.50) at a fair budget, for dense
+AND tropical alike. Making training actually HELP requires more self-play scale, where tropical has no
+disadvantage vs dense.** (Supersedes the earlier "firm NO-GO," which described only the starved-search
+regime — see Experiment E.)
 
 1. **NOT the optimizer (refuted, both domains).** Swapping the closed sign-optimizer for AdamW does **not**
    rescue strength — Adam is *worse* in the loop and collapses the prior hardest. The pre-investigation

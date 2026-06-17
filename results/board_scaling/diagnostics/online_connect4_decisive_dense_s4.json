@@ -1,0 +1,63 @@
+{
+  "game": "connect4",
+  "config": {
+    "net_kind": "dense",
+    "core_kind": "dyadic",
+    "latent_dim": 64,
+    "num_simulations": 100,
+    "num_workers": 8,
+    "unroll": 3,
+    "batch": 128,
+    "games_per_iter": 16,
+    "train_steps_per_iter": 40,
+    "iters": 14,
+    "tau_start": 1.0,
+    "tau_end": 0.3,
+    "temp_start": 1.0,
+    "temp_end": 0.15,
+    "c_puct": 1.25,
+    "backup": "mean",
+    "lr": 0.003,
+    "seed": 4,
+    "legal_mask": false,
+    "tree_model": "alphazero"
+  },
+  "opponent": "negamax",
+  "eval_games": 60,
+  "results": [
+    {
+      "net": "dense",
+      "optimizer": "adamw",
+      "recipe": "ce",
+      "score_soft": 0.45,
+      "score_hard": 0.45,
+      "score_untrained": 0.842,
+      "lift": -0.392,
+      "h2h_vs_untrained": 0.417,
+      "tau_gap": 0.0,
+      "final_mode_frac": 0.237
+    }
+  ],
+  "traces": {
+    "adamw/ce": [
+      {
+        "iter": 0,
+        "loss": 8.606,
+        "mode_frac": 0.192,
+        "prior_entropy": 1.923,
+        "kl_to_uniform": 0.023,
+        "value_pred_L1": 0.275,
+        "value_target_std": 1.004
+      },
+      {
+        "iter": 13,
+        "loss": 8.037,
+        "mode_frac": 0.237,
+        "prior_entropy": 1.832,
+        "kl_to_uniform": 0.114,
+        "value_pred_L1": 0.366,
+        "value_target_std": 1.003
+      }
+    ]
+  }
+}
