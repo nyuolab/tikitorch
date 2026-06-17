@@ -125,16 +125,54 @@ cap, material adjudication.
 ## Axis 2 — WALL-CLOCK + THROUGHPUT
 
 MuZero has **two** throughputs that map to the FPGA actor/learner split — we report **both** for every arm.
-**Cross-arm caution:** the GPU arm runs a resnet (b6c64); the FPGA arm a tiny dyadic projection net — model
-sizes differ by orders of magnitude, so do NOT directly compare their samples/s as a like-for-like speedup.
+**Cross-arm caution (REVISED 2026-06-18 — the old "orders of magnitude smaller" caveat is FALSE at chess
+scale; numbers below are audited):** at chess (769-d obs, 4096-action head) our nets are **param-comparable to
+the resnet** — resnet b6c64 = **1.68M params** (verified by instantiating the baseline net), tropical **1.86M**
+(**1.11×**), dense **0.76M** (**0.45×**). The real asymmetry is **compute/forward**: the resnet's conv stack
+reuses weights over the 8×8 board → ~**37× more MACs/forward** (rep tower ~58M MACs, rep+dyn per tree-node
+~119M) than our tropical projection net (~1.6M MACs) *despite comparable params*. So samples/s is not a
+like-for-like *hardware* speedup (very different MACs/sample), but it is NOT a tiny-vs-huge mismatch.
+TikiTorch CPU rows: matched to the GPU baseline's config (chess, **learned-model** tree, 50 sims, 12 workers,
+batch 128), measured on a **16-core Apple M3 Max (12P+4E), macOS** —
+[`cpu_chess_throughput.txt`](diagnostics/cpu_chess_throughput.txt) (2 runs; **high run-to-run variance** on a
+thermally-throttling laptop SoC — report ranges). resnet params from the baseline `blocks=6,channels=64` config.
 
 | arm | self-play moves/s (actor) | train samples/s (learner) | provenance |
 |---|---|---|---|
-| TikiTorch multiply-free, **CPU** (own true-MuZero chess loop) | TBD | TBD | `[to-measure]` EC2 CPU (free) |
-| **reference MuZero, A10G** (g5.4xlarge, resnet b6c64, 50 sims, 12 workers) | **1.42** | **54.6** (0.43 steps/s × b128) | `[measured]` GPU compute-idle ~93% (util<5%) — self-play CPU-bound (mz_summary.json) |
-| TikiTorch chess kernel, **FPGA** _(NOT comparable to GPU row →)_ | fwd: **126 inf/s** _(est.)_ | **40** /s _(est., batch=1)_ | `[C-synth-derived]` from axis-4 streaming latencies (fwd 7.92 ms; train 24.86 ms); tiny dyadic net ≠ resnet; estimate ≠ measured — **implies no FPGA win** (and the train kernel is not AFI-viable; see axis 4) |
-| _anchor: MiniZero, single box (Othello, **not** chess)_ | ~5 board-games/s (378.5 s / 2000-game iter, 4×1080Ti) | — | `[citable]` arXiv:2310.11305 |
+| TikiTorch **dense**, CPU (own true-MuZero chess loop) | **7.0–8.8** | **5,700–6,461** (44.5–50.5 steps/s × b128) | `[measured, 2 runs]` M3 Max, 12 workers; 0.76M params, net-eval ~96 µs, self-play **~0% net-bound** (tree-bound) |
+| TikiTorch **tropical** (multiply-free), CPU | **6.1–8.1** | **2,244–2,517** (17.5–19.7 steps/s × b128) | `[measured, 2 runs]` same box; 1.86M params, net-eval ~4000 µs (dyadic STE slow on CPU), **~11–13% net-bound** |
+| **reference MuZero, A10G** (resnet b6c64, 50 sims, 12 workers) | **1.42** | **54.6** (0.43 steps/s × b128) | `[measured]` **self-play on CPU** (`selfplay_on_gpu=False`, x86 host), train on GPU; GPU compute-idle ~93% (mz_summary.json) |
+| TikiTorch chess kernel, **FPGA** _(NOT comparable to GPU row →)_ | fwd: **126 inf/s** _(est.)_ | **40** /s _(est., batch=1)_ | `[C-synth-derived]` from axis-4 streaming latencies; estimate ≠ measured — **implies no FPGA win** (train kernel not AFI-viable; see axis 4) |
+| _anchor: MiniZero, single box (Othello, **not** chess)_ | ~5 board-games/s (4×1080Ti) | — | `[citable]` arXiv:2310.11305 |
 | _anchor: AlphaZero search rate_ | ~80k positions/s | — | `[citable]` arXiv:1712.01815 |
+
+**Rigorous reading (CPU vs the GPU baseline) — what is and isn't a real comparison:**
+- **The GPU baseline barely uses the GPU at this scale.** Its self-play ran *on CPU* (`selfplay_on_gpu=False`),
+  tree-bound (GPU ~93% idle); its training did only 0.43 resnet-steps/s — far below an A10G's capacity (small
+  net + b128 + Ray/Python overhead dominate). The comparison is **CPU-bound-actor + underutilized-GPU-learner**,
+  not a saturated GPU.
+- **Actor:** our loop does **~6–9 moves/s vs the reference's 1.42** (~4–6×). But self-play is **tree-bound for
+  both** (our net-eval is ~0–13% of self-play time), so this is **NOT a hardware or substrate win** — it bundles
+  *four* confounds, only some in our favor cleanly: leaner in-process MCTS (no Ray), ~37× lighter net-eval,
+  **a faster per-core CPU (Apple M3 Max laptop vs the cloud x86 host)**, and framework overhead. Self-play uses
+  no GPU in either arm. The cross-silicon CPU difference alone could account for a meaningful part of the gap.
+- **Learner:** our CPU does **more** samples/s than the GPU resnet (dense ~6k / tropical ~2.4k vs 54.6) — but
+  this bundles three non-hardware confounds: our nets are ~37× MAC-lighter/sample, the GPU is underutilized,
+  **and the reference 54.6 is measured inside a live concurrent Ray self-play+train+reanalyse pipeline while
+  our number is an isolated `train_step()` loop over a pre-filled buffer (not iso-workload).** It is **not** a
+  clean hardware comparison. The only clean one is the **same net on both** → the `[to-measure]` GPU row (run
+  our dense net on one A10G); expectation: for a small net the GPU ≈ CPU (actor tree-bound, learner overhead-bound).
+- **Tropical vs dense on CPU:** tropical is ~1.1× slower in self-play and ~2.5× slower in training (net-eval
+  ~4000 µs vs ~96 µs — the dyadic straight-through quantize is unoptimized in PyTorch). The "inverse on fabric"
+  (dyadic cheap) is **`[projected]`**, not established — Axis 4 shows the train kernel is 184%-of-SLR + misses
+  timing. Even so, tropical-CPU out-throughputs the GPU baseline here.
+- **Energy is NOT measured for the CPU arm** (`[to-measure]`): a 16-core M3 Max sustaining ~8 moves/s could
+  plausibly draw comparable or more whole-system energy/move than the lightly-loaded (67.5 W) GPU box — so the
+  throughput numbers **do not** imply an efficiency win; the energy axis cannot yet adjudicate it.
+- **Strength:** dense ≈ tropical parity (H2H 0.505 vs 0.500) is measured on **Connect4** (ROOT_CAUSE Exp E);
+  on **chess** the measured claim is weaker — *both arms fail to lift above their untrained control; no
+  dense-vs-tropical chess head-to-head was run* (chess substrate-parity is `[projected from Connect4]`).
+  Either way, "faster" here = *throughput*, not a stronger player.
 
 ---
 

@@ -1,0 +1,19 @@
+# CPU chess throughput — GPU-baseline-matched config (chess, learned-model tree, 50 sims, 12 workers, b128)
+# host: Apple M3 Max (12P+4E), Darwin 25.5.0 arm64; single run
+# cmd: PYTHONPATH=. python3 scripts/muzero_scale_bench.py --game chess --tree muzero --sims 50 --games 12 --workers 12 --steps 30
+# date: 2026-06-18
+
+[bench] game=chess tree=muzero sims=50 games/iter=12 workers=12 latent=64 batch=128
+
+=== tropical (tropicalsgd), 1,861,190 params ===
+  net eval        : 3900 us/inference (batch1, CPU)
+  self-play       : 960 moves in 118.0s -> 8.14 moves/s (12 workers; 0.68/core)
+  train (learner) : 19.67 steps/s -> 2,517 samples/s (b128)
+  net-bound frac  : ~13% of self-play is net-eval (rest = MCTS tree, host)
+
+=== dense (adamw), 763,586 params ===
+  net eval        : 95 us/inference (batch1, CPU)
+  self-play       : 923 moves in 105.3s -> 8.77 moves/s (12 workers; 0.73/core)
+  train (learner) : 50.48 steps/s -> 6,461 samples/s (b128)
+  net-bound frac  : ~0% of self-play is net-eval (rest = MCTS tree, host)
+
