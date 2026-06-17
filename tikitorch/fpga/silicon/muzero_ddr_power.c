@@ -9,20 +9,21 @@
 //   g++ -O2 -std=c++17 -DMZ_OBS_OVERRIDE=769 -DMZ_L_OVERRIDE=64 -DMZ_A_OVERRIDE=4096 \
 //       -I$SDK/include -I<hls>/forge_kernels -I<hls> muzero_ddr_power.c -lfpga_mgmt -o muzero_ddr_power
 //   sudo ./muzero_ddr_power <slot> <n_kicks>
-#include <cstdio>
-#include <cstdlib>
-#include <cstdint>
-#include <cstring>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <time.h>
 #include <inttypes.h>
-extern "C" {
+// Compiled as C (gcc): fpga_dma.h uses C99 `char buf[static N]` which is INVALID in C++ (g++ failed on it).
+// So: plain C headers, no extern "C", and the chess buffer size hardcoded (avoids pulling the C++
+// forge_buffer_muzero.hpp / its constexpr into a C translation unit).
 #include <fpga_pci.h>
 #include <fpga_mgmt.h>
-#include <utils/lcd.h>
 #include <fpga_dma.h>
-}
-#include "forge_buffer_muzero.hpp"   // MZ_BUFFER_WORDS (chess via -DMZ_*_OVERRIDE)
+#define MZ_BUFFER_WORDS 3132144   /* chess forward buffer (OBS=769,L=64,A=4096) = forge_muzero_buffer_words() */
 
 // s_axilite control register offsets (confirmed from control_s_axi.v; identical to bridge.cpp) ----
 #define R_AP_CTRL   0x00
