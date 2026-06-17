@@ -22,7 +22,6 @@
 // forge_buffer_muzero.hpp / its constexpr into a C translation unit).
 #include <fpga_pci.h>
 #include <fpga_mgmt.h>
-#include <fpga_dma.h>
 #define MZ_BUFFER_WORDS 3132144   /* chess forward buffer (OBS=769,L=64,A=4096) = forge_muzero_buffer_words() */
 
 // s_axilite control register offsets (confirmed from control_s_axi.v; identical to bridge.cpp) ----
@@ -50,18 +49,21 @@ int main(int argc, char** argv) {
     pci_bar_handle_t bar0 = PCI_BAR_HANDLE_INIT;
     if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR0, 0, &bar0) != 0) { fprintf(stderr, "attach BAR0 failed\n"); return 3; }
 
-    // --- stage the buffer into DDR over DMA-PCIS (XDMA) ---
-    int wfd = fpga_dma_open_queue(FPGA_DMA_XDMA, slot, /*channel*/0, /*is_read*/false);
-    if (wfd < 0) { fprintf(stderr, "fpga_dma_open_queue(write) failed: %d\n", wfd); return 4; }
-    uint8_t* hbuf = (uint8_t*)calloc(1, bytes);    // weights=0: do_fwd still streams + shift-adds (real toggling)
-    const size_t CH = 4UL * 1024 * 1024;           // 4 MB chunks
+    // --- stage the buffer into DDR via the shell DMA-PCIS BAR4 (the proven morph-LM fpga_pci path; no XDMA
+    // kernel driver). BAR4 offset X -> sh_cl_dma_pcis addr X -> our 2->1 crossbar -> sh_ddr -> DDR addr X.
+    // Weights = 0 is fine for a POWER measurement: do_fwd still streams 12 MB from DDR + shift-adds (real
+    // switching). fpga_pci_write_burst bulk-writes (BURST_CAPABLE BAR4), chunked. ---
+    pci_bar_handle_t bar4 = PCI_BAR_HANDLE_INIT;
+    if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR4, BURST_CAPABLE, &bar4) != 0) { fprintf(stderr, "attach BAR4 failed\n"); return 4; }
+    uint32_t* hbuf = (uint32_t*)calloc(MZ_BUFFER_WORDS, 4);
+    const long CHW = 256 * 1024;                    // 256K-word (1 MB) bursts
     double sdma = now_s();
-    for (size_t off = 0; off < bytes; off += CH) {
-        size_t n = (bytes - off < CH) ? (bytes - off) : CH;
-        int rc = fpga_dma_burst_write(wfd, hbuf + off, n, (size_t)(DDR_BUF_ADDR + off));
-        if (rc != 0) { fprintf(stderr, "fpga_dma_burst_write @0x%zx rc=%d\n", off, rc); return 5; }
+    for (long off = 0; off < MZ_BUFFER_WORDS; off += CHW) {
+        long n = (MZ_BUFFER_WORDS - off < CHW) ? (MZ_BUFFER_WORDS - off) : CHW;
+        int rc = fpga_pci_write_burst(bar4, (uint64_t)(DDR_BUF_ADDR) + (uint64_t)off * 4, hbuf + off, (uint64_t)n);
+        if (rc != 0) { fprintf(stderr, "fpga_pci_write_burst @word %ld rc=%d\n", off, rc); return 5; }
     }
-    printf("[ddr] staged %.2f MB into DDR in %.3f s\n", bytes / 1048576.0, now_s() - sdma);
+    printf("[ddr] staged %.2f MB into DDR via BAR4 in %.3f s\n", bytes / 1048576.0, now_s() - sdma);
 
     // --- program the kernel's m_axi buffer pointer (= DDR address) + mode ---
     fpga_pci_poke(bar0, R_BUFFER_0, (uint32_t)(DDR_BUF_ADDR & 0xFFFFFFFFULL));
@@ -87,6 +89,6 @@ int main(int argc, char** argv) {
     }
     double el = now_s() - s;
     printf("[ddr] LOOP: %ld/%ld kicks in %.3f s -> %.3f ms/kick, %.1f inf/s\n", ok, n_kicks, el, el / ok * 1e3, ok / el);
-    free(hbuf); fpga_pci_detach(bar0);
+    free(hbuf); fpga_pci_detach(bar0); fpga_pci_detach(bar4);
     return 0;
 }
