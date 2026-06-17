@@ -13,9 +13,12 @@
 #include <cstdint>
 
 // sgn * (x << exp); exp<0 => arithmetic right shift. A bit-shift + sign — NO multiplier.
+// sgn is +1/-1 for a nonzero dyadic weight and 0 for an exactly-zero weight (export sets sgn=0,exp=0
+// there) -> a zero weight must contribute 0, not x. (explicit cast: ap_int negation widens to <33>.)
 static inline acc_t dyadic_mac(data_t x, int exp, int sgn) {
+    if (sgn == 0) return (acc_t)0;
     acc_t v = (exp >= 0) ? ((acc_t)x << exp) : ((acc_t)x >> (-exp));
-    return sgn >= 0 ? v : (acc_t)(-v);   // explicit cast: ap_int negation widens to <33>, so the ?: needs it
+    return sgn > 0 ? v : (acc_t)(-v);
 }
 
 static inline data_t sat16(acc_t a) {

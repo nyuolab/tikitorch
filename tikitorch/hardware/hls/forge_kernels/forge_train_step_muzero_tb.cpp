@@ -81,7 +81,7 @@ int main() {
         forge_train_step_muzero(buf.data(), 1, action, 0, 0);                 // dynamics step (mode 1)
 
         // independent recompute with the SAME acc_t/data_t widths => bit-exact to the kernel arithmetic
-        auto rmac = [](data_t x, int e, int s) { acc_t v = (e >= 0) ? ((acc_t)x << e) : ((acc_t)x >> (-e)); return s >= 0 ? v : (acc_t)(-v); };
+        auto rmac = [](data_t x, int e, int s) -> acc_t { if (s == 0) return (acc_t)0; acc_t v = (e >= 0) ? ((acc_t)x << e) : ((acc_t)x >> (-e)); return s > 0 ? v : (acc_t)(-v); };
         auto rsat = [](acc_t a) -> data_t { if (a > 32767) a = 32767; if (a < -32768) a = -32768; return (data_t)a; };
         auto rlin = [&](int oe, int os, int ob, const std::vector<data_t>& x, std::vector<data_t>& y, int OUT, int IN) {
             for (int o = 0; o < OUT; o++) { acc_t acc = (acc_t)buf[ob + o]; for (int i = 0; i < IN; i++) acc += rmac(x[i], buf[oe + o * IN + i], buf[os + o * IN + i]); y[o] = rsat(acc); } };
