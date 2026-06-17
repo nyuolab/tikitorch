@@ -6,11 +6,14 @@
 # the HDK DDR-IP step (see run_muzero_ddr_afi_build.sh) — confirmed against the reference DDR build.
 source ${HDK_SHELL_DIR}/build/scripts/synth_cl_header.tcl
 
-# CL top + kernel RTL (+ shell .inc), staged into the post-encryption source dir by encrypt.tcl
+# CL top + kernel RTL (+ shell .inc), staged into the post-encryption source dir by encrypt.tcl.
+# NOTE: do NOT read_verilog sh_ddr.sv — it is an ENCRYPTED shell module already provided by the header/shell
+# (the PCIM build instantiated it via unused_ddr_template with no extra read); a raw read_verilog of the
+# encrypted file fails with "Error generated from encrypted envelope". We just instantiate sh_ddr in the .sv.
 read_verilog -sv [glob ${src_post_enc_dir}/*.{s,}v]
 
-# the sh_ddr DDR controller module (synthesizable source shipped with the shell)
-read_verilog -sv [glob ${HDK_SHELL_DIR}/design/sh_ddr/synth/*.sv]
+# DDR4 controller IP that sh_ddr (DDR_PRESENT=1) wraps — required when the DDR controller is instantiated
+read_ip [list ${HDK_IP_SRC_DIR}/cl_ddr4/cl_ddr4.xci]
 
 # our IP: OCL AXI4-Lite slice + the 2->1 DDR crossbar
 read_ip [glob $CL_DIR/design/ip/axi_register_slice_light/axi_register_slice_light.xci]

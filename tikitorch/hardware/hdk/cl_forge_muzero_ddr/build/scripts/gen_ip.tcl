@@ -10,12 +10,13 @@ create_project -in_memory -part $part
 # OCL control slice (AXI4-Lite 32b)
 create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name axi_register_slice_light -dir $ipdir
 set_property -dict [list CONFIG.PROTOCOL {AXI4LITE} CONFIG.ADDR_WIDTH {32} CONFIG.DATA_WIDTH {32}] [get_ips axi_register_slice_light]
-# 2 SI (kernel + DMA-PCIS) -> 1 MI (DDR), 512b, 64-bit addr, 16-bit ID, serialized (SASD)
+# 2 SI (kernel + DMA-PCIS) -> 1 MI (DDR), 512b, 64-bit addr. SI ID width = 15 so the crossbar's master-side
+# thread ID = 15 + ceil(log2(2)) = 16, matching cl_sh_ddr_axi's 16-bit ID (avoids the 17-bit overflow).
+# Default SAMD connectivity (has master IDs; SASD was an axi_interconnect value, invalid here).
 create_ip -name axi_crossbar -vendor xilinx.com -library ip -module_name axi_crossbar_ddr -dir $ipdir
 set_property -dict [list \
   CONFIG.NUM_SI {2} CONFIG.NUM_MI {1} \
-  CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ADDR_WIDTH {64} CONFIG.ID_WIDTH {16} \
-  CONFIG.CONNECTIVITY_MODE {SASD} \
+  CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ADDR_WIDTH {64} CONFIG.ID_WIDTH {15} \
   CONFIG.R_REGISTER {1} \
   CONFIG.M00_A00_BASE_ADDR {0x0000000000000000} CONFIG.M00_A00_ADDR_WIDTH {34} \
 ] [get_ips axi_crossbar_ddr]
