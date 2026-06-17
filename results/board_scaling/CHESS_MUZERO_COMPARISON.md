@@ -3,7 +3,11 @@
 > **Status: all 4 axes measured; adversarially honesty-audited against source files (silicon axis re-audited
 > 2026-06-15 after the 512-bit streaming-kernel rewrite).** Quality (axis 1, CPU), throughput + energy
 > (axes 2–3, measured GPU + C-synth-derived FPGA), and silicon (axis 4, chess-scale C-synth) are all filled.
-> **Silicon headline: the FORWARD kernel is ROUTED + AFI'd + LOADS ON REAL F2 (DSP=0, WNS +0.123 ns post-route, agfi-0b2c228a17e516e0a; loads on f2.6xlarge, PCIM clean, Vccint 8–10 W loaded/idle; inference-power = to-measure). C-synth: 14%-of-SLR LUT, timing met with
+> **Silicon headline: the FORWARD kernel RUNS INFERENCE ON REAL F2. PCIM AFI (agfi-0b2c228a17e516e0a):
+> routed DSP=0, WNS +0.123 ns, loads + PCIM-clean, but host-DRAM-PCIM not drivable on EC2 (IOMMU). DDR-variant
+> AFI (agfi-085dca07f374aa1cd, WNS +0.154 ns): kernel reads on-card DDR4 — MEASURED 9.22 ms/inference, 108
+> inf/s, whole-rail ≈0.074 J/inference (the DSP=0 core's dynamic draw is below the board Vccint sensor floor).
+> C-synth: 14%-of-SLR LUT, timing met with
 > margin); the TRAIN kernel is research-track (DSP=0 confirmed, but 184%-of-SLR LUT + C-synth timing miss).**
 > Mirrors `results/lm_shakespeare/fig_hallmark_lm.md`.
 
@@ -140,7 +144,8 @@ sizes differ by orders of magnitude, so do NOT directly compare their samples/s 
 |---|---|---|---|
 | **reference MuZero, A10G** | **end-to-end 47.6 J/move (1237 mJ/sample)** ‖ **GPU-active 3.7 J/move (96.8 mJ/sample)** | nvidia-smi power×dt @5 Hz; 67.5 W whole-window / 73.7 W GPU-active | `[measured]` (power.csv) |
 | TikiTorch chess FORWARD kernel, **FPGA (on real F2 silicon)** | **Vccint 8–10 W (loaded, kernel IDLE)** — measured on f2.6xlarge with the AFI loaded (`agfi-0b2c228a17e516e0a`); this is the shell + DSP=0 CL static draw, **NOT** inference power | `fpga-describe-local-image -M`, 5 samples (8/9 W last/avg, 10 W max); PCIM clean (0 protocol errors) | `[measured-partial]` loaded/idle only |
-| TikiTorch chess FORWARD kernel, FPGA — **inference (dynamic)** | **attempted on F2, BLOCKED** — the CL's PCIM master issues clean reads to the host buffer (pcim-read-count 0→8, 0 errors) but stalls: a raw hugepage isn't IOMMU-granted to the FPGA, so reads never complete and the kernel never runs (Vccint stayed at idle 7 W). EC2 host-memory-access wall, not a CL defect. Fix = IOMMU-map the buffer **or** rebuild to read on-card DDR (see MUZERO_CHESS_FWD_AFI.md §3b) | F2 `muzero_pcim_power.c` + `-M` sampling | `[to-measure]` (blocked, diagnosed) |
+| TikiTorch chess FORWARD kernel, FPGA — **inference (dynamic), DDR AFI** | **MEASURED on F2 silicon: kernel runs from on-card DDR4 — 9.22 ms/inference, 108 inf/s (4000 kicks, AP_DONE ret=0). Whole-rail Vccint ~7–10 W during inference, statistically identical to idle (9 W) → the DSP=0 kernel's dynamic draw is BELOW the ~±2 W sensor floor against the shell+DDR4 baseline. Whole-rail energy bound ≈ 8 W × 9.22 ms ≈ 0.074 J/inference (shell-dominated, NOT kernel-isolated).** | F2 `muzero_ddr_power.c` (fpga_pci BAR4 stage + kick loop) + `-M`; agfi-085dca07f374aa1cd | `[measured]` (DDR rebuild; supersedes the PCIM-IOMMU block) |
+| _(PCIM variant — superseded)_ | PCIM-to-host AFI loads + issues clean reads but EC2 won't IOMMU-grant a raw hugepage → kernel stalls (never runs). Rebuilt to read on-card DDR (the row above) to get a drivable inference. | `muzero_pcim_power.c` | `[diagnosed]` |
 | TikiTorch, CPU | not measured | — | `[to-measure]`/`[projected]` |
 | DeepMind | not published per-move | — | `[missing]` |
 
@@ -151,11 +156,15 @@ This gate defines both the 73.7 W figure and the 93%-idle figure — it is disti
 idle time = **pessimistic**; **GPU-active** (active-power × active-time) = optimistic compute-only — the LM A10G
 row reports the same split. NB: an earlier placeholder "~0.7–1.7 mJ-class IF it routed" FPGA figure remains
 **withdrawn** — the forward kernel is now P&R'd, AFI'd, and LOADS on real F2 (Vccint 8–10 W idle, PCIM clean),
-but that is the **loaded/idle** rail (shell-dominated), NOT inference power. A defensible board-FPGA J/inference
-still does not exist: it requires running the kernel (Stage 3b, PCIM host driver) and sampling Vccint during
-the forward pass. Do NOT multiply 8–10 W × 7.92 ms — the idle rail is mostly shell static, and dynamic draw of
-the DSP=0 CL is unmeasured. The honest on-silicon claim today is: **the AFI loads and the PCIM path is clean;
-power-per-inference is to-measure.**_
+but that was the **loaded/idle** rail. The **DDR-variant AFI now RUNS inference on silicon** (kernel reads
+on-card DDR4, 9.22 ms/inference, 108 inf/s, measured) — so a whole-rail energy bound exists:
+≈ 8 W × 9.22 ms ≈ **0.074 J/inference**. CAVEAT, load-bearing: this is the **whole Vccint rail** (shell + DDR4
+controller + CL), and during-inference Vccint (7–10 W) is **statistically identical to idle** — the DSP=0
+kernel's own dynamic draw is **below the ~±2 W sensor resolution**, so the J/inference is shell+DDR-dominated
+and the kernel's isolated energy is **unmeasurable at this sensor granularity** (itself a finding: a 14%-of-SLR
+multiply-free datapath is lost in the platform baseline). Honest on-silicon claim: **the kernel runs from DDR
+at a measured 9.22 ms/108 inf-s; whole-rail ≈0.074 J/inference; the multiply-free core's dynamic power is below
+the board sensor's floor.** NOT comparable to a GPU MCTS "move" (tiny dyadic forward pass ≠ resnet + search)._
 
 _The GPU energy caveat is load-bearing: in a Python MuZero loop, CPU-side MCTS dominates wall-clock, so
 end-to-end mJ/move over-attributes energy to the GPU. We commit to reporting **both** the end-to-end number

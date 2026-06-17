@@ -1,0 +1,17 @@
+# DDR forward AFI — on-silicon dynamic run (agfi-085dca07f374aa1cd, f2.6xlarge, 2026-06-17)
+
+## driver
+[ddr] MZ_BUFFER_WORDS=3132144 (11.95 MB); n_kicks=4000; mode=0 (forward); DDR addr=0x0
+[ddr] staged 11.95 MB into DDR via BAR4 in 0.010 s
+[ddr] warm kick: AP_DONE in 9.223 ms, ret=0  -> KERNEL RUNS FROM DDR
+[ddr] LOOP: 4000/4000 kicks in 36.888 s -> 9.222 ms/kick, 108.4 inf/s
+DRIVER_EXIT=0
+
+## idle Vccint
+   Last measured: 9 watts
+   Average: 9 watts
+   Max measured: 10 watts
+
+## during-inference Vccint
+   8    Last measured: 7 watts
+   6    Last measured: 8 watts

@@ -86,3 +86,29 @@ issued transactions). The only missing piece is the host-side DMA mapping.
 
 The loaded/idle Vccint (7–9 W) above stands; the inference-power figure remains **to-measure** pending one of
 the above.
+
+## Stage 3b RESOLVED via DDR rebuild — inference RUNS on silicon (measured 2026-06-17)
+
+The PCIM-to-host block (above) was resolved by rebuilding the CL to read **on-card DDR4** instead of host
+DRAM (`cl_forge_muzero_ddr`): kernel m_axi + shell DMA-PCIS → a 2→1 AXI crossbar → `sh_ddr` (DDR_PRESENT=1) →
+DDR4. The host stages the buffer into DDR via the DMA-PCIS BAR4 (`fpga_pci_write_burst`); the kernel reads DDR
+(which it owns — no host IOMMU). DDR build closed first-pass past elaboration: **WNS +0.154 ns, DSP=0**;
+**AFI agfi-085dca07f374aa1cd**.
+
+**On F2 (`muzero_ddr_power.c`):**
+| item | value |
+|---|---|
+| stage 11.95 MB → DDR (BAR4 burst) | 0.010 s |
+| warm kick | **AP_DONE, 9.223 ms, ret=0 → kernel runs from DDR** |
+| sustained loop | **4000/4000 kicks, 9.22 ms/inference, 108.4 inf/s** |
+| Vccint idle | 9 W (avg), 10 W max |
+| Vccint during inference | 7–8 W (avg), 10 W max — **statistically identical to idle** |
+| whole-rail energy bound | ≈ 8 W × 9.22 ms ≈ **0.074 J/inference** |
+
+**Honest reading:** the zero-DSP MuZero chess forward kernel **executes real inference on F2 silicon** at a
+**measured** 9.22 ms / 108 inf-s (validates the ~126 inf/s C-synth estimate). The per-inference Vccint is
+**below the board sensor's ~±2 W resolution** against the shell+DDR4 baseline — i.e., the 14%-of-SLR
+multiply-free datapath draws so little it's lost in the platform floor. So the J/inference is a whole-rail
+(shell-dominated) bound, not a kernel-isolated figure. NOT comparable to a GPU MCTS move (tiny dyadic forward
+pass ≠ resnet + search). Driver `tikitorch/fpga/silicon/muzero_ddr_power.c`; runner
+`scripts/run_muzero_ddr_f2_dynpower.sh`; package `tikitorch/hardware/hdk/cl_forge_muzero_ddr/`.
