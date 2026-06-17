@@ -1,0 +1,187 @@
+{
+  "game": "chess",
+  "config": {
+    "net_kind": "tropical",
+    "core_kind": "dyadic",
+    "latent_dim": 64,
+    "num_simulations": 16,
+    "num_workers": 8,
+    "unroll": 3,
+    "batch": 128,
+    "games_per_iter": 10,
+    "train_steps_per_iter": 30,
+    "iters": 8,
+    "tau_start": 1.0,
+    "tau_end": 0.3,
+    "temp_start": 1.0,
+    "temp_end": 0.15,
+    "c_puct": 1.25,
+    "backup": "mean",
+    "lr": 0.003,
+    "seed": 0,
+    "legal_mask": false,
+    "tree_model": "muzero"
+  },
+  "opponent": "random",
+  "eval_games": 20,
+  "results": [
+    {
+      "optimizer": "tropicalsgd",
+      "recipe": "ce",
+      "score_soft": 0.325,
+      "score_hard": 0.25,
+      "score_untrained": 0.35,
+      "lift": -0.025,
+      "tau_gap": 0.075,
+      "final_mode_frac": 0.401
+    },
+    {
+      "optimizer": "tropicalsgd",
+      "recipe": "ce_ent0.1",
+      "score_soft": 0.35,
+      "score_hard": 0.4,
+      "score_untrained": 0.375,
+      "lift": -0.025,
+      "tau_gap": -0.05,
+      "final_mode_frac": 0.366
+    },
+    {
+      "optimizer": "adamw",
+      "recipe": "ce",
+      "score_soft": 0.35,
+      "score_hard": 0.3,
+      "score_untrained": 0.45,
+      "lift": -0.1,
+      "tau_gap": 0.05,
+      "final_mode_frac": 0.613
+    },
+    {
+      "optimizer": "adamw",
+      "recipe": "ce_ent0.1",
+      "score_soft": 0.4,
+      "score_hard": 0.325,
+      "score_untrained": 0.425,
+      "lift": -0.025,
+      "tau_gap": 0.075,
+      "final_mode_frac": 0.436
+    }
+  ],
+  "traces": {
+    "tropicalsgd/ce": [
+      {
+        "iter": 0,
+        "loss": 27.636,
+        "mode_frac": 0.014,
+        "prior_entropy": 6.192,
+        "kl_to_uniform": 2.126,
+        "value_pred_L1": 0.822,
+        "value_target_std": 0.894
+      },
+      {
+        "iter": 4,
+        "loss": 15.993,
+        "mode_frac": 0.23,
+        "prior_entropy": 3.326,
+        "kl_to_uniform": 4.992,
+        "value_pred_L1": 0.61,
+        "value_target_std": 0.652
+      },
+      {
+        "iter": 7,
+        "loss": 11.486,
+        "mode_frac": 0.401,
+        "prior_entropy": 3.227,
+        "kl_to_uniform": 5.091,
+        "value_pred_L1": 0.258,
+        "value_target_std": 0.473
+      }
+    ],
+    "tropicalsgd/ce_ent0.1": [
+      {
+        "iter": 0,
+        "loss": 24.647,
+        "mode_frac": 0.013,
+        "prior_entropy": 5.727,
+        "kl_to_uniform": 2.591,
+        "value_pred_L1": 0.853,
+        "value_target_std": 0.903
+      },
+      {
+        "iter": 4,
+        "loss": 13.308,
+        "mode_frac": 0.203,
+        "prior_entropy": 2.887,
+        "kl_to_uniform": 5.431,
+        "value_pred_L1": 0.416,
+        "value_target_std": 0.602
+      },
+      {
+        "iter": 7,
+        "loss": 10.776,
+        "mode_frac": 0.366,
+        "prior_entropy": 2.069,
+        "kl_to_uniform": 6.248,
+        "value_pred_L1": 0.288,
+        "value_target_std": 0.493
+      }
+    ],
+    "adamw/ce": [
+      {
+        "iter": 0,
+        "loss": 26.222,
+        "mode_frac": 0.016,
+        "prior_entropy": 5.833,
+        "kl_to_uniform": 2.484,
+        "value_pred_L1": 1.037,
+        "value_target_std": 1.002
+      },
+      {
+        "iter": 4,
+        "loss": 13.011,
+        "mode_frac": 0.348,
+        "prior_entropy": 2.56,
+        "kl_to_uniform": 5.757,
+        "value_pred_L1": 0.596,
+        "value_target_std": 0.729
+      },
+      {
+        "iter": 7,
+        "loss": 8.333,
+        "mode_frac": 0.613,
+        "prior_entropy": 1.701,
+        "kl_to_uniform": 6.617,
+        "value_pred_L1": 0.456,
+        "value_target_std": 0.614
+      }
+    ],
+    "adamw/ce_ent0.1": [
+      {
+        "iter": 0,
+        "loss": 23.674,
+        "mode_frac": 0.013,
+        "prior_entropy": 6.243,
+        "kl_to_uniform": 2.075,
+        "value_pred_L1": 0.906,
+        "value_target_std": 0.952
+      },
+      {
+        "iter": 4,
+        "loss": 13.17,
+        "mode_frac": 0.311,
+        "prior_entropy": 3.012,
+        "kl_to_uniform": 5.306,
+        "value_pred_L1": 0.775,
+        "value_target_std": 0.95
+      },
+      {
+        "iter": 7,
+        "loss": 10.278,
+        "mode_frac": 0.436,
+        "prior_entropy": 2.379,
+        "kl_to_uniform": 5.938,
+        "value_pred_L1": 0.757,
+        "value_target_std": 0.935
+      }
+    ]
+  }
+}

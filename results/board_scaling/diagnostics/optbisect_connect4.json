@@ -1,0 +1,98 @@
+{
+  "task": "connect4_supervised_stationary",
+  "positions": 512,
+  "rollouts": 32,
+  "depth": 4,
+  "steps": 1000,
+  "latent": 64,
+  "value_predict_mean_L1": 0.2791,
+  "value_target_std": 0.3459,
+  "value_target_var": 0.1194,
+  "policy_uniform_entropy": 1.9459,
+  "results": [
+    {
+      "optimizer": "tropicalsgd (sign-only)",
+      "tag": "sign",
+      "value_L1": 0.0865,
+      "value_setting": "lr=0.001",
+      "value_redux": 0.69,
+      "policy_CE": 1.724,
+      "policy_setting": "lr=0.003",
+      "policy_top1": 0.273,
+      "policy_mode_frac": 0.328,
+      "policy_entropy": 1.682
+    },
+    {
+      "optimizer": "signsgd+mom0.9",
+      "tag": "sign",
+      "value_L1": 0.0313,
+      "value_setting": "lr=0.001",
+      "value_redux": 0.888,
+      "policy_CE": 1.703,
+      "policy_setting": "lr=0.001",
+      "policy_top1": 0.312,
+      "policy_mode_frac": 0.293,
+      "policy_entropy": 1.702
+    },
+    {
+      "optimizer": "adamw (open ceiling)",
+      "tag": "open",
+      "value_L1": 0.0298,
+      "value_setting": "lr=0.003",
+      "value_redux": 0.893,
+      "policy_CE": 1.7042,
+      "policy_setting": "lr=0.003",
+      "policy_top1": 0.502,
+      "policy_mode_frac": 0.295,
+      "policy_entropy": 1.707
+    },
+    {
+      "optimizer": "frexpmag (magfree)",
+      "tag": "magfree",
+      "value_L1": 0.0735,
+      "value_setting": "bs=10",
+      "value_redux": 0.737,
+      "policy_CE": 1.7839,
+      "policy_setting": "bs=10",
+      "policy_top1": 0.219,
+      "policy_mode_frac": 0.342,
+      "policy_entropy": 1.704
+    },
+    {
+      "optimizer": "tropicaladam (magfree)",
+      "tag": "magfree",
+      "value_L1": 0.0748,
+      "value_setting": "si=0.125",
+      "value_redux": 0.732,
+      "policy_CE": 1.7198,
+      "policy_setting": "si=0.03125",
+      "policy_top1": 0.627,
+      "policy_mode_frac": 0.298,
+      "policy_entropy": 1.73
+    },
+    {
+      "optimizer": "countagreement (magfree)",
+      "tag": "magfree",
+      "value_L1": 0.0919,
+      "value_setting": "bs=10",
+      "value_redux": 0.671,
+      "policy_CE": 1.7225,
+      "policy_setting": "bs=10",
+      "policy_top1": 0.295,
+      "policy_mode_frac": 0.314,
+      "policy_entropy": 1.708
+    },
+    {
+      "optimizer": "exponentemaadam (magfree)",
+      "tag": "magfree",
+      "value_L1": 0.0673,
+      "value_setting": "bs=10",
+      "value_redux": 0.759,
+      "policy_CE": 1.7333,
+      "policy_setting": "bs=10",
+      "policy_top1": 0.402,
+      "policy_mode_frac": 0.359,
+      "policy_entropy": 1.672
+    }
+  ]
+}

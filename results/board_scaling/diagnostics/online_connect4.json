@@ -1,0 +1,373 @@
+{
+  "game": "connect4",
+  "config": {
+    "net_kind": "tropical",
+    "core_kind": "dyadic",
+    "latent_dim": 64,
+    "num_simulations": 40,
+    "num_workers": 8,
+    "unroll": 3,
+    "batch": 128,
+    "games_per_iter": 16,
+    "train_steps_per_iter": 40,
+    "iters": 14,
+    "tau_start": 1.0,
+    "tau_end": 0.3,
+    "temp_start": 1.0,
+    "temp_end": 0.15,
+    "c_puct": 1.25,
+    "backup": "mean",
+    "lr": 0.003,
+    "seed": 0,
+    "legal_mask": false,
+    "tree_model": "muzero"
+  },
+  "opponent": "random",
+  "eval_games": 60,
+  "results": [
+    {
+      "optimizer": "tropicalsgd",
+      "recipe": "ce",
+      "score_soft": 0.8,
+      "score_hard": 0.867,
+      "score_untrained": 0.817,
+      "lift": -0.017,
+      "tau_gap": -0.067,
+      "final_mode_frac": 0.578
+    },
+    {
+      "optimizer": "tropicalsgd",
+      "recipe": "ce_ent0.1",
+      "score_soft": 0.8,
+      "score_hard": 0.7,
+      "score_untrained": 0.783,
+      "lift": 0.017,
+      "tau_gap": 0.1,
+      "final_mode_frac": 0.444
+    },
+    {
+      "optimizer": "adamw",
+      "recipe": "ce",
+      "score_soft": 0.7,
+      "score_hard": 0.733,
+      "score_untrained": 0.767,
+      "lift": -0.067,
+      "tau_gap": -0.033,
+      "final_mode_frac": 0.541
+    },
+    {
+      "optimizer": "adamw",
+      "recipe": "ce_ent0.1",
+      "score_soft": 0.717,
+      "score_hard": 0.65,
+      "score_untrained": 0.767,
+      "lift": -0.05,
+      "tau_gap": 0.067,
+      "final_mode_frac": 0.478
+    },
+    {
+      "optimizer": "tropicaladam",
+      "recipe": "ce",
+      "score_soft": 0.733,
+      "score_hard": 0.667,
+      "score_untrained": 0.767,
+      "lift": -0.033,
+      "tau_gap": 0.067,
+      "final_mode_frac": 0.295
+    },
+    {
+      "optimizer": "tropicaladam",
+      "recipe": "ce_ent0.1",
+      "score_soft": 0.65,
+      "score_hard": 0.667,
+      "score_untrained": 0.717,
+      "lift": -0.067,
+      "tau_gap": -0.017,
+      "final_mode_frac": 0.253
+    }
+  ],
+  "traces": {
+    "tropicalsgd/ce": [
+      {
+        "iter": 0,
+        "loss": 8.359,
+        "mode_frac": 0.254,
+        "prior_entropy": 1.703,
+        "kl_to_uniform": 0.243,
+        "value_pred_L1": 0.41,
+        "value_target_std": 1.001
+      },
+      {
+        "iter": 4,
+        "loss": 7.362,
+        "mode_frac": 0.469,
+        "prior_entropy": 1.414,
+        "kl_to_uniform": 0.532,
+        "value_pred_L1": 0.721,
+        "value_target_std": 0.988
+      },
+      {
+        "iter": 8,
+        "loss": 6.859,
+        "mode_frac": 0.55,
+        "prior_entropy": 1.137,
+        "kl_to_uniform": 0.809,
+        "value_pred_L1": 0.721,
+        "value_target_std": 0.998
+      },
+      {
+        "iter": 12,
+        "loss": 6.467,
+        "mode_frac": 0.577,
+        "prior_entropy": 1.15,
+        "kl_to_uniform": 0.796,
+        "value_pred_L1": 0.7,
+        "value_target_std": 0.986
+      },
+      {
+        "iter": 13,
+        "loss": 6.429,
+        "mode_frac": 0.578,
+        "prior_entropy": 1.094,
+        "kl_to_uniform": 0.852,
+        "value_pred_L1": 0.68,
+        "value_target_std": 0.985
+      }
+    ],
+    "tropicalsgd/ce_ent0.1": [
+      {
+        "iter": 0,
+        "loss": 7.7,
+        "mode_frac": 0.246,
+        "prior_entropy": 1.828,
+        "kl_to_uniform": 0.118,
+        "value_pred_L1": 0.811,
+        "value_target_std": 1.003
+      },
+      {
+        "iter": 4,
+        "loss": 7.096,
+        "mode_frac": 0.378,
+        "prior_entropy": 1.468,
+        "kl_to_uniform": 0.478,
+        "value_pred_L1": 0.604,
+        "value_target_std": 1.001
+      },
+      {
+        "iter": 8,
+        "loss": 6.934,
+        "mode_frac": 0.393,
+        "prior_entropy": 1.486,
+        "kl_to_uniform": 0.46,
+        "value_pred_L1": 0.705,
+        "value_target_std": 0.976
+      },
+      {
+        "iter": 12,
+        "loss": 6.641,
+        "mode_frac": 0.437,
+        "prior_entropy": 1.374,
+        "kl_to_uniform": 0.572,
+        "value_pred_L1": 0.737,
+        "value_target_std": 1.002
+      },
+      {
+        "iter": 13,
+        "loss": 6.599,
+        "mode_frac": 0.444,
+        "prior_entropy": 1.385,
+        "kl_to_uniform": 0.561,
+        "value_pred_L1": 0.595,
+        "value_target_std": 0.983
+      }
+    ],
+    "adamw/ce": [
+      {
+        "iter": 0,
+        "loss": 8.167,
+        "mode_frac": 0.264,
+        "prior_entropy": 1.654,
+        "kl_to_uniform": 0.292,
+        "value_pred_L1": 0.307,
+        "value_target_std": 1.002
+      },
+      {
+        "iter": 4,
+        "loss": 7.149,
+        "mode_frac": 0.392,
+        "prior_entropy": 1.41,
+        "kl_to_uniform": 0.536,
+        "value_pred_L1": 0.538,
+        "value_target_std": 0.996
+      },
+      {
+        "iter": 8,
+        "loss": 6.648,
+        "mode_frac": 0.45,
+        "prior_entropy": 1.319,
+        "kl_to_uniform": 0.627,
+        "value_pred_L1": 0.447,
+        "value_target_std": 1.0
+      },
+      {
+        "iter": 12,
+        "loss": 6.114,
+        "mode_frac": 0.518,
+        "prior_entropy": 1.175,
+        "kl_to_uniform": 0.771,
+        "value_pred_L1": 0.57,
+        "value_target_std": 1.002
+      },
+      {
+        "iter": 13,
+        "loss": 5.939,
+        "mode_frac": 0.541,
+        "prior_entropy": 1.158,
+        "kl_to_uniform": 0.788,
+        "value_pred_L1": 0.571,
+        "value_target_std": 1.003
+      }
+    ],
+    "adamw/ce_ent0.1": [
+      {
+        "iter": 0,
+        "loss": 7.776,
+        "mode_frac": 0.201,
+        "prior_entropy": 1.912,
+        "kl_to_uniform": 0.033,
+        "value_pred_L1": 0.292,
+        "value_target_std": 1.001
+      },
+      {
+        "iter": 4,
+        "loss": 6.963,
+        "mode_frac": 0.388,
+        "prior_entropy": 1.626,
+        "kl_to_uniform": 0.319,
+        "value_pred_L1": 0.578,
+        "value_target_std": 1.003
+      },
+      {
+        "iter": 8,
+        "loss": 6.36,
+        "mode_frac": 0.468,
+        "prior_entropy": 1.417,
+        "kl_to_uniform": 0.529,
+        "value_pred_L1": 0.452,
+        "value_target_std": 0.987
+      },
+      {
+        "iter": 12,
+        "loss": 5.921,
+        "mode_frac": 0.49,
+        "prior_entropy": 1.394,
+        "kl_to_uniform": 0.552,
+        "value_pred_L1": 0.514,
+        "value_target_std": 0.999
+      },
+      {
+        "iter": 13,
+        "loss": 5.848,
+        "mode_frac": 0.478,
+        "prior_entropy": 1.291,
+        "kl_to_uniform": 0.655,
+        "value_pred_L1": 0.554,
+        "value_target_std": 0.996
+      }
+    ],
+    "tropicaladam/ce": [
+      {
+        "iter": 0,
+        "loss": 10.655,
+        "mode_frac": 0.263,
+        "prior_entropy": 1.787,
+        "kl_to_uniform": 0.159,
+        "value_pred_L1": 0.779,
+        "value_target_std": 0.947
+      },
+      {
+        "iter": 4,
+        "loss": 8.033,
+        "mode_frac": 0.277,
+        "prior_entropy": 1.69,
+        "kl_to_uniform": 0.256,
+        "value_pred_L1": 0.612,
+        "value_target_std": 0.983
+      },
+      {
+        "iter": 8,
+        "loss": 8.001,
+        "mode_frac": 0.294,
+        "prior_entropy": 1.673,
+        "kl_to_uniform": 0.273,
+        "value_pred_L1": 0.82,
+        "value_target_std": 0.992
+      },
+      {
+        "iter": 12,
+        "loss": 8.023,
+        "mode_frac": 0.294,
+        "prior_entropy": 1.675,
+        "kl_to_uniform": 0.271,
+        "value_pred_L1": 0.742,
+        "value_target_std": 0.976
+      },
+      {
+        "iter": 13,
+        "loss": 8.034,
+        "mode_frac": 0.295,
+        "prior_entropy": 1.662,
+        "kl_to_uniform": 0.284,
+        "value_pred_L1": 0.805,
+        "value_target_std": 0.978
+      }
+    ],
+    "tropicaladam/ce_ent0.1": [
+      {
+        "iter": 0,
+        "loss": 10.075,
+        "mode_frac": 0.273,
+        "prior_entropy": 1.818,
+        "kl_to_uniform": 0.128,
+        "value_pred_L1": 0.331,
+        "value_target_std": 0.996
+      },
+      {
+        "iter": 4,
+        "loss": 7.465,
+        "mode_frac": 0.236,
+        "prior_entropy": 1.763,
+        "kl_to_uniform": 0.183,
+        "value_pred_L1": 0.612,
+        "value_target_std": 0.975
+      },
+      {
+        "iter": 8,
+        "loss": 7.448,
+        "mode_frac": 0.243,
+        "prior_entropy": 1.763,
+        "kl_to_uniform": 0.183,
+        "value_pred_L1": 0.731,
+        "value_target_std": 0.996
+      },
+      {
+        "iter": 12,
+        "loss": 7.404,
+        "mode_frac": 0.251,
+        "prior_entropy": 1.711,
+        "kl_to_uniform": 0.234,
+        "value_pred_L1": 0.599,
+        "value_target_std": 0.99
+      },
+      {
+        "iter": 13,
+        "loss": 7.378,
+        "mode_frac": 0.253,
+        "prior_entropy": 1.706,
+        "kl_to_uniform": 0.24,
+        "value_pred_L1": 0.745,
+        "value_target_std": 1.0
+      }
+    ]
+  }
+}
