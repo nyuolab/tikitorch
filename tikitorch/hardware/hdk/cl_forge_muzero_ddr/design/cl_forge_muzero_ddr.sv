@@ -63,7 +63,7 @@ module cl_forge_muzero_ddr
   logic        ocl_ar_valid_pre, ocl_ar_ready_pre;  logic [31:0] ocl_ar_addr_pre;
   logic        ocl_r_valid_pre, ocl_r_ready_pre;    logic [31:0] ocl_r_data_pre;  logic [1:0] ocl_r_resp_pre;
 
-  axi_register_slice_light OCL_REG_SLC (
+  muzero_ocl_slice OCL_REG_SLC (
     .aclk          (clk_main_a0),       .aresetn       (rst_main_n),
     .s_axi_awaddr  (ocl_cl_awaddr),     .s_axi_awprot  (3'h0),
     .s_axi_awvalid (ocl_cl_awvalid),    .s_axi_awready (cl_ocl_awready),
@@ -132,12 +132,12 @@ module cl_forge_muzero_ddr
   logic  [1:0]  ddr_arburst; logic ddr_arlock; logic [3:0] ddr_arcache; logic [2:0] ddr_arprot; logic [3:0] ddr_arqos; logic [3:0] ddr_arregion;
   logic         ddr_arvalid, ddr_arready;
   logic [15:0]  ddr_rid;    logic [511:0] ddr_rdata;  logic [1:0] ddr_rresp; logic ddr_rlast, ddr_rvalid, ddr_rready;
-  logic [14:0]  krn_bid_15, krn_rid_15, dma_bid_15, dma_rid_15;  // 15-bit per-SI response IDs from the crossbar
+  logic [15:0]  krn_bid_16, krn_rid_16;   // 16-bit kernel-side response IDs from the crossbar (kernel uses bit 0)
 
   axi_crossbar_ddr XBAR_DDR (
     .aclk    (clk_main_a0),  .aresetn (rst_main_n_sync),
-    // ---- SI: kernel m_axi (ID 1->15) high, sh_cl_dma_pcis (ID 16->15) low ----
-    .s_axi_awid    ({ {14'h0, krn_awid}, sh_cl_dma_pcis_awid[14:0] }),
+    // ---- SI: kernel m_axi (ID 1->16) high, sh_cl_dma_pcis (16-bit ID) low ----
+    .s_axi_awid    ({ {15'h0, krn_awid}, sh_cl_dma_pcis_awid }),
     .s_axi_awaddr  ({ krn_awaddr,        sh_cl_dma_pcis_awaddr }),
     .s_axi_awlen   ({ krn_awlen,         sh_cl_dma_pcis_awlen }),
     .s_axi_awsize  ({ krn_awsize,        sh_cl_dma_pcis_awsize }),
@@ -153,11 +153,11 @@ module cl_forge_muzero_ddr
     .s_axi_wlast   ({ krn_wlast,         sh_cl_dma_pcis_wlast }),
     .s_axi_wvalid  ({ krn_wvalid,        sh_cl_dma_pcis_wvalid }),
     .s_axi_wready  ({ krn_wready,        cl_sh_dma_pcis_wready }),
-    .s_axi_bid     ({ krn_bid_15,        dma_bid_15 }),
+    .s_axi_bid     ({ krn_bid_16,        cl_sh_dma_pcis_bid }),
     .s_axi_bresp   ({ krn_bresp,         cl_sh_dma_pcis_bresp }),
     .s_axi_bvalid  ({ krn_bvalid,        cl_sh_dma_pcis_bvalid }),
     .s_axi_bready  ({ krn_bready,        sh_cl_dma_pcis_bready }),
-    .s_axi_arid    ({ {14'h0, krn_arid}, sh_cl_dma_pcis_arid[14:0] }),
+    .s_axi_arid    ({ {15'h0, krn_arid}, sh_cl_dma_pcis_arid }),
     .s_axi_araddr  ({ krn_araddr,        sh_cl_dma_pcis_araddr }),
     .s_axi_arlen   ({ krn_arlen,         sh_cl_dma_pcis_arlen }),
     .s_axi_arsize  ({ krn_arsize,        sh_cl_dma_pcis_arsize }),
@@ -168,7 +168,7 @@ module cl_forge_muzero_ddr
     .s_axi_arqos   ({ krn_arqos,         4'h0 }),
     .s_axi_arvalid ({ krn_arvalid,       sh_cl_dma_pcis_arvalid }),
     .s_axi_arready ({ krn_arready,       cl_sh_dma_pcis_arready }),
-    .s_axi_rid     ({ krn_rid_15,        dma_rid_15 }),
+    .s_axi_rid     ({ krn_rid_16,        cl_sh_dma_pcis_rid }),
     .s_axi_rdata   ({ krn_rdata,         cl_sh_dma_pcis_rdata }),
     .s_axi_rresp   ({ krn_rresp,         cl_sh_dma_pcis_rresp }),
     .s_axi_rlast   ({ krn_rlast,         cl_sh_dma_pcis_rlast }),
@@ -185,11 +185,9 @@ module cl_forge_muzero_ddr
     .m_axi_arregion (ddr_arregion), .m_axi_arqos (ddr_arqos), .m_axi_arvalid (ddr_arvalid), .m_axi_arready (ddr_arready),
     .m_axi_rid (ddr_rid), .m_axi_rdata (ddr_rdata), .m_axi_rresp (ddr_rresp), .m_axi_rlast (ddr_rlast), .m_axi_rvalid (ddr_rvalid), .m_axi_rready (ddr_rready)
   );
-  // per-SI 15-bit response IDs from the crossbar: kernel uses bit 0; DMA-PCIS zero-extends to the shell's 16-bit
-  assign krn_bid = krn_bid_15[0];
-  assign krn_rid = krn_rid_15[0];
-  assign cl_sh_dma_pcis_bid = {1'b0, dma_bid_15};
-  assign cl_sh_dma_pcis_rid = {1'b0, dma_rid_15};
+  // kernel response IDs come back 16-bit from the crossbar; the kernel uses bit 0 (DMA-PCIS bid/rid direct above)
+  assign krn_bid = krn_bid_16[0];
+  assign krn_rid = krn_rid_16[0];
 
   // =========================================================================
   // sh_ddr (DDR_PRESENT=1): DDR controller. AXI slave <- crossbar MI; DDR4 pins <- shell; stats.

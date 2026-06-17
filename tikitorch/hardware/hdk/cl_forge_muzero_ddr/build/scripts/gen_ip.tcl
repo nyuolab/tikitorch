@@ -7,16 +7,17 @@
 set part xcvu47p-fsvh2892-2-e
 set ipdir [lindex $argv 0]
 create_project -in_memory -part $part
-# OCL control slice (AXI4-Lite 32b)
-create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name axi_register_slice_light -dir $ipdir
-set_property -dict [list CONFIG.PROTOCOL {AXI4LITE} CONFIG.ADDR_WIDTH {32} CONFIG.DATA_WIDTH {32}] [get_ips axi_register_slice_light]
-# 2 SI (kernel + DMA-PCIS) -> 1 MI (DDR), 512b, 64-bit addr. SI ID width = 15 so the crossbar's master-side
-# thread ID = 15 + ceil(log2(2)) = 16, matching cl_sh_ddr_axi's 16-bit ID (avoids the 17-bit overflow).
-# Default SAMD connectivity (has master IDs; SASD was an axi_interconnect value, invalid here).
+# OCL control slice (AXI4-Lite 32b). Named muzero_ocl_slice (NOT axi_register_slice_light) so it does not
+# collide with the HDK's own axi_register_slice_light that the DDR path (sh_ddr deps) reads from HDK_IP_SRC_DIR.
+create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name muzero_ocl_slice -dir $ipdir
+set_property -dict [list CONFIG.PROTOCOL {AXI4LITE} CONFIG.ADDR_WIDTH {32} CONFIG.DATA_WIDTH {32}] [get_ips muzero_ocl_slice]
+# 2 SI (kernel + DMA-PCIS) -> 1 MI (DDR), 512b, 64-bit addr, ID_WIDTH=16. With NUM_MI=1 the axi_crossbar does
+# NOT widen the master ID (it tracks SIs internally) — master thread ID = ID_WIDTH = 16, matching
+# cl_sh_ddr_axi's 16-bit ID (smoke #2 showed ID_WIDTH=15 -> 15-bit master, hence 16). Default SAMD.
 create_ip -name axi_crossbar -vendor xilinx.com -library ip -module_name axi_crossbar_ddr -dir $ipdir
 set_property -dict [list \
   CONFIG.NUM_SI {2} CONFIG.NUM_MI {1} \
-  CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ADDR_WIDTH {64} CONFIG.ID_WIDTH {15} \
+  CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ADDR_WIDTH {64} CONFIG.ID_WIDTH {16} \
   CONFIG.R_REGISTER {1} \
   CONFIG.M00_A00_BASE_ADDR {0x0000000000000000} CONFIG.M00_A00_ADDR_WIDTH {34} \
 ] [get_ips axi_crossbar_ddr]

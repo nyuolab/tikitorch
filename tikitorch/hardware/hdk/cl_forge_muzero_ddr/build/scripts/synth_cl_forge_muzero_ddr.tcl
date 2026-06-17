@@ -12,13 +12,25 @@ source ${HDK_SHELL_DIR}/build/scripts/synth_cl_header.tcl
 # encrypted file fails with "Error generated from encrypted envelope". We just instantiate sh_ddr in the .sv.
 read_verilog -sv [glob ${src_post_enc_dir}/*.{s,}v]
 
-# DDR4 controller IP that sh_ddr (DDR_PRESENT=1) wraps — required when the DDR controller is instantiated
-read_ip [list ${HDK_IP_SRC_DIR}/cl_ddr4/cl_ddr4.xci]
+# sh_ddr (DDR_PRESENT=1) dependency IPs from the HDK IP src dir: the DDR4 MIG + the AXI clock-converters /
+# register slices sh_ddr instantiates internally (DDR clock-domain crossing). These are pre-built in
+# HDK_IP_SRC_DIR; reading them makes their modules available so sh_ddr's encrypted body elaborates (the
+# "encrypted envelope" error was sh_ddr referencing these missing deps). Matches the reference cl_dram_hbm_dma
+# read_ip list, DDR subset.
+read_ip [list \
+  ${HDK_IP_SRC_DIR}/cl_ddr4/cl_ddr4.xci \
+  ${HDK_IP_SRC_DIR}/axi_register_slice/axi_register_slice.xci \
+  ${HDK_IP_SRC_DIR}/axi_register_slice_light/axi_register_slice_light.xci \
+  ${HDK_IP_SRC_DIR}/cl_axi3_256b_reg_slice/cl_axi3_256b_reg_slice.xci \
+  ${HDK_IP_SRC_DIR}/cl_axi_clock_converter/cl_axi_clock_converter.xci \
+  ${HDK_IP_SRC_DIR}/cl_axi_clock_converter_light/cl_axi_clock_converter_light.xci \
+]
 
-# our IP: OCL AXI4-Lite slice + the 2->1 DDR crossbar
-read_ip [glob $CL_DIR/design/ip/axi_register_slice_light/axi_register_slice_light.xci]
+# our IP: OCL AXI4-Lite slice (muzero_ocl_slice — renamed to avoid the HDK axi_register_slice_light clash)
+# + the 2->1 DDR crossbar. OOC flow needs synth_ip for the CL's own IP.
+read_ip [glob $CL_DIR/design/ip/muzero_ocl_slice/muzero_ocl_slice.xci]
 read_ip [glob $CL_DIR/design/ip/axi_crossbar_ddr/axi_crossbar_ddr.xci]
-synth_ip [get_ips axi_register_slice_light]
+synth_ip [get_ips muzero_ocl_slice]
 synth_ip [get_ips axi_crossbar_ddr]
 
 synth_design -mode out_of_context \
