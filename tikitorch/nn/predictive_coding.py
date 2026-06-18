@@ -626,8 +626,16 @@ class DyadicPCNet(nn.Module):
 
     @torch.no_grad()
     def cascade_grads(self, x0: torch.Tensor, target: torch.Tensor,
-                      mode: str = "dyadic") -> None:
+                      mode: str = "dyadic", loss: str = "ce") -> None:
         """Single-pass **cached-routing** backward — the tropical depth solution.
+
+        ``loss`` sets the top-layer error (the only place a loss derivative enters):
+        ``"ce"`` (default) uses the softmax-cross-entropy gradient ``softmax(logits) -
+        target`` — this is what makes the cascade MATCH backprop at depth on
+        classification; ``"mse"`` uses the L2-energy gradient ``logits - target`` (the
+        canonical PC energy, but it trails backprop by a growing margin at depth — d32
+        ~9pp on MNIST). The softmax is a per-sample boundary op over the output
+        classes; the network-internal credit assignment stays multiplier-free.
 
         Iterative settling (:meth:`infer`) walls at ~depth 48; this exploits the
         fact that tropical routing is *discrete and cacheable*. Forward once,
@@ -650,7 +658,8 @@ class DyadicPCNet(nn.Module):
         from tikitorch.nn import dyadic_quantize
         q = (lambda v: torch.sign(v)) if mode == "sign" else dyadic_quantize
         acts, cache = self._forward_cache(x0)
-        e = acts[-1] - target                                # dE/d logits (L2 energy)
+        e = (torch.softmax(acts[-1], dim=-1) - target) if loss == "ce" \
+            else (acts[-1] - target)                         # top error: CE | L2(MSE)
         for l in reversed(range(self.depth)):
             relu_mask, skip_gate, has_skip = cache[l]
             e_relu = e * skip_gate if has_skip else e
@@ -664,19 +673,20 @@ class DyadicPCNet(nn.Module):
                 e = e_down
 
     def train_step_cascade(self, x0: torch.Tensor, y: torch.Tensor, opt,
-                           mode: str = "dyadic"):
-        """One deep training step via the single-pass cascade (no settling)."""
+                           mode: str = "dyadic", loss: str = "ce"):
+        """One deep training step via the single-pass cascade (no settling).
+        ``loss="ce"`` (default) matches backprop at depth; see :meth:`cascade_grads`."""
         target = self._make_target(y, ref=x0)
         opt.zero_grad(set_to_none=True)
-        self.cascade_grads(x0, target, mode=mode)
+        self.cascade_grads(x0, target, mode=mode, loss=loss)
         opt.step()
 
     # -- error-relaxation: the ASYNC / distributed form that works at scale -----
     @torch.no_grad()
     def error_relax_grads(self, x0: torch.Tensor, target: torch.Tensor,
                           n_iter: Optional[int] = None, mode: str = "dyadic",
-                          participation: float = 1.0, stale: bool = False,
-                          rand_order: bool = False,
+                          loss: str = "ce", participation: float = 1.0,
+                          stale: bool = False, rand_order: bool = False,
                           gen: Optional[torch.Generator] = None) -> None:
         """ASYNC / iterative form of the cascade — the distributed learner that
         works at scale.
@@ -709,7 +719,9 @@ class DyadicPCNet(nn.Module):
         if n_iter is None:
             n_iter = L + 4
         E = [torch.zeros_like(a) for a in acts]
-        E[L] = acts[L] - target                              # clamped output error
+        eL = (torch.softmax(acts[L], dim=-1) - target) if loss == "ce" \
+            else (acts[L] - target)                          # clamped top error: CE | MSE
+        E[L] = eL
         free = list(reversed(range(1, L)))                   # E_1..E_{L-1} relaxed
         for _ in range(n_iter):
             snap = [t.clone() for t in E] if stale else E
@@ -722,7 +734,7 @@ class DyadicPCNet(nn.Module):
                         torch.rand(1, generator=gen).item() >= participation:
                     continue
                 E[l] = self._route_T(l, snap[l + 1], cache)
-            E[L] = acts[L] - target                          # re-clamp output
+            E[L] = eL                                        # re-clamp output error
         q = (lambda v: torch.sign(v)) if mode == "sign" else dyadic_quantize
         for l in range(L):
             relu_mask, skip_gate, has_skip = cache[l]
@@ -732,13 +744,14 @@ class DyadicPCNet(nn.Module):
 
     def train_step_relax(self, x0: torch.Tensor, y: torch.Tensor, opt,
                          n_iter: Optional[int] = None, mode: str = "dyadic",
-                         **async_kw) -> None:
+                         loss: str = "ce", **async_kw) -> None:
         """One iterative / async error-relaxation step (see :meth:`error_relax_grads`).
         ``async_kw`` -> participation / stale / rand_order / gen. Sync == the cascade;
-        async is the distributed-capable regime."""
+        async is the distributed-capable regime. ``loss="ce"`` matches backprop."""
         target = self._make_target(y, ref=x0)
         opt.zero_grad(set_to_none=True)
-        self.error_relax_grads(x0, target, n_iter=n_iter, mode=mode, **async_kw)
+        self.error_relax_grads(x0, target, n_iter=n_iter, mode=mode, loss=loss,
+                               **async_kw)
         opt.step()
 
     # -- nudged ITERATIVE settling: the fully-local / async / distributed regime --

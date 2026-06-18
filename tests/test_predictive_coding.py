@@ -302,11 +302,34 @@ def test_dyadic_pc_cascade_matches_autograd_sign():
         h = net.f(l, h)
     (0.5 * ((h - target) ** 2).sum()).backward()
     g_auto = [layer.weight.grad.clone() for layer in net.layers]
-    # cascade backward (sign mode → exact per-sample sign)
-    net.cascade_grads(x, target, mode="sign")
+    # cascade backward (sign mode → exact per-sample sign); loss="mse" to match the
+    # L2-energy autograd reference above (loss="ce" is the classification default).
+    net.cascade_grads(x, target, mode="sign", loss="mse")
     for ga, layer in zip(g_auto, net.layers):
         assert torch.equal(torch.sign(ga), torch.sign(layer.weight.grad)), \
             "cascade grad sign must match autograd backprop (routing/skip-highway)"
+
+
+def test_dyadic_pc_cascade_ce_matches_autograd_sign():
+    """With loss="ce" (the classification default) the cascade equals autograd
+    softmax-cross-entropy in grad SIGN at batch=1 — this is what lets the cascade
+    match backprop at depth (MSE trails)."""
+    import torch.nn.functional as F
+    torch.manual_seed(0)
+    net = DyadicPCNet([12, 12, 12, 4], residual=True)
+    x = torch.randn(1, 12)
+    y = torch.randint(0, 4, (1,))
+    target = net._make_target(y, ref=x)
+    net.zero_grad(set_to_none=True)
+    h = x
+    for l in range(net.depth):
+        h = net.f(l, h)
+    F.cross_entropy(h, y).backward()                     # autograd CE on the dyadic forward
+    g_auto = [layer.weight.grad.clone() for layer in net.layers]
+    net.cascade_grads(x, target, mode="sign", loss="ce")
+    for ga, layer in zip(g_auto, net.layers):
+        assert torch.equal(torch.sign(ga), torch.sign(layer.weight.grad)), \
+            "cascade(loss='ce') grad sign must match autograd cross-entropy"
 
 
 def test_dyadic_pc_cascade_trains_deep():
