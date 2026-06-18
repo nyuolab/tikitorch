@@ -590,6 +590,41 @@ class DyadicPCNet(nn.Module):
 
     # -- cached-routing cascade (the deep-PC depth solution) ----------------
     @torch.no_grad()
+    def _forward_cache(self, x0: torch.Tensor):
+        """Feed-forward pass -> ``(acts, cache)`` where ``cache[l] = (relu_mask,
+        skip_gate, has_skip)`` is layer l's FROZEN hard routing. Shared by the
+        cascade and the error-relaxation, which both freeze routing at this pass."""
+        acts, cache = [x0], []
+        h = x0
+        for l in range(self.depth):
+            pre = self.layers[l](h)
+            interior = (l < self.depth - 1) or self.relu_readout
+            relu_out = torch.relu(pre) if interior else pre
+            relu_mask = (pre > 0).float() if interior else torch.ones_like(pre)
+            if self._has_skip(l, h, relu_out):
+                skip_gate = (relu_out >= h).float()          # 1 where transformed branch won
+                out = torch.maximum(relu_out, h)
+                has_skip = True
+            else:
+                skip_gate, out, has_skip = None, relu_out, False
+            cache.append((relu_mask, skip_gate, has_skip))
+            acts.append(out)
+            h = out
+        return acts, cache
+
+    @torch.no_grad()
+    def _route_T(self, l: int, u: torch.Tensor, cache) -> torch.Tensor:
+        """A_l^T u via the FROZEN cached routing (shift-add, multiplier-free): route
+        the error at layer l's output down to its input; unit-gain on skip-wins."""
+        from tikitorch.nn import dyadic_quantize
+        relu_mask, skip_gate, has_skip = cache[l]
+        delta = (u * skip_gate * relu_mask) if has_skip else (u * relu_mask)
+        e_down = delta @ dyadic_quantize(self.layers[l].weight)
+        if has_skip:
+            e_down = e_down + u * (1.0 - skip_gate)          # unit-gain skip highway
+        return e_down
+
+    @torch.no_grad()
     def cascade_grads(self, x0: torch.Tensor, target: torch.Tensor,
                       mode: str = "dyadic") -> None:
         """Single-pass **cached-routing** backward — the tropical depth solution.
@@ -614,22 +649,7 @@ class DyadicPCNet(nn.Module):
         """
         from tikitorch.nn import dyadic_quantize
         q = (lambda v: torch.sign(v)) if mode == "sign" else dyadic_quantize
-        acts, cache = [x0], []
-        h = x0
-        for l in range(self.depth):
-            pre = self.layers[l](h)
-            interior = (l < self.depth - 1) or self.relu_readout
-            relu_out = torch.relu(pre) if interior else pre
-            relu_mask = (pre > 0).float() if interior else torch.ones_like(pre)
-            if self._has_skip(l, h, relu_out):
-                skip_gate = (relu_out >= h).float()          # 1 where transformed branch won
-                out = torch.maximum(relu_out, h)
-                has_skip = True
-            else:
-                skip_gate, out, has_skip = None, relu_out, False
-            cache.append((relu_mask, skip_gate, has_skip))
-            acts.append(out)
-            h = out
+        acts, cache = self._forward_cache(x0)
         e = acts[-1] - target                                # dE/d logits (L2 energy)
         for l in reversed(range(self.depth)):
             relu_mask, skip_gate, has_skip = cache[l]
@@ -649,6 +669,74 @@ class DyadicPCNet(nn.Module):
         target = self._make_target(y, ref=x0)
         opt.zero_grad(set_to_none=True)
         self.cascade_grads(x0, target, mode=mode)
+        opt.step()
+
+    # -- error-relaxation: the ASYNC / distributed form that works at scale -----
+    @torch.no_grad()
+    def error_relax_grads(self, x0: torch.Tensor, target: torch.Tensor,
+                          n_iter: Optional[int] = None, mode: str = "dyadic",
+                          participation: float = 1.0, stale: bool = False,
+                          rand_order: bool = False,
+                          gen: Optional[torch.Generator] = None) -> None:
+        """ASYNC / iterative form of the cascade — the distributed learner that
+        works at scale.
+
+        Relaxes the PC equilibrium-error condition ``E_l = A_l^T E_{l+1}`` (routing
+        FROZEN at the feed-forward pass) by repeated LOCAL updates in any order,
+        then applies the same multiplier-free weight update as the cascade. This is
+        the iterative regime that actually trains at full scale: unlike the
+        state-settling :meth:`settle_nudge` (whose energy *diverges* as the weights
+        grow during training, collapsing to chance), the error-relaxation is a
+        triangular (nilpotent) system — unconditionally stable regardless of weight
+        magnitude.
+
+        - **Sync** (``participation=1``, top-down, in-place): converges in ONE pass
+          to *exactly* :meth:`cascade_grads` (= backprop credit assignment).
+        - **Async** (``participation<1`` partial node updates / ``stale`` lagged
+          reads / ``rand_order`` no global schedule): the neuromorphic / in-memory /
+          distributed form the cascade's strict ordered pass cannot do. Robust —
+          converges to the same credit signal given enough local rounds (measured
+          within ~0.6pp of sync at 50% participation + stale + random order).
+
+        ``n_iter`` defaults to ``depth + 4`` (enough for sync; raise for heavy
+        async). See ``results/predictive_coding/SCALE_TESTS.md``.
+        """
+        from tikitorch.nn import dyadic_quantize
+        acts, cache = self._forward_cache(x0)
+        L = self.depth
+        if n_iter is None:
+            n_iter = L + 4
+        E = [torch.zeros_like(a) for a in acts]
+        E[L] = acts[L] - target                              # clamped output error
+        free = list(reversed(range(1, L)))                   # E_1..E_{L-1} relaxed
+        for _ in range(n_iter):
+            snap = [t.clone() for t in E] if stale else E
+            order = free
+            if rand_order:
+                order = [free[i] for i in
+                         torch.randperm(len(free), generator=gen).tolist()]
+            for l in order:
+                if participation < 1.0 and \
+                        torch.rand(1, generator=gen).item() >= participation:
+                    continue
+                E[l] = self._route_T(l, snap[l + 1], cache)
+            E[L] = acts[L] - target                          # re-clamp output
+        q = (lambda v: torch.sign(v)) if mode == "sign" else dyadic_quantize
+        for l in range(L):
+            relu_mask, skip_gate, has_skip = cache[l]
+            delta = (E[l + 1] * skip_gate * relu_mask) if has_skip else (E[l + 1] * relu_mask)
+            self.layers[l].weight.grad = q(delta).transpose(0, 1) @ q(acts[l])
+            self.layers[l].bias.grad = q(delta).sum(0)
+
+    def train_step_relax(self, x0: torch.Tensor, y: torch.Tensor, opt,
+                         n_iter: Optional[int] = None, mode: str = "dyadic",
+                         **async_kw) -> None:
+        """One iterative / async error-relaxation step (see :meth:`error_relax_grads`).
+        ``async_kw`` -> participation / stale / rand_order / gen. Sync == the cascade;
+        async is the distributed-capable regime."""
+        target = self._make_target(y, ref=x0)
+        opt.zero_grad(set_to_none=True)
+        self.error_relax_grads(x0, target, n_iter=n_iter, mode=mode, **async_kw)
         opt.step()
 
     # -- nudged ITERATIVE settling: the fully-local / async / distributed regime --

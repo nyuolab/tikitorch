@@ -408,3 +408,55 @@ def test_dyadic_pc_async_robust():
                                  beta=0.5, async_frac=0.5, stale=True, rand_order=True)
     acc = (net.predict_logits(Xte).argmax(-1) == Yte).float().mean().item()
     assert acc > 0.6, f"async/stale/rand-order nudged PC failed to learn: acc={acc:.3f}"
+
+
+# ---------------------------------------------------------------------------
+# Error-relaxation — the async/distributed regime that works AT SCALE
+# (state-settling settle_nudge diverges as weights grow on full datasets; the
+# error-relaxation is a triangular/nilpotent system, unconditionally stable)
+# ---------------------------------------------------------------------------
+def test_dyadic_pc_error_relax_sync_matches_cascade():
+    """Synchronous error-relaxation converges in one in-place pass to EXACTLY the
+    cascade gradient (it is the iterative solve of the same triangular system)."""
+    torch.manual_seed(0)
+    net = DyadicPCNet([16] + [16] * 5 + [4], residual=True)
+    x = torch.randn(8, 16)
+    target = net._make_target(torch.randint(0, 4, (8,)), ref=x)
+    net.cascade_grads(x, target, mode="dyadic")
+    g_casc = [layer.weight.grad.clone() for layer in net.layers]
+    net.error_relax_grads(x, target, mode="dyadic")           # sync default
+    for gc, layer in zip(g_casc, net.layers):
+        assert torch.equal(gc, layer.weight.grad), \
+            "sync error-relaxation must equal the cascade gradient exactly"
+
+
+def test_dyadic_pc_error_relax_trains():
+    """train_step_relax (iterative error-relaxation, no global backward) learns."""
+    torch.manual_seed(0)
+    X, Y = _blobs(300, 4, 16, seed=7)
+    Xtr, Ytr, Xte, Yte = X[:900], Y[:900], X[900:], Y[900:]
+    net = DyadicPCNet([16] + [16] * 5 + [4], residual=True)
+    opt = torch.optim.Adam(net.parameters(), lr=1e-2)
+    for _ in range(12):
+        for i in range(0, 900 - 32, 32):
+            net.train_step_relax(Xtr[i:i + 32], Ytr[i:i + 32], opt)
+    acc = (net.predict_logits(Xte).argmax(-1) == Yte).float().mean().item()
+    assert acc > 0.8, f"error-relaxation PC failed to learn: acc={acc:.3f}"
+
+
+def test_dyadic_pc_error_relax_async_robust():
+    """Error-relaxation trains under the distributed conditions: partial node
+    participation + stale (lagged) reads + random order — and unlike state-settling
+    it stays stable as the weights grow."""
+    torch.manual_seed(0)
+    X, Y = _blobs(300, 4, 16, seed=7)
+    Xtr, Ytr, Xte, Yte = X[:900], Y[:900], X[900:], Y[900:]
+    net = DyadicPCNet([16] + [16] * 5 + [4], residual=True)
+    opt = torch.optim.Adam(net.parameters(), lr=1e-2)
+    gen = torch.Generator().manual_seed(0)
+    for _ in range(15):
+        for i in range(0, 900 - 32, 32):
+            net.train_step_relax(Xtr[i:i + 32], Ytr[i:i + 32], opt, n_iter=24,
+                                 participation=0.5, stale=True, rand_order=True, gen=gen)
+    acc = (net.predict_logits(Xte).argmax(-1) == Yte).float().mean().item()
+    assert acc > 0.6, f"async error-relaxation failed to learn: acc={acc:.3f}"

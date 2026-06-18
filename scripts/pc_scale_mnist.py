@@ -138,16 +138,24 @@ def run_one(mode, dims, train, test, *, seed, epochs, batch, lr, n_sweeps,
     Xte, yte = test
     t0 = time.time()
 
-    if mode in ("cascade", "nudge"):
+    if mode in ("cascade", "nudge", "relax", "relax_async"):
         net = DyadicPCNet(dims, residual=residual).to(device)
         opt = torch.optim.Adam(net.parameters(), lr=lr)
+        depth = len(dims) - 1
+        rgen = torch.Generator(device=device).manual_seed(seed + 99)
         for _ in range(epochs):
             for xb, yb in iterate(Xtr, ytr, batch, gen):
                 if mode == "cascade":
                     net.train_step_cascade(xb, yb, opt, mode="dyadic")
-                else:
+                elif mode == "nudge":               # state-settling (diverges at scale)
                     net.train_step_nudge(xb, yb, opt, n_sweeps=n_sweeps,
                                          mf_mode="dyadic")
+                elif mode == "relax":               # error-relaxation, sync (== cascade)
+                    net.train_step_relax(xb, yb, opt, mode="dyadic")
+                else:                               # error-relaxation, heavy async
+                    net.train_step_relax(xb, yb, opt, n_iter=3 * depth, mode="dyadic",
+                                         participation=0.5, stale=True,
+                                         rand_order=True, gen=rgen)
         logits_fn = net.predict_logits
     elif mode in ("bp_dyadic", "bp_float"):
         net = (DyadicMLP(dims, residual=residual) if mode == "bp_dyadic"
