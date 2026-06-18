@@ -97,7 +97,9 @@ cmd_status(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE
   aws_ s3 ls "$S3_RESULTS/" --recursive 2>/dev/null || echo "(nothing yet)"
   aws_ s3 ls "$S3_RESULTS/DONE" >/dev/null 2>&1 && echo "== DONE present ==" || { echo "-- driver.log tail --"; aws_ s3 cp "$S3_RESULTS/driver.log" - 2>/dev/null | tail -25; }; }
 cmd_fetch(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE_FILE"
-  local DEST="$PROJECT_DIR/results/predictive_coding"; mkdir -p "$DEST"
+  # land each run under its own TAG dir so concurrent/sequential runs never clobber
+  # one another's scale_*.jsonl (a shared filename + `aws s3 cp` silently overwrites).
+  local DEST="$PROJECT_DIR/results/predictive_coding/$TAG"; mkdir -p "$DEST"
   aws_ s3 cp "$S3_RESULTS/" "$DEST/" --recursive --exclude "*" --include "scale_*.jsonl" --include "driver.log" --only-show-errors
   ls -1 "$DEST"/scale_*.jsonl 2>/dev/null || echo "(none yet)"; }
 cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; source "$STATE_FILE"
