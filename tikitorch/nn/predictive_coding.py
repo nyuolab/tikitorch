@@ -699,7 +699,9 @@ class DyadicPCNet(nn.Module):
           within ~0.6pp of sync at 50% participation + stale + random order).
 
         ``n_iter`` defaults to ``depth + 4`` (enough for sync; raise for heavy
-        async). See ``results/predictive_coding/SCALE_TESTS.md``.
+        async). ``gen`` (if given) must be a **CPU** ``torch.Generator`` — the async
+        draws are control-flow (participation coin, layer order), not on the data
+        device. See ``results/predictive_coding/SCALE_TESTS.md``.
         """
         from tikitorch.nn import dyadic_quantize
         acts, cache = self._forward_cache(x0)

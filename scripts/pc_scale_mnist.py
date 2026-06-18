@@ -142,7 +142,7 @@ def run_one(mode, dims, train, test, *, seed, epochs, batch, lr, n_sweeps,
         net = DyadicPCNet(dims, residual=residual).to(device)
         opt = torch.optim.Adam(net.parameters(), lr=lr)
         depth = len(dims) - 1
-        rgen = torch.Generator(device=device).manual_seed(seed + 99)
+        rgen = torch.Generator().manual_seed(seed + 99)   # CPU: async draws are control-flow
         for _ in range(epochs):
             for xb, yb in iterate(Xtr, ytr, batch, gen):
                 if mode == "cascade":

@@ -29,6 +29,7 @@ push(){
 }
 
 echo "[pcscale] PC_TASK=$PC_TASK $(date -u +%H:%M:%S)"
+rm -f "$OUT"      # start fresh: the script appends, and git archive ships any committed scale_*.jsonl
 "$PYBIN" -c "import torch;print('cuda',torch.cuda.is_available(),torch.cuda.get_device_name(0) if torch.cuda.is_available() else '-')" || true
 
 ( while true; do sleep 60; push; done ) &
