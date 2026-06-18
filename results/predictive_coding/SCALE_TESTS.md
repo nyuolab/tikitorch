@@ -3,7 +3,8 @@
 **Date:** 2026-06-18 · **Hardware:** AWS EC2 g5.4xlarge (1× A10G) · 3 seeds/config
 **Code:** `scripts/pc_scale_mnist.py`, `scripts/pc_scale_cifar.py`, driven by
 `scripts/run_pc_scale_gpu.sh` (PC_TASK=mnist|cifar). Raw data:
-`results/predictive_coding/scale_mnist.jsonl` (144 rows), `scale_cifar.jsonl` (18 rows).
+`results/predictive_coding/scale_mnist.jsonl` (144 rows), `scale_cifar.jsonl` (18 rows),
+`scale_mnist_iterative.jsonl` (error-relaxation: sync / async / cascade).
 **Audited:** every headline claim below was adversarially re-checked against the raw
 JSONL (a workflow of independent verifiers); corrections from that audit are folded in.
 
@@ -23,8 +24,10 @@ positive, one confirmation, one genuine tropical win, and two honest negatives:
   additive residual (MNIST d32: dyadic 0.971 vs float 0.915).
 - **Negative 1 (correction):** the multiplier-free *cascade* matches backprop on
   CIFAR (−0.35pp) but on the deep MLP it **trails by ~2–5pp, growing with depth**.
-- **Negative 2:** the iterative **nudge** (distributed) regime **collapses to
-  chance** at full scale — it does not transfer from the toy.
+- **Negative 2 → RESOLVED (see "The iterative regime, fixed" below):** the
+  state-settling **nudge** regime collapses to chance at full scale (its energy
+  diverges as weights grow). The fix is **error-relaxation** (frozen routing), which
+  is unconditionally stable, matches the cascade exactly, and keeps the async value.
 
 ## Setup
 
@@ -118,9 +121,53 @@ them is open work.
 
 `nudge` collapses to **chance (~0.10 test *and* train) at every tested depth
 (4/8/16; d32 not run) on both datasets**. On the 12×12 toy it reached ~0.76 at d16;
-at 784-dim it learns nothing
-with the toy's hyperparameters (γ/β/sweeps). The distributed/async regime does **not
-transfer to full scale out of the box** — it needs retuning before any scale claim.
+at 784-dim it learns nothing with the toy's hyperparameters (γ/β/sweeps). Root-caused
+and fixed below.
+
+## The iterative regime, fixed (error-relaxation)
+
+**Root cause (instrumented).** `settle_nudge` settles the *state* energy by
+preconditioned Gauss–Seidel. That iteration's stability depends on the weight
+magnitude, and as the dyadic weights grow during training the settle **diverges**:
+on full MNIST d4, epoch 0 reaches 0.81, then the settle energy blows up to ~10²⁰ by
+epoch 1 and accuracy falls to chance. Tuning cannot save it — β/sweeps best is 0.43
+(vs cascade 0.92), and *more* settling is *worse* (it over-settles out of the
+feed-forward basin). Two-phase EqProp doesn't help either: here the free phase **is**
+the feed-forward pass (eps_free ≈ 0), so the contrastive update reduces to the
+single-phase one.
+
+**The fix.** At the true equilibrium `dE/dx_l = 0` gives `E_l = A_l^T E_{l+1}` — the
+equilibrium errors *are* the backprop/cascade error propagated top-down. So relax the
+**error** variables directly (with routing **frozen** at the feed-forward pass, like
+the cascade) instead of the state energy. With frozen routing this is a **triangular
+(nilpotent)** system: it converges to the exact cascade gradient in ≤depth local
+rounds and is **unconditionally stable regardless of weight magnitude**. Diagnostic:
+the frozen-relaxed gradient is cosine-similarity **0.99** with the cascade gradient
+per layer, and the synchronous form is **bit-exact equal** to `cascade_grads` (a unit
+test asserts `torch.equal`). Exposed as `DyadicPCNet.error_relax_grads` /
+`train_step_relax`; data `scale_mnist_iterative.jsonl`.
+
+Full MNIST, residual, 8 epochs, 3 seeds:
+
+| depth | cascade | error-relax **sync** | error-relax **async** (50% participation + stale + random-order) |
+|---|---|---|---|
+| d8  | 0.958 | 0.958 | **0.958** |
+| d16 | 0.950 | 0.950 | **0.950** |
+| d32 | 0.921 | 0.921 | **0.921** |
+
+- **Sync == cascade** (it is the iterative solve of the same triangular system).
+- **Async ≈ sync within ~0.1pp** — with half the nodes silent per round, lagged
+  (stale) reads, and no global update order. Given enough local rounds the system
+  fully converges, so at d32 it reaches the *identical* per-seed values. (The earlier
+  single-seed depth-scan on a 5k subset showed the same: d4–d32 async within ~0.6pp.)
+
+So the iterative regime now **works at full scale** — local, no global backward
+controller, robust to partial participation / lag / no clock — i.e. it keeps the
+distributed/neuromorphic value the cascade's strict ordered pass cannot offer, while
+reaching the same credit signal. Honest framing: sync error-relaxation *is* the
+cascade; the **async capability** is the value-add, not new accuracy. Cost: the async
+draws (participation coin + order permutation) serialize on a GPU so the sim is slow;
+on genuinely async hardware they are free.
 
 ## Caveats & limitations
 
@@ -136,16 +183,23 @@ transfer to full scale out of the box** — it needs retuning before any scale c
   cascade and BP are mid-collapse there; treat d16 non-residual as transitional.
 - **Energy/throughput not measured** — these are accuracy results on GPU sim; the
   multiplier-free advantage is a deploy-time (FPGA/ASIC) property, not shown here.
-- **nudge failure is unexplained** (not yet root-caused to a hyperparameter).
+- **Async robustness is demonstrated in *simulation*** (we emulate partial
+  participation / stale reads / random order); it is not a measurement on real
+  asynchronous hardware.
+- **The error-relaxation async confirmation is MNIST-only** (the GPU run hit its
+  time backstop on the sim-slow async mode before Fashion; the single-seed depth-scan
+  covered both). State-settling `settle_nudge` is retained for the analog/physical
+  (voltage-relaxation) reading but is scale-fragile — use `train_step_relax`.
 
 ## Verdict
 
 Tropical/dyadic PC **scales to real tasks for the forward/cascade regime**: a fully
 multiplier-free VGG-10 hits CIFAR-10 parity with float backprop at Qi's scale, the
 ±2^k forward is nearly free, and the tropical max-residual is a genuine depth-stability
-win. The honest costs: the MLP cascade trails backprop by a depth-growing 2–5pp
-(mechanism-dependent), and the iterative/distributed nudge regime does not yet
-transfer past the toy.
+win. The **iterative/distributed regime now also works at full scale** via
+error-relaxation (sync == cascade; async within ~0.1pp), where the naive state-settling
+diverged. The remaining honest cost: the MLP cascade trails backprop by a depth-growing
+2–5pp (mechanism-dependent vs the CIFAR `MFGrad` path).
 
 ## Next steps
 
@@ -154,8 +208,8 @@ transfer past the toy.
 2. **Reconcile the two cascades** — port the CIFAR `MFGrad` operand-quantization into
    the MLP path (or vice-versa) and find why the MLP cascade compounds error with
    depth.
-3. **Root-cause nudge-at-scale** — retune γ/β/sweeps for 784-dim; if it can't be made
-   to learn on full MNIST, say so plainly.
+3. **Error-relaxation at depth + on conv** — extend the async confirmation to Fashion
+   and to the dyadic VGG (CIFAR), and push depth past 32.
 4. **Measure deploy metrics** (energy/throughput) for the dyadic VGG forward — that is
    where the multiplier-free constraint is supposed to pay off.
 
@@ -166,6 +220,8 @@ export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
 PC_TASK=mnist bash scripts/run_pc_scale_gpu.sh launch          # Phase 0 baseline
 PC_TASK=mnist PC_ARGS="--residual --depths 8 16 32 --modes cascade bp_dyadic bp_float --epochs 8" \
   bash scripts/run_pc_scale_gpu.sh launch                      # Phase 0b depth-fix
+PC_TASK=mnist PC_ARGS="--residual --depths 8 16 32 --modes relax relax_async cascade --epochs 8" \
+  bash scripts/run_pc_scale_gpu.sh launch                      # iterative regime (error-relaxation)
 PC_TASK=cifar MAX_MINUTES=300 bash scripts/run_pc_scale_gpu.sh launch   # Phase 1
 # status | fetch | terminate ; results stream to S3 and self-terminate
 ```
