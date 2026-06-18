@@ -70,34 +70,46 @@ def make_dims(in_dim: int, hidden: int, depth: int, n_classes: int = 10):
 
 class DyadicMLP(nn.Module):
     """+-2^k (DyadicLinear) ReLU MLP with a linear readout -- the backprop closure
-    baseline (same multiplier-free forward as DyadicPCNet)."""
+    baseline (same multiplier-free forward as DyadicPCNet). With ``residual`` it
+    uses the TROPICAL max-skip ``max(relu(Wx), x)`` on matching interior dims,
+    matching DyadicPCNet's cascade residual so cascade-vs-bp_dyadic stays apples
+    to apples at depth."""
 
-    def __init__(self, dims):
+    def __init__(self, dims, residual: bool = False):
         super().__init__()
+        self.residual = residual
         self.layers = nn.ModuleList(
             [DyadicLinear(dims[l], dims[l + 1]) for l in range(len(dims) - 1)])
 
     def forward(self, x):
         for l, layer in enumerate(self.layers):
-            x = layer(x)
+            out = layer(x)
             if l < len(self.layers) - 1:
-                x = torch.relu(x)
+                out = torch.relu(out)
+                if self.residual and out.shape[-1] == x.shape[-1]:
+                    out = torch.maximum(out, x)        # tropical residual skip
+            x = out
         return x
 
 
 class FloatMLP(nn.Module):
-    """Plain float ReLU MLP -- the absolute (non-multiplier-free) ceiling."""
+    """Plain float ReLU MLP -- the absolute (non-multiplier-free) ceiling. With
+    ``residual`` it uses the standard additive skip ``relu(Wx) + x``."""
 
-    def __init__(self, dims):
+    def __init__(self, dims, residual: bool = False):
         super().__init__()
+        self.residual = residual
         self.layers = nn.ModuleList(
             [nn.Linear(dims[l], dims[l + 1]) for l in range(len(dims) - 1)])
 
     def forward(self, x):
         for l, layer in enumerate(self.layers):
-            x = layer(x)
+            out = layer(x)
             if l < len(self.layers) - 1:
-                x = torch.relu(x)
+                out = torch.relu(out)
+                if self.residual and out.shape[-1] == x.shape[-1]:
+                    out = out + x                      # additive residual skip
+            x = out
         return x
 
 
@@ -138,7 +150,8 @@ def run_one(mode, dims, train, test, *, seed, epochs, batch, lr, n_sweeps,
                                          mf_mode="dyadic")
         logits_fn = net.predict_logits
     elif mode in ("bp_dyadic", "bp_float"):
-        net = (DyadicMLP(dims) if mode == "bp_dyadic" else FloatMLP(dims)).to(device)
+        net = (DyadicMLP(dims, residual=residual) if mode == "bp_dyadic"
+               else FloatMLP(dims, residual=residual)).to(device)
         opt = torch.optim.Adam(net.parameters(), lr=lr)
         for _ in range(epochs):
             for xb, yb in iterate(Xtr, ytr, batch, gen):
@@ -224,8 +237,8 @@ def main():
         m = run_one(job["mode"], dims, train, test, seed=job["seed"], epochs=ep,
                     batch=args.batch, lr=args.lr, n_sweeps=args.n_sweeps,
                     residual=residual, device=device)
-        rec = {**job, "hidden": args.hidden, "epochs": ep, "device": str(device),
-               **m}
+        rec = {**job, "hidden": args.hidden, "epochs": ep, "residual": residual,
+               "device": str(device), **m}
         fout.write(json.dumps(rec) + "\n")
         fout.flush()
         print(f"[{j+1}/{len(jobs)}] {job['dataset']:8s} d{job['depth']:<3d} "
