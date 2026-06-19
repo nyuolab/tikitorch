@@ -475,6 +475,8 @@ ARMS = {
     "shift_nocontrast_adamw": dict(agg="shift", skip=False, signal=None),  # CONTROL + AdamW
     "shift_ef":       dict(agg="shift", skip=False, signal=None),   # ATTEMPT 8: shift blend + ERROR-FEEDBACK dyadic optimizer (fully mult-free)
     "shift_mom":      dict(agg="shift", skip=False, signal=None),   # ATTEMPT 9: shift blend + MOMENTUM dyadic optimizer (mult-free EMA)
+    "shift_sgd":      dict(agg="shift", skip=False, signal=None),   # DIAGNOSTIC: shift + plain SGD+momentum on TRUE grad (is Adam's adaptivity essential, or was dyadic-quant crude?)
+    "shift_dadam":    dict(agg="shift", skip=False, signal=None),   # ATTEMPT 10: shift + DYADIC-ADAM (mult-free per-param adaptive scale: 1/|g|_ema as a pow2 SHIFT)
 }
 
 
@@ -500,15 +502,24 @@ def train(arm, seed, args, device):
     use_adamw = arm.endswith("_adamw")                     # diagnostic: isolate mechanism from dyadic-mag
     use_ef = arm.endswith("_ef")                           # ATTEMPT 8: error-feedback dyadic optimizer
     use_mom = arm.endswith("_mom")                         # ATTEMPT 9: momentum dyadic optimizer
-    ef_buf, mom_buf = {}, {}                               # per-param residual / momentum buffers
+    use_sgd = arm.endswith("_sgd")                         # DIAGNOSTIC: plain SGD+momentum, true grad
+    use_dadam = arm.endswith("_dadam")                     # ATTEMPT 10: dyadic-Adam (mult-free adaptive)
+    use_sched = use_adamw or use_sgd or use_dadam          # lr-scheduled optimizers
+    ef_buf, mom_buf, m_buf, v_buf = {}, {}, {}, {}         # optimizer state buffers
     torch.manual_seed(seed); gen = torch.Generator().manual_seed(seed)
     model = GPT(args.vocab, args.d, args.heads, args.layers, args.L,
                 agg=cfg["agg"], skip=cfg["skip"], k=args.k).to(device)
-    opt = (torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.98), weight_decay=0.01)
-           if use_adamw else torch.optim.SGD(model.parameters(), lr=args.sign_lr))
+    if use_adamw:
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.98), weight_decay=0.01)
+    elif use_sgd:
+        opt = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
+    elif use_dadam:
+        opt = torch.optim.SGD(model.parameters(), lr=args.lr)   # the adaptive step is built in p.grad below
+    else:
+        opt = torch.optim.SGD(model.parameters(), lr=args.sign_lr)
     for step in range(args.steps):
         model.train()
-        if use_adamw:
+        if use_sched:
             for g in opt.param_groups:
                 g["lr"] = lr_sched(step, args)
         if cfg["agg"] == "shift":                          # anneal the shift-softmax temperature
@@ -552,8 +563,18 @@ def train(arm, seed, args, device):
                         den = max(1, (mask[:, None, :].expand_as(jt_last)).sum().item())
                         print(f"    [{arm} s{seed}] step{step} j_tgt==succ {hit/den:.3f}", flush=True)
             torch.autograd.backward(S_live, gss)        # self-supervised signal -> Q/K via score grad
-        if use_adamw:                                  # diagnostic optimizer (NOT mult-free)
+        if use_adamw or use_sgd:                       # diagnostic optimizers on TRUE grad (NOT mult-free)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        elif use_dadam:                                # DYADIC-ADAM: per-param adaptive scale, mult-free
+            for p in model.parameters():               # m,v = dyadic EMAs (b=0.875=1-2^-3); step = m * pow2(1/v)
+                if p.grad is not None:
+                    g = p.grad
+                    m = m_buf.get(p, torch.zeros_like(g)); v = v_buf.get(p, torch.zeros_like(g))
+                    m = (m - m * 0.125) + g * 0.125            # 0.125 = 2^-3 -> shifts (mult-free EMA)
+                    v = (v - v * 0.125) + g.abs() * 0.125      # EMA of |grad| (L1, no square)
+                    m_buf[p], v_buf[p] = m, v
+                    scale = torch.exp2(-torch.round(torch.log2(v.clamp_min(1e-12))))  # 1/|g|_ema as a pow2 SHIFT
+                    p.grad = m * scale                        # adaptive step = m shifted (mult-free)
         elif use_ef:                                   # error-feedback dyadic (mult-free): accumulate
             for p in model.parameters():               # the rounding residual so coarse steps de-bias
                 if p.grad is not None:

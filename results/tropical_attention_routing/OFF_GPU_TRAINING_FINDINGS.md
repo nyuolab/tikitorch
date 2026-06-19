@@ -72,7 +72,28 @@ property that the multiplier-free constraint cannot supply; all three trace to a
 |---|---|---|---|
 | **target-findability** (hard-gather + a manufactured target) | content-adaptive **and** deploy-findable | structural = not adaptive; grad-token = not findable (uses the answer `y`); value-alignment = circular | ff2 **4.77**, grad-token **4.08**, value-align ≈ chance — all vs random-frozen **3.54** |
 | **blend-smoothness** (a differentiable relaxation) | smooth **and** mult-free | dyadic weights are coarse; finer mantissa → less peaked → lossy hardening | shift soft/gather **4.40/4.44**; finer (3-bit) **3.63/3.97** — still > random 3.54 |
-| **optimizer-adaptivity** (the mult-free update) | per-parameter adaptive scaling | sign-magnitude / error-feedback / momentum all stall the fine-grained gradient that AdamW trains | shift+{dyadic, EF, momentum} = chance vs shift+AdamW **0.831** |
+| **optimizer-adaptivity** (the mult-free update) | per-parameter adaptive scaling | sign-magnitude / error-feedback / momentum / *plain SGD on the true grad* all stall — the router needs Adam's adaptivity (not better gradients) | shift+{dyadic, EF, momentum, SGD} = chance vs shift+AdamW **0.831** — **CRACKED, see §2a** |
+
+### 2a. The optimizer front, CRACKED — `dyadic-Adam` (leveraging the PC pow2 trick)
+The diagnostic above (plain SGD on the *true* gradient also stalls) shows the router needs Adam's
+*per-parameter adaptive scaling*, not better-quality gradients ("transformers need Adam"). We supply
+that adaptivity **multiplier-free** by borrowing the predictive-coding work's signature move
+(power-of-2 quantization): **dyadic-Adam** — per-parameter scale `1/|g|_EMA` realized as a pow2
+**shift** (`2^-round(log2 v)`); `m, v` are dyadic EMAs (`β = 0.875 = 1−2⁻³`, a shift); the step
+`m · pow2_scale` is a shift. Every op is add/abs/shift/leading-bit-extract — no multiply.
+
+**Measured (induction, 3 seeds): dyadic-Adam gather 0.929 ± 0.023 — *beats* AdamW 0.850 ± 0.029**
+(soft 1.000 both). So **fully multiplier-free differentiable attention routing — forward + backward
++ OPTIMIZER — trains the router from the LM loss alone to ceiling**, no teacher, no target, no
+multiply. dyadic-Adam is a **reusable general multiplier-free *adaptive* optimizer**: it fills a gap
+in the PC toolkit (PC's `set_mf_grads` / dyadic-magnitude is SGD-flavored — it matches Adam on
+SGD-friendly MLPs/Convs but, as shown here, stalls on Adam-needing *attention*). Arms:
+`shift_sgd` (diagnostic), `shift_dadam` (the win), in `induction_selfsup.py`.
+
+This **removes the optimizer front** of the wall. The two remaining fronts (target-findability for a
+general LM, and blend-smoothness — the dyadic-coarse blend underfits smooth attention, independent of
+the optimizer) still block *competitive char-LM*. So the crack completes the **winner-take-all**
+mechanism fully multiplier-free, not competitive LM.
 
 **The through-line:** the multiply (exp/divide for the soft weights; continuous weights for a
 smooth blend; `1/√v` for an adaptive optimizer) does essential work for *smooth* attention
