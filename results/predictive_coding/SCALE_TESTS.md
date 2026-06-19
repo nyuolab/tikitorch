@@ -5,7 +5,8 @@
 `scripts/run_pc_scale_gpu.sh` (PC_TASK=mnist|cifar). Raw data:
 `results/predictive_coding/scale_mnist.jsonl` (144 rows), `scale_cifar.jsonl` (18 rows),
 `scale_mnist_iterative.jsonl` (error-relaxation: sync / async / cascade),
-`scale_mnist_cascade_ce.jsonl` (CE cascade reconciliation).
+`scale_mnist_cascade_ce.jsonl` (CE cascade reconciliation), `scale_cifar100.jsonl`
+(CIFAR-100 VGG-10/13).
 **Audited:** every headline claim below was adversarially re-checked against the raw
 JSONL (a workflow of independent verifiers); corrections from that audit are folded in.
 
@@ -66,6 +67,19 @@ positive, one confirmation, one genuine tropical win, and two honest negatives:
   conv, fully multiplier-free training costs well under a point → **near-parity.**
 - Cost: cascade wall-clock ≈ 2× (285s vs 146s/run at VGG-10) — purely the `MFGrad`
   hooks recomputing weight grads in sim; on fabric that accumulation is shift-add.
+
+### CIFAR-100 + deeper VGG (3 seeds, 40 epochs) — parity holds at 100 classes
+
+| | `bp_float` | `bp_dyadic` | `cascade` |
+|---|---|---|---|
+| VGG-10 | 0.715 | 0.712 | 0.710 |
+| VGG-13 | 0.718 | 0.709 | 0.707 |
+
+Multiplier-free forward (`bp_dyadic`) is within **−0.29pp** of float at VGG-10 and
+**−0.90pp** at VGG-13; the fully-multiplier-free `cascade` within **−0.50 / −1.12pp**
+of float (and ~−0.2pp vs `bp_dyadic`). So the ±2^k parity extends cleanly from 10 to
+**100 classes**, and the deeper VGG-13 holds (no collapse), though it does not improve
+over VGG-10 on this dataset. Data: `scale_cifar100.jsonl`.
 
 ## MNIST / Fashion-MNIST — deep MLP
 
