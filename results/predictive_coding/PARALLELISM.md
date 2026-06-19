@@ -83,12 +83,44 @@ blocker, not the FLOP count**. The honest claim is therefore not "PC is more acc
 — it is "PC reaches backprop-quality credit assignment **multiplier-free and without
 global synchronization**, which is the regime that hardware actually constrains."
 
+## Modeled throughput (the structural argument, made quantitative)
+
+A pipeline-parallelism throughput model (`scripts/.../throughput_model.py`,
+`throughput_model.png`) turns the locks into numbers. It is **not** measured
+wall-clock — it is derived from the dependency structure, and the only PC-favoring
+assumptions are the *actual* differences, each grounded:
+
+- backprop has a **backward sweep** (cost τ_b/stage); PC has **none** (local updates);
+- backprop needs a **sync barrier** (exact all-reduced gradients); PC has **none**;
+- backprop **cannot use stale gradients**, so inter-stage latency δ sits **on the
+  critical path** (2L hops + barrier); PC **tolerates staleness** (this is the part we
+  *measured*: async 50%+stale+random within ~0.6pp), so δ is **hidden** (overlapped).
+
+For a standard L-stage / B-microbatch pipeline (τ_f = 1, τ_b = 2, local-update 0.3):
+
+| condition | PC throughput / backprop |
+|---|---|
+| L=32, **zero** latency (δ=0) | **2.3×** — purely from having no backward sweep |
+| L=32, δ = 1·τ_f | **3.1×** |
+| L=32, δ = 2·τ_f | **3.9×** — staleness-tolerance hides the latency backprop pays |
+| L=128, δ = 0.5·τ_f | **2.9×** |
+
+![throughput model](throughput_model.png)
+
+PC's throughput is **flat in latency** (left: it hides δ); backprop's **decays** (δ is
+on its critical path). The speedup **grows with depth** (right) — backprop's backward
+sweep and latency both scale with L. So the parallelism advantage is real even with
+*no* communication cost (the missing backward sweep = ~2.3×) and **compounds** under
+the latency/asynchrony that real distributed hardware imposes.
+
 ## Honest scope
 
-- This is a **structural** argument plus a **simulated** measurement (we emulate
-  partial participation / staleness / random order; we have not measured wall-clock
-  speedup on real async hardware). Real-hardware throughput is the obvious next claim
+- The throughput numbers are a **model** (standard pipeline-parallelism dependency
+  structure), not measured wall-clock on real async hardware; the staleness-tolerance
+  that lets PC hide latency is the one piece we *measured* (async error-relaxation).
+  Real-hardware throughput on a multi-chip / neuromorphic substrate is the next claim
   to substantiate.
-- "Layer-parallel updates" is a property of the *local rule*; turning it into measured
-  parallel **throughput** (pipeline/model-parallel, heterogeneous update rates) is a
-  concrete next experiment, not yet run.
+- The model's constants (τ_b = 2·τ_f, local-update = 0.3·τ_f, barrier = δ) are typical
+  but illustrative; the *qualitative* result (flat-in-latency vs decaying;
+  grows-with-depth) follows from the dependency structure regardless of the exact
+  constants.
