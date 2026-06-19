@@ -48,7 +48,7 @@ from typing import List, Optional
 import torch
 import torch.nn as nn
 
-__all__ = ["TropicalPCLayer", "TropicalPCNet", "DyadicPCNet"]
+__all__ = ["TropicalPCLayer", "TropicalPCNet", "DyadicPCNet", "SparseCodingPC"]
 
 
 def _predict(weight: torch.Tensor, bias: torch.Tensor, x: torch.Tensor, kind: str):
@@ -858,3 +858,90 @@ class DyadicPCNet(nn.Module):
     def extra_repr(self) -> str:
         return (f"dims={self.dims}, depth={self.depth}, gamma={self.gamma}, "
                 f"relu_readout={self.relu_readout}, residual={self.residual}")
+
+
+# ---------------------------------------------------------------------------
+# Generative PC — dyadic sparse coding (the inference capability backprop lacks)
+# ---------------------------------------------------------------------------
+
+
+class SparseCodingPC(nn.Module):
+    """Single-layer **generative** predictive coding = dyadic sparse coding.
+
+    Models each input as a SPARSE combination of dictionary atoms, ``x ≈ D·s`` with
+    ``s`` k-sparse. The code ``s`` is **inferred by settling** (descend
+    ``½‖mask⊙(x − D·s)‖²`` then keep the top-k atoms — winner-take-all, the
+    tropical/max-plus primitive); the dyadic dictionary ``D`` (±2^k columns, unit
+    norm) is learned by a **local** update (``ΔD ∝ err ⊗ s``) — *no backprop*. This
+    is the Olshausen-Field / Rao-Ballard generative PC on the tropical/dyadic
+    substrate, the one PC formulation where the max/WTA structure is the point.
+
+    The contrast with a feed-forward net is the whole value: ONE trained model
+    answers *arbitrary* inference queries by settling — reconstruction, in-painting
+    under ANY mask, denoising — which a discriminative backprop net structurally
+    cannot. (Measured: MNIST, recovers digits from 50% random pixel masking ~60%
+    better than mean-fill; see ``results/predictive_coding/GENERATIVE_PC.md``.)
+
+    Closure: the deployed dictionary is ±2^k (shift-add) and the code is a top-k
+    gate — multiplier-free as a weight-VALUE property; the float-sim inference
+    matmuls are the usual artifact (cf. :class:`DyadicLinear`).
+    """
+
+    def __init__(self, n_pixels: int, n_atoms: int, n_active: int = 15):
+        super().__init__()
+        self.n_pixels = n_pixels
+        self.n_atoms = n_atoms
+        self.n_active = n_active
+        self.D = nn.Parameter(torch.randn(n_pixels, n_atoms) * 0.1)
+
+    def _dict(self) -> torch.Tensor:
+        """Deployed dictionary: ±2^k columns, unit-normalized (multiplier-free)."""
+        from tikitorch.nn import dyadic_quantize
+        d = dyadic_quantize(self.D)
+        return d / d.norm(dim=0, keepdim=True).clamp_min(1e-6)
+
+    @torch.no_grad()
+    def infer(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None,
+              n_steps: int = 40, lr: float = 0.3):
+        """Settle the k-sparse code for ``x``; ``mask`` (1=observed) restricts the fit
+        to observed pixels. Returns ``(s, reconstruction)``."""
+        Dn = self._dict()
+        s = torch.zeros(x.shape[0], self.n_atoms, device=x.device, dtype=x.dtype)
+        for _ in range(n_steps):
+            err = x - s @ Dn.t()
+            if mask is not None:
+                err = err * mask
+            s = s + lr * (err @ Dn)
+            thr = s.abs().topk(self.n_active, dim=1).values[:, -1:]   # top-k / WTA
+            s = s * (s.abs() >= thr).float()
+        return s, s @ Dn.t()
+
+    @torch.no_grad()
+    def complete(self, x: torch.Tensor, mask: torch.Tensor,
+                 n_steps: int = 120, lr: float = 0.3) -> torch.Tensor:
+        """In-paint / denoise: infer the code from the OBSERVED pixels and fill the
+        rest. ``mask`` is 1 on observed pixels, 0 on missing. Any mask pattern."""
+        _, recon = self.infer(x * mask, mask=mask, n_steps=n_steps, lr=lr)
+        return mask * x + (1.0 - mask) * recon
+
+    @torch.no_grad()
+    def reconstruct(self, x: torch.Tensor, n_steps: int = 60,
+                    lr: float = 0.3) -> torch.Tensor:
+        return self.infer(x, n_steps=n_steps, lr=lr)[1]
+
+    @torch.no_grad()
+    def train_step(self, x: torch.Tensor, lr_dict: float = 0.05,
+                   n_steps: int = 25, lr_code: float = 0.3) -> float:
+        """One local learning step: settle the code, apply the LOCAL dyadic dictionary
+        update (operand-quantized ``ΔD ∝ err ⊗ s``), re-normalize atoms. No backprop,
+        no optimizer. Returns the reconstruction MSE."""
+        from tikitorch.nn import dyadic_quantize
+        s, recon = self.infer(x, n_steps=n_steps, lr=lr_code)
+        err = x - recon
+        self.D += lr_dict * (dyadic_quantize(err).t() @ dyadic_quantize(s)) / x.shape[0]
+        self.D /= self.D.norm(dim=0, keepdim=True).clamp_min(1e-6)
+        return float((err ** 2).mean())
+
+    def extra_repr(self) -> str:
+        return (f"n_pixels={self.n_pixels}, n_atoms={self.n_atoms}, "
+                f"n_active={self.n_active}")

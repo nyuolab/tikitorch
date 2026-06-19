@@ -19,6 +19,7 @@ from tikitorch.nn.predictive_coding import (
     TropicalPCLayer,
     TropicalPCNet,
     DyadicPCNet,
+    SparseCodingPC,
 )
 
 
@@ -483,3 +484,49 @@ def test_dyadic_pc_error_relax_async_robust():
                                  participation=0.5, stale=True, rand_order=True, gen=gen)
     acc = (net.predict_logits(Xte).argmax(-1) == Yte).float().mean().item()
     assert acc > 0.6, f"async error-relaxation failed to learn: acc={acc:.3f}"
+
+
+# ---------------------------------------------------------------------------
+# Generative PC — dyadic sparse coding (inference backprop can't do)
+# ---------------------------------------------------------------------------
+def _sparse_data(n, n_pix, n_atoms_true, k, gen, seed_atoms=0):
+    """Images = sum of k random nonneg dictionary atoms (a sparse generative model)."""
+    ga = torch.Generator().manual_seed(seed_atoms)
+    Dtrue = torch.rand(n_pix, n_atoms_true, generator=ga)            # nonneg atoms
+    X = torch.zeros(n, n_pix)
+    for i in range(n):
+        idx = torch.randperm(n_atoms_true, generator=gen)[:k]
+        coef = torch.rand(k, generator=gen)
+        X[i] = (Dtrue[:, idx] * coef).sum(1)
+    return X / X.max()
+
+
+def test_sparse_coding_pc_completes_better_than_mean_fill():
+    """Dyadic sparse-coding PC (generative, no backprop) infers the code from
+    OBSERVED pixels and in-paints the rest — recovering masked pixels far better than
+    a mean-fill baseline. This is the inference capability a feed-forward net lacks."""
+    torch.manual_seed(0)
+    g = torch.Generator().manual_seed(0)
+    Xtr = _sparse_data(2000, 64, 20, 4, g)
+    Xte = _sparse_data(200, 64, 20, 4, g)
+    model = SparseCodingPC(n_pixels=64, n_atoms=48, n_active=6)
+    for _ in range(40):
+        for i in range(0, Xtr.shape[0] - 64, 64):
+            model.train_step(Xtr[i:i + 64], lr_dict=0.1, n_steps=20)
+    # mask 50% of pixels at random, complete from the observed half
+    mask = (torch.rand(Xte.shape, generator=g) > 0.5).float()
+    filled = model.complete(Xte, mask, n_steps=100)
+    miss = (1.0 - mask)
+    pc_mse = ((filled - Xte) ** 2 * miss).sum() / miss.sum()
+    meanfill_mse = ((Xtr.mean(0) - Xte) ** 2 * miss).sum() / miss.sum()
+    assert pc_mse < 0.6 * meanfill_mse, \
+        f"sparse-coding PC did not complete well: {pc_mse:.4f} vs mean-fill {meanfill_mse:.4f}"
+
+
+def test_sparse_coding_pc_code_is_k_sparse():
+    """The inferred code is exactly k-active (top-k winner-take-all)."""
+    torch.manual_seed(0)
+    model = SparseCodingPC(n_pixels=64, n_atoms=48, n_active=6)
+    x = torch.rand(8, 64)
+    s, _ = model.infer(x, n_steps=10)
+    assert ((s != 0).sum(1) <= 6).all(), "code exceeds n_active nonzeros"
