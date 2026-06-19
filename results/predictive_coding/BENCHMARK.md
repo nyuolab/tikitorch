@@ -37,9 +37,21 @@ settling (the collapse baseline); "best PC" = their enhanced variant.
 | CIFAR-10 VGG-10 | 72.75 (Qi, collapse) | 92.07 (Qi S+F) | 92.21 (Qi) | **91.4** cascade / 92.2 float |
 | CIFAR-100 VGG-10 | 45.86 (Qi, collapse) | **63.35** (Qi S+F) | 69.35 (Qi) | **71.0** cascade / 71.5 float |
 | Tiny-ImageNet VGG-15 | 22.95 (Qi, collapse) | 42.51 (Qi S+F) | 44.52 (Qi) | — *(not run)* |
-| CIFAR-10 ResNet-18 | 70.44 (best PC, −22pt) | — | 92.83 | — *(not run)* |
+| CIFAR-10 ResNet-18 | 70.44 (best PC, −22pt) | — | 92.83 | *(running)* |
 | MNIST MLP (shallow) | 98.1 / iPC 98.45 | — | 98.07 | 97.4 (d8 deep) |
-| MNIST 128-layer ResNet | — | ~98 (μPC) | (no BP given) | — *(we did d32)* |
+| **MNIST 128-layer (residual)** | — | ~98 (μPC, Depth-μP) | **24.1 (float BP collapses)** | **93.8** cascade (mult-free) |
+
+**The μPC head-to-head is a clean structural win.** μPC's whole contribution is a
+parameterisation (Depth-μP) that lets *float* PC train at 128 layers. We measured a
+128-layer residual MLP three ways (3 seeds, MNIST): the multiplier-free **cascade =
+93.8%** (flat from d32: 97.0 → 95.6 → 93.8 at d32/64/128), `bp_dyadic` = 86.6%, and
+**float backprop collapses to 24.1%** (d32 91.5 → d64 68.2 → d128 24.1). So the
+**tropical max-residual** `max(relu(Wx), x)` — bounded and idempotent, so it does not
+accumulate variance the way the *additive* float residual does — is doing μPC's
+depth-scaling job, **multiplier-free, and at a depth where the float additive-residual
+net dies.** (Honest: our cascade *is* backprop, so this is "tropical-residual backprop
+trains 128 layers where additive-residual backprop collapses" — the lever is the
+residual, not the cascade; data `scale_mnist_128layer.jsonl`.)
 
 Reading this honestly:
 
