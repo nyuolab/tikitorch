@@ -366,19 +366,35 @@ def build_model(kind, data, args):
                        else "dot_product"),
         max_seq_len=args.seq_len, task_type="lm", vocab_size=data.vocab)
     apply_variant(model, data.vocab, args)
-    if getattr(args, "n_hops", 1) > 1 or getattr(args, "agg_variant", None):
+    if (getattr(args, "n_hops", 1) > 1 or getattr(args, "agg_variant", None)
+            or getattr(args, "score_variant", None)):
         from tikitorch.nn import TropicalAttention
         attns = [m for m in model.modules() if isinstance(m, TropicalAttention)]
         for m in attns:
             if args.n_hops > 1:
                 m.n_hops = args.n_hops
             if args.agg_variant:
-                m.agg_variant = args.agg_variant   # e.g. "sinkhorn" (assignment routing)
+                m.agg_variant = args.agg_variant   # e.g. "gather" (deploy-pure attn) / "sinkhorn"
                 m.sink_eps = args.sink_eps
                 m.sink_iters = args.sink_iters
-        print(f"[attn] n_hops={args.n_hops} agg={args.agg_variant or 'default'} "
+            if args.score_variant:
+                m.score_variant = args.score_variant   # e.g. "l1" (-sum_d|Q-K|)
+        print(f"[attn] score={args.score_variant or 'default'} "
+              f"agg={args.agg_variant or 'default'} n_hops={args.n_hops} "
               f"sink_eps={args.sink_eps} sink_iters={args.sink_iters} on "
               f"{len(attns)} TropicalAttention module(s)")
+    # Guard the train/deploy operator-mismatch trap: the l1 score is validated
+    # ONLY with the argmax-GATHER deploy op. The default agg ("argmax") is the
+    # per-dim max-plus MATMUL -- a DIFFERENT operator -- so a soft-trained l1 model
+    # silently collapses to the bigram floor at tau=0 hard-eval (the likely cause
+    # of the prior "tropical attention floors at bigram" result). Require gather.
+    if (args.score_variant == "l1" and args.agg_variant != "gather"
+            and not getattr(args, "allow_op_mismatch", False)):
+        raise SystemExit(
+            "[config] --score-variant l1 requires --agg-variant gather: hard-eval "
+            "(tau=0) otherwise uses the per-dim max-plus matmul, a different operator "
+            "than the softmax(scores)@V the l1 arm trains with, and collapses it. "
+            "Pass --allow-op-mismatch only for the deliberate collapse control.")
     return model
 
 
@@ -621,12 +637,23 @@ def main():
                         "routing over the content score graph (purely max-plus). "
                         "Tests routing (not averaging) as attention's mechanism.")
     p.add_argument("--agg-variant", type=str, default=None,
-                   choices=["argmax", "iter_topk", "min", "maxmin", "sinkhorn"],
-                   help="override tropical attention value-aggregation. 'sinkhorn' = "
-                        "assignment/permutation routing (train soft doubly-stochastic "
-                        "transport -> deploy hard permutation): densifies the gradient "
-                        "(every key carries column mass) AND changes the routing class "
-                        "from value-copy to assignment.")
+                   choices=["argmax", "iter_topk", "min", "maxmin", "sinkhorn", "gather"],
+                   help="override tropical attention value-aggregation. 'gather' = "
+                        "argmax-GATHER (train softmax(scores)@V -> deploy V[argmax_j]): "
+                        "the true deploy-pure limit of softmax attention (ONE key per "
+                        "query, shared across dims), multiplier-free. The default "
+                        "'argmax' is the max-plus MATMUL (per-dim argmax) which the "
+                        "induction probe showed collapses a soft-trained model. "
+                        "'sinkhorn' = assignment/permutation routing.")
+    p.add_argument("--score-variant", type=str, default=None,
+                   choices=["dot_product", "l_inf", "hilbert", "hilbert_asym", "l1"],
+                   help="override tropical attention SCORE. 'l1' = -sum_d|Q-K| "
+                        "(many-to-many AdderNet distance, dense gradient over all dims; "
+                        "the best multiplier-free score in the induction probe). Pairs "
+                        "with --agg-variant gather for fully deploy-pure attention.")
+    p.add_argument("--allow-op-mismatch", action="store_true",
+                   help="bypass the l1=>gather guard (ONLY for the deliberate "
+                        "l1+argmax collapse control, Experiment A2).")
     p.add_argument("--sink-eps", type=float, default=1.0,
                    help="Sinkhorn entropic temperature (smaller = sharper -> closer to "
                         "a hard permutation; anneal toward 0 for pure-tropical deploy).")
