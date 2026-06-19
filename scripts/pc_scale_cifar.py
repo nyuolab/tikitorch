@@ -51,6 +51,8 @@ _CFGS = {
     "vgg7":  [64, "M", 128, "M", 256, 256, "M"],
     "vgg10": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, "M"],
     "vgg13": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, "M"],
+    "vgg15": [64, 64, "M", 128, 128, "M", 256, 256, 256, "M", 512, 512, 512, "M",
+              512, 512, 512, "M"],                  # 13-conv deep VGG (~Qi VGG-15/16)
 }
 
 
@@ -80,6 +82,52 @@ def make_vgg(cfg, n_classes, dyadic: bool):
             c_in = v
     layers += [nn.AdaptiveAvgPool2d(1), nn.Flatten(), Lin(c_in, n_classes)]
     return nn.Sequential(*layers)
+
+
+class _BasicBlock(nn.Module):
+    """ResNet basic block, dyadic convs + BN + additive skip (the standard residual
+    that float ResNets use; the cascade/MFGrad handles the skip via autograd)."""
+
+    def __init__(self, Conv, c_in, c_out, stride):
+        super().__init__()
+        self.conv1 = Conv(c_in, c_out, 3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(c_out)
+        self.conv2 = Conv(c_out, c_out, 3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(c_out)
+        self.down = None
+        if stride != 1 or c_in != c_out:
+            self.down = nn.Sequential(Conv(c_in, c_out, 1, stride=stride, bias=False),
+                                      nn.BatchNorm2d(c_out))
+
+    def forward(self, x):
+        out = torch.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out = out + (self.down(x) if self.down is not None else x)
+        return torch.relu(out)
+
+
+def make_resnet18(n_classes, dyadic: bool):
+    """CIFAR ResNet-18 (3x3 stem, 4 stages x 2 basic blocks). All convs/fc dyadic when
+    dyadic=True. This is exactly where iterative settling-PC collapses (lit: PC 70.4 vs
+    BP 92.8 on CIFAR-10) — the dyadic cascade (=backprop) should match BP."""
+    Conv = DyadicConv2d if dyadic else nn.Conv2d
+    from tikitorch.nn import DyadicLinear
+    Lin = DyadicLinear if dyadic else nn.Linear
+    stage = [(64, 1), (128, 2), (256, 2), (512, 2)]
+    layers = [Conv(3, 64, 3, padding=1, bias=False), nn.BatchNorm2d(64), nn.ReLU(inplace=True)]
+    c_in = 64
+    for c_out, stride in stage:
+        layers.append(_BasicBlock(Conv, c_in, c_out, stride))
+        layers.append(_BasicBlock(Conv, c_out, c_out, 1))
+        c_in = c_out
+    layers += [nn.AdaptiveAvgPool2d(1), nn.Flatten(), Lin(512, n_classes)]
+    return nn.Sequential(*layers)
+
+
+def make_net(cfg_name, n_classes, dyadic):
+    if cfg_name.startswith("resnet"):
+        return make_resnet18(n_classes, dyadic)
+    return make_vgg(_CFGS[cfg_name], n_classes, dyadic=dyadic)
 
 
 class MFGrad:
@@ -155,7 +203,7 @@ def run_one(mode, cfg_name, dataset, *, seed, epochs, lr, batch, workers,
     torch.manual_seed(seed)
     n_classes = _NCLASS[dataset]
     dyadic = mode in ("bp_dyadic", "cascade")
-    model = make_vgg(_CFGS[cfg_name], n_classes, dyadic=dyadic).to(device)
+    model = make_net(cfg_name, n_classes, dyadic=dyadic).to(device)
     mf = MFGrad(model) if mode == "cascade" else None
     opt = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=5e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
