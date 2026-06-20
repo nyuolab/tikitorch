@@ -219,7 +219,7 @@ def bigram_floor(d, V, n_train):
 def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train,
             seed, epochs, batch, lr, wd, drop, device, pc_niter=None):
     torch.manual_seed(seed)
-    pc = mode in ("relax", "relax_async")
+    pc = mode in ("relax", "relax_async", "relax_exact")
     net = DyadicConvPC1d(V, width, depth, kernel, dils, float_conv=(mode == "bp_float")).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=wd)
     warmup = max(1, epochs // 20)                                  # warmup + cosine decay:
@@ -238,6 +238,8 @@ def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train
                 xb_in = xb  # token ids; dropout applied as embedding-level not here
             if mode == "relax":
                 net.train_step_relax(xb, yb, opt)
+            elif mode == "relax_exact":                          # DIAGNOSTIC: local form, REAL grad
+                net.train_step_relax(xb, yb, opt, quant=False)   # (not mult-free) — isolates form vs quant
             elif mode == "relax_async":
                 net.train_step_relax(xb, yb, opt, n_iter=(pc_niter or 3 * depth),
                                      participation=0.5, stale=True, rand_order=True, gen=rgen)
@@ -286,7 +288,7 @@ if __name__ == "__main__":
     print(f"bigram floor={floor:.3f} bpc | bp lr={args.lr} pc lr={args.pc_lr}\n", flush=True)
     rows = []
     for mode in args.modes:
-        mlr = args.pc_lr if mode in ("relax", "relax_async") else args.lr
+        mlr = args.pc_lr if mode in ("relax", "relax_async", "relax_exact") else args.lr
         b, bep, wall = run_one(mode, V, seq=args.seq, width=args.width, depth=args.depth,
                                kernel=args.kernel, dils=dils, tr=tr, va=va, d_full=d_full,
                                n_train=n_train, seed=0, epochs=args.epochs, batch=args.batch,
