@@ -49,6 +49,7 @@ def _causal_neg(s):
 
 _SHIFT_CONTRAST = True       # backward keeps the weighted -<g,out> partition contrast (control: False)
 _SHIFT_WBITS = 0             # weight mantissa bits: 0 = pure pow2 (coarse); >0 = K-bit dyadic (finer, mult-free)
+_MBR_K = 4                   # margin-banded rank blend: top-k support (k shifts+adds per query)
 
 
 class ShiftSoftmaxBlend(torch.autograd.Function):
@@ -101,6 +102,127 @@ class ShiftSoftmaxBlend(torch.autograd.Function):
         return ds, dv, None, None
 
 
+class MarginBandedRankBlend(torch.autograd.Function):
+    """IDEA 5 WILDCARD — a mult-free SMOOTH aggregation that SIDESTEPS the fine-w*V multiply.
+
+    The core tension: out_d = Σ_j w_ij V_jd with a fine continuous w_ij is a MULTIPLY, so w must
+    be a shift (dyadic). ShiftSoftmaxBlend made w = 2^round((s-max)/Δ): score-MAGNITUDE drives the
+    weight VALUE, which (a) is coarse and (b) couples smoothness to peakedness (finer = flatter =
+    lossy gather). This Function DECOUPLES the two:
+
+      * The blend WEIGHTS are FIXED dyadic RANK weights w_r = 2^(-r) over the top-k keys (r=rank,
+        0=winner). They are constants {1, 1/2, 1/4, ...} -> a right-SHIFT by r. NEVER a multiply,
+        NEVER a function of the (continuous) score magnitude, so they introduce no fine product.
+      * WHICH keys participate is controlled by a MARGIN BAND: rank r is INCLUDED iff its score gap
+        to the winner  m_r = s_(0) - s_(r)  is within the band  Δ  (a COMPARE). gate_r = 1[m_r <= Δ].
+      * out = (Σ_r gate_r · 2^-r · V_(r)) / pow2_ceil(Σ_r gate_r · 2^-r).  Numerator = k shifts+adds;
+        denominator divide = a shift (pow2-ceil). ZERO multiply (top-k=k adds, vs the dense Σ_j w V).
+
+    WHY THIS RESOLVES THE TENSION (not "just finer weights"):
+      - SMOOTH for the LM: the gradient does NOT come from a finer weight VALUE; it comes from the
+        soft GATE. gate_r = sigmoid_STE of (Δ - m_r): forward is the hard {0,1} compare, backward is
+        a smooth band derivative. Moving a key's score across the band edge smoothly grows/shrinks
+        its (fixed 2^-r) contribution -> the LM controls HOW MANY keys blend and HOW PEAKED, by
+        moving scores RELATIVE TO THE BAND, without ever needing a fine weight. Smoothness lives in
+        the BAND, not the weight.
+      - PEAKED for deploy: as Δ -> 0 (annealed) the band closes, every runner-up's gate -> 0, the
+        blend collapses to rank-0 only = EXACT top-1 argmax-gather. Hardening is LOSSLESS BY
+        CONSTRUCTION: at Δ_floor=0 the train op IS the deploy op (out = V_(0)). No "flatter blend
+        => lossy" failure mode, because peakedness is the band width, set to 0 at deploy, NOT a
+        weight-mantissa knob fighting smoothness.
+      - The two pulls are now ORTHOGONAL: weight FINENESS (fixed at the dyadic rank ladder, never
+        touched) vs PEAKEDNESS (the band Δ, annealed to 0). ShiftSoftmaxBlend tied them to one knob.
+
+    Backward (mult-free, dyadic-operand like ShiftSoftmaxBlend):
+      - to V: scatter g_up by the (fixed) normalized rank weights wn_r (shifts) -> dv.
+      - to s: the gate is the ONLY score-dependent term. d gate_r / d m_r is a band bump; m_r =
+        s_(0)-s_(r) so it pushes s_(r) toward/away from the winner. The contribution magnitude is
+        the dyadic-operand advantage adv_r = <q(g), q(V_(r))> - <q(g), q(out)> (= ShiftSoftmaxBlend's
+        weighted partition contrast, the load-bearing cross-key coupling), scaled by the FIXED wn_r.
+        All products are ±2^k operands -> shifts. The band bump is a constant (1/bandwidth, a shift).
+    """
+
+    @staticmethod
+    def forward(ctx, s, v, Delta, K):
+        B, H, L, Lk = s.shape
+        kk = min(K, Lk)
+        finite = torch.isfinite(s)
+        # rank by score (desc). topv = sorted scores, topi = their key indices.
+        topv, topi = s.topk(kk, dim=-1)                       # (B,H,L,kk)
+        win = topv[..., :1]                                   # s_(0), the winner score
+        margin = win - topv                                   # m_r = s_(0)-s_(r) >= 0  (COMPARE input)
+        valid = torch.isfinite(topv)                          # masked (causal) keys are -inf
+        # FIXED dyadic rank weights 2^-r (a right-shift by r); NEVER score-magnitude.
+        ranks = torch.arange(kk, device=s.device, dtype=s.dtype)
+        wr = torch.exp2(-ranks)                               # (kk,) = {1, 1/2, 1/4, ...}
+        wr = wr.view(1, 1, 1, kk).expand(B, H, L, kk)
+        # MARGIN-BAND gate: include rank r iff m_r <= Delta. Forward hard {0,1}; backward smooth band.
+        # band derivative width = Delta (so the soft edge scales with the annealed band).
+        bw = max(Delta, 1e-6)
+        soft_gate = torch.sigmoid((Delta - margin) / bw)      # smooth (backward only)
+        hard_gate = (margin <= Delta).to(s.dtype)             # compare (forward)
+        gate = hard_gate + (soft_gate - soft_gate.detach())   # STE: hard forward, soft grad
+        gate = gate * valid                                   # never gate in an -inf (masked) key
+        gate = torch.where(torch.isnan(gate), torch.zeros_like(gate), gate)
+        w = wr * gate                                         # (B,H,L,kk) shift * {0,1-ish}
+        # gather the top-k value vectors, blend, normalize by pow2-ceil (a shift).
+        dh = v.shape[-1]
+        v_exp = v.unsqueeze(2).expand(B, H, L, Lk, dh)        # (B,H,Lq,Lk,dh) value per query
+        idx = topi.unsqueeze(-1).expand(B, H, L, kk, dh)      # (B,H,L,kk,dh)
+        vtop = torch.gather(v_exp, 3, idx)                    # (B,H,L,kk,dh) top-k value vectors
+        num = torch.einsum("bhik,bhikd->bhid", w, vtop)       # Σ_r w_r V_(r) -- k shifts+adds (k small)
+        Z = w.sum(-1, keepdim=True).clamp_min(1e-12)
+        Zhat = torch.exp2(torch.ceil(torch.log2(Z)))          # pow2-ceil -> 1/Zhat is an exact shift
+        out = num / Zhat
+        wn = (w / Zhat)                                       # normalized fixed-rank weights (shifts)
+        ctx.save_for_backward(wn, vtop, out, topi, valid, soft_gate, wr)
+        ctx.bw = bw; ctx.dh = v.shape[-1]; ctx.Lk = Lk
+        return out
+
+    @staticmethod
+    def backward(ctx, g_up):
+        wn, vtop, out, topi, valid, soft_gate, wr = ctx.saved_tensors
+        B, H, L, kk, dh = vtop.shape
+        gq = dyadic_quantize(g_up)                            # (B,H,L,dh) ±2^k
+        vq = dyadic_quantize(vtop)                            # (B,H,L,kk,dh) ±2^k
+        oq = dyadic_quantize(out)                             # (B,H,L,dh) ±2^k
+        gV = torch.einsum("bhid,bhikd->bhik", gq, vq)         # <g,V_(r)>  (dyadic-operand dot = shifts)
+        gout = torch.einsum("bhid,bhid->bhi", gq, oq).unsqueeze(-1)
+        adv = gV - gout                                       # weighted partition contrast (cross-key)
+        # TWO score-gradient channels (both mult-free; the SUM is the load-bearing signal):
+        #  (1) DENSE in-blend value-alignment (the TRUE softmax score-gradient form, matching
+        #      ShiftSoftmaxBlend): dL/ds_r = wn_r * (<g,V_r> - <g,out>). A key whose value moves the
+        #      output DOWNHILL (advantage <0 vs the uphill g=dL/dout) gets dL/ds<0 -> descent RAISES
+        #      its score. Non-sparse: flows to every key in the blend, regardless of band position.
+        ds_align = (wn * adv) * valid                         # (B,H,L,kk)  TRUE gradient sign (no extra negation)
+        #  (2) BAND-EDGE participation control: gate_r = sigmoid((Δ-margin_r)/bw), gate'= soft_gate*
+        #      (1-soft_gate)/bw. Chain: dL/ds_r = (wn_r·adv_r)·gate_d·(d gate_r/d s_r). margin_r=s_0-s_r
+        #      => d gate_r/d s_r = +gate_d (r>=1); the WINNER couples to ALL ranks (d gate_r/d s_0 =
+        #      -gate_d) -> winner += -Σ_r. Lets the LM widen/narrow the blend by moving scores vs the band.
+        gate_d = (soft_gate * (1.0 - soft_gate)) / ctx.bw
+        band = wn * adv * gate_d * valid                      # (B,H,L,kk)  per-rank band sensitivity
+        ds_band = band.clone()                                # r>=1: +band ; r=0 handled below
+        ds_rank = ds_align + ds_band                          # (B,H,L,kk) grad wrt sorted score s_(r)
+        ds_rank[..., 0:1] = ds_rank[..., 0:1] - band.sum(-1, keepdim=True)  # winner couples to all ranks
+        # scatter the per-rank score grad back to the (B,H,L,Lk) score tensor by key index.
+        ds = torch.zeros(B, H, L, ctx.Lk, device=g_up.device, dtype=g_up.dtype)
+        ds.scatter_(-1, topi, ds_rank)
+        # grad to V: scatter g_up by the fixed normalized rank weight (shifts).
+        dv_top = torch.einsum("bhik,bhid->bhikd", wn, g_up)  # (B,H,L,kk,dh)
+        return ds, _scatter_dv(topi, dv_top, ctx.Lk, dh), None, None
+
+
+def _scatter_dv(topi, dv_top, Lk, dh):
+    """Scatter per-rank value grads (B,H,L,kk,dh) back to (B,H,L_key,dh) value grad.
+    Each query's top-k keys are distinct indices into the L_key axis; accumulate."""
+    B, H, L, kk = topi.shape
+    dv = torch.zeros(B, H, Lk, dh, device=dv_top.device, dtype=dv_top.dtype)
+    idx = topi.reshape(B, H, L * kk)                          # key indices (B,H,L*kk)
+    src = dv_top.reshape(B, H, L * kk, dh)
+    dv.scatter_add_(-2, idx.unsqueeze(-1).expand(B, H, L * kk, dh), src)
+    return dv
+
+
 class Block(nn.Module):
     def __init__(self, d, heads, agg="gather", skip=False, k=4):
         super().__init__()
@@ -135,6 +257,8 @@ class Block(nn.Module):
             g = tropical_value_pull_iter_topk(v, s, self.topk)
         elif self.agg == "shift":                          # mult-free DIFFERENTIABLE blend (train relaxation)
             g = ShiftSoftmaxBlend.apply(s, v, self.Delta, 12)
+        elif self.agg == "mbr":                             # IDEA 5: margin-banded rank blend (mult-free)
+            g = MarginBandedRankBlend.apply(s, v, self.Delta, _MBR_K)
         else:                                              # gather (deploy/floor)
             jstar = s.argmax(-1)
             g = torch.gather(v, -2, jstar.unsqueeze(-1).expand(*jstar.shape, self.dh))
@@ -477,6 +601,9 @@ ARMS = {
     "shift_mom":      dict(agg="shift", skip=False, signal=None),   # ATTEMPT 9: shift blend + MOMENTUM dyadic optimizer (mult-free EMA)
     "shift_sgd":      dict(agg="shift", skip=False, signal=None),   # DIAGNOSTIC: shift + plain SGD+momentum on TRUE grad (is Adam's adaptivity essential, or was dyadic-quant crude?)
     "shift_dadam":    dict(agg="shift", skip=False, signal=None),   # ATTEMPT 10: shift + DYADIC-ADAM (mult-free per-param adaptive scale: 1/|g|_ema as a pow2 SHIFT)
+    "mbr":            dict(agg="mbr", skip=False, signal=None),     # IDEA 5: margin-banded rank blend + dyadic-mag
+    "mbr_adamw":      dict(agg="mbr", skip=False, signal=None),     # IDEA 5 + AdamW (isolate mechanism)
+    "mbr_dadam":      dict(agg="mbr", skip=False, signal=None),     # IDEA 5 + dyadic-Adam (fully mult-free)
 }
 
 
@@ -522,7 +649,7 @@ def train(arm, seed, args, device):
         if use_sched:
             for g in opt.param_groups:
                 g["lr"] = lr_sched(step, args)
-        if cfg["agg"] == "shift":                          # anneal the shift-softmax temperature
+        if cfg["agg"] in ("shift", "mbr"):                 # anneal the band/temperature high->low
             d = delta_at(step, args)
             for b in model.blocks:
                 b.Delta = d
@@ -613,8 +740,11 @@ def main():
     p.add_argument("--gfloor", type=float, default=0.0)    # skip VALIGN queries with ||g_i|| below this
     p.add_argument("--delta0", type=float, default=2.0)    # shift-softmax temperature: anneal start
     p.add_argument("--delta-floor", type=float, default=0.25)  # ... and floor
+    p.add_argument("--mbr-k", type=int, default=4)         # margin-banded rank blend: top-k support
     p.add_argument("--arms", type=str, default="lm_only,ff_succ,ff_succ_shuffle")
     args = p.parse_args()
+    global _MBR_K
+    _MBR_K = args.mbr_k
     device = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
     print(f"SELFSUP test (ATTEMPT 4: L1-margin FF, successor target): L={args.L} vocab={args.vocab} m={args.m} "
           f"d={args.d} k={args.k} steps={args.steps} seeds={args.seeds} dev={device} "

@@ -140,10 +140,38 @@ These scripts depend on the working-tree `tikitorch` library (`tropical_l1_score
 
 ---
 
+## 3. Track B — a fully off-GPU LM now TRAINS end-to-end (blend-smoothness narrowed)
+
+The optimizer front (§2a) being solved, the remaining front was a *smooth* mult-free blend. Result
+(char-LM, dyadic-Adam, fully multiplier-free fwd+bwd+opt, deploy = argmax-gather):
+
+| fully-mult-free LM | gather bpb | note |
+|---|---|---|
+| `l1_gather` (**softmax** blend — the one multiply) | **2.48** | optimizer solved: ≈ AdamW 2.43 |
+| **`mbr`** — Margin-Banded Rank Blend (mult-free) | **3.44** | lossless; beats random-frozen 3.54; the off-GPU artifact |
+| `pshift` — peaking-regularized shift | 4.81 | ❌ forcing the model to peak over-constrains it |
+| random-frozen attention | 3.54 | floor |
+
+**`l1_gather + dyadic-Adam = 2.48 ≈ AdamW 2.43** isolates the gap as *purely the blend*: the
+optimizer, dyadic linears, fine-dyadic norm and ReLU MLP all reach softmax quality off-GPU.
+
+**MBR** (fixed dyadic rank weights `2^-r` over top-k + a margin-band *gate* — smoothness lives in
+the gate, not the weight value; band→0 = exact argmax-gather, lossless by construction) is the best
+multiplier-free blend: **3.44, lossless, beats random-frozen.** So the whole stack — MBR + dyadic-Adam
++ dyadic linears + fine-dyadic norm + ReLU MLP — is multiplier-free in forward, backward *and*
+optimizer and **trains end-to-end with no GPU**. Full off-GPU training is achieved; quality is ~1 bpb
+behind the softmax blend (2.48).
+
+**`pshift`** (force the *model* to peak via a relu-hinge on the top1−top2 gap, so a smooth blend still
+hardens losslessly) **failed (4.81)** — forcing peakedness destroys the blending the LM needs;
+smoothness is load-bearing.
+
 ## 4. Status / next
 
-Closed for now. The teacher-free routing win (1b) and the mult-free differentiable attention (1c)
-are real and reusable; the off-GPU *competitive-LM* goal is a well-characterized fundamental wall.
-If revisited, the only fronts left are low-odds: a mult-free adaptive optimizer to replace Adam's
-`1/√v`, or a smoother mult-free blend that also hardens losslessly — but both run into the same
-multiply-does-essential-work conclusion.
+A fully off-GPU-trainable tropical LM **exists** (MBR @ 3.44, beats random, lossless deploy); the lone
+remaining gap to *competitive* (softmax 2.48) is a **smooth multiplier-free blend** — the dyadic-coarse
+weight wall (`Σ w·V` mult-free forces dyadic weights), the same "mult-free wins winner-take-all,
+underfits smooth" theme seen across the project. Untested refinement: **RTK** (residual top-k,
+self-normalizing finer top weight `{0.5, 0.75, 0.875}`, no pow2-ceil) — the workflow runner-up; may
+shave the gap, unlikely to fully close ~1 bpb. Then: scale past char/tiny-shakespeare (BPE, bigger
+model, more data) and stand up the NanoGPT/NanoChat GPU baseline for a quality+energy comparison.

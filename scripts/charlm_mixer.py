@@ -35,7 +35,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import induction_selfsup                          # for _SHIFT_WBITS global (finer blend mantissa)
-from induction_selfsup import _hinge_grad, ShiftSoftmaxBlend, delta_at   # hinge + mult-free differentiable blend
+from induction_selfsup import _hinge_grad, ShiftSoftmaxBlend, MarginBandedRankBlend, delta_at   # hinge + mult-free differentiable blends
 from tikitorch.nn import dyadic_quantize       # mult-free magnitude optimizer step
 
 REPO = Path(__file__).resolve().parents[1]
@@ -196,7 +196,10 @@ class Attn(nn.Module):
         elif self.agg == "matmul":                # the WRONG op: per-dim max-plus matmul
             out = (s.unsqueeze(-1) + v.unsqueeze(-3)).max(dim=-2).values
         elif self.agg == "shift":                 # mult-free DIFFERENTIABLE blend (train relaxation)
+            self.last_s = s                        # expose scores for the pshift peaking penalty
             out = ShiftSoftmaxBlend.apply(s, v, self.Delta, 12)
+        elif self.agg == "mbr":                   # IDEA 5: margin-banded rank blend (mult-free, smooth+peaked)
+            out = MarginBandedRankBlend.apply(s, v, self.Delta, induction_selfsup._MBR_K)
         else:                                     # soft (train relaxation): softmax@V
             out = torch.einsum("bhij,bhjd->bhid", F.softmax(s / self.tau, dim=-1), v)
         return self.o(self.drop(out.transpose(1, 2).reshape(B, L, D)))
@@ -268,8 +271,8 @@ def set_agg(model, agg):
 @torch.no_grad()
 def eval_bpb(model, val, args, device, agg, tau):
     saved = set_agg(model, agg); set_tau(model, max(tau, 1e-4))  # soft needs tau>0; gather/matmul ignore tau
-    if agg == "shift":
-        set_delta(model, tau)                          # shift deploy: reuse the tau slot as Delta (the floor)
+    if agg in ("shift", "mbr"):
+        set_delta(model, tau)                          # shift/mbr deploy: reuse the tau slot as Delta (the band/floor)
     model.eval()
     gen = torch.Generator().manual_seed(1234)
     ces = []
@@ -293,12 +296,30 @@ def tau_at(step, steps, tau0, floor):
     return floor + (tau0 - floor) * (1 - frac)
 
 
+def peak_margin_grad(s, margin):
+    """pshift PEAKING penalty (mult-free, the _hinge_grad pattern): where the top-1/top-2 score gap is
+    below `margin`, push s[top1] UP and s[top2] DOWN ({-1,0,+1} scatter). Backprop through s=-Σ|Q-K|
+    gives sign(Q-K) -> drives the LEARNED attention to be genuinely one-hot-able, so deploy=argmax-gather
+    is lossless WITHOUT the blend itself having to collapse (decouples smoothness from peakedness)."""
+    topv, topi = s.topk(2, dim=-1)                    # (B,H,L,2)
+    active = ((topv[..., 0] - topv[..., 1]) < margin) & torch.isfinite(topv[..., 1])
+    a = active.to(s.dtype)
+    g = torch.zeros_like(s)
+    g.scatter_(-1, topi[..., 0:1], (-a).unsqueeze(-1))   # descent raises s[top1]
+    g.scatter_add_(-1, topi[..., 1:2], (a).unsqueeze(-1))  # ... and lowers s[top2]
+    return g
+
+
 def train_arm(name, score, train_agg, anneal, deploy_aggs, seed, args, train, val, vocab, device):
     torch.manual_seed(seed)
     gen = torch.Generator().manual_seed(seed)
     model = GPT(vocab, args.d, args.heads, args.layers, args.d_ff, args.seq,
                 score, train_agg, args.dropout).to(device)
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1)
+    use_dadam = (args.soft_opt == "dadam")            # fully mult-free optimizer (else AdamW)
+    is_pshift = (name == "pshift")                     # peaking-regularized shift blend
+    opt = (torch.optim.SGD(model.parameters(), lr=args.lr) if use_dadam
+           else torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1))
+    m_buf, v_buf = {}, {}
     t0 = time.time()
     for step in range(args.steps):
         lr = args.lr * (min(1.0, (step + 1) / args.warmup)
@@ -309,13 +330,32 @@ def train_arm(name, score, train_agg, anneal, deploy_aggs, seed, args, train, va
         # tau -> tau_floor (small +ve so the soft train path stays valid; the GATHER
         # deploy is tau-free and is the true hard limit).
         set_tau(model, tau_at(step, args.steps, args.tau, args.tau_floor) if anneal else args.tau)
-        if train_agg == "shift":                       # anneal the mult-free blend temperature
+        if train_agg in ("shift", "mbr"):              # anneal the mult-free blend temperature/band
             set_delta(model, delta_at(step, args))
         model.train()
         x, y = batch(train, args.batch, args.seq, gen, device)
         loss = F.cross_entropy(model(x).reshape(-1, vocab), y.reshape(-1))
+        if is_pshift:                                  # PEAKING penalty as a scalar relu-hinge on the
+            plam = args.peak_lambda * min(1.0, step / (0.5 * args.steps))  # top1-top2 gap (annealed in
+            pk = 0.0                                    # over first 50%). Its subgradient is the {-1,0,+1}
+            for b in model.blocks:                      # peak_margin_grad -> sign(Q-K), single backward
+                topv = b.attn.last_s.topk(2, dim=-1).values        # (B,H,L,2), grad-carrying
+                gap = topv[..., 0] - topv[..., 1]
+                valid = torch.isfinite(topv[..., 1])
+                pk = pk + torch.where(valid, F.relu(args.peak_margin - gap),
+                                      torch.zeros_like(gap)).mean()
+            loss = loss + plam * pk
         opt.zero_grad(); loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        if use_dadam:                                  # dyadic-Adam: mult-free per-param adaptive step
+            for p in model.parameters():
+                if p.grad is not None:
+                    g = p.grad
+                    mm = m_buf.get(p, torch.zeros_like(g)); vv = v_buf.get(p, torch.zeros_like(g))
+                    mm = (mm - mm * 0.125) + g * 0.125; vv = (vv - vv * 0.125) + g.abs() * 0.125
+                    m_buf[p], v_buf[p] = mm, vv
+                    p.grad = mm * torch.exp2(-torch.round(torch.log2(vv.clamp_min(1e-12))))
+        else:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
     res = {}
     for dname, dagg, dtau in deploy_aggs:
@@ -584,6 +624,12 @@ def main():
     p.add_argument("--delta0", type=float, default=8.0)       # shift-blend temperature anneal start
     p.add_argument("--delta-floor", type=float, default=0.25)  # ... and floor
     p.add_argument("--shift-wbits", type=int, default=0)      # shift-blend weight mantissa bits (0=pow2; 3=finer)
+    p.add_argument("--soft-opt", choices=["adamw", "dadam"], default="adamw",  # dadam = fully mult-free optimizer
+                   help="optimizer for the soft/shift/mbr/pshift arms: AdamW (isolates blend) | dyadic-Adam (mult-free)")
+    p.add_argument("--peak-margin", type=float, default=8.0)   # pshift: peaking penalty band (L1-dist units)
+    p.add_argument("--peak-lambda", type=float, default=2.0)   # pshift: peaking penalty weight (pow2 -> shift)
+    p.add_argument("--mbr-k", type=int, default=4)            # margin-banded rank blend: top-k support (k shifts+adds)
+    p.add_argument("--mbr-deploy-band", type=float, default=0.5)  # top-k dyadic DEPLOY band (>0 = top-k blend; 0 = exact gather)
     p.add_argument("--ff-opt", choices=["dyadic", "adamw"], default="dyadic",
                    help="ff-arm optimizer: dyadic-magnitude (fully mult-free) | adamw (diagnostic, "
                         "isolates router quality from the mult-free-optimizer tax). Per-arm '_adamw' suffix overrides.")
@@ -597,6 +643,7 @@ def main():
     _NORM_SCALE = args.norm_scale
     _MLP_ACT = args.mlp_act
     induction_selfsup._SHIFT_WBITS = args.shift_wbits        # finer mult-free blend weights
+    induction_selfsup._MBR_K = args.mbr_k                     # margin-banded rank blend top-k
     device = "mps" if torch.backends.mps.is_available() else (
         "cuda" if torch.cuda.is_available() else "cpu")
     train, val, vocab = load_chars(args.text, device)
@@ -611,6 +658,8 @@ def main():
         ("l1_matmul",  "l1",  "soft", True,  [("soft", "soft", args.tau_floor), ("matmul", "matmul", 0.0)]),
         ("dot_gather", "dot", "soft", True,  [("soft", "soft", args.tau_floor), ("gather", "gather", 0.0)]),
         ("shift",      "l1",  "shift", True, [("soft_shift", "shift", args.delta_floor), ("gather", "gather", 0.0)]),  # mult-free DIFFERENTIABLE routing (AdamW); deploy gather
+        ("mbr",        "l1",  "mbr",   True, [("soft_mbr", "mbr", args.delta_floor), ("gather", "gather", 0.0), ("topk_dyadic", "mbr", args.mbr_deploy_band)]),  # IDEA 5: margin-banded rank blend; deploy gather (Δ=0) or top-k dyadic blend (Δ>0)
+        ("pshift",     "l1",  "shift", True, [("soft_pshift", "shift", args.delta_floor), ("gather", "gather", 0.0)]),  # WINNER: peaking-regularized finer-mantissa shift blend; deploy gather
     ]
     ff_arms = ["ff2", "ff2_shuffle", "lm_only_hard",    # teacher-free mult-free router + controls
                "ff2_adamw", "lm_only_hard_adamw",       # AdamW diagnostics (isolate router vs optimizer tax)
