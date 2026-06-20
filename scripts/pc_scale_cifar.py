@@ -41,8 +41,9 @@ from tikitorch.nn import dyadic_quantize
 _NORM = {
     "cifar10": ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     "cifar100": ((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762)),
+    "tinyimagenet": ((0.480, 0.448, 0.398), (0.277, 0.269, 0.282)),
 }
-_NCLASS = {"cifar10": 10, "cifar100": 100}
+_NCLASS = {"cifar10": 10, "cifar100": 100, "tinyimagenet": 200}
 
 # VGG-style configs: ints = conv out-channels, 'M' = 2x2 maxpool. The label's
 # number is (#conv + 1 FC head) to echo Qi's VGG-5/7/10/15 naming.
@@ -170,17 +171,48 @@ class MFGrad:
             m.weight.grad = gw
 
 
+def _prep_tinyimagenet(root):
+    """Download Tiny-ImageNet-200 and reorganize val/ into class folders for ImageFolder."""
+    import os, urllib.request, zipfile, shutil
+    base = os.path.join(root, "tiny-imagenet-200")
+    if not os.path.isdir(base):
+        zp = os.path.join(root, "tiny-imagenet-200.zip")
+        if not os.path.exists(zp):
+            os.makedirs(root, exist_ok=True)
+            urllib.request.urlretrieve(
+                "http://cs231n.stanford.edu/tiny-imagenet-200.zip", zp)
+        with zipfile.ZipFile(zp) as z:
+            z.extractall(root)
+    val_org = os.path.join(base, "val_organized")
+    if not os.path.isdir(val_org):
+        os.makedirs(val_org, exist_ok=True)
+        img_dir = os.path.join(base, "val", "images")
+        with open(os.path.join(base, "val", "val_annotations.txt")) as f:
+            for line in f:
+                fn, wnid = line.split("\t")[:2]
+                cd = os.path.join(val_org, wnid)
+                os.makedirs(cd, exist_ok=True)
+                shutil.copy(os.path.join(img_dir, fn), os.path.join(cd, fn))
+    return os.path.join(base, "train"), val_org
+
+
 def loaders(name, data_root, batch, workers, augment=True):
     from torchvision import datasets, transforms
     mean, std = _NORM[name]
     norm = transforms.Normalize(mean, std)
+    imgsz = 64 if name == "tinyimagenet" else 32
     tf_tr = transforms.Compose(
-        ([transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip()]
+        ([transforms.RandomCrop(imgsz, padding=imgsz // 8), transforms.RandomHorizontalFlip()]
          if augment else []) + [transforms.ToTensor(), norm])
     tf_te = transforms.Compose([transforms.ToTensor(), norm])
-    cls = {"cifar10": datasets.CIFAR10, "cifar100": datasets.CIFAR100}[name]
-    tr = cls(data_root, train=True, download=True, transform=tf_tr)
-    te = cls(data_root, train=False, download=True, transform=tf_te)
+    if name == "tinyimagenet":
+        train_dir, val_dir = _prep_tinyimagenet(data_root)
+        tr = datasets.ImageFolder(train_dir, transform=tf_tr)
+        te = datasets.ImageFolder(val_dir, transform=tf_te)
+    else:
+        cls = {"cifar10": datasets.CIFAR10, "cifar100": datasets.CIFAR100}[name]
+        tr = cls(data_root, train=True, download=True, transform=tf_tr)
+        te = cls(data_root, train=False, download=True, transform=tf_te)
     mk = lambda ds, sh: torch.utils.data.DataLoader(
         ds, batch_size=batch, shuffle=sh, num_workers=workers, pin_memory=True,
         drop_last=sh)
