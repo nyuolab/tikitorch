@@ -39,6 +39,19 @@ class DyadicConv1d(nn.Conv1d):
         return self._conv_forward(x, dq(self.weight), self.bias)
 
 
+def stoch_dyadic(w):
+    """UNBIASED stochastic round to a signed power of two (±2^k): rounds |w| up/down to the
+    nearest two powers with linear probability, so E[q]=w (deterministic dq is biased -> a
+    weight-grad noise FLOOR; stochastic averages it out over training). Still mult-free
+    (±2^k -> product is a shift)."""
+    mag = w.abs().clamp_min(1e-20)
+    e = torch.floor(torch.log2(mag))
+    lo = torch.exp2(e); hi = torch.exp2(e + 1)
+    p = (mag - lo) / (hi - lo)                                # P(round up), unbiased in linear space
+    up = (torch.rand_like(mag) < p).float()
+    return torch.sign(w) * (lo * (1 - up) + hi * up)
+
+
 class DyadicConvPC1d(nn.Module):
     """Causal dilated dyadic-conv char-LM trained by local async PC (all-position)."""
     def __init__(self, vocab, width=128, depth=6, kernel=5, dilations=None, float_conv=False):
@@ -83,10 +96,13 @@ class DyadicConvPC1d(nn.Module):
 
     @torch.no_grad()
     def error_relax_grads(self, ids, target, n_iter=None, participation=1.0,
-                          stale=False, rand_order=False, gen=None, quant=True):
+                          stale=False, rand_order=False, gen=None, quant=True, stoch=False):
         """target: (B, L, V) one-hot of next char. Sets .grad on convs + head.
-        quant=True -> multiplier-free (±2^k operands); quant=False -> exact adjoint (for the gate)."""
+        quant=True -> multiplier-free (±2^k operands); quant=False -> exact adjoint (for the gate).
+        stoch=True -> UNBIASED stochastic dyadic rounding of the weight-grad activation (averages
+        out the deterministic-rounding noise floor); still mult-free."""
         q = dq if quant else (lambda t: t)
+        qw = stoch_dyadic if (quant and stoch) else q            # weight-grad activation quantizer
         acts, masks = self._forward_cache(ids)
         D = self.depth
         if n_iter is None:
@@ -99,7 +115,7 @@ class DyadicConvPC1d(nn.Module):
         flatF = feat.reshape(B * L, W)
         # SINGLE-operand quant: error REAL x activation ±2^k = a shift (mult-free), exact in
         # the error -> much less lossy than quantizing BOTH operands (the +0.23-bpc cause).
-        self.head.weight.grad = flatE.transpose(0, 1) @ q(flatF)      # sum over (B,L)
+        self.head.weight.grad = flatE.transpose(0, 1) @ qw(flatF)     # sum over (B,L)
         self.head.bias.grad = flatE.sum(0)
         e_feat = (eL @ q(self.head.weight)).transpose(1, 2)    # (B, W, L) per-position feat error
         E = [torch.zeros_like(a) for a in acts]
@@ -120,7 +136,7 @@ class DyadicConvPC1d(nn.Module):
             delta = E[l + 1] * masks[l]                              # error REAL (kept exact)
             P = self._pad(l)
             self.convs[l].weight.grad = torch.nn.grad.conv1d_weight(  # act ±2^k x delta real = shift
-                F.pad(q(acts[l]), (P, 0)), self.convs[l].weight.shape, delta,
+                F.pad(qw(acts[l]), (P, 0)), self.convs[l].weight.shape, delta,
                 dilation=self.dil[l])
             self.convs[l].bias.grad = delta.sum(dim=(0, 2))
 
@@ -217,7 +233,7 @@ def bigram_floor(d, V, n_train):
 
 
 def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train,
-            seed, epochs, batch, lr, wd, drop, device, pc_niter=None):
+            seed, epochs, batch, lr, wd, drop, device, pc_niter=None, stoch=False):
     torch.manual_seed(seed)
     pc = mode in ("relax", "relax_async", "relax_exact")
     net = DyadicConvPC1d(V, width, depth, kernel, dils, float_conv=(mode == "bp_float")).to(device)
@@ -237,12 +253,12 @@ def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train
             if drop > 0:
                 xb_in = xb  # token ids; dropout applied as embedding-level not here
             if mode == "relax":
-                net.train_step_relax(xb, yb, opt)
+                net.train_step_relax(xb, yb, opt, stoch=stoch)
             elif mode == "relax_exact":                          # DIAGNOSTIC: local form, REAL grad
                 net.train_step_relax(xb, yb, opt, quant=False)   # (not mult-free) — isolates form vs quant
             elif mode == "relax_async":
                 net.train_step_relax(xb, yb, opt, n_iter=(pc_niter or 3 * depth),
-                                     participation=0.5, stale=True, rand_order=True, gen=rgen)
+                                     participation=0.5, stale=True, rand_order=True, gen=rgen, stoch=stoch)
             else:
                 opt.zero_grad(set_to_none=True)
                 F.cross_entropy(net(xb).reshape(-1, V), yb.reshape(-1)).backward()
@@ -269,6 +285,7 @@ if __name__ == "__main__":
     ap.add_argument("--lr", type=float, default=1.5e-3)
     ap.add_argument("--pc-lr", type=float, default=5e-4, dest="pc_lr")
     ap.add_argument("--pc-niter", type=int, default=None, dest="pc_niter")  # async settling rounds (dilated conv needs more)
+    ap.add_argument("--pc-stoch", action="store_true", dest="pc_stoch")     # unbiased stochastic weight-grad rounding
     ap.add_argument("--wd", type=float, default=2e-4)
     ap.add_argument("--drop", type=float, default=0.0)
     ap.add_argument("--subset", type=int, default=None)
@@ -293,7 +310,7 @@ if __name__ == "__main__":
                                kernel=args.kernel, dils=dils, tr=tr, va=va, d_full=d_full,
                                n_train=n_train, seed=0, epochs=args.epochs, batch=args.batch,
                                lr=mlr, wd=args.wd, drop=args.drop, device=args.device,
-                               pc_niter=args.pc_niter)
+                               pc_niter=args.pc_niter, stoch=args.pc_stoch)
         rows.append({"mode": mode, "val_bpc": b, "best_epoch": bep, "wall_s": wall,
                      "seq": args.seq, "width": args.width, "depth": args.depth, "lr": mlr})
         print(f"==> {mode}: best {b} @ep{bep} ({wall}s)\n", flush=True)
