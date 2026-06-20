@@ -97,8 +97,10 @@ class DyadicConvPC1d(nn.Module):
         eL = (torch.softmax(logits, -1) - target)              # CE top-error, per position
         flatE = eL.reshape(B * L, -1)
         flatF = feat.reshape(B * L, W)
-        self.head.weight.grad = q(flatE).transpose(0, 1) @ q(flatF)   # sum over (B,L)
-        self.head.bias.grad = q(flatE).sum(0)
+        # SINGLE-operand quant: error REAL x activation ±2^k = a shift (mult-free), exact in
+        # the error -> much less lossy than quantizing BOTH operands (the +0.23-bpc cause).
+        self.head.weight.grad = flatE.transpose(0, 1) @ q(flatF)      # sum over (B,L)
+        self.head.bias.grad = flatE.sum(0)
         e_feat = (eL @ q(self.head.weight)).transpose(1, 2)    # (B, W, L) per-position feat error
         E = [torch.zeros_like(a) for a in acts]
         E[D] = e_feat
@@ -115,12 +117,12 @@ class DyadicConvPC1d(nn.Module):
                 E[l] = e[..., self._pad(l):]                   # drop the left-pad adjoint
             E[D] = e_feat
         for l in range(D):
-            delta = E[l + 1] * masks[l]
+            delta = E[l + 1] * masks[l]                              # error REAL (kept exact)
             P = self._pad(l)
-            self.convs[l].weight.grad = torch.nn.grad.conv1d_weight(
-                F.pad(q(acts[l]), (P, 0)), self.convs[l].weight.shape, q(delta),
+            self.convs[l].weight.grad = torch.nn.grad.conv1d_weight(  # act ±2^k x delta real = shift
+                F.pad(q(acts[l]), (P, 0)), self.convs[l].weight.shape, delta,
                 dilation=self.dil[l])
-            self.convs[l].bias.grad = q(delta).sum(dim=(0, 2))
+            self.convs[l].bias.grad = delta.sum(dim=(0, 2))
 
     def train_step_relax(self, ids, y, opt, n_iter=None, **akw):
         target = F.one_hot(y, self.vocab).float()              # (B, L, V)
