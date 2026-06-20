@@ -168,19 +168,22 @@ def gradcheck(seq=256):
 
 
 # ---------------- training harness (all-position conv char-LM) ----------------
-def load(seq, subset=None):
+def load(seq, subset=None, stride=None):
+    """Sliding (overlapping) windows: stride < seq gives many more training samples
+    (non-overlapping seq-256 windows undersample badly -> ~34 steps/epoch)."""
     text = open(PATH).read()
     chars = sorted(set(text)); V = len(chars)
     stoi = {c: i for i, c in enumerate(chars)}
     d = torch.tensor([stoi[c] for c in text], dtype=torch.long)
     if subset:
         d = d[:subset]
-    N = (len(d) - 1) // seq
-    d = d[:N * seq + 1]
-    X = torch.stack([d[i * seq:(i + 1) * seq] for i in range(N)])          # (N, seq)
-    Y = torch.stack([d[i * seq + 1:(i + 1) * seq + 1] for i in range(N)])  # (N, seq) next-char
-    n = int(0.9 * N)
-    return (X[:n], Y[:n]), (X[n:], Y[n:]), V, d, n * seq
+    stride = stride or seq
+    starts = list(range(0, len(d) - seq - 1, stride))
+    X = torch.stack([d[s:s + seq] for s in starts])              # (N, seq)
+    Y = torch.stack([d[s + 1:s + seq + 1] for s in starts])      # (N, seq) next-char
+    n = int(0.9 * len(starts))
+    split_char = starts[n]                                       # char index splitting train/val
+    return (X[:n], Y[:n]), (X[n:], Y[n:]), V, d, split_char
 
 
 def iterate(X, Y, batch, gen, device):
@@ -244,6 +247,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--gradcheck", action="store_true")
     ap.add_argument("--seq", type=int, default=128)
+    ap.add_argument("--stride", type=int, default=None)      # sliding-window stride (<seq = more samples)
     ap.add_argument("--width", type=int, default=128)
     ap.add_argument("--depth", type=int, default=4)
     ap.add_argument("--kernel", type=int, default=5)
@@ -264,7 +268,7 @@ if __name__ == "__main__":
 
     dils = [2 ** i for i in range(args.depth)]
     rf = 1 + (args.kernel - 1) * sum(dils)
-    tr, va, V, d_full, n_train = load(args.seq, args.subset)
+    tr, va, V, d_full, n_train = load(args.seq, args.subset, args.stride)
     floor = bigram_floor(d_full, V, n_train)
     print(f"conv char-LM: V={V} seq={args.seq} width={args.width} depth={args.depth} "
           f"dils={dils} RF={rf} train_win={tr[0].size(0)} val_win={va[0].size(0)} dev={args.device}")
