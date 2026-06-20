@@ -45,15 +45,18 @@ machinery. Our multiplier-free cascade tracks backprop wherever settling-PC coll
 | CIFAR-10 VGG-15 (deep) | — | — | 92.1 (ours) | 91.4 cascade |
 | MNIST MLP (shallow) | 98.1 / iPC 98.45 | — | 98.07 | 97.4 (d8) |
 | **MNIST 128-layer (residual)** | — | ~98 (μPC, 5 ep) | **24.1 (float *additive*-res. BP, all seeds)** | **93.8** cascade (*max*-res.) |
-| Tiny-ImageNet 200-way (Qi: VGG-15; ours: ResNet-18) | 22.95 (Qi VGG-15) | 42.51 (Qi S+F) | — | *ResNet-18 run in flight* |
+| Tiny-ImageNet 200-way (Qi: VGG-15; ours: ResNet-18) | 22.95 (Qi VGG-15) | 42.51 (Qi S+F) | 63.0 (ours RN-18) | **61.6** cascade (−1.4pp, n=1) |
 
 **Three clean structural wins:**
 
-1. **ResNet-18 (vs the benchmark's collapse).** The literature's best settling-PC drops
-   to **70.44%** on ResNet-18 (−23pt); our multiplier-free cascade is **93.3%**, matching
-   float backprop (93.7%) within 0.4pp. Same on CIFAR-100 ResNet-18 (73.8 ≈ 74.3). This
-   is the sharpest case: *wherever settling-PC collapses, our multiplier-free cascade
-   matches backprop.*
+1. **ResNet-18, including on Tiny-ImageNet (vs the benchmark's collapse).** The
+   literature's best settling-PC drops to **70.44%** on CIFAR-10 ResNet-18 (−23pt); our
+   multiplier-free cascade is **93.3%**, matching float backprop (93.7%) within 0.4pp.
+   Same on CIFAR-100 ResNet-18 (73.8 ≈ 74.3). And now on **Tiny-ImageNet** (200-way, Qi's
+   hardest, where Qi's VGG-15 plain settling-PC collapses to 22.95): our multiplier-free
+   cascade ResNet-18 = **61.6%** vs our float backprop **63.0%** (−1.4pp, n=1 seed). This
+   is the pattern across the board: *wherever settling-PC collapses, our multiplier-free
+   cascade matches backprop* — now confirmed on the hardest discriminative case.
 2. **128 layers (vs μPC) — the lever is the residual *type*.** μPC's contribution is a
    parameterisation (Depth-μP) that lets *float* PC train at 128 layers (≈98%, 5 epochs).
    We measured a 128-layer residual MLP three ways (3 seeds; the residual type is
@@ -193,7 +196,7 @@ multiplier is a model, not a measurement.
 | Better *deep settling*-PC than Qi / μPC (their problem) | **No** — we sidestepped it (cascade = backprop), did not beat it |
 | Prospective-config / continual-learning PC edge | **No** (honest negative — true equilibrium ≈ backprop) |
 | Generative SOTA scale/quality | **No** — single-layer MNIST, behind Salvatori/K-SVD |
-| Tiny-ImageNet (Qi's hardest discriminative) | **In flight** (ResNet-18 cascade vs BP, EC2) |
+| Tiny-ImageNet 200-way (Qi's hardest discriminative) | **Won, measured** (cascade 61.6 vs BP 63.0, −1.4pp; ResNet-18, n=1) |
 | Measured deploy energy/throughput on real settling/in-memory fabric | **Open** (accuracy is GPU-sim; the substrate win is structural, not yet HW-measured) |
 
 ---
@@ -213,7 +216,9 @@ multiplier is a model, not a measurement.
   settling hardware where backprop has no physical realization** — the axis the entire
   float, transpose-weight PC and DL literature does not occupy. We explicitly **do not**
   claim a free GPU speedup from "synchronization-freedom": staleness-tolerance is shared
-  with async-SGD, and the throughput multiplier is a model, not a measurement. The
-  remaining work to make it a true head-to-head: Tiny-ImageNet (in flight), the **measured
-  round-tax** of asynchrony (`pc_staleness_frontier.py`), and **measured** deploy
-  energy/throughput on real multiplier-free / settling hardware.
+  with async-SGD, and the throughput multiplier is a model, not a measurement. With
+  Tiny-ImageNet now run (cascade 61.6 ≈ BP 63.0) and the round-tax now measured
+  (`pc_staleness_frontier.py`: async → exact backprop gradient, but at O(L/p) rounds), the
+  one remaining piece is **measured** deploy energy/throughput on real multiplier-free /
+  settling hardware — the substrate claim is structural and code-true today, but not yet
+  hardware-measured.

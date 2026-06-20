@@ -1,0 +1,2 @@
+{"dataset": "tinyimagenet", "cfg": "resnet18", "mode": "bp_float", "seed": 0, "device": "cuda", "test_acc": 0.6297, "wall_s": 2949.2, "epochs": 30}
+{"dataset": "tinyimagenet", "cfg": "resnet18", "mode": "cascade", "seed": 0, "device": "cuda", "test_acc": 0.6162, "wall_s": 6425.2, "epochs": 30}

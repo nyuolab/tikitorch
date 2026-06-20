@@ -36,7 +36,8 @@ settling (the collapse baseline); "best PC" = their enhanced variant.
 |---|---|---|---|---|
 | CIFAR-10 VGG-10 | 72.75 (Qi, collapse) | 92.07 (Qi S+F) | 92.21 (Qi) | **91.4** cascade / 92.2 float |
 | CIFAR-100 VGG-10 | 45.86 (Qi, collapse) | **63.35** (Qi S+F) | 69.35 (Qi) | **71.0** cascade / 71.5 float |
-| Tiny-ImageNet VGG-15 | 22.95 (Qi, collapse) | 42.51 (Qi S+F) | 44.52 (Qi) | — *(not run)* |
+| Tiny-ImageNet VGG-15 (Qi's arch) | 22.95 (Qi, collapse) | 42.51 (Qi S+F) | 44.52 (Qi) | — *(diff arch below)* |
+| **Tiny-ImageNet ResNet-18 (ours, 200-way)** | — | — | 63.0 (ours) | **61.6** cascade (mult-free, −1.4pp, n=1) |
 | **CIFAR-10 ResNet-18** | **70.44 (best PC, −23pt)** | — | 93.7 (ours) | **93.3** cascade (mult-free) |
 | CIFAR-100 ResNet-18 | — | — | 74.3 (ours) | **73.8** cascade (mult-free) |
 | CIFAR-10 VGG-15 (deep) | — | — | 92.1 (ours) | 91.4 cascade (mult-free) |
@@ -94,10 +95,13 @@ Reading this honestly:
   do (our own attempt to reach the true settling equilibrium ≈ backprop too;
   `SCALE_TESTS.md`). So: we win on *accuracy-per-multiplier* and on *not-collapsing*,
   not on "better deep PC."
-- **Scale gap (now mostly closed):** **ResNet-18** (vs the benchmark) and **128-layer**
-  (vs μPC) are now **run and won** (multiplier-free, matching backprop where settling-PC
-  collapses). The one remaining gap is **Tiny-ImageNet** (Qi's hardest, 200-way) — the
-  next run.
+- **Scale gap (now closed): Tiny-ImageNet (Qi's hardest, 200-way) is run.** Multiplier-free
+  cascade ResNet-18 = **61.6%** vs our float backprop **63.0%** (−1.4pp, `scale_tinyimagenet.jsonl`)
+  — the same "cascade ≈ backprop" pattern now holds on the 200-way hardest case, where the
+  literature's settling-PC collapses (Qi's VGG-15 plain PC = 22.95). **ResNet-18** (vs the
+  benchmark) and **128-layer** (vs μPC) are likewise run and won. *Caveat:* our Tiny-ImageNet
+  is **ResNet-18, n=1 seed** (time-bounded), not Qi's VGG-15 — so it is "our mult-free cascade
+  ≈ our backprop on the hardest dataset," not a like-for-like vs Qi's VGG-15 numbers.
 
 ## Generative: in-painting / inference vs the generative-PC literature
 
