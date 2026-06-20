@@ -31,20 +31,31 @@ prediction; sliding windows; warmup+cosine lr schedule.
 |---|---|---|
 | bp_float | float backprop | 2.511 |
 | **bp_dyadic** | backprop, ±2^k forward, **real-multiply backward** | **2.451** |
-| relax (sync local PC) | local, **fully multiplier-free** (operand-quantized weight grad) | 2.680 |
-| **relax_async** (async/fabric local PC) | neighbour-local, partial+stale+any-order, fully mult-free | **2.680** |
+| **relax_async** (async/fabric local PC) | neighbour-local, partial+stale+any-order, **fully mult-free** | **2.617** |
+| relax (sync) — identical to async | local, fully mult-free | 2.617 |
 | *bigram floor* | — | 3.58 |
 
-**Verdict: a qualified win.** Local async PC trains the competitive conv (multiplier-free,
-async-robust), but the **fully-multiplier-free** form trails the real-backward `bp_dyadic`
-by **+0.23 bpc** at convergence. This is **not** an lr/undertraining artifact — the cosine
-schedule converged the PC arm (it plateaus/oscillates at ~2.68 from ep35–44 while lr
-decays, no further improvement and no degrade). The gap is the cost of the
-**operand-quantized conv weight gradient**: the gradient *direction* is right
-(gradcheck cosine ≈ 0.96 to backprop), but quantizing both conv-weight-grad operands to
-±2^k is **lossier on conv than on the MLP** — where the same coarsening was ≈ free
-(Rung 1 matched). On conv it costs ~0.23 bpc, concentrated where the per-layer grad
-quantization is worst (the gate showed the top conv at cosine 0.61).
+**Verdict: a qualified win — fully-multiplier-free local async PC trains the competitive
+conv to within ~0.1 bpc of float backprop** (2.617 vs bp_float 2.511), and the async/fabric
+form is robust (`relax_async` == `relax` bit-identically — partial participation + stale +
+any-order converge to the same result as sync). The residual **+0.17 vs `bp_dyadic`** (2.451)
+is the price of making the **backward also multiplier-free**: `bp_dyadic` uses a ±2^k
+*forward* but a **real-multiply** backward, while `relax_async` is fully mult-free (the
+weight grad is `±2^k activation × real error = a shift`). That operand quantization is ~free
+on the MLP (Rung 1 matched) but costs ~0.17 bpc on conv.
+
+**This was driven down with two principled fixes (not lr-guessing):**
+1. **Single-operand quantization** (error real × ±2^k activation = a shift) instead of
+   quantizing both operands — raised the per-layer weight-grad cosine to ~0.98 (top conv
+   0.61 → 0.98). [Helped the gradient direction; on its own did not move training — the
+   floor was a *bias*, not magnitude.]
+2. **Unbiased stochastic dyadic rounding** (round ±2^k up/down with linear probability,
+   E[q]=w) — averages out the deterministic-rounding *bias floor* over training: **2.680 →
+   2.617** (closed ~30% of the original +0.23). The residual is inherent ±2^k weight-grad
+   *direction* noise (a direction problem; lr/optimizer/schedule can't fix it — only finer
+   quantization, e.g. 2-term dyadic, untested). The lr/convergence question was settled
+   separately (the cosine schedule converged the PC arm cleanly — the residual is real, not
+   undertraining).
 
 ## Honest scope & the open lever
 
