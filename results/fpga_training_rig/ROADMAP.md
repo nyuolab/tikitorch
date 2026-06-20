@@ -71,7 +71,20 @@ uncertainties first.
   dyadic-Adam (optimizer ✓) and the dyadic forward (✓), **the entire fwd+bwd+optimizer loop is now
   validated multiplier-free, end-to-end, at softmax-competitive quality (2.48, +0.3–0.4 from dense)** —
   the single irreducible multiply being the attention soft-blend (on DSPs). Algorithm green-lights the rig.
-- **Gates 1, 2 (compute density, backward-kernel timing) — pending Vitis csynth** (user's F2/EC2 toolchain).
+- **Gate 2 (backward-kernel timing/area) — ✅ PASSED (2026-06-21, Vitis HLS csynth, z1d/FPGA-dev AMI, xcvu47p @4ns; `forge_wgrad_probe.cpp`, report `forge_wgrad_probe_csynth.rpt`).**
+  The operand-quantized weight-grad GEMM at d768 (`gW=q(gO)ᵀ@q(x)`, dyadic-MAC = priority-encode →
+  exp-add → barrel-shift → signed-accumulate, output-stationary OT8×IT64) **closes timing: 2.920 ns ≤
+  4.0 ns**, at **49% LUT of one SLR (16% device), DSP=0, FF 7%/SLR**. This is the exact kernel class
+  that did NOT close for chess-train (184%/SLR, 5.427 ns) — it now closes at transformer width because
+  the shift-add PE + output-stationary tiling is timing-friendly. Fits in half an SLR with room for the
+  rest of the block. (Probe latency 2.66 ms/768×768 matrix is *unoptimized* — tile loops not yet
+  pipelined; throughput tuning, not feasibility.)
+- **Gate 1 (compute density) — partial read: DSP=0.** The dyadic-MAC maps to LUT logic (no multiplier),
+  so the ~9000 DSP48s sit idle — the "DSP-as-adder" lever is *available but unused*. Lighting DSPs as
+  accumulators is the next throughput optimization (cuts LUT and/or raises the PE-lane ceiling).
+- **NET: all three critical-path gates (3 algorithm, 2 timing/area, 1 fits & DSP-free) are GREEN at the
+  probe level — the rig's biggest risks are de-risked.** Next: throughput (pipeline tile loops to II=1 +
+  DSP-as-adder) and the full S1 training block (fwd GEMM + attention + norm + dyadic-Adam).
 
 ## First three steps (local, no F2 builds)
 
