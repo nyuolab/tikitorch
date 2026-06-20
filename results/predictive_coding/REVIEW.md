@@ -154,11 +154,19 @@ error-relaxation on full MNIST is **sync == cascade == backprop bit-exact**, and
 within ~0.1pp** under 50% participation + stale reads + random order at d4–d32 — the
 credit signal provably converges to the *exact* backprop gradient (the frozen-routing
 system is triangular/nilpotent). To stop booking the cost of asynchrony as zero, we now
-also measure the **round-tax** (`scripts/pc_staleness_frontier.py`): how many extra local
-message-passing rounds async needs to reach the exact backprop gradient (cosine ≥ 0.999)
-vs the single ordered sync pass, across staleness × participation × depth. The net
-parallelism claim is honest only if that tax stays bounded while backprop's avoided
-backward-sweep cost grows with depth.
+also measured the **round-tax** (`scripts/pc_staleness_frontier.py`,
+`staleness_frontier.png`): how many local message-passing rounds async needs to reach the
+exact backprop gradient (cosine ≥ 0.999) vs the single ordered sync pass. **The result is
+two-sided and honest.** *Positive:* the async gradient **always converges to the exact
+backprop gradient** (cosine → 1.000) under partial participation + lagged reads + random
+order — it never lands on the wrong credit. *Falsifier:* the round-tax **grows ~O(L /
+participation)** (measured: stale = L, partial-50% = 1.5·L, 50%+stale+rand ≈ 4–6·L, and
+25%+stale+rand doesn't converge within 128 rounds at depth ≥ 32). Since that is the *same
+order* as the backward sweep it replaces, **there is no free, depth-growing throughput
+speedup** — the earlier "speedup grows with depth" claim is refuted by our own
+measurement. What async actually buys is **scheduling freedom with correct credit** (any
+order, any lag, partial participation → still the exact gradient), at O(L) rounds — a
+substrate-enablement property (it runs on a clockless async fabric), not a pipeline win.
 
 **Bottom line on parallelism:** the durable, code-true claims are **multiplier-free**
 (±2^k shift-add, no DSP multiplies), **weight-transport-free**, and **credit-local-in-
@@ -177,10 +185,10 @@ multiplier is a model, not a measurement.
 | Matches backprop where settling-PC collapses | **Won, measured** (ResNet-18 93.3 vs 70.4; 128-layer 93.8 vs float-BP 24.1) |
 | Qi-scale discriminative parity (calibrated) | **Won, measured** (VGG-10 cascade 91.4, float 92.2 = Qi 92.21) |
 | PC≫backprop generative inference, multiplier-free | **Won, measured** (in-painting + associative memory) |
-| Async credit converges to the *exact* backprop gradient under stale/partial/random-order | **Won, measured** (cosine→1.000; async acc = sync within 0.1pp, MNIST sim) |
+| Async credit converges to the *exact* backprop gradient under stale/partial/random-order | **Won, measured** (cosine→1.000 every condition; async acc = sync within 0.1pp, MNIST sim) |
 | **Weight-transport-free + credit-local-in-space** (runnable on settling/in-memory HW) | **Won, code-verified** (same forward weight carries the error; neighbour-only fixpoint) |
-| Round-tax of asynchrony bounded (cost the throughput model assumed zero) | **Measuring** (`pc_staleness_frontier.py`) |
-| Synchronization-free → free GPU speedup over backprop | **Dropped** — staleness-tolerance shared with async-SGD/Hogwild; 2.3–3.9× is modeled vs *synchronous* backprop (strawman) |
+| Round-tax of asynchrony bounded → depth-growing throughput win | **No, measured** (`pc_staleness_frontier.py`) — tax grows ~O(L/p); refutes the "grows with depth" claim |
+| Synchronization-free → free GPU speedup over backprop | **Dropped** — staleness shared with async-SGD/Hogwild; throughput straddles 1× (overlap-dependent); 2.3–3.9× was vs a *synchronous* strawman |
 | "Break the backward lock" **and** match backprop accuracy simultaneously | **No** — those are two different methods (accuracy-matching form *is* an ordered backward; the lock-breaking form trails ~15%) |
 | Better *deep settling*-PC than Qi / μPC (their problem) | **No** — we sidestepped it (cascade = backprop), did not beat it |
 | Prospective-config / continual-learning PC edge | **No** (honest negative — true equilibrium ≈ backprop) |
