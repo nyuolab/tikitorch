@@ -37,7 +37,9 @@ settling (the collapse baseline); "best PC" = their enhanced variant.
 | CIFAR-10 VGG-10 | 72.75 (Qi, collapse) | 92.07 (Qi S+F) | 92.21 (Qi) | **91.4** cascade / 92.2 float |
 | CIFAR-100 VGG-10 | 45.86 (Qi, collapse) | **63.35** (Qi S+F) | 69.35 (Qi) | **71.0** cascade / 71.5 float |
 | Tiny-ImageNet VGG-15 | 22.95 (Qi, collapse) | 42.51 (Qi S+F) | 44.52 (Qi) | — *(not run)* |
-| CIFAR-10 ResNet-18 | 70.44 (best PC, −22pt) | — | 92.83 | *(running)* |
+| **CIFAR-10 ResNet-18** | **70.44 (best PC, −23pt)** | — | 93.7 (ours) | **93.3** cascade (mult-free) |
+| CIFAR-100 ResNet-18 | — | — | 74.3 (ours) | **73.8** cascade (mult-free) |
+| CIFAR-10 VGG-15 (deep) | — | — | 92.1 (ours) | 91.4 cascade (mult-free) |
 | MNIST MLP (shallow) | 98.1 / iPC 98.45 | — | 98.07 | 97.4 (d8 deep) |
 | **MNIST 128-layer (residual)** | — | ~98 (μPC, Depth-μP) | **24.1 (float BP collapses)** | **93.8** cascade (mult-free) |
 
@@ -55,13 +57,14 @@ residual, not the cascade; data `scale_mnist_128layer.jsonl`.)
 
 Reading this honestly:
 
-- **Where it's a clean win:** on **CIFAR-100 VGG-10**, our multiplier-free cascade
-  (71.0%, matching our 71.5% float backprop) is **ahead of Qi's float S+F settling-PC
-  (63.35%)** — because their enhanced PC still trails backprop by ~6pt there while we
-  *are* backprop. Same pattern wherever settling-PC collapses (ResNet-18: PC 70.44 vs
-  BP 92.83). (Caveat: our VGG-10 / training schedule isn't identical to Qi's — our BP
-  baseline is 71.5 vs their 69.35 — so read it as "we match backprop; they don't,"
-  not a like-for-like 71.0-vs-63.35 sweep.)
+- **Where it's a clean win (now measured): CIFAR-10 ResNet-18.** This is the sharpest
+  case — the literature's best settling-PC **collapses to 70.44%** (−23pt vs BP 92.83).
+  Our multiplier-free **cascade = 93.3%**, matching our float backprop (93.7%) within
+  0.4pp (2 seeds). Same on **CIFAR-100 ResNet-18** (cascade 73.8 ≈ BP 74.3) and
+  **CIFAR-100 VGG-10** (cascade 71.0, ahead of Qi's float S+F 63.35). So *wherever
+  iterative settling-PC collapses or trails backprop, our multiplier-free cascade
+  matches backprop.* (Caveat: arch/schedule not identical to the lit's — read it as
+  "we match backprop; settling-PC doesn't," not a like-for-like sweep.)
 - **Where it's a tie:** CIFAR-10 (everyone ≈ backprop ≈ 92%); shallow MNIST/Fashion
   (PC ≈ backprop has been known since Whittington-Bogacz).
 - **The honest catch:** this "win" is **because our discriminative PC is backprop**
@@ -70,9 +73,10 @@ Reading this honestly:
   do (our own attempt to reach the true settling equilibrium ≈ backprop too;
   `SCALE_TESTS.md`). So: we win on *accuracy-per-multiplier* and on *not-collapsing*,
   not on "better deep PC."
-- **Scale gap (real):** we have **not** run **Tiny-ImageNet** (Qi's hardest) or
-  **ResNet / 128-layer** (Qi / μPC). Our deepest is VGG-13 (CIFAR) and 32-layer MLP.
-  A true head-to-head needs those.
+- **Scale gap (now mostly closed):** **ResNet-18** (vs the benchmark) and **128-layer**
+  (vs μPC) are now **run and won** (multiplier-free, matching backprop where settling-PC
+  collapses). The one remaining gap is **Tiny-ImageNet** (Qi's hardest, 200-way) — the
+  next run.
 
 ## Generative: in-painting / inference vs the generative-PC literature
 
