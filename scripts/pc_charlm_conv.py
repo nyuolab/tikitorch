@@ -220,6 +220,13 @@ def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train
     pc = mode in ("relax", "relax_async")
     net = DyadicConvPC1d(V, width, depth, kernel, dils, float_conv=(mode == "bp_float")).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=wd)
+    warmup = max(1, epochs // 20)                                  # warmup + cosine decay:
+    def _lr(ep):                                                  # high peak lr (fast), decays
+        if ep < warmup:                                          # to ~0 (no late early-peak-degrade)
+            return (ep + 1) / warmup
+        p = (ep - warmup) / max(1, epochs - warmup)
+        return 0.5 * (1 + math.cos(math.pi * p))
+    sched = torch.optim.lr_scheduler.LambdaLR(opt, _lr)
     gen = torch.Generator().manual_seed(seed); rgen = torch.Generator().manual_seed(seed + 99)
     best, bep = 1e9, -1; t0 = time.time()
     Xtr, Ytr = tr
@@ -239,7 +246,9 @@ def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train
         v = val_bpc(net, va[0], va[1], V, device)
         if v < best:
             best, bep = v, ep
-        print(f"  [{mode}] ep{ep} val_bpc {v:.3f} (best {best:.3f}@{bep}) ({time.time()-t0:.0f}s)", flush=True)
+        print(f"  [{mode}] ep{ep} val_bpc {v:.3f} (best {best:.3f}@{bep}) lr={sched.get_last_lr()[0]:.1e} "
+              f"({time.time()-t0:.0f}s)", flush=True)
+        sched.step()
     return round(best, 4), bep, round(time.time() - t0, 1)
 
 
