@@ -16,9 +16,11 @@ cd "$REPO"
 export PYTHONPATH="$REPO" PYTHONUNBUFFERED=1 DATA_ROOT="$REPO/_data"
 mkdir -p results/predictive_coding
 
+MATRIX_FLAG="--matrix"
 case "$PC_TASK" in
   mnist) SCRIPT=scripts/pc_scale_mnist.py; OUT=results/predictive_coding/scale_mnist.jsonl ;;
   cifar) SCRIPT=scripts/pc_scale_cifar.py; OUT=results/predictive_coding/scale_cifar.jsonl ;;
+  convlm) SCRIPT=scripts/pc_charlm_conv.py; OUT=results/predictive_coding/charlm_conv_localpc.jsonl; MATRIX_FLAG="" ;;
   *) echo "[pcscale] unknown PC_TASK=$PC_TASK"; exit 2 ;;
 esac
 LOG=/tmp/pc_scale.log
@@ -36,7 +38,7 @@ rm -f "$OUT"      # start fresh: the script appends, and git archive ships any c
 UP=$!
 
 # shellcheck disable=SC2086
-"$PYBIN" "$SCRIPT" --matrix --out "$OUT" $PC_ARGS 2>&1 | tee "$LOG"
+"$PYBIN" "$SCRIPT" $MATRIX_FLAG --out "$OUT" $PC_ARGS 2>&1 | tee "$LOG"
 rc=${PIPESTATUS[0]}
 
 kill "$UP" 2>/dev/null || true

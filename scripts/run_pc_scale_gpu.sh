@@ -34,7 +34,8 @@ cmd_launch(){
   case "$PC_TASK" in
     mnist) need="$need scripts/pc_scale_mnist.py" ;;
     cifar) need="$need scripts/pc_scale_cifar.py" ;;
-    *) echo "FATAL: unknown PC_TASK=$PC_TASK (want mnist|cifar)"; exit 1 ;;
+    convlm) need="$need scripts/pc_charlm_conv.py" ;;
+    *) echo "FATAL: unknown PC_TASK=$PC_TASK (want mnist|cifar|convlm)"; exit 1 ;;
   esac
   for f in $need; do
     tar tzf "$STATE_DIR/src.tar.gz" | grep -qx "$f" || { echo "FATAL: $f not committed (git archive HEAD ships only committed files)"; exit 1; }
