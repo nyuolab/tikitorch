@@ -148,7 +148,8 @@ The optimizer front (§2a) being solved, the remaining front was a *smooth* mult
 | fully-mult-free LM | gather bpb | note |
 |---|---|---|
 | `l1_gather` (**softmax** blend — the one multiply) | **2.48** | optimizer solved: ≈ AdamW 2.43 |
-| **`mbr`** — Margin-Banded Rank Blend (mult-free) | **3.44** | lossless; beats random-frozen 3.54; the off-GPU artifact |
+| **`mbr`** — Margin-Banded Rank Blend (mult-free) | **3.44** | lossless; beats random-frozen 3.54; **the accepted off-GPU blend** |
+| `rtk` — Residual Top-K blend (mult-free) | 3.55 | lossless; finer top weight did NOT beat MBR |
 | `pshift` — peaking-regularized shift | 4.81 | ❌ forcing the model to peak over-constrains it |
 | random-frozen attention | 3.54 | floor |
 
@@ -171,7 +172,12 @@ smoothness is load-bearing.
 A fully off-GPU-trainable tropical LM **exists** (MBR @ 3.44, beats random, lossless deploy); the lone
 remaining gap to *competitive* (softmax 2.48) is a **smooth multiplier-free blend** — the dyadic-coarse
 weight wall (`Σ w·V` mult-free forces dyadic weights), the same "mult-free wins winner-take-all,
-underfits smooth" theme seen across the project. Untested refinement: **RTK** (residual top-k,
-self-normalizing finer top weight `{0.5, 0.75, 0.875}`, no pow2-ceil) — the workflow runner-up; may
-shave the gap, unlikely to fully close ~1 bpb. Then: scale past char/tiny-shakespeare (BPE, bigger
-model, more data) and stand up the NanoGPT/NanoChat GPU baseline for a quality+energy comparison.
+underfits smooth" theme seen across the project. Both smooth-blend candidates were tried: MBR (3.44,
+accepted) and RTK (3.55, worse — the residual finer-top-weight did not help); `pshift` (force-peak)
+failed (4.81). **MBR is the accepted off-GPU blend.**
+
+NEXT (scaling toward NanoGPT): the off-GPU stack is settled, so the remaining work is (1) SCALE past
+char/tiny-shakespeare — BPE tokenizer, bigger model, more data — and check whether the ~1 bpb blend gap
+holds/shrinks/grows; (2) a MINIMAL-MULTIPLY fallback if the gap matters at scale: `l1_gather` (softmax
+blend) + dyadic-Adam = 2.48 keeps *everything but one train-time softmax* off-GPU; (3) stand up the
+NanoGPT GPU baseline for a quality + tokens/J energy comparison.

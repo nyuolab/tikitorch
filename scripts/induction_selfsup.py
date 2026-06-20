@@ -50,6 +50,7 @@ def _causal_neg(s):
 _SHIFT_CONTRAST = True       # backward keeps the weighted -<g,out> partition contrast (control: False)
 _SHIFT_WBITS = 0             # weight mantissa bits: 0 = pure pow2 (coarse); >0 = K-bit dyadic (finer, mult-free)
 _MBR_K = 4                   # margin-banded rank blend: top-k support (k shifts+adds per query)
+_RTK_K = 2                   # residual top-k blend: top-k support (k=2 = convex regime)
 
 
 class ShiftSoftmaxBlend(torch.autograd.Function):
@@ -221,6 +222,52 @@ def _scatter_dv(topi, dv_top, Lk, dh):
     src = dv_top.reshape(B, H, L * kk, dh)
     dv.scatter_add_(-2, idx.unsqueeze(-1).expand(B, H, L * kk, dh), src)
     return dv
+
+
+class ResidualTopKBlend(torch.autograd.Function):
+    """RUNNER-UP (idea 2, RTK): residual top-k blend, finer top weight than MBR, no pow2-ceil divide.
+    out = V_(0) + Σ_{r>=1} 2^-c_r · (V_(r) - V_(0)),  c_r = round((s_(0) - s_(r))/Δ) clamped [0,W].
+    Each term = vector-sub -> right-SHIFT by c_r -> add (mult-free, self-normalizing). k=2 = the convex
+    regime (top weight 1-2^-c_1 ∈ {0,.5,.75,.875,...} -- finer than MBR's fixed 0.5). Δ annealed high->low:
+    high Δ => small c => runners weighted ~1 => smooth blend (dense grad); Δ->0 => c->inf => out=V_(0) =
+    EXACT argmax-gather (lossless by construction)."""
+
+    @staticmethod
+    def forward(ctx, s, v, Delta, k, W):
+        B, H, L, Lk = s.shape; dh = v.shape[-1]
+        kk = min(k, Lk)
+        topv, topi = s.topk(kk, dim=-1)                      # (B,H,L,kk) compare only
+        idx = topi.unsqueeze(-1).expand(B, H, L, kk, dh)
+        Vk = torch.gather(v.unsqueeze(2).expand(B, H, L, Lk, dh), 3, idx)  # (B,H,L,kk,dh)
+        Vtop = Vk[..., 0, :]                                 # (B,H,L,dh) = argmax-gather anchor
+        gap = topv[..., :1] - topv                           # (B,H,L,kk) >=0; gap[...,0]=0
+        finite = torch.isfinite(topv)
+        c = (gap / Delta).round().clamp(0.0, float(W))
+        w = torch.where(finite, torch.exp2(-c), torch.zeros_like(c))   # (B,H,L,kk) dyadic; w[...,0]=1
+        out = Vtop.clone()
+        for r in range(1, kk):                               # residual corrections: sub -> shift -> add
+            out = out + w[..., r:r + 1] * (Vk[..., r, :] - Vtop)
+        ctx.save_for_backward(w, Vk, Vtop, out, topi, finite)
+        ctx.Lk = Lk
+        return out
+
+    @staticmethod
+    def backward(ctx, g_up):
+        w, Vk, Vtop, out, topi, finite = ctx.saved_tensors
+        B, H, L, kk, dh = Vk.shape
+        gq, Vq, oq = dyadic_quantize(g_up), dyadic_quantize(Vk), dyadic_quantize(out)
+        gVk = torch.einsum("bhid,bhikd->bhik", gq, Vq)       # <g,V_(r)>
+        gout = torch.einsum("bhid,bhid->bhi", gq, oq).unsqueeze(-1)
+        adv = (gVk - gout) * finite.to(gVk.dtype)            # weighted partition contrast
+        ds_rank = w * adv                                    # per-rank score grad (dyadic-operand)
+        ds = torch.zeros(B, H, L, ctx.Lk, device=g_up.device, dtype=ds_rank.dtype)
+        ds.scatter_(-1, topi, ds_rank)
+        coeff = w.clone()                                    # value-grad coeff: runner r -> w_r ...
+        if kk > 1:
+            coeff[..., 0] = 1.0 - w[..., 1:].sum(-1)         # ... anchor -> 1 - Σ_{r>=1} w_r
+        coeff = coeff * finite.to(coeff.dtype)
+        dv_top = torch.einsum("bhik,bhid->bhikd", coeff, g_up)
+        return ds, _scatter_dv(topi, dv_top, ctx.Lk, dh), None, None, None
 
 
 class Block(nn.Module):
