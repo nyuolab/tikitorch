@@ -62,6 +62,17 @@ Wall-clock @ ~900 tok/s: 300B-token pretrain ≈ **10.5 yr** (infeasible single-
 Steps 1–3 are all doable now in csynth / CPU sim — **no F2 build needed** — and collapse the largest
 uncertainties first.
 
+### Validation log
+- **Gate 3 (algorithm) — ✅ PASSED (2026-06-21, CPU/MPS, `scripts/charlm_mixer.py --linear mfgrad`).**
+  The FPGA-faithful multiplier-free backward — weight-grad computed as `q(gO)ᵀ@q(x)` (a shift-add tree,
+  both operands dyadic; *not* an autograd matmul) + input-grad `q(W)ᵀ@gO` — trains a **transformer**
+  char-LM to **gather 2.481**, identical to the `dyadic`-linear/autograd-backward baseline 2.48. The
+  PC `set_mf_grads` recipe (previously MLP/Conv-only) holds on a transformer at no quality cost. With
+  dyadic-Adam (optimizer ✓) and the dyadic forward (✓), **the entire fwd+bwd+optimizer loop is now
+  validated multiplier-free, end-to-end, at softmax-competitive quality (2.48, +0.3–0.4 from dense)** —
+  the single irreducible multiply being the attention soft-blend (on DSPs). Algorithm green-lights the rig.
+- **Gates 1, 2 (compute density, backward-kernel timing) — pending Vitis csynth** (user's F2/EC2 toolchain).
+
 ## First three steps (local, no F2 builds)
 
 1. **csynth a DSP-as-adder PE tile + d768 weight-grad GEMM** (Vitis HLS, no AFI) — measure LUT/DSP/timing.

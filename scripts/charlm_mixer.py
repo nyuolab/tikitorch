@@ -52,10 +52,49 @@ def _act():
 _LINEAR = "standard"
 
 
+class _MFGradLinearFn(torch.autograd.Function):
+    """FPGA-FAITHFUL multiplier-free linear (the PC set_mf_grads recipe, for the training-rig de-risk).
+    forward: y = x @ q(W)^T + b        (dyadic ±2^k weights -> shift-add; the deploy op)
+    backward (ALL shift-add, NO multiply -- this is what the FPGA weight-grad kernel computes):
+      gx = gO @ q(W)                    (W^T gO; weights ±2^k -> shifts)
+      gW = q(gO)^T @ q(x)              (BOTH operands dyadic -> products are 2^(a+b) shifts; the
+                                        cascade/set_mf_grads recipe proven on MLP/Conv, UNTESTED on a transformer)
+    Contrast with DyadicLinear, whose weight-grad is the ordinary autograd matmul (a real multiply,
+    made mult-free only at the dyadic-Adam optimizer step). This makes the weight-grad COMPUTE mult-free."""
+
+    @staticmethod
+    def forward(ctx, x, W, b):
+        Wq = dyadic_quantize(W)
+        ctx.save_for_backward(x, Wq, b)
+        y = x @ Wq.t()
+        return y + b if b is not None else y
+
+    @staticmethod
+    def backward(ctx, gO):
+        x, Wq, b = ctx.saved_tensors
+        xf = x.reshape(-1, x.shape[-1]); gf = gO.reshape(-1, gO.shape[-1])
+        gx = (gO @ Wq).reshape(x.shape)                              # W^T gO  (±2^k -> shift)
+        gW = dyadic_quantize(gf).t() @ dyadic_quantize(xf)          # q(gO)^T q(x)  (operand-quantized -> shift)
+        gb = gf.sum(0) if b is not None else None
+        return gx, gW, gb
+
+
+class MFGradLinear(nn.Module):
+    def __init__(self, i, o, bias=True):
+        super().__init__()
+        self.weight = nn.Parameter(torch.empty(o, i)); nn.init.kaiming_uniform_(self.weight, a=5 ** 0.5)
+        self.bias = nn.Parameter(torch.zeros(o)) if bias else None
+
+    def forward(self, x):
+        return _MFGradLinearFn.apply(x, self.weight, self.bias)
+
+
 def Lin(i, o, bias=True):
     if _LINEAR == "dyadic":
         from tikitorch.nn import DyadicLinear
         return DyadicLinear(i, o, bias=bias)
+    if _LINEAR == "mfgrad":                       # FPGA-faithful: operand-quantized weight-grad (shift-add)
+        return MFGradLinear(i, o, bias=bias)
     return nn.Linear(i, o, bias=bias)
 
 
@@ -609,7 +648,7 @@ def main():
     p.add_argument("--tau-floor", type=float, default=0.05)
     p.add_argument("--eval-batches", type=int, default=20)
     p.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
-    p.add_argument("--linear", choices=["standard", "dyadic"], default="standard",
+    p.add_argument("--linear", choices=["standard", "dyadic", "mfgrad"], default="standard",
                    help="proj+MLP linear type: nn.Linear or DyadicLinear (±2^k, mult-free)")
     p.add_argument("--norm", choices=["layernorm", "tropical", "rms", "var_nogamma",
                                       "dyadic_gamma", "fine_dyadic"], default="layernorm",
