@@ -212,7 +212,7 @@ def bigram_floor(d, V, n_train):
 
 
 def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train,
-            seed, epochs, batch, lr, wd, drop, device):
+            seed, epochs, batch, lr, wd, drop, device, pc_niter=None):
     torch.manual_seed(seed)
     pc = mode in ("relax", "relax_async")
     net = DyadicConvPC1d(V, width, depth, kernel, dils, float_conv=(mode == "bp_float")).to(device)
@@ -227,7 +227,7 @@ def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train
             if mode == "relax":
                 net.train_step_relax(xb, yb, opt)
             elif mode == "relax_async":
-                net.train_step_relax(xb, yb, opt, n_iter=3 * depth,
+                net.train_step_relax(xb, yb, opt, n_iter=(pc_niter or 3 * depth),
                                      participation=0.5, stale=True, rand_order=True, gen=rgen)
             else:
                 opt.zero_grad(set_to_none=True)
@@ -251,6 +251,7 @@ if __name__ == "__main__":
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--lr", type=float, default=1.5e-3)
     ap.add_argument("--pc-lr", type=float, default=5e-4, dest="pc_lr")
+    ap.add_argument("--pc-niter", type=int, default=None, dest="pc_niter")  # async settling rounds (dilated conv needs more)
     ap.add_argument("--wd", type=float, default=2e-4)
     ap.add_argument("--drop", type=float, default=0.0)
     ap.add_argument("--subset", type=int, default=None)
@@ -274,7 +275,8 @@ if __name__ == "__main__":
         b, bep, wall = run_one(mode, V, seq=args.seq, width=args.width, depth=args.depth,
                                kernel=args.kernel, dils=dils, tr=tr, va=va, d_full=d_full,
                                n_train=n_train, seed=0, epochs=args.epochs, batch=args.batch,
-                               lr=mlr, wd=args.wd, drop=args.drop, device=args.device)
+                               lr=mlr, wd=args.wd, drop=args.drop, device=args.device,
+                               pc_niter=args.pc_niter)
         rows.append({"mode": mode, "val_bpc": b, "best_epoch": bep, "wall_s": wall,
                      "seq": args.seq, "width": args.width, "depth": args.depth, "lr": mlr})
         print(f"==> {mode}: best {b} @ep{bep} ({wall}s)\n", flush=True)
