@@ -22,8 +22,11 @@ it does so **multiplier-free** (±2^k shift-add, top-k WTA), which **no competit
 On the generative side, PC's real over-backprop advantage (inference / associative
 recall) **is** genuine and established in the literature, and we **reproduce it
 multiplier-free**. So the defensible, unique contribution across both regimes is one
-axis nobody else has — **multiplier-free + synchronization-free credit assignment that
-reaches backprop quality** — not "more accurate" and not "better deep settling-PC."
+axis nobody else has — credit assignment at **backprop quality** that is **multiplier-
+free** (±2^k), **weight-transport-free**, and **credit-local-in-space**, hence deployable
+on analog/in-memory/settling hardware backprop cannot run on — not "more accurate," not
+"better deep settling-PC," and (after adversarial review) **not** a free GPU speedup from
+"synchronization-freedom" (staleness-tolerance is shared with async-SGD; see §4).
 
 ---
 
@@ -41,8 +44,8 @@ machinery. Our multiplier-free cascade tracks backprop wherever settling-PC coll
 | CIFAR-100 ResNet-18 | — | — | 74.3 (ours) | **73.8** cascade |
 | CIFAR-10 VGG-15 (deep) | — | — | 92.1 (ours) | 91.4 cascade |
 | MNIST MLP (shallow) | 98.1 / iPC 98.45 | — | 98.07 | 97.4 (d8) |
-| **MNIST 128-layer (residual)** | — | ~98 (μPC) | **24.1 (float BP collapses)** | **93.8** cascade |
-| Tiny-ImageNet ResNet-18 (200-way) | 22.95 (Qi VGG-15, collapse) | 42.51 (Qi S+F) | — | *run in flight* |
+| **MNIST 128-layer (residual)** | — | ~98 (μPC, 5 ep) | **24.1 (float *additive*-res. BP, all seeds)** | **93.8** cascade (*max*-res.) |
+| Tiny-ImageNet 200-way (Qi: VGG-15; ours: ResNet-18) | 22.95 (Qi VGG-15) | 42.51 (Qi S+F) | — | *ResNet-18 run in flight* |
 
 **Three clean structural wins:**
 
@@ -51,13 +54,20 @@ machinery. Our multiplier-free cascade tracks backprop wherever settling-PC coll
    float backprop (93.7%) within 0.4pp. Same on CIFAR-100 ResNet-18 (73.8 ≈ 74.3). This
    is the sharpest case: *wherever settling-PC collapses, our multiplier-free cascade
    matches backprop.*
-2. **128 layers (vs μPC).** μPC's entire contribution is a parameterisation (Depth-μP)
-   that lets *float* PC train at 128 layers. We measured a 128-layer residual MLP three
-   ways: multiplier-free **cascade = 93.8%** (flat from d32), `bp_dyadic` 86.6%, and
-   **float additive-residual backprop collapses to 24.1%**. The **tropical max-residual**
-   `max(relu(Wx), x)` — bounded and idempotent, so it does not accumulate variance the
-   way additive float residuals do — is doing μPC's depth-scaling job, multiplier-free,
-   at a depth where the float additive-residual net dies.
+2. **128 layers (vs μPC) — the lever is the residual *type*.** μPC's contribution is a
+   parameterisation (Depth-μP) that lets *float* PC train at 128 layers (≈98%, 5 epochs).
+   We measured a 128-layer residual MLP three ways (3 seeds; the residual type is
+   code-verified: `bp_float` uses **additive** `relu(Wx)+x`, cascade/`bp_dyadic` use the
+   tropical **max** `max(relu(Wx),x)`). Per-seed at d128: **float additive-residual BP
+   collapses on all 3 seeds → 24.1%** (robust); the multiplier-free **max-residual cascade
+   trains on all 3 seeds → 93.8%** (the only *reliably*-training variant); `bp_dyadic`
+   (mult-free fwd, max-residual) is bimodal (mean 86.6, but 2/3 seeds ~94.4 — so its mean
+   *understates* it). So the **tropical max-residual** — bounded/idempotent, so it does
+   not accumulate variance the way additive float residuals do — does μPC's depth-scaling
+   job multiplier-free, at a depth where the *additive* float net dies on every seed.
+   (Honest: cascade *is* backprop credit; the lever is the residual type, not the cascade.
+   The float d64=68.2 mean is a one-collapsed-seed artifact, median 88.7 — the collapse is
+   sharp only at d128, not a smooth slide.)
 3. **Qi-scale parity (calibrated).** Our float VGG-10 (92.17%) reproduces Qi's backprop
    number (92.21%), so the baseline is calibrated to their setup — and the fully
    multiplier-free cascade is within 0.8pp of it, ahead of Qi's float S+F on CIFAR-100.
@@ -105,33 +115,57 @@ constraint**, well behind the float PC SOTA on scale and quality.
 
 ---
 
-## 4. The parallelism thesis — the axis nobody else competes on
+## 4. The parallelism thesis — re-scoped to what actually survives scrutiny
 
-Since accuracy is backprop-equivalent, accuracy is **not** the value proposition
-(`PARALLELISM.md`). The value of being a *legit* PC (local energy, settling, no global
-backward) is that it removes the synchronization backprop needs. Backprop imposes three
-locks (Jaderberg 2017): forward / update / backward. **PC breaks update + backward:**
-the weight update is local (`ΔW_l ∝ ε_l ⊗ x_l`), every layer updates at once, no
-sequential backward sweep, no global gradient to route.
+This is the half the whole effort points at, and an adversarial review (2026-06-20,
+4-lens panel + async-SGD rebuttal) forced it to be re-scoped. The honest version is
+**narrower and more defensible** than "synchronization-free → 2.3–3.9× over backprop."
 
-We **measured** the part that matters: async error-relaxation on full MNIST is **sync ==
-cascade == backprop bit-exact**, and **async within ~0.1pp** under 50% participation +
-stale reads + random update order at d4–d32. I.e. half the workers silent each round, no
-global clock, lagged communication — and it trains to the same accuracy. A
-pipeline-throughput model turns the missing backward sweep + staleness-tolerance into
-**2.3× (no latency) → 3.9× (latency-bound) → grows with depth** speedup over backprop.
+**First, two corrections that matter.** (1) The "no backward sweep / all layers at once"
+claim was attached to the wrong method. The *accuracy-matching* learner is the
+error-relaxation, which is **bit-exact equal to the cascade = backprop credit** — it
+*has* a directional top-down credit dependency (`E_l = A_l^T E_{l+1}`); async execution
+*reorders/delays* that dependency, it does not *eliminate* it. The method that genuinely
+has no directional sweep (state-settling `settle_nudge`) is the one that **diverges at
+scale** and caps at ~85% of backprop. So "matches backprop" and "breaks the backward
+lock" come from **two different, non-coinciding methods** — you cannot claim both at
+once. (2) **Staleness-tolerance is *not* PC-unique.** Async-SGD, Hogwild!, Downpour,
+PipeDream/1F1B already hide pipeline latency and train under bounded-stale gradients for
+backprop. A throughput model that compares PC only against *synchronous* backprop (as our
+`pc_throughput_model.py` did) measures against a strawman; the 2.3–3.9× is now demoted to
+an explicitly-modeled illustration with a sensitivity band (floor ~1.7×), not a headline.
 
-The two axes none of the competitors (all FP32, real multipliers, settling-PC *more*
-multiply-heavy than backprop) have, and they compound:
-- **Multiplier-free** — ±2^k shift-add, top-k WTA, no DSP multiplies.
-- **Synchronization-free** — local, async, delay/partial-tolerant; no global backward,
-  no global clock, no all-to-all gradient routing.
+**What genuinely survives the async-SGD rebuttal — the one axis async-backprop cannot
+occupy.** PC eliminates the **backward graph itself**: (a) **no weight transport** — the
+*same* forward `±2^k` weight carries the error (`_route_T`; the cascade's error step
+reuses `self.layers[l].weight`, never a transposed copy), and (b) **no separate
+error-carrying datapath** — credit is a **local neighbour-only message-passing fixpoint**,
+not a global all-to-all gradient object that must be routed end-to-end before any update
+is correct. Async-SGD/Hogwild parallelize the **data/batch axis** and still compute a full
+backward with a transpose-weight datapath; they parallelize *where/when* the backward
+runs, never *whether it exists*. PC's distinct contribution is on the **depth/credit
+axis**: it makes the credit assignment runnable on **analog / in-memory / crossbar
+settling hardware where backprop has no physical realization at all** (the EqProp /
+memristor lineage). That is a **hardware-substrate** property, not a GPU throughput win —
+and it is true in the code today, independent of any throughput model.
 
-That combination is what maps onto neuromorphic / in-memory / wafer-scale / chiplet-async
-substrates, where backprop's global synchronous backward is the blocker, not the FLOPs.
-**Honest scope:** the throughput numbers are a dependency-structure *model*, not measured
-wall-clock; the staleness-tolerance that lets PC hide latency is the one piece we
-*measured*. Real-hardware async throughput is the next claim to substantiate.
+**What we measured (and the new measurement that grounds the cost).** Async
+error-relaxation on full MNIST is **sync == cascade == backprop bit-exact**, and **async
+within ~0.1pp** under 50% participation + stale reads + random order at d4–d32 — the
+credit signal provably converges to the *exact* backprop gradient (the frozen-routing
+system is triangular/nilpotent). To stop booking the cost of asynchrony as zero, we now
+also measure the **round-tax** (`scripts/pc_staleness_frontier.py`): how many extra local
+message-passing rounds async needs to reach the exact backprop gradient (cosine ≥ 0.999)
+vs the single ordered sync pass, across staleness × participation × depth. The net
+parallelism claim is honest only if that tax stays bounded while backprop's avoided
+backward-sweep cost grows with depth.
+
+**Bottom line on parallelism:** the durable, code-true claims are **multiplier-free**
+(±2^k shift-add, no DSP multiplies), **weight-transport-free**, and **credit-local-in-
+space** — which together make this learner deployable on settling/in-memory substrates
+backprop cannot run on. The contestable claim ("free GPU speedup via synchronization-
+freedom") is dropped: staleness-tolerance is shared with async-SGD, and the throughput
+multiplier is a model, not a measurement.
 
 ---
 
@@ -143,13 +177,16 @@ wall-clock; the staleness-tolerance that lets PC hide latency is the one piece w
 | Matches backprop where settling-PC collapses | **Won, measured** (ResNet-18 93.3 vs 70.4; 128-layer 93.8 vs float-BP 24.1) |
 | Qi-scale discriminative parity (calibrated) | **Won, measured** (VGG-10 cascade 91.4, float 92.2 = Qi 92.21) |
 | PC≫backprop generative inference, multiplier-free | **Won, measured** (in-painting + associative memory) |
-| Sync-free / async credit assignment survives parallel-HW conditions | **Won, measured** (async = sync within 0.1pp) |
-| Throughput advantage from broken locks | **Modeled** (2.3–3.9×), not measured wall-clock |
+| Async credit converges to the *exact* backprop gradient under stale/partial/random-order | **Won, measured** (cosine→1.000; async acc = sync within 0.1pp, MNIST sim) |
+| **Weight-transport-free + credit-local-in-space** (runnable on settling/in-memory HW) | **Won, code-verified** (same forward weight carries the error; neighbour-only fixpoint) |
+| Round-tax of asynchrony bounded (cost the throughput model assumed zero) | **Measuring** (`pc_staleness_frontier.py`) |
+| Synchronization-free → free GPU speedup over backprop | **Dropped** — staleness-tolerance shared with async-SGD/Hogwild; 2.3–3.9× is modeled vs *synchronous* backprop (strawman) |
+| "Break the backward lock" **and** match backprop accuracy simultaneously | **No** — those are two different methods (accuracy-matching form *is* an ordered backward; the lock-breaking form trails ~15%) |
 | Better *deep settling*-PC than Qi / μPC (their problem) | **No** — we sidestepped it (cascade = backprop), did not beat it |
 | Prospective-config / continual-learning PC edge | **No** (honest negative — true equilibrium ≈ backprop) |
 | Generative SOTA scale/quality | **No** — single-layer MNIST, behind Salvatori/K-SVD |
 | Tiny-ImageNet (Qi's hardest discriminative) | **In flight** (ResNet-18 cascade vs BP, EC2) |
-| Measured deploy energy/throughput on fabric | **Open** (accuracy is GPU-sim; the deploy win is unproven here) |
+| Measured deploy energy/throughput on real settling/in-memory fabric | **Open** (accuracy is GPU-sim; the substrate win is structural, not yet HW-measured) |
 
 ---
 
@@ -161,8 +198,14 @@ wall-clock; the staleness-tolerance that lets PC hide latency is the one piece w
 - **Against Salvatori / K-SVD (generative):** we reproduce PC's genuine over-backprop
   advantage (inference, associative recall) multiplier-free, at modest (MNIST,
   single-layer) scale — behind the float SOTA, ahead on the hardware constraint.
-- **The defensible contribution:** **multiplier-free + synchronization-free credit
-  assignment that reaches backprop quality** — the one axis the entire float, synchronous
-  PC literature does not occupy. The remaining work to make it a true head-to-head is
-  Tiny-ImageNet (in flight) and **measured** deploy energy/throughput on real
-  multiplier-free / async hardware.
+- **The defensible contribution (re-scoped after adversarial review):** a credit-
+  assignment that reaches **backprop quality** while being **multiplier-free** (±2^k),
+  **weight-transport-free**, and **credit-local-in-space** (a neighbour-only fixpoint, not
+  a global gradient object). That combination is deployable on **analog / in-memory /
+  settling hardware where backprop has no physical realization** — the axis the entire
+  float, transpose-weight PC and DL literature does not occupy. We explicitly **do not**
+  claim a free GPU speedup from "synchronization-freedom": staleness-tolerance is shared
+  with async-SGD, and the throughput multiplier is a model, not a measurement. The
+  remaining work to make it a true head-to-head: Tiny-ImageNet (in flight), the **measured
+  round-tax** of asynchrony (`pc_staleness_frontier.py`), and **measured** deploy
+  energy/throughput on real multiplier-free / settling hardware.

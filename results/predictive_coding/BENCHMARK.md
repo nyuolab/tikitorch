@@ -41,19 +41,38 @@ settling (the collapse baseline); "best PC" = their enhanced variant.
 | CIFAR-100 ResNet-18 | — | — | 74.3 (ours) | **73.8** cascade (mult-free) |
 | CIFAR-10 VGG-15 (deep) | — | — | 92.1 (ours) | 91.4 cascade (mult-free) |
 | MNIST MLP (shallow) | 98.1 / iPC 98.45 | — | 98.07 | 97.4 (d8 deep) |
-| **MNIST 128-layer (residual)** | — | ~98 (μPC, Depth-μP) | **24.1 (float BP collapses)** | **93.8** cascade (mult-free) |
+| **MNIST 128-layer (residual)** | — | ~98 (μPC, Depth-μP, 5 ep) | **24.1 (float *additive*-residual BP collapses)** | **93.8** cascade (mult-free, *max*-residual) |
 
-**The μPC head-to-head is a clean structural win.** μPC's whole contribution is a
-parameterisation (Depth-μP) that lets *float* PC train at 128 layers. We measured a
-128-layer residual MLP three ways (3 seeds, MNIST): the multiplier-free **cascade =
-93.8%** (flat from d32: 97.0 → 95.6 → 93.8 at d32/64/128), `bp_dyadic` = 86.6%, and
-**float backprop collapses to 24.1%** (d32 91.5 → d64 68.2 → d128 24.1). So the
-**tropical max-residual** `max(relu(Wx), x)` — bounded and idempotent, so it does not
-accumulate variance the way the *additive* float residual does — is doing μPC's
-depth-scaling job, **multiplier-free, and at a depth where the float additive-residual
-net dies.** (Honest: our cascade *is* backprop, so this is "tropical-residual backprop
-trains 128 layers where additive-residual backprop collapses" — the lever is the
-residual, not the cascade; data `scale_mnist_128layer.jsonl`.)
+**The μPC head-to-head — the lever is the residual *type*, and it is a tropical win.**
+μPC's whole contribution is a parameterisation (Depth-μP) that lets *float* PC train at
+128 layers (≈98%, 5 epochs). We measured a 128-layer residual MLP three ways (3 seeds,
+MNIST; `scale_mnist_128layer.jsonl`). The decisive variable is the **residual type**,
+which is verifiable in code: `bp_float` uses the standard **additive** skip
+`relu(Wx) + x` (`FloatMLP`, `pc_scale_mnist.py:110`), while both `cascade` and
+`bp_dyadic` use the **tropical max** skip `max(relu(Wx), x)`
+(`DyadicPCNet`/`DyadicMLP`:89,74). Per-seed at d128:
+
+- **Float, additive residual (`bp_float`): collapses on all 3 seeds → 24.1%**
+  (22.0 / 22.4 / 27.9 — robust collapse). *Honest correction:* the path is *not* a smooth
+  slide. At d64 it is **bimodal** — one collapsed seed (26.4) drags the mean to 68.2%,
+  but the median is **88.7%** (the other two seeds train fine). The collapse is sharp and
+  all-seeds only at d128, not a monotone decline.
+- **Multiplier-free, tropical max-residual (`cascade`): trains on all 3 seeds → 93.8%**
+  (92.9 / 93.9 / 94.7), flat from d32 (97.0 → 95.6 → 93.8). The only variant that trains
+  *reliably* (every seed) at d128.
+- **Multiplier-free forward, float backprop, max-residual (`bp_dyadic`): mostly trains,
+  bimodal → mean 86.6%** but that mean hides a split: **2 of 3 seeds reach ~94.4%**
+  (94.4 / 94.6 — which *beat* cascade's mean), one collapsed to 70.9%. So the "86.6"
+  single number understates it; the max-residual trains deep here too, just less reliably
+  than the cascade.
+
+So the **tropical max-residual** `max(relu(Wx), x)` — bounded and idempotent, so it does
+not accumulate variance the way the *additive* float residual does — is doing μPC's
+depth-scaling job **multiplier-free, at a depth where the float additive-residual net
+dies on every seed**, and the mult-free cascade is the most *reliable* of the three.
+(Honest framing: the cascade *is* backprop credit, so this is "tropical-max-residual
+trains 128 layers where additive-residual collapses" — the lever is the **residual type**,
+not the cascade and not multiplier-freeness per se.)
 
 Reading this honestly:
 
@@ -63,7 +82,9 @@ Reading this honestly:
   0.4pp (2 seeds). Same on **CIFAR-100 ResNet-18** (cascade 73.8 ≈ BP 74.3) and
   **CIFAR-100 VGG-10** (cascade 71.0, ahead of Qi's float S+F 63.35). So *wherever
   iterative settling-PC collapses or trails backprop, our multiplier-free cascade
-  matches backprop.* (Caveat: arch/schedule not identical to the lit's — read it as
+  matches backprop.* (Disclosure: the CIFAR-100 ResNet-18 "BP 74.3" is `bp_float`; the
+  `bp_dyadic` variant is actually *higher* at 74.5, so the true cascade-to-best-BP gap is
+  0.74pp there — the loosest in the set, vs 0.44pp on CIFAR-10 ResNet-18.) (Caveat: arch/schedule not identical to the lit's — read it as
   "we match backprop; settling-PC doesn't," not a like-for-like sweep.)
 - **Where it's a tie:** CIFAR-10 (everyone ≈ backprop ≈ 92%); shallow MNIST/Fashion
   (PC ≈ backprop has been known since Whittington-Bogacz).
