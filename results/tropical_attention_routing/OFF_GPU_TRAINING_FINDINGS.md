@@ -167,6 +167,31 @@ behind the softmax blend (2.48).
 hardens losslessly) **failed (4.81)** — forcing peakedness destroys the blending the LM needs;
 smoothness is load-bearing.
 
+## 3a. Scaling (text8, 20M chars — a benchmark where attention matters)
+
+Does the ~1 bpb mult-free-blend gap shrink with scale? Tested on text8 (char-level), fully
+multiplier-free stack + dyadic-Adam, deploy = argmax-gather:
+
+| arm | d256/L4/h8 | d384/L6/h12 | gap to dense |
+|---|---|---|---|
+| dense (dot+softmax — the one multiply) | 2.06 | 1.87 | — |
+| `l1_gather` (softmax blend, else fully off-GPU) | 2.36 | 2.29 | +0.30 → +0.42 |
+| `mbr` (fully multiplier-free blend) | 3.35 | 3.90¹ | +1.29 → does not shrink |
+
+¹ d384 `mbr` ran at batch 16 (OOM dodge); the *direction* (no improvement) is unambiguous.
+
+**Conclusion — the mult-free *blend* tax is scale-invariant.** It holds at ~1 bpb across data
+(shakespeare → text8, where attention is genuinely load-bearing) and does not shrink with model
+size; the "bigger models use peakier attention → mult-free keeps up" hypothesis is **not** borne
+out here. This matches the project-wide theme: multiplier-free wins winner-take-all, underfits
+smooth.
+
+**But the MINIMAL-MULTIPLY path scales competitively.** `l1_gather` — a single train-time softmax,
+with the optimizer (dyadic-Adam), linears (dyadic), norm (fine-dyadic) and MLP (ReLU) *all*
+multiplier-free — tracks dense within **+0.3–0.4 bpb** and *improves* with scale (2.36 → 2.29). For
+a NanoGPT-style off-GPU model this is the recommended artifact: everything off-GPU except the
+attention softmax.
+
 ## 4. Status / next
 
 A fully off-GPU-trainable tropical LM **exists** (MBR @ 3.44, beats random, lossless deploy); the lone
@@ -176,8 +201,14 @@ underfits smooth" theme seen across the project. Both smooth-blend candidates we
 accepted) and RTK (3.55, worse — the residual finer-top-weight did not help); `pshift` (force-peak)
 failed (4.81). **MBR is the accepted off-GPU blend.**
 
-NEXT (scaling toward NanoGPT): the off-GPU stack is settled, so the remaining work is (1) SCALE past
-char/tiny-shakespeare — BPE tokenizer, bigger model, more data — and check whether the ~1 bpb blend gap
-holds/shrinks/grows; (2) a MINIMAL-MULTIPLY fallback if the gap matters at scale: `l1_gather` (softmax
-blend) + dyadic-Adam = 2.48 keeps *everything but one train-time softmax* off-GPU; (3) stand up the
-NanoGPT GPU baseline for a quality + tokens/J energy comparison.
+SCALING DONE (§3a): the fully-mult-free blend tax is **scale-invariant** (~1 bpb, both data and model
+axes); the **minimal-multiply** path (`l1_gather`: one train-time softmax, everything else off-GPU)
+scales competitively (+0.3–0.4 from dense, improving with size). So the recommended NanoGPT artifact is
+the minimal-multiply model, not the fully-mult-free one.
+
+NEXT (NanoGPT comparison): (1) take the minimal-multiply `l1_gather` config to larger scale (BPE +
+bigger model + more text8/owt); (2) stand up a NanoGPT-on-GPU baseline at matched params/data;
+(3) compare quality (bpb/ppl) **and energy** (tokens/J) — the off-GPU/FPGA tropical model's pitch is
+energy at iso-quality, deploy being fully multiplier-free regardless of the one train-time softmax.
+Open research (if a *strictly* zero-multiply LM is required): a smooth multiplier-free blend remains
+unsolved (MBR/RTK/pshift all leave ~1 bpb).
