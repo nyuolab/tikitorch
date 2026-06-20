@@ -89,6 +89,7 @@ PC's real advantage over backprop is here — and it's established:
 | Salvatori 2021 | CIFAR-10 corrupted retrieval | PCN ≫ | Modern Hopfield ~9 imgs |
 | K-SVD (float sparse coding) | image denoising (Lena/Barbara…) | 34.86 dB PSNR | 34.62 (wavelet BLS-GSM) |
 | **ours (multiplier-free SparseCodingPC)** | **MNIST, 50% random pixels** | **60% better than mean-fill** | (no backprop AE can answer arbitrary masks) |
+| **ours (mult-free, associative memory)** | **store K=200 MNIST, recall from 50% cue** | **43% recalled (MSE<0.01); recon MSE 0.0104** | **0% recalled; recon MSE 0.0384** (backprop AE) |
 
 Reading this honestly:
 
@@ -96,6 +97,13 @@ Reading this honestly:
   Our result **confirms the same capability** — one model, arbitrary masks, by settling
   — but does it **multiplier-free** (±2^k dictionary, top-k WTA sparse code), which the
   float literature does not.
+- **Associative memory reproduces the same PC≫AE gap, multiplier-free** (now measured;
+  `ASSOCIATIVE_MEMORY.md`): store K=200 MNIST images, recall from a 50% pixel cue — the
+  multiplier-free sparse-PC recalls **43%** below MSE 0.01 and a backprop autoencoder
+  recalls **0%** (PC's mean reconstruction error is 3.5–3.7× lower at both 50% and 25%
+  cues). The AE learns a near-mean map and cannot infer from a partial observation; PC
+  settles its latent from the observed pixels. Same qualitative result Salvatori report
+  (PCN ≫ backprop AE), under the harder hardware constraint.
 - We are **behind the float PC SOTA on scale and quality**: ours is single-layer on
   MNIST; Salvatori is 10-layer on Tiny-ImageNet, K-SVD is the gold standard on natural
   images. Our metric (MSE-vs-mean-fill) is also weaker than theirs (perfect-retrieval
