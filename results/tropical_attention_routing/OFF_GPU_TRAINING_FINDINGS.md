@@ -192,6 +192,25 @@ multiplier-free — tracks dense within **+0.3–0.4 bpb** and *improves* with s
 a NanoGPT-style off-GPU model this is the recommended artifact: everything off-GPU except the
 attention softmax.
 
+## 3b. Energy projection — the actual NanoGPT pitch (scripts/lm_energy_projection.py)
+
+bpb alone says "dense wins by ~0.4"; the point is that tropical gives up that ~0.4 to **eliminate the
+entire multiplier datapath**. The tropical DEPLOY forward is *fully* multiplier-free (l1 score +
+argmax-gather + dyadic linears + fine-dyadic norm + ReLU MLP + dyadic head): **100% of the dense
+model's multiplies become shift+adds.** Op-count → energy PROJECTION (Horowitz 45nm per-op figures;
+*not* a measured FPGA number):
+
+| config | fp32 | int8 | int32 | mults removed/token |
+|---|---|---|---|---|
+| text8 d384 (this session) | 2.6× | 3.8× | 16× | 11.8 M (100%) |
+| GPT-2-small (NanoGPT 124M) projection | 2.6× | 3.8× | 16× | 142 M (100%) |
+
+(× = less compute energy, dense ÷ tropical.) The op-level ratio is set by the mult:add cost ratio;
+the **larger, harder-to-model win on FPGA is freeing the DSP multiplier array** (LUT shift-adds instead)
+and dropping the softmax — the op-energy model understates that. A measured ratio needs HLS synthesis of
+the LM (cf. the project's morph-LM / MuZero F2 deployments). **So the NanoGPT trade is: ~+0.4 bpb (and a
+single train-time softmax) for ~3–4× (fp32/int8) lower compute energy + a multiplier-free fabric.**
+
 ## 4. Status / next
 
 A fully off-GPU-trainable tropical LM **exists** (MBR @ 3.44, beats random, lossless deploy); the lone
