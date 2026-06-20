@@ -211,6 +211,36 @@ and dropping the softmax — the op-energy model understates that. A measured ra
 the LM (cf. the project's morph-LM / MuZero F2 deployments). **So the NanoGPT trade is: ~+0.4 bpb (and a
 single train-time softmax) for ~3–4× (fp32/int8) lower compute energy + a multiplier-free fabric.**
 
+## 3c. Strictly-zero-multiply LM: the irreducible multiply (final characterization)
+
+To make the FULLY-mult-free model competitive (not just the minimal-multiply one) we attacked the
+smooth-blend gradient directly — `LutSoftmaxGather`: hard argmax-gather forward (exact, deploy-identical)
++ the TRUE softmax gradient computed multiplier-free via an `exp2` LUT (the morph-LM exp2-ROM convention)
++ dyadic shifts. This unblocks the memory's stated obstacle ("softmax p needs exp"). Measured (char-LM
+d256, fully mult-free, dyadic-Adam): **`lutsm` gather 3.46 — tied with `mbr` 3.44, still ~1 bpb behind
+`l1_gather` 2.48.**
+
+**This is decisive: the true-softmax gradient (lutsm) ≈ the coarse gradient (mbr) ⇒ the gradient was never
+the bottleneck — the FORWARD is.** A hard-gather (or coarse-blend) forward caps at ~3.4 *regardless of
+gradient quality*, because the model only ever trains on single (or coarsely-blended) values; `l1_gather`'s
+quality comes from its SOFT forward (the model trains on softmax-blended values).
+
+And that soft blend is **the one irreducible multiply in a transformer**:
+
+| op | mult-free? | mechanism |
+|---|---|---|
+| linears `W·x` | ✅ | `W` is a fixed weight → dyadic ±2^k → shift |
+| norm `c/scale` | ✅ | `1/scale` → dyadic → shift |
+| softmax `exp` | ✅ | fixed function → LUT / ROM |
+| **attention blend `Σ pⱼ·Vⱼ`** | ❌ | **`p` AND `V` are both data-dependent → not a shift, not a LUT-able function of one input → a genuine variable×variable multiply** |
+
+You can dyadic-quantize a *weight* and LUT a *fixed function*, but a *variable×variable* product needs a
+multiplier — and the soft attention blend is exactly that. So a strictly-zero-multiply transformer must
+use HARD (non-blended) attention, which caps at ~+1 bpb (mbr/lutsm 3.4). **VERDICT: the strictly-zero-
+multiply LM is fundamentally walled at ~+1 bpb; the MINIMAL-MULTIPLY transformer — soft attention as the
+single irreducible multiply, everything else (linears/norm/exp/optimizer) mult-free — is the competitive
+off-GPU answer (2.48, +0.3–0.4 from dense).**
+
 ## 4. Status / next
 
 A fully off-GPU-trainable tropical LM **exists** (MBR @ 3.44, beats random, lossless deploy); the lone

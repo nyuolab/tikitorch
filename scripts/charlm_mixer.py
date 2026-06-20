@@ -35,7 +35,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import induction_selfsup                          # for _SHIFT_WBITS global (finer blend mantissa)
-from induction_selfsup import _hinge_grad, ShiftSoftmaxBlend, MarginBandedRankBlend, ResidualTopKBlend, delta_at   # hinge + mult-free differentiable blends
+from induction_selfsup import _hinge_grad, ShiftSoftmaxBlend, MarginBandedRankBlend, ResidualTopKBlend, LutSoftmaxGather, delta_at   # hinge + mult-free differentiable blends
 from tikitorch.nn import dyadic_quantize       # mult-free magnitude optimizer step
 
 REPO = Path(__file__).resolve().parents[1]
@@ -202,6 +202,9 @@ class Attn(nn.Module):
             out = MarginBandedRankBlend.apply(s, v, self.Delta, induction_selfsup._MBR_K)
         elif self.agg == "rtk":                   # IDEA 2: residual top-k blend (finer top weight, lossless)
             out = ResidualTopKBlend.apply(s, v, self.Delta, induction_selfsup._RTK_K, 12)
+        elif self.agg == "lutsm":                 # STRICTLY-ZERO-MULT: hard gather fwd + LUT-softmax mult-free bwd
+            self.last_s = s
+            out = LutSoftmaxGather.apply(s, v, self.Delta)
         else:                                     # soft (train relaxation): softmax@V
             out = torch.einsum("bhij,bhjd->bhid", F.softmax(s / self.tau, dim=-1), v)
         return self.o(self.drop(out.transpose(1, 2).reshape(B, L, D)))
@@ -273,7 +276,7 @@ def set_agg(model, agg):
 @torch.no_grad()
 def eval_bpb(model, val, args, device, agg, tau):
     saved = set_agg(model, agg); set_tau(model, max(tau, 1e-4))  # soft needs tau>0; gather/matmul ignore tau
-    if agg in ("shift", "mbr", "rtk"):
+    if agg in ("shift", "mbr", "rtk", "lutsm"):
         set_delta(model, tau)                          # shift/mbr deploy: reuse the tau slot as Delta (the band/floor)
     model.eval()
     gen = torch.Generator().manual_seed(1234)
@@ -332,7 +335,7 @@ def train_arm(name, score, train_agg, anneal, deploy_aggs, seed, args, train, va
         # tau -> tau_floor (small +ve so the soft train path stays valid; the GATHER
         # deploy is tau-free and is the true hard limit).
         set_tau(model, tau_at(step, args.steps, args.tau, args.tau_floor) if anneal else args.tau)
-        if train_agg in ("shift", "mbr", "rtk"):              # anneal the mult-free blend temperature/band
+        if train_agg in ("shift", "mbr", "rtk", "lutsm"):              # anneal the mult-free blend temperature/band
             set_delta(model, delta_at(step, args))
         model.train()
         x, y = batch(train, args.batch, args.seq, gen, device)
@@ -665,6 +668,7 @@ def main():
         ("mbr",        "l1",  "mbr",   True, [("soft_mbr", "mbr", args.delta_floor), ("gather", "gather", 0.0), ("topk_dyadic", "mbr", args.mbr_deploy_band)]),  # IDEA 5: margin-banded rank blend; deploy gather (Δ=0) or top-k dyadic blend (Δ>0)
         ("pshift",     "l1",  "shift", True, [("soft_pshift", "shift", args.delta_floor), ("gather", "gather", 0.0)]),  # WINNER: peaking-regularized finer-mantissa shift blend; deploy gather
         ("rtk",        "l1",  "rtk",   True, [("soft_rtk", "rtk", args.delta_floor), ("gather", "gather", 0.0)]),  # RUNNER-UP: residual top-k blend (finer top weight); deploy gather
+        ("lutsm",      "l1",  "lutsm", True, [("gather", "gather", 0.0)]),  # STRICTLY-ZERO-MULT: hard-gather fwd + LUT-softmax mult-free bwd
     ]
     ff_arms = ["ff2", "ff2_shuffle", "lm_only_hard",    # teacher-free mult-free router + controls
                "ff2_adamw", "lm_only_hard_adamw",       # AdamW diagnostics (isolate router vs optimizer tax)

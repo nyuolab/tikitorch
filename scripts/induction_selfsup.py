@@ -224,6 +224,45 @@ def _scatter_dv(topi, dv_top, Lk, dh):
     return dv
 
 
+class LutSoftmaxGather(torch.autograd.Function):
+    """STRICTLY-ZERO-MULTIPLY attention (the smooth-blend wall, attacked at the GRADIENT not the forward).
+    The smooth-vs-peaked tension that capped MBR/shift/pshift came from the SOFT FORWARD BLEND (fine w*V
+    is a multiply -> dyadic-coarse weights -> underfits). This sidesteps it:
+      FORWARD  = hard argmax-GATHER (exact, mult-free, deploy-identical). NO blend, NO coarse weights.
+      BACKWARD = the TRUE softmax score/value gradient, computed MULTIPLIER-FREE via an exp2 LUT
+                 (the project's morph-LM exp2-ROM convention) + an LZC pow2 normalizer (shift):
+                   p   = exp2((s-max)/Δ) / pow2_ceil(Σ exp2)        # LUT + shift  (NO exp HW, NO divide)
+                   ds_j = q(p_j) · (<q(g),q(V_j)> - <q(g),q(out)>)  # dyadic operands -> shifts
+                   dv_j = q(p_j) · g_up
+    This is exactly the NON-DEGENERATE soft-weighted routing gradient the memory flagged as blocked
+    ("softmax p needs exp") -- unblocked by computing p with a ROM instead of a multiplier. Quantizing p
+    in the BACKWARD only affects the gradient (robust; dyadic-Adam trains fine on coarse grads), while
+    the FORWARD stays the exact hard gather -> lossless deploy by construction. Δ annealed high->low."""
+
+    @staticmethod
+    def forward(ctx, s, v, Delta):
+        jstar = s.argmax(-1)
+        out = torch.gather(v, -2, jstar.unsqueeze(-1).expand(*jstar.shape, v.shape[-1]))
+        ctx.save_for_backward(s, v, out)
+        ctx.Delta = Delta
+        return out
+
+    @staticmethod
+    def backward(ctx, g_up):
+        s, v, out = ctx.saved_tensors
+        finite = torch.isfinite(s)
+        ex = torch.where(finite, torch.exp2((s - s.amax(-1, keepdim=True)) / ctx.Delta),
+                         torch.zeros_like(s))                # exp2-ROM (sim); /Δ folds the ln2 const
+        Zhat = torch.exp2(torch.ceil(torch.log2(ex.sum(-1, keepdim=True).clamp_min(1e-12))))
+        p = dyadic_quantize(ex / Zhat)                       # softmax probs, dyadic (LUT/pow2 -> shift)
+        gq, vq, oq = dyadic_quantize(g_up), dyadic_quantize(v), dyadic_quantize(out)
+        gV = torch.einsum("bhid,bhjd->bhij", gq, vq)         # <g,V_j>
+        gout = torch.einsum("bhid,bhid->bhi", gq, oq).unsqueeze(-1)
+        ds = p * (gV - gout)                                 # TRUE softmax score grad (dyadic = shifts)
+        dv = torch.einsum("bhij,bhid->bhjd", p, g_up)        # softmax value grad
+        return ds, dv, None
+
+
 class ResidualTopKBlend(torch.autograd.Function):
     """RUNNER-UP (idea 2, RTK): residual top-k blend, finer top weight than MBR, no pow2-ceil divide.
     out = V_(0) + Σ_{r>=1} 2^-c_r · (V_(r) - V_(0)),  c_r = round((s_(0) - s_(r))/Δ) clamped [0,W].
