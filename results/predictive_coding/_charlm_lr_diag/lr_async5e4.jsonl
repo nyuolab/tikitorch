@@ -1,0 +1,1 @@
+{"mode": "relax_async", "val_bpc": 2.3406, "best_epoch": 12, "wall_s": 412.7, "epochs": 14, "context": 12, "hidden": 256, "depth": 4, "wd": 0.0002, "drop": 0.1}
