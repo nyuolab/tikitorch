@@ -70,11 +70,15 @@ scale where Rung-4's economics flip).
 
 ## The open tests (the path, in dependency order)
 
-1. **Model-parallel PC correctness** *(the immediate test — see `pc_model_parallel.py`)*:
-   does PC's local credit train an LM to full quality when each layer is a **real separate
-   process** exchanging **only neighbour messages with no global barrier** — not the
-   single-process simulated async of the staleness-frontier? This is the correctness gate
-   for the whole vision.
+1. **Model-parallel PC correctness** *(`pc_model_parallel.py`)* — **DONE, PASSED.** Sharded
+   one MLP char-LM across **D real `torch.distributed` (gloo) processes, one layer each**,
+   neighbour-only point-to-point messages, **no all-reduce, no global barrier, no process
+   ever holding the global model or gradient**, each updating its layer from its own local
+   credit. **Measured: it tracks single-process backprop step-for-step and reaches the same
+   quality** — D=3: sharded 3.618 vs backprop 3.621; D=5: sharded **3.0179** vs backprop
+   **3.0182**. So the carrier survives *real* sharding (not a single-process simulation
+   artifact). [This is correctness, not throughput — gloo localhost; Rung 4 already settled
+   the digital-throughput economics.]
 2. **Amortised relaxation** *(the Rung-4 revisit)*: does **few rounds per step, warm-started
    across steps** (credit converges over training, not within each step) hold quality? If
    so, PC's per-step cost drops from O(L/p) toward O(1) and Rung-4's digital economics could
