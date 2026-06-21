@@ -127,6 +127,16 @@ int main(int argc, char** argv) {
     for (int j = 0; j < PC_N*PC_D; j++) { fpga_pci_peek(bar4r, DDR_BUF_ADDR + (uint64_t)(O_EDN + j)*4, &v); ed[j] = (int32_t)v; }
     for (int j = 0; j < PC_D; j++)      { fpga_pci_peek(bar4r, DDR_BUF_ADDR + (uint64_t)(O_GB + j)*4,  &v); gb[j] = (int32_t)v; }
 
+    // diagnostics: are outputs zero (kernel writes not landing) or non-zero-but-wrong (compute/layout)?
+    long nz_gw = 0, nz_ed = 0, nz_gb = 0;
+    for (int j = 0; j < PC_D*PC_D; j++) if (gw[j] != 0) nz_gw++;
+    for (int j = 0; j < PC_N*PC_D; j++) if (ed[j] != 0) nz_ed++;
+    for (int j = 0; j < PC_D; j++) if (gb[j] != 0) nz_gb++;
+    printf("[pc] readback nonzero: gw %ld/%d  e_down %ld/%d  gb %ld/%d\n",
+           nz_gw, PC_D*PC_D, nz_ed, PC_N*PC_D, nz_gb, PC_D);
+    printf("[pc] samples: gw[0]=%d(ref %ld) gw[100]=%d(ref %ld) ed[0]=%d(ref %ld) gb[0]=%d(ref %ld)\n",
+           gw[0], ref_gw[0], gw[100], ref_gw[100], ed[0], ref_ed[0], gb[0], ref_gb[0]);
+
     long mgw = 0, med = 0, mgb = 0;
     for (int j = 0; j < PC_D*PC_D; j++) { long d = labs((long)gw[j] - ref_gw[j]); if (d > mgw) mgw = d; }
     for (int j = 0; j < PC_N*PC_D; j++) { long d = labs((long)ed[j] - ref_ed[j]); if (d > med) med = d; }
