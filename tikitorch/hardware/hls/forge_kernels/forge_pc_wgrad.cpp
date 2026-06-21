@@ -36,7 +36,15 @@ static const int OFF_SKIP = OFF_MASK + PC_N * PC_D;
 static const int OFF_GW   = OFF_SKIP + PC_N * PC_D;
 static const int OFF_EDN  = OFF_GW   + PC_D * PC_D;
 
-// dyadic-quantize a value to (sign, exponent): round(log2|v|) via MSB + the next bit. (== the probes' dyad)
+// dyadic-quantize a value to (sign, exponent): round-half-in-LOG -> sign*2^round(log2|v|).
+// Bit-exact to tikitorch.nn.dyadic_quantize (the measured PC carrier's quantizer) via a 16-entry
+// constant threshold: bump to 2^(msb+1) iff |v| >= ceil(sqrt(2)*2^msb). Verified 0 mismatch over all
+// int16 (pc_wgrad_kernel_check.py). Mult-FREE: just a priority-encode, a constant LUT read, and a
+// compare -- exact round(log2|v|) the cheap-1.5x way would only approximate (the cheaper bump-on-next-
+// bit round is training-equivalent, see pc_wgrad_round_ablation.py; faithful is used for rigor).
+static const ap_uint<16> DYAD_THRESH[16] = {
+    2, 3, 6, 12, 23, 46, 91, 182, 363, 725, 1449, 2897, 5793, 11586, 23171, 46341};
+
 static inline void dyad(data_t v, bool &sgn, exp_t &e, bool &nz) {
 #pragma HLS INLINE
     ap_uint<16> a = (v < 0) ? (ap_uint<16>)(-v) : (ap_uint<16>)v;
@@ -46,7 +54,7 @@ PRIO: for (int b = 15; b >= 1; b--) {
 #pragma HLS UNROLL
         if (a[b]) { msb = b; break; }
     }
-    if (msb >= 1 && a[msb - 1]) msb = msb + 1;
+    if (nz && a >= DYAD_THRESH[msb]) msb = msb + 1;   // round half in log (== dyadic_quantize)
     e = msb;
 }
 
