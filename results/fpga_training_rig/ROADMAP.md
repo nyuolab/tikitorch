@@ -120,12 +120,21 @@ uncertainties first.
   MID ~509 (band 340–510) / "best" ~600–650 (the old 1,017 was optimistic — writeback-bound, so
   DSP-adder lane-doubling gives ~1.2× not 2×). Flagship-A ~30M-to-convergence ≈ 2 weeks on one F2.** Full
   analysis: `results/fpga_training_rig/TOKS_PROJECTION.md`.
+- **THROUGHPUT — ✅ WRITE-FLOOR REACHED via DATAFLOW (2026-06-21, the lever flat2 couldn't pull).** The
+  write-bound weight-grad (`wide2` 76,640 cyc vs the 36,864-word write-floor) is fixed by `#pragma HLS
+  DATAFLOW` — two concurrent processes (compute ∥ writeback) + a right-sized FIFO. **`forge_wgrad_df3`
+  (per-row 2048-bit token, depth-16 FIFO): 40,927 cyc / 0.164 ms, closes 2.920 ns, 51% LUT/SLR, DSP=0**
+  (report confirms `compute_tiles` 40,927 ∥ `write_tiles` 36,875, Pipeline type `dataflow` → writeback
+  hidden under compute). **1.87× over wide2, 16.2× over the 664,932-cyc probe.** (`forge_wgrad_df`, the
+  whole-tile 16,384-bit token, FAILED Vitis's 4096-bit stream-aggregate limit — the per-row hedge was
+  necessary.) **Updated MEASURED tok/s (124M): floor ~78 / MID ~720–930 — reaches the roadmap's "900
+  planned" band AT DSP=0** (DSP-as-adder now becomes headroom toward "best", not a prerequisite).
+  Flagship-A ~30M-to-convergence ≈ 1–1.5 weeks on one F2. The throughput lever is exhausted (write-floor
+  reached); details in `TOKS_PROJECTION.md`.
 - **STILL OPEN (next levers):** (a) BIT-EXACT CSIM of each kernel vs the CPU reference (area/timing/cycle
   proven; HLS functional correctness argued via emulator + identical-PE diff, not yet cosim'd). (b) Integrate
   the kernels into one S1 block trainer + DDR-streaming choreography (`forge_buffer_gpt2.hpp`) — now the
-  critical path. (c) FURTHER THROUGHPUT (optional): close the ~2× write-floor gap (true compute/writeback
-  overlap or 1024-bit bus) + DSP-as-adder — characterized, diminishing returns vs integration. (d) AFI
-  build (gated — expensive/outward; not done).
+  critical path. (c) AFI build (gated — expensive/outward; not done).
 
 ## First three steps (local, no F2 builds)
 

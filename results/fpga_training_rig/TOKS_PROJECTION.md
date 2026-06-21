@@ -287,5 +287,39 @@ writeback (~47k of 75k cycles), now near its own write-roofline. So:
 
 **Net: throughput optimization delivered 8.7× on the critical backward kernel (2.66 ms → 0.307 ms,
 DSP=0, half-SLR) and pinned the flagship at a defensible MID ~509 tok/s (band 340–510). Flagship-A
-~30M-to-convergence ≈ 2 weeks on one F2.** Remaining tok/s levers (write-floor overlap, DSP-adder)
-are characterized and open; integration (S1 block) is now the critical path, not more kernel tuning.
+~30M-to-convergence ≈ 2 weeks on one F2.**
+
+---
+
+## DATAFLOW write-floor overlap — ✅ LANDED (2026-06-21, the lever flat2 couldn't pull)
+
+The `wide2` weight-grad was output-write-bound (75,072 cyc vs the 36,864-word write-floor). `flat2`'s
+single-loop ping-pong failed to overlap compute with writeback (II>1). **`#pragma HLS DATAFLOW` with
+two concurrent processes (compute ∥ writeback) + a right-sized FIFO succeeded:**
+
+| kernel | cycles | ms | LUT/SLR | DSP | note |
+|---|---|---|---|---|---|
+| `forge_wgrad_wide2` (prior best) | 76,640 | 0.307 | 51% | 2 | writeback serialized after compute |
+| **`forge_wgrad_df3`** ⭐ | **40,927** | **0.164** | 51% | 2* | DATAFLOW per-row token (2048-bit), overlap landed |
+| `forge_wgrad_df` (whole-tile token) | — | — | — | — | **FAILED**: 16,384-bit stream token > Vitis 4096-bit aggregate limit |
+
+`df3` report confirms true concurrency: `compute_tiles` 40,927 ∥ `write_tiles` 36,875, Pipeline type =
+**`dataflow`** → the DDR writeback is fully hidden under compute, landing at the write-floor.
+**1.87× over wide2, 16.2× over the original 664,932-cyc probe**, closes 2.920 ns, DSP=0. (The
+whole-tile `df` variant proved the per-row hedge necessary — a 32×512-bit token busts the stream limit.)
+
+**Updated tok/s — the write-floor lever reaches the planned band at DSP=0:**
+- The throughput-determining weight-grad latency improves 75,072 → 40,927 (~1.83×). On the projection's
+  conservative wgrad-uniform basis, **MID ~509 → ~900–930 tok/s**; on a realistic basis (fwd/input-grad
+  are cheaper, not write-bound, so the step is less wgrad-dominated) the lift is ~1.4–1.6× → **~720–820
+  tok/s**. Either way it reaches/approaches the roadmap's **"900 planned"** — and critically **at DSP=0**,
+  i.e. *without* the DSP-as-adder lever (which now becomes additional headroom toward "best", not a
+  prerequisite).
+- FLOOR (1 instance, full latency) rises proportionally: 0.164 ms/instance → ~78 tok/s.
+- Honest caveat: the device-level MID still depends on the unchanged A1 (≥5–6 instances fit) and A7
+  (attention overlap) assumptions; df3 improves the per-instance rate, not the floorplan. Band: **~720–930**.
+
+**Net throughput verdict: 16.2× on the weight-grad end-to-end (2.66 ms → 0.164 ms, DSP=0, half-SLR),
+flagship pinned at MID ~720–930 tok/s reaching the planned band at DSP=0. Flagship-A ~30M-to-convergence
+≈ 1–1.5 weeks on one F2. The throughput lever is now exhausted (write-floor reached); S1 block
+integration is the critical path.**
