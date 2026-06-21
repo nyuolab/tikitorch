@@ -247,3 +247,45 @@ uncertainty already absorbed (closes at csynth). P&R could erode it, but the pre
   ~500 tok/s puts flagship-A (~30M to convergence) at ~2 weeks and a 124M 1B-token fine-tune at
   ~3 weeks on ONE F2 — the single-card full-124M from-scratch (300B tok, ~19 yr) remains a
   multi-F2-farm task, exactly as the roadmap states.**
+
+---
+
+## MEASURED (round-2 csynth, 2026-06-21) — supersedes the projections above
+
+All weight-grad kernels + a realistic forward, **csynth on xcvu47p @ 4 ns, all close 2.920 ns**:
+
+| kernel | cycles | ms@250MHz | LUT/SLR | DSP | note |
+|---|---|---|---|---|---|
+| `forge_wgrad_probe` (baseline) | 664,932 | 2.66 | 49% | 0 | scalar writeback |
+| `forge_wgrad_wide` | 111,972 | 0.448 | 50% | 0 | 512-bit burst writeback → 5.94× |
+| **`forge_wgrad_wide2`** ⭐ | **76,640** | **0.307** | 51% | 2* | + wide loads / fused quantize → **8.7×**, bit-exact to proven |
+| `forge_wgrad_flat2` | 73,841 | 0.295 | 64% | 3* | ping-pong overlap — **underdelivered** (projected 36,864) |
+| `forge_fwd_wide` | ~70,000 | ~0.28 | 51% | 0 | pre-dyadic W → the 589,824-cyc QW artifact removed |
+
+*DSP 2–3 = an address-divide (`base/feat`, feat=768 not a power of two) in control logic, **not** a
+datapath multiplier. The dyadic MAC is DSP=0; the multiplier-free invariant holds (DSP_MULT=0).
+
+**Key finding — the weight-grad is OUTPUT-WRITE-BOUND, not compute-bound.** It must write the full
+589,824-element gW matrix = **36,864 wide-word floor**, which *exceeds* the 18,432-cycle 512-lane
+compute floor. `wide2`'s per-tile cost (ITILE 65 cyc = NRED 20 + **WB 41** + ~4) is dominated by the
+writeback (~47k of 75k cycles), now near its own write-roofline. So:
+- The 8.7× win came entirely from fixing writeback bandwidth (scalar → 512-bit burst), as diagnosed.
+  Front-matter (loads+quantize) collapsed from ~49,200 → **1,563 cycles** in wide2.
+- The `flat2` roofline play (overlap compute under writeback to reach the 36,864 floor) **did not
+  materialize in synthesis** — measured 73,841 ≈ wide2; the ping-pong did not schedule at II=1 across
+  the phase-interleaved loop. The ~2× gap to the write floor is **open, real-but-unrealized**.
+
+**Corrected tok/s bands (measured-grounded):**
+- **FLOOR ~57 / MID ~509** — CONFIRMED. The mid basis (steady-state ~75k cyc) is exactly `wide2`'s
+  measured full latency; the forward is *cheaper* (compute 20,424 cyc), so the wgrad-based denominator
+  is, if anything, conservative.
+- **BEST ~1,017 was OPTIMISTIC.** It assumed DSP-as-adder lane-doubling gives ~2×. But the kernel is
+  **writeback-bound**, so doubling lanes cuts only the NRED term (~23k→~11k) → ~75k→~63k = **~1.2×,
+  not 2×**. A realistic "best" without a deeper architectural change (true compute/writeback overlap,
+  or a 1024-bit bus) is **~600–650 tok/s**, not ~1,000. The roadmap's 3,500 needs the overlap AND
+  DSP-adder AND wider memory — a target, not a result.
+
+**Net: throughput optimization delivered 8.7× on the critical backward kernel (2.66 ms → 0.307 ms,
+DSP=0, half-SLR) and pinned the flagship at a defensible MID ~509 tok/s (band 340–510). Flagship-A
+~30M-to-convergence ≈ 2 weeks on one F2.** Remaining tok/s levers (write-floor overlap, DSP-adder)
+are characterized and open; integration (S1 block) is now the critical path, not more kernel tuning.

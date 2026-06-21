@@ -99,11 +99,32 @@ uncertainties first.
 
   So a full transformer-block trainer's compute fits ~1–2 SLRs, DSP-free except the soft-blend. This
   proves the rig's datapath is **buildable on real silicon**, not just on paper.
-- **STILL OPEN (next levers):** (a) THROUGHPUT — `forge_wgrad2`'s dataflow opt failed; pipelining the
-  weight-grad/GEMM tile loops to II=1 (+ DSP-as-adder) is unsolved and is *the* tok/s lever (rig is
-  compute-bound). (b) BIT-EXACT CSIM of each kernel vs the CPU reference (area/timing proven; functional
-  correctness of the HLS not yet — the *algorithm* is validated via the CPU `mfgrad` gate). (c) Integrate
-  the kernels into one S1 block trainer + the DDR-streaming choreography (`forge_buffer_gpt2.hpp`). (d) AFI
+- **THROUGHPUT — ✅ 8.7× DELIVERED + tok/s PINNED (2026-06-21, Vitis csynth, xcvu47p @4ns).** The
+  weight-grad bottleneck was the **scalar writeback** (512 int32/tile @ 1/cycle = 89% of the 665k-cycle
+  baseline), NOT compute. Fix = 512-bit burst writeback + wide loads/fused-quantize:
+
+  | kernel | cycles | ms | LUT/SLR | DSP | vs baseline |
+  |---|---|---|---|---|---|
+  | `forge_wgrad_probe` (baseline) | 664,932 | 2.66 | 49% | 0 | 1× |
+  | `forge_wgrad_wide` (burst writeback) | 111,972 | 0.448 | 50% | 0 | 5.94× |
+  | **`forge_wgrad_wide2`** (+ wide loads) ⭐ | **76,640** | **0.307** | 51% | 2* | **8.7×** |
+  | `forge_wgrad_flat2` (ping-pong overlap) | 73,841 | 0.295 | 64% | 3* | 9.0× (roofline play **underdelivered**) |
+  | `forge_fwd_wide` (pre-dyadic W) | ~70,000 | ~0.28 | 51% | 0 | (fwd; 2.36 ms QW artifact removed) |
+
+  *DSP 2–3 = an address-divide in control logic, NOT a datapath multiplier (dyadic MAC is DSP=0). All
+  close 2.920 ns. **Winner: `forge_wgrad_wide2`** (bit-exact to proven, half-SLR). KEY: the weight-grad
+  is **output-WRITE-bound** — it must write the full 589,824-elem gW (36,864-word floor > 18,432 compute
+  floor); `flat2`'s overlap-to-floor didn't schedule II=1 (projected 36,864, measured 73,841). The v1
+  sweep (bigpe/turbo/dsp/fast/pe512) ALL missed (bigpe 1.83-SLR no-win; 4 flatteners >75-min synth
+  backstop) — lesson: unroll ONLY the 512 lanes, never tiles/N. **MEASURED tok/s (124M): floor ~57 /
+  MID ~509 (band 340–510) / "best" ~600–650 (the old 1,017 was optimistic — writeback-bound, so
+  DSP-adder lane-doubling gives ~1.2× not 2×). Flagship-A ~30M-to-convergence ≈ 2 weeks on one F2.** Full
+  analysis: `results/fpga_training_rig/TOKS_PROJECTION.md`.
+- **STILL OPEN (next levers):** (a) BIT-EXACT CSIM of each kernel vs the CPU reference (area/timing/cycle
+  proven; HLS functional correctness argued via emulator + identical-PE diff, not yet cosim'd). (b) Integrate
+  the kernels into one S1 block trainer + DDR-streaming choreography (`forge_buffer_gpt2.hpp`) — now the
+  critical path. (c) FURTHER THROUGHPUT (optional): close the ~2× write-floor gap (true compute/writeback
+  overlap or 1024-bit bus) + DSP-as-adder — characterized, diminishing returns vs integration. (d) AFI
   build (gated — expensive/outward; not done).
 
 ## First three steps (local, no F2 builds)
