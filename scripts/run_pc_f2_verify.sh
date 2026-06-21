@@ -60,9 +60,10 @@ mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.
 gcc -O2 -std=gnu11 -I"\$SDK/include" \
     /opt/tiki/tikitorch/fpga/silicon/forge_pc_ddr_verify.c -lfpga_mgmt -o /tmp/forge_pc_ddr_verify 2>&1 | tee /tmp/build.txt
 up
+( sudo /tmp/forge_pc_ddr_verify 0 kat 2>&1 | tee /tmp/verify_kat.txt; echo KAT_EXIT=\${PIPESTATUS[0]} >> /tmp/verify_kat.txt ) || true
 ( sudo /tmp/forge_pc_ddr_verify 0 2>&1 | tee /tmp/verify.txt; echo VERIFY_EXIT=\${PIPESTATUS[0]} >> /tmp/verify.txt ) || true
 echo "== post metrics =="; sudo \$FD -S 0 -M 2>&1 | grep -iE "Vccint|Last measured|ddr" | tee /tmp/m_post.txt || true
-for f in img build verify m_post; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
+for f in img build verify_kat verify m_post; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
 echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 up; shutdown -h now
 UDEOF

@@ -53,18 +53,22 @@ static double now_s(){ struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); ret
 
 int main(int argc, char** argv) {
     int slot = (argc > 1) ? atoi(argv[1]) : 0;
+    int kat  = (argc > 2 && strcmp(argv[2], "kat") == 0);   // known-answer test: all inputs = 1
     const size_t bytes = (size_t)BUFLEN * 4;
     int32_t* h = (int32_t*)calloc(BUFLEN, 4);             // host buffer (inputs in, outputs read back)
 
-    // --- build inputs (deployed fixed-point range; same recipe as the CSIM tb) ---
+    // --- build inputs. KAT (all 1s): answer is trivially gW=gB=N, e_down=D everywhere, and lane order
+    // is IRRELEVANT (every value is 1) -> isolates a value/lane READ issue from a structural compute bug.
+    // Otherwise: deployed fixed-point range (same recipe as the CSIM tb). ---
     srand(20260621);
     for (int i = 0; i < PC_N*PC_D; i++) {
-        h[O_E + i]    = (rand() % 1201) - 600;
-        h[O_ACT + i]  = rand() % 601;
-        h[O_MASK + i] = (rand() % 100) < 60 ? 1 : 0;
-        h[O_SKIP + i] = (rand() % 100) < 70 ? 1 : 0;
+        h[O_E + i]    = kat ? 1 : (rand() % 1201) - 600;
+        h[O_ACT + i]  = kat ? 1 : rand() % 601;
+        h[O_MASK + i] = kat ? 1 : ((rand() % 100) < 60 ? 1 : 0);
+        h[O_SKIP + i] = kat ? 1 : ((rand() % 100) < 70 ? 1 : 0);
     }
-    for (int i = 0; i < PC_D*PC_D; i++) h[O_W + i] = (rand() % 1201) - 600;
+    for (int i = 0; i < PC_D*PC_D; i++) h[O_W + i] = kat ? 1 : (rand() % 1201) - 600;
+    if (kat) printf("[pc] KNOWN-ANSWER TEST: all inputs=1 -> expect gW=gB=%d and e_down=%d everywhere\n", PC_N, PC_D);
 
     // --- host reference (int64 cascade_grads layer-step) BEFORE staging (outputs zeroed in h) ---
     static long delta[PC_N][PC_D];
