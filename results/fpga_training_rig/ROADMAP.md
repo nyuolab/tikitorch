@@ -85,6 +85,26 @@ uncertainties first.
 - **NET: all three critical-path gates (3 algorithm, 2 timing/area, 1 fits & DSP-free) are GREEN at the
   probe level — the rig's biggest risks are de-risked.** Next: throughput (pipeline tile loops to II=1 +
   DSP-as-adder) and the full S1 training block (fwd GEMM + attention + norm + dyadic-Adam).
+- **S1 KERNEL SUITE — ✅ SYNTHESIZES + CLOSES TIMING on silicon (2026-06-21, Vitis csynth, xcvu47p @4ns;
+  4 parallel AWS z1d csynths).** Every training-block kernel closes 2.920 ns ≤ 4.0 ns, with the DSP
+  profile EXACTLY as designed — mult-free except the one attention soft-blend:
+
+  | kernel | timing | DSP | LUT/SLR | notes |
+  |---|---|---|---|---|
+  | `forge_fwd_gemm` (dyadic forward GEMM) | 2.92 ns | 0 | 1% | weight→shift, mult-free |
+  | `forge_dyadic_adam` (optimizer update) | 2.92 ns | 0 | 3% | 0.59 ms / 590k-param region |
+  | `forge_attn` (attention block) | 2.92 ns | **128** (4%) | 8% | DSP = the `Σp·V` soft-blend = the ONE irreducible multiply, confirmed in silicon |
+  | `forge_wgrad_probe` (weight-grad) | 2.92 ns | 0 | 49% | the validated backward |
+  | `forge_wgrad2` (throughput try) | 2.92 ns | 0 | 81% | **FAILED**: 2.7–40 ms, no win vs probe 2.66 ms |
+
+  So a full transformer-block trainer's compute fits ~1–2 SLRs, DSP-free except the soft-blend. This
+  proves the rig's datapath is **buildable on real silicon**, not just on paper.
+- **STILL OPEN (next levers):** (a) THROUGHPUT — `forge_wgrad2`'s dataflow opt failed; pipelining the
+  weight-grad/GEMM tile loops to II=1 (+ DSP-as-adder) is unsolved and is *the* tok/s lever (rig is
+  compute-bound). (b) BIT-EXACT CSIM of each kernel vs the CPU reference (area/timing proven; functional
+  correctness of the HLS not yet — the *algorithm* is validated via the CPU `mfgrad` gate). (c) Integrate
+  the kernels into one S1 block trainer + the DDR-streaming choreography (`forge_buffer_gpt2.hpp`). (d) AFI
+  build (gated — expensive/outward; not done).
 
 ## First three steps (local, no F2 builds)
 

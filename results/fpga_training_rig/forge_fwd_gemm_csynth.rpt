@@ -1,0 +1,353 @@
+
+
+================================================================
+== Vitis HLS Report for 'forge_fwd_gemm'
+================================================================
+* Date:           Sat Jun 20 23:22:58 2026
+
+* Version:        2024.1 (Build 5069499 on May 21 2024)
+* Project:        forge_fwd_gemm_proj
+* Solution:       solution1 (Vivado IP Flow Target)
+* Product family: virtexuplusHBM
+* Target device:  xcvu47p-fsvh2892-2L-e
+
+
+================================================================
+== Performance Estimates
+================================================================
++ Timing: 
+    * Summary: 
+    +--------+---------+----------+------------+
+    |  Clock |  Target | Estimated| Uncertainty|
+    +--------+---------+----------+------------+
+    |ap_clk  |  4.00 ns|  2.920 ns|     1.08 ns|
+    +--------+---------+----------+------------+
+
++ Latency: 
+    * Summary: 
+    +---------+---------+----------+----------+-----+-----+---------+
+    |  Latency (cycles) |  Latency (absolute) |  Interval | Pipeline|
+    |   min   |   max   |    min   |    max   | min | max |   Type  |
+    +---------+---------+----------+----------+-----+-----+---------+
+    |        ?|        ?|         ?|         ?|    ?|    ?|       no|
+    +---------+---------+----------+----------+-----+-----+---------+
+
+    + Detail: 
+        * Instance: 
+        +----------------------------------------------------------------------+-----------------------------------------------------------+---------+---------+----------+----------+--------+--------+-----------------------------------------------+
+        |                                                                      |                                                           |  Latency (cycles) |  Latency (absolute) |     Interval    |                    Pipeline                   |
+        |                               Instance                               |                           Module                          |   min   |   max   |    min   |    max   |   min  |   max  |                      Type                     |
+        +----------------------------------------------------------------------+-----------------------------------------------------------+---------+---------+----------+----------+--------+--------+-----------------------------------------------+
+        |grp_burst_load_fu_205                                                 |burst_load                                                 |        ?|        ?|         ?|         ?|       ?|       ?|                                             no|
+        |grp_forge_fwd_gemm_Pipeline_QW_VITIS_LOOP_84_1_fu_215                 |forge_fwd_gemm_Pipeline_QW_VITIS_LOOP_84_1                 |   589828|   589828|  2.359 ms|  2.359 ms|  589825|  589825|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        |grp_forge_fwd_gemm_Pipeline_IRED_fu_270                               |forge_fwd_gemm_Pipeline_IRED                               |      772|      772|  3.088 us|  3.088 us|     769|     769|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        |grp_forge_fwd_gemm_Pipeline_VITIS_LOOP_127_6_VITIS_LOOP_128_7_fu_341  |forge_fwd_gemm_Pipeline_VITIS_LOOP_127_6_VITIS_LOOP_128_7  |      137|      137|  0.548 us|  0.548 us|     129|     129|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        +----------------------------------------------------------------------+-----------------------------------------------------------+---------+---------+----------+----------+--------+--------+-----------------------------------------------+
+
+        * Loop: 
+        +----------+---------+---------+----------+-----------+-----------+------+----------+
+        |          |  Latency (cycles) | Iteration|  Initiation Interval  | Trip |          |
+        | Loop Name|   min   |   max   |  Latency |  achieved |   target  | Count| Pipelined|
+        +----------+---------+---------+----------+-----------+-----------+------+----------+
+        |- OTILE   |    88512|    88512|       922|          -|          -|    96|        no|
+        +----------+---------+---------+----------+-----------+-----------+------+----------+
+
+
+
+================================================================
+== Utilization Estimates
+================================================================
+* Summary: 
++---------------------+---------+------+---------+---------+-----+
+|         Name        | BRAM_18K|  DSP |    FF   |   LUT   | URAM|
++---------------------+---------+------+---------+---------+-----+
+|DSP                  |        -|     -|        -|        -|    -|
+|Expression           |        -|     -|        0|      129|    -|
+|FIFO                 |        -|     -|        -|        -|    -|
+|Instance             |        2|     -|     2110|     5599|    0|
+|Memory               |      265|     -|        0|        0|    0|
+|Multiplexer          |        -|     -|        0|     1226|    -|
+|Register             |        -|     -|      768|        -|    -|
++---------------------+---------+------+---------+---------+-----+
+|Total                |      267|     0|     2878|     6954|    0|
++---------------------+---------+------+---------+---------+-----+
+|Available SLR        |     1344|  3008|   869120|   434560|  320|
++---------------------+---------+------+---------+---------+-----+
+|Utilization SLR (%)  |       19|     0|       ~0|        1|    0|
++---------------------+---------+------+---------+---------+-----+
+|Available            |     4032|  9024|  2607360|  1303680|  960|
++---------------------+---------+------+---------+---------+-----+
+|Utilization (%)      |        6|     0|       ~0|       ~0|    0|
++---------------------+---------+------+---------+---------+-----+
+
++ Detail: 
+    * Instance: 
+    +----------------------------------------------------------------------+-----------------------------------------------------------+---------+----+-----+------+-----+
+    |                               Instance                               |                           Module                          | BRAM_18K| DSP|  FF |  LUT | URAM|
+    +----------------------------------------------------------------------+-----------------------------------------------------------+---------+----+-----+------+-----+
+    |grp_burst_load_fu_205                                                 |burst_load                                                 |        0|   0|  104|   339|    0|
+    |control_s_axi_U                                                       |control_s_axi                                              |        0|   0|  106|   168|    0|
+    |grp_forge_fwd_gemm_Pipeline_IRED_fu_270                               |forge_fwd_gemm_Pipeline_IRED                               |        0|   0|  803|  2992|    0|
+    |grp_forge_fwd_gemm_Pipeline_QW_VITIS_LOOP_84_1_fu_215                 |forge_fwd_gemm_Pipeline_QW_VITIS_LOOP_84_1                 |        0|   0|  207|   464|    0|
+    |grp_forge_fwd_gemm_Pipeline_VITIS_LOOP_127_6_VITIS_LOOP_128_7_fu_341  |forge_fwd_gemm_Pipeline_VITIS_LOOP_127_6_VITIS_LOOP_128_7  |        0|   0|  203|   927|    0|
+    |gmem_m_axi_U                                                          |gmem_m_axi                                                 |        2|   0|  687|   709|    0|
+    +----------------------------------------------------------------------+-----------------------------------------------------------+---------+----+-----+------+-----+
+    |Total                                                                 |                                                           |        2|   0| 2110|  5599|    0|
+    +----------------------------------------------------------------------+-----------------------------------------------------------+---------+----+-----+------+-----+
+
+    * DSP: 
+    N/A
+
+    * Memory: 
+    +-----------------------------+-------------------------------------+---------+---+----+-----+-------+-----+------+-------------+
+    |            Memory           |                Module               | BRAM_18K| FF| LUT| URAM| Words | Bits| Banks| W*Bits*Banks|
+    +-----------------------------+-------------------------------------+---------+---+----+-----+-------+-----+------+-------------+
+    |forge_fwd_gemm_int_wE_U      |forge_fwd_gemm_int_wE_RAM_AUTO_1R1W  |       23|  0|   0|    0|  73728|    5|     1|       368640|
+    |forge_fwd_gemm_int_wE_10_U   |forge_fwd_gemm_int_wE_RAM_AUTO_1R1W  |       23|  0|   0|    0|  73728|    5|     1|       368640|
+    |forge_fwd_gemm_int_wE_11_U   |forge_fwd_gemm_int_wE_RAM_AUTO_1R1W  |       23|  0|   0|    0|  73728|    5|     1|       368640|
+    |forge_fwd_gemm_int_wE_12_U   |forge_fwd_gemm_int_wE_RAM_AUTO_1R1W  |       23|  0|   0|    0|  73728|    5|     1|       368640|
+    |forge_fwd_gemm_int_wE_13_U   |forge_fwd_gemm_int_wE_RAM_AUTO_1R1W  |       23|  0|   0|    0|  73728|    5|     1|       368640|
+    |forge_fwd_gemm_int_wE_14_U   |forge_fwd_gemm_int_wE_RAM_AUTO_1R1W  |       23|  0|   0|    0|  73728|    5|     1|       368640|
+    |forge_fwd_gemm_int_wE_15_U   |forge_fwd_gemm_int_wE_RAM_AUTO_1R1W  |       23|  0|   0|    0|  73728|    5|     1|       368640|
+    |forge_fwd_gemm_int_wE_16_U   |forge_fwd_gemm_int_wE_RAM_AUTO_1R1W  |       23|  0|   0|    0|  73728|    5|     1|       368640|
+    |forge_fwd_gemm_int_wS_U      |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wNZ_U     |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wS_17_U   |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wNZ_24_U  |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wS_18_U   |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wNZ_25_U  |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wS_19_U   |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wNZ_26_U  |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wS_20_U   |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wNZ_27_U  |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wS_21_U   |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wNZ_28_U  |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wS_22_U   |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wNZ_29_U  |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wS_23_U   |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_wNZ_30_U  |forge_fwd_gemm_int_wS_RAM_AUTO_1R1W  |        5|  0|   0|    0|  73728|    1|     1|        73728|
+    |forge_fwd_gemm_int_xx_U      |forge_fwd_gemm_int_xx_RAM_AUTO_1R1W  |        1|  0|   0|    0|    768|   16|     1|        12288|
+    +-----------------------------+-------------------------------------+---------+---+----+-----+-------+-----+------+-------------+
+    |Total                        |                                     |      265|  0|   0|    0|1770240|   72|    25|      4141056|
+    +-----------------------------+-------------------------------------+---------+---+----+-----+-------+-----+------+-------------+
+
+    * FIFO: 
+    N/A
+
+    * Expression: 
+    +----------------------+----------+----+---+----+------------+------------+
+    |     Variable Name    | Operation| DSP| FF| LUT| Bitwidth P0| Bitwidth P1|
+    +----------------------+----------+----+---+----+------------+------------+
+    |add_ln95_1_fu_424_p2  |         +|   0|  0|  17|          10|           4|
+    |add_ln95_fu_390_p2    |         +|   0|  0|  71|          64|          22|
+    |sub_ln111_fu_463_p2   |         -|   0|  0|  24|          17|          17|
+    |icmp_ln95_fu_418_p2   |      icmp|   0|  0|  17|          10|          10|
+    +----------------------+----------+----+---+----+------------+------------+
+    |Total                 |          |   0|  0| 129|         101|          53|
+    +----------------------+----------+----+---+----+------------+------------+
+
+    * Multiplexer: 
+    +------------------------------------+-----+-----------+-----+-----------+
+    |                Name                | LUT | Input Size| Bits| Total Bits|
+    +------------------------------------+-----+-----------+-----+-----------+
+    |ap_NS_fsm                           |  155|         34|    1|         34|
+    |forge_fwd_gemm_int_wE_10_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wE_10_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wE_10_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wE_11_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wE_11_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wE_11_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wE_12_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wE_12_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wE_12_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wE_13_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wE_13_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wE_13_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wE_14_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wE_14_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wE_14_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wE_15_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wE_15_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wE_15_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wE_16_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wE_16_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wE_16_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wE_address0      |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wE_ce0           |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wE_we0           |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wNZ_24_address0  |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wNZ_24_ce0       |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wNZ_24_we0       |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wNZ_25_address0  |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wNZ_25_ce0       |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wNZ_25_we0       |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wNZ_26_address0  |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wNZ_26_ce0       |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wNZ_26_we0       |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wNZ_27_address0  |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wNZ_27_ce0       |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wNZ_27_we0       |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wNZ_28_address0  |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wNZ_28_ce0       |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wNZ_28_we0       |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wNZ_29_address0  |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wNZ_29_ce0       |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wNZ_29_we0       |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wNZ_30_address0  |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wNZ_30_ce0       |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wNZ_30_we0       |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wNZ_address0     |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wNZ_ce0          |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wNZ_we0          |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wS_17_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wS_17_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wS_17_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wS_18_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wS_18_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wS_18_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wS_19_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wS_19_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wS_19_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wS_20_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wS_20_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wS_20_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wS_21_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wS_21_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wS_21_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wS_22_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wS_22_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wS_22_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wS_23_address0   |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wS_23_ce0        |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wS_23_we0        |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_wS_address0      |   14|          3|   17|         51|
+    |forge_fwd_gemm_int_wS_ce0           |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_wS_we0           |    9|          2|    1|          2|
+    |forge_fwd_gemm_int_xx_address0      |   14|          3|   10|         30|
+    |forge_fwd_gemm_int_xx_ce0           |   14|          3|    1|          3|
+    |forge_fwd_gemm_int_xx_we0           |    9|          2|    1|          2|
+    |gmem_ARADDR                         |   26|          5|   64|        320|
+    |gmem_ARLEN                          |   26|          5|   32|        160|
+    |gmem_ARVALID                        |   20|          4|    1|          4|
+    |gmem_AWVALID                        |    9|          2|    1|          2|
+    |gmem_BREADY                         |    9|          2|    1|          2|
+    |gmem_RREADY                         |   20|          4|    1|          4|
+    |gmem_WVALID                         |    9|          2|    1|          2|
+    |gmem_blk_n_AR                       |    9|          2|    1|          2|
+    |gmem_blk_n_R                        |    9|          2|    1|          2|
+    |ot_fu_144                           |    9|          2|   10|         20|
+    +------------------------------------+-----+-----------+-----+-----------+
+    |Total                               | 1226|        264|  582|       1931|
+    +------------------------------------+-----+-----------+-----+-----------+
+
+    * Register: 
+    +-----------------------------------------------------------------------------------+----+----+-----+-----------+
+    |                                        Name                                       | FF | LUT| Bits| Const Bits|
+    +-----------------------------------------------------------------------------------+----+----+-----+-----------+
+    |ap_CS_fsm                                                                          |  33|   0|   33|          0|
+    |b_1_reg_596                                                                        |  32|   0|   32|          0|
+    |b_2_reg_602                                                                        |  32|   0|   32|          0|
+    |b_3_reg_608                                                                        |  32|   0|   32|          0|
+    |b_4_reg_614                                                                        |  32|   0|   32|          0|
+    |b_5_reg_620                                                                        |  32|   0|   32|          0|
+    |b_6_reg_626                                                                        |  32|   0|   32|          0|
+    |b_7_reg_632                                                                        |  32|   0|   32|          0|
+    |b_reg_590                                                                          |  32|   0|   32|          0|
+    |buffer_r_read_reg_509                                                              |  64|   0|   64|          0|
+    |gmem_addr_1_reg_575                                                                |  64|   0|   64|          0|
+    |grp_burst_load_fu_205_ap_start_reg                                                 |   1|   0|    1|          0|
+    |grp_forge_fwd_gemm_Pipeline_IRED_fu_270_ap_start_reg                               |   1|   0|    1|          0|
+    |grp_forge_fwd_gemm_Pipeline_QW_VITIS_LOOP_84_1_fu_215_ap_start_reg                 |   1|   0|    1|          0|
+    |grp_forge_fwd_gemm_Pipeline_VITIS_LOOP_127_6_VITIS_LOOP_128_7_fu_341_ap_start_reg  |   1|   0|    1|          0|
+    |ot_1_reg_581                                                                       |  10|   0|   10|          0|
+    |ot_fu_144                                                                          |  10|   0|   10|          0|
+    |p_loc22_fu_172                                                                     |  32|   0|   32|          0|
+    |p_loc23_fu_168                                                                     |  32|   0|   32|          0|
+    |p_loc24_fu_164                                                                     |  32|   0|   32|          0|
+    |p_loc25_fu_160                                                                     |  32|   0|   32|          0|
+    |p_loc26_fu_156                                                                     |  32|   0|   32|          0|
+    |p_loc27_fu_152                                                                     |  32|   0|   32|          0|
+    |p_loc28_fu_148                                                                     |  32|   0|   32|          0|
+    |p_loc_fu_176                                                                       |  32|   0|   32|          0|
+    |sub_ln111_reg_638                                                                  |   9|   0|   17|          8|
+    |trunc_ln1_reg_564                                                                  |  62|   0|   62|          0|
+    +-----------------------------------------------------------------------------------+----+----+-----+-----------+
+    |Total                                                                              | 768|   0|  776|          8|
+    +-----------------------------------------------------------------------------------+----+----+-----+-----------+
+
+
+
+================================================================
+== Interface
+================================================================
+* Summary: 
++-----------------------+-----+-----+------------+----------------+--------------+
+|       RTL Ports       | Dir | Bits|  Protocol  |  Source Object |    C Type    |
++-----------------------+-----+-----+------------+----------------+--------------+
+|s_axi_control_AWVALID  |   in|    1|       s_axi|         control|        scalar|
+|s_axi_control_AWREADY  |  out|    1|       s_axi|         control|        scalar|
+|s_axi_control_AWADDR   |   in|    5|       s_axi|         control|        scalar|
+|s_axi_control_WVALID   |   in|    1|       s_axi|         control|        scalar|
+|s_axi_control_WREADY   |  out|    1|       s_axi|         control|        scalar|
+|s_axi_control_WDATA    |   in|   32|       s_axi|         control|        scalar|
+|s_axi_control_WSTRB    |   in|    4|       s_axi|         control|        scalar|
+|s_axi_control_ARVALID  |   in|    1|       s_axi|         control|        scalar|
+|s_axi_control_ARREADY  |  out|    1|       s_axi|         control|        scalar|
+|s_axi_control_ARADDR   |   in|    5|       s_axi|         control|        scalar|
+|s_axi_control_RVALID   |  out|    1|       s_axi|         control|        scalar|
+|s_axi_control_RREADY   |   in|    1|       s_axi|         control|        scalar|
+|s_axi_control_RDATA    |  out|   32|       s_axi|         control|        scalar|
+|s_axi_control_RRESP    |  out|    2|       s_axi|         control|        scalar|
+|s_axi_control_BVALID   |  out|    1|       s_axi|         control|        scalar|
+|s_axi_control_BREADY   |   in|    1|       s_axi|         control|        scalar|
+|s_axi_control_BRESP    |  out|    2|       s_axi|         control|        scalar|
+|ap_clk                 |   in|    1|  ap_ctrl_hs|  forge_fwd_gemm|  return value|
+|ap_rst_n               |   in|    1|  ap_ctrl_hs|  forge_fwd_gemm|  return value|
+|interrupt              |  out|    1|  ap_ctrl_hs|  forge_fwd_gemm|  return value|
+|m_axi_gmem_AWVALID     |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWREADY     |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWADDR      |  out|   64|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWID        |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWLEN       |  out|    8|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWSIZE      |  out|    3|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWBURST     |  out|    2|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWLOCK      |  out|    2|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWCACHE     |  out|    4|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWPROT      |  out|    3|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWQOS       |  out|    4|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWREGION    |  out|    4|       m_axi|            gmem|       pointer|
+|m_axi_gmem_AWUSER      |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_WVALID      |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_WREADY      |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_WDATA       |  out|   32|       m_axi|            gmem|       pointer|
+|m_axi_gmem_WSTRB       |  out|    4|       m_axi|            gmem|       pointer|
+|m_axi_gmem_WLAST       |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_WID         |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_WUSER       |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARVALID     |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARREADY     |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARADDR      |  out|   64|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARID        |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARLEN       |  out|    8|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARSIZE      |  out|    3|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARBURST     |  out|    2|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARLOCK      |  out|    2|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARCACHE     |  out|    4|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARPROT      |  out|    3|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARQOS       |  out|    4|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARREGION    |  out|    4|       m_axi|            gmem|       pointer|
+|m_axi_gmem_ARUSER      |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_RVALID      |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_RREADY      |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_RDATA       |   in|   32|       m_axi|            gmem|       pointer|
+|m_axi_gmem_RLAST       |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_RID         |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_RUSER       |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_RRESP       |   in|    2|       m_axi|            gmem|       pointer|
+|m_axi_gmem_BVALID      |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_BREADY      |  out|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_BRESP       |   in|    2|       m_axi|            gmem|       pointer|
+|m_axi_gmem_BID         |   in|    1|       m_axi|            gmem|       pointer|
+|m_axi_gmem_BUSER       |   in|    1|       m_axi|            gmem|       pointer|
++-----------------------+-----+-----+------------+----------------+--------------+
+
