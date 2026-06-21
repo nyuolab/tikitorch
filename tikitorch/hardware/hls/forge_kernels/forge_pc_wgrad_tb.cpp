@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <ap_int.h>
 
 #define TB_D  256
 #define TB_N  16
@@ -22,7 +23,7 @@ static const int O_EDN  = O_GW   + TB_D * TB_D;
 static const int O_GB   = O_EDN  + TB_N * TB_D;
 static const int BUFLEN = O_GB   + TB_D;
 
-void forge_pc_wgrad(int32_t *buffer);              // the design under test
+void forge_pc_wgrad(ap_uint<512> *buffer);         // the design under test (native 512b word bus)
 
 // reference dyad: sign*2^e via ceil(sqrt(2)*2^msb) threshold (== kernel DYAD_THRESH, == dyadic_quantize)
 static const int THRESH[16] = {2,3,6,12,23,46,91,182,363,725,1449,2897,5793,11586,23171,46341};
@@ -36,7 +37,8 @@ static long ref_dyad(long v) {
 }
 
 int main() {
-    int32_t *buf = (int32_t *)malloc(sizeof(int32_t) * BUFLEN);
+    // 64-byte aligned so the int32 view can be reinterpreted as ap_uint<512> words (BUFLEN % 16 == 0)
+    int32_t *buf = (int32_t *)aligned_alloc(64, sizeof(int32_t) * BUFLEN);
     srand(1234);
     // modest fixed-point magnitudes: errors/acts/weights in a deployed-scaling range (|.| <~ 600),
     // so gW/e_down stay well inside int32 — the realistic operating point.
@@ -51,7 +53,7 @@ int main() {
     for (int i = 0; i < TB_D * TB_D; i++) buf[O_GW + i] = 0;
     for (int i = 0; i < TB_D; i++) buf[O_GB + i] = 0;
 
-    forge_pc_wgrad(buf);                                     // run the kernel
+    forge_pc_wgrad((ap_uint<512> *)buf);                     // run the kernel (int32 view -> 512b words)
 
     // int64 reference of the SAME layer-step (no overflow), compared to the kernel's int32 output
     long max_gw = 0, max_ed = 0, max_gb = 0, worst_gw = 0, worst_ed = 0;

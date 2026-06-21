@@ -60,26 +60,40 @@ PRIO: for (int b = 15; b >= 1; b--) {
     e = msb;
 }
 
-static inline void burst_load(int32_t *buf, int off, data_t *dst, int n) {
+// The gmem master is a NATIVE 512b word bus (16 int32 lanes/word) so it wires straight to the proven
+// 512b DDR crossbar (cl_forge_pc_ddr) with no width converter. (HLS auto-widen of an int32* bundle did
+// NOT trigger here — the int32->int16 load cast blocks it — so the bus is made 512b explicitly.) All
+// buffer regions (e|W|acts|mask|skip|gW|e_down|gB) start + run on 16-int32 boundaries, so off/cnt given
+// in int32 units divide evenly into words. burst_load reads + unpacks lanes; burst_store packs + writes.
+#define WL 16   // int32 lanes per 512-bit word
+
+static inline void burst_load(ap_uint<512> *buf, int off_i32, data_t *dst, int n_i32) {
 #pragma HLS INLINE off
-LD: for (int i = 0; i < n; i++) {
+LD: for (int w = 0; w < n_i32 / WL; w++) {
 #pragma HLS PIPELINE II=1
-        dst[i] = (data_t)buf[off + i];
+        ap_uint<512> word = buf[off_i32 / WL + w];
+        for (int l = 0; l < WL; l++) {
+#pragma HLS UNROLL
+            dst[w * WL + l] = (data_t)(ap_int<32>)word.range(32 * l + 31, 32 * l);
+        }
     }
 }
 
-// contiguous wide write: a sequential int32 store the HLS auto-widens to 512b (max_widen_bitwidth),
-// so the gmem bundle matches the proven 512b DDR CL (no 32b->512b width converter needed).
-static inline void burst_store(int32_t *buf, int off, const int32_t *src, int n) {
+static inline void burst_store(ap_uint<512> *buf, int off_i32, const int32_t *src, int n_i32) {
 #pragma HLS INLINE off
-ST: for (int i = 0; i < n; i++) {
+ST: for (int w = 0; w < n_i32 / WL; w++) {
 #pragma HLS PIPELINE II=1
-        buf[off + i] = src[i];
+        ap_uint<512> word = 0;
+        for (int l = 0; l < WL; l++) {
+#pragma HLS UNROLL
+            word.range(32 * l + 31, 32 * l) = (ap_uint<32>)src[w * WL + l];
+        }
+        buf[off_i32 / WL + w] = word;
     }
 }
 
-void forge_pc_wgrad(int32_t *buffer) {
-#pragma HLS INTERFACE m_axi port=buffer offset=slave bundle=gmem max_widen_bitwidth=512
+void forge_pc_wgrad(ap_uint<512> *buffer) {
+#pragma HLS INTERFACE m_axi port=buffer offset=slave bundle=gmem
 #pragma HLS INTERFACE s_axilite port=buffer
 #pragma HLS INTERFACE s_axilite port=return
 
