@@ -70,11 +70,25 @@ zero-multiply datapath that closes timing on the F2 silicon**. The error route r
 *same* forward dyadic weight (`q(W)`) — **weight transport is structurally absent in the
 kernel**, not just the math.
 
+## On the F2 part — AFI built, timing closed, registered (2026-06-21)
+
+The kernel is packaged into a real F2 image and registered:
+
+- `cl_forge_pc_ddr` (cloned from the silicon-proven `cl_forge_muzero_ddr`; kernel swapped to
+  `forge_pc_wgrad`, 5-bit control slice, native 512b gmem bus into the 2→1 DDR crossbar) went
+  through Vivado **synth → place → phys-opt → route** clean.
+- **Post-route timing CLOSED**: WNS **+0.083 ns**, WHS **+0.010 ns**, TNS/THS = 0 (positive
+  setup *and* hold slack against the F2 shell). `Developer_CL.tar` produced.
+- **Registered**: `afi-0d26a69d2730f7f7a` / **`agfi-04af4e4edaf3493e2`**.
+- The on-silicon verification (`forge_pc_ddr_verify.c` + `run_pc_f2_verify.sh`): stage inputs
+  to on-card DDR via BAR4, kick, read back gW/e_down/gB, compare to an int64 `cascade_grads`
+  reference → must be bit-exact. *(Pending: F2 run once the AFI is `available`.)*
+
 ## Honest scope — what this is and is NOT
 
-- It **is** the backward *layer-step* kernel, C-synthesized and C-simulated, DSP=0, bit-exact.
-- It is **not yet** AFI-deployed on F2 (next: a `cl_forge_pc_ddr` CL + host driver → measure
-  the gradient produced *on real silicon* matches `cascade_grads`).
+- It **is** the backward layer-step kernel: C-synthesized + C-simulated bit-exact, DSP=0, and
+  now **placed-and-routed into a timing-closing F2 AFI** (`agfi-04af4e4edaf3493e2`).
+- The **on-silicon bit-exact readback** is the immediate next step (AFI validating at AWS).
 - It is **not** a full training loop on fabric, and **not** multi-F2 sharded yet.
 - The **digital-throughput economics still stand** (Rung 4): this does not make PC faster
   than backprop on a digital fabric. The win remains **structural/substrate** — no global
