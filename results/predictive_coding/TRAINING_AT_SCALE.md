@@ -78,7 +78,12 @@ scale where Rung-4's economics flip).
    quality** — D=3: sharded 3.618 vs backprop 3.621; D=5: sharded **3.0179** vs backprop
    **3.0182**. So the carrier survives *real* sharding (not a single-process simulation
    artifact). [This is correctness, not throughput — gloo localhost; Rung 4 already settled
-   the digital-throughput economics.]
+   the digital-throughput economics.] **NOW ALSO ON REAL SILICON** (`MULTI_F2_SCALE_OUT.md`):
+   a 2-layer backward sharded across **two physical FPGAs** (slots 0+1 of an f2.12xlarge, both
+   running `agfi-063e2dd0d3255dcaa`), each chip one layer, **only a single neighbour error
+   message** between them (no global gradient / weight transport / barrier) → gradients
+   **bit-exact** to single-process `cascade_grads`. The structural mechanism, demonstrated on
+   real separate accelerators.
 2. **Amortised relaxation** *(`pc_amortized_relax.py`, the Rung-4 revisit)* — **DONE, FAILED
    (a clean negative that *closes* Rung 4).** Tested whether few error-propagation sweeps
    per step (K<L), warm-started across steps, hold quality. **They do not:** at K<L quality

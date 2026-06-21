@@ -1,0 +1,10 @@
+[shard] slot 1: AP_DONE in 0.693 ms
+[shard] slot 1 produced gW1, gB1, e_down1 LOCALLY (never saw layer 0's weights/grad).
+[shard] neighbour message e_down1 (max|.|=4858480) rescaled >>10 to int16 fixed-point.
+[shard] slot 0: AP_DONE in 0.706 ms
+[shard] slot 0 produced gW0, gB0, e_down0 LOCALLY from the e_down neighbour message only.
+
+[shard] layer 1 (slot 1): max|gW|=0 max|e_down|=0 max|gB|=0
+[shard] layer 0 (slot 0): max|gW|=0 max|e_down|=0 max|gB|=0
+[shard] -> BIT-EXACT: the 2-layer PC backward SHARDED ACROSS 2 FPGAs (neighbour-message-only, no global gradient/transport/barrier) == cascade_grads
+SHARD_EXIT=0
