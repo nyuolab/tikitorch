@@ -92,9 +92,11 @@ int main(int argc, char** argv) {
 
     // --- attach, stage inputs to DDR (BAR4), kick, read outputs back, compare ---
     if (fpga_mgmt_init() != 0) { fprintf(stderr,"fpga_mgmt_init failed\n"); return 2; }
-    pci_bar_handle_t bar0 = PCI_BAR_HANDLE_INIT, bar4 = PCI_BAR_HANDLE_INIT;
+    pci_bar_handle_t bar0 = PCI_BAR_HANDLE_INIT, bar4 = PCI_BAR_HANDLE_INIT, bar4r = PCI_BAR_HANDLE_INIT;
     if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR0, 0, &bar0) != 0) { fprintf(stderr,"attach BAR0 failed\n"); return 3; }
-    if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR4, BURST_CAPABLE, &bar4) != 0) { fprintf(stderr,"attach BAR4 failed\n"); return 4; }
+    if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR4, BURST_CAPABLE, &bar4) != 0) { fprintf(stderr,"attach BAR4 (burst) failed\n"); return 4; }
+    // separate non-burst BAR4 handle for single-word peek READS (burst handle is write-combined)
+    if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR4, 0, &bar4r) != 0) { fprintf(stderr,"attach BAR4 (read) failed\n"); return 4; }
 
     const long CHW = 256*1024;
     for (long off = 0; off < BUFLEN; off += CHW) {
@@ -102,6 +104,13 @@ int main(int argc, char** argv) {
         if (fpga_pci_write_burst(bar4, DDR_BUF_ADDR + (uint64_t)off*4, (uint32_t*)(h+off), (uint64_t)n) != 0) {
             fprintf(stderr,"write_burst @%ld failed\n", off); return 5; }
     }
+    // staging sanity: peek a few input words back and compare to what we wrote (isolates DDR
+    // staging from kernel correctness if anything later mismatches)
+    { int sane = 1; uint32_t rv; int probe[5] = {O_E+0, O_W+0, O_W+1000, O_ACT+5, O_W+(PC_D*PC_D-1)};
+      for (int p = 0; p < 5; p++) { fpga_pci_peek(bar4r, DDR_BUF_ADDR + (uint64_t)probe[p]*4, &rv);
+        if ((int32_t)rv != h[probe[p]]) { sane = 0; printf("[pc] STAGING MISMATCH @%d: wrote %d read %d\n", probe[p], h[probe[p]], (int32_t)rv); } }
+      printf("[pc] DDR staging sanity: %s\n", sane ? "OK (inputs read back correctly)" : "FAILED"); }
+
     fpga_pci_poke(bar0, R_BUFFER_0, (uint32_t)(DDR_BUF_ADDR & 0xFFFFFFFFULL));
     fpga_pci_poke(bar0, R_BUFFER_1, (uint32_t)(DDR_BUF_ADDR >> 32));
     fpga_pci_poke(bar0, R_AP_CTRL, AP_START);
@@ -110,11 +119,13 @@ int main(int argc, char** argv) {
     if (!done) { fprintf(stderr,"[pc] KICK HUNG (no AP_DONE in 10s)\n"); return 6; }
     printf("[pc] AP_DONE in %.3f ms -> kernel ran from DDR\n", (now_s()-t0)*1e3);
 
-    // read gW, e_down, gB back from DDR
+    // read gW, e_down, gB back from DDR via BAR4 single-word peeks (the SDK has no read_burst;
+    // a peek at BAR4 offset X -> DMA-PCIS read X -> crossbar -> DDR[X]). ~70k peeks, a few ms.
     int32_t* gw = (int32_t*)malloc(4*PC_D*PC_D); int32_t* ed = (int32_t*)malloc(4*PC_N*PC_D); int32_t* gb = (int32_t*)malloc(4*PC_D);
-    fpga_pci_read_burst(bar4, DDR_BUF_ADDR + (uint64_t)O_GW*4,  (uint32_t*)gw, PC_D*PC_D);
-    fpga_pci_read_burst(bar4, DDR_BUF_ADDR + (uint64_t)O_EDN*4, (uint32_t*)ed, PC_N*PC_D);
-    fpga_pci_read_burst(bar4, DDR_BUF_ADDR + (uint64_t)O_GB*4,  (uint32_t*)gb, PC_D);
+    uint32_t v;
+    for (int j = 0; j < PC_D*PC_D; j++) { fpga_pci_peek(bar4r, DDR_BUF_ADDR + (uint64_t)(O_GW + j)*4,  &v); gw[j] = (int32_t)v; }
+    for (int j = 0; j < PC_N*PC_D; j++) { fpga_pci_peek(bar4r, DDR_BUF_ADDR + (uint64_t)(O_EDN + j)*4, &v); ed[j] = (int32_t)v; }
+    for (int j = 0; j < PC_D; j++)      { fpga_pci_peek(bar4r, DDR_BUF_ADDR + (uint64_t)(O_GB + j)*4,  &v); gb[j] = (int32_t)v; }
 
     long mgw = 0, med = 0, mgb = 0;
     for (int j = 0; j < PC_D*PC_D; j++) { long d = labs((long)gw[j] - ref_gw[j]); if (d > mgw) mgw = d; }
@@ -123,6 +134,6 @@ int main(int argc, char** argv) {
     printf("[pc] ON-SILICON vs cascade_grads:  max|gW|=%ld  max|e_down|=%ld  max|gB|=%ld\n", mgw, med, mgb);
     int ok = (mgw == 0 && med == 0 && mgb == 0);
     printf("[pc] -> %s\n", ok ? "BIT-EXACT ON SILICON (the PC gradient computed on F2 == cascade_grads)" : "MISMATCH");
-    fpga_pci_detach(bar0); fpga_pci_detach(bar4);
+    fpga_pci_detach(bar0); fpga_pci_detach(bar4); fpga_pci_detach(bar4r);
     return ok ? 0 : 1;
 }
