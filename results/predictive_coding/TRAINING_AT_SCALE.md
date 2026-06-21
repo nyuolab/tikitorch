@@ -79,10 +79,18 @@ scale where Rung-4's economics flip).
    **3.0182**. So the carrier survives *real* sharding (not a single-process simulation
    artifact). [This is correctness, not throughput — gloo localhost; Rung 4 already settled
    the digital-throughput economics.]
-2. **Amortised relaxation** *(the Rung-4 revisit)*: does **few rounds per step, warm-started
-   across steps** (credit converges over training, not within each step) hold quality? If
-   so, PC's per-step cost drops from O(L/p) toward O(1) and Rung-4's digital economics could
-   flip. This is the most promising lever to attack the digital-throughput wall.
+2. **Amortised relaxation** *(`pc_amortized_relax.py`, the Rung-4 revisit)* — **DONE, FAILED
+   (a clean negative that *closes* Rung 4).** Tested whether few error-propagation sweeps
+   per step (K<L), warm-started across steps, hold quality. **They do not:** at K<L quality
+   collapses (~4.7 vs backprop 2.9 bpc on a depth-6 char-LM), and warm-start is *worse* than
+   cold. The reason is fundamental — partial propagation means the **error never reaches the
+   bottom layers** (they get no signal, don't train); that is an *incomplete* gradient, not
+   a *stale* one (which async-SGD tolerates), and persisting it across steps just injects
+   noise from a stale weight/routing config. So **there is no algorithmic shortcut**: PC's
+   error-route is the full O(L) sweep per step, its digital per-step cost is real, and
+   **Rung 4 stands** — the win is **substrate-only** (on analog/in-memory that O(L) sweep is
+   continuous-time settling, which no digital shortcut replicates). [Pipelining the backward
+   would require learned synthetic gradients (DNI) — a different, costed mechanism, not PC.]
 3. **A PC-trainable competitive sequence arch** (the architecture wall — SSM direction).
 4. **The substrate** — a deployed model-parallel PC kernel + a kernel-isolated energy
    measurement + the analog/in-memory endgame.
