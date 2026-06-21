@@ -19,7 +19,8 @@ static const int O_MASK = O_ACT  + TB_N * TB_D;
 static const int O_SKIP = O_MASK + TB_N * TB_D;
 static const int O_GW   = O_SKIP + TB_N * TB_D;
 static const int O_EDN  = O_GW   + TB_D * TB_D;
-static const int BUFLEN = O_EDN  + TB_N * TB_D;
+static const int O_GB   = O_EDN  + TB_N * TB_D;
+static const int BUFLEN = O_GB   + TB_D;
 
 void forge_pc_wgrad(int32_t *buffer);              // the design under test
 
@@ -46,13 +47,14 @@ int main() {
         buf[O_SKIP + i] = (rand() % 100) < 70 ? 1 : 0;       // ~70% conv-branch-won
     }
     for (int i = 0; i < TB_D * TB_D; i++) buf[O_W + i] = (rand() % 1201) - 600;
-    for (int i = 0; i < TB_N * TB_D; i++) { buf[O_GW + (i % (TB_D*TB_D))] = 0; buf[O_EDN + i] = 0; }
+    for (int i = 0; i < TB_N * TB_D; i++) buf[O_EDN + i] = 0;
     for (int i = 0; i < TB_D * TB_D; i++) buf[O_GW + i] = 0;
+    for (int i = 0; i < TB_D; i++) buf[O_GB + i] = 0;
 
     forge_pc_wgrad(buf);                                     // run the kernel
 
     // int64 reference of the SAME layer-step (no overflow), compared to the kernel's int32 output
-    long max_gw = 0, max_ed = 0, worst_gw = 0, worst_ed = 0;
+    long max_gw = 0, max_ed = 0, max_gb = 0, worst_gw = 0, worst_ed = 0;
     // precompute gated delta
     static long delta[TB_N][TB_D];
     for (int n = 0; n < TB_N; n++)
@@ -85,12 +87,23 @@ int main() {
             if (d != 0 && bad < 40) { printf("  e_down[%d][%d] ref=%ld got=%ld\n", n, i, acc, got); bad++; }
         }
 
+    // (3) gB[o] = sum_n q(delta[n][o])
+    for (int o = 0; o < TB_D; o++) {
+        long acc = 0;
+        for (int n = 0; n < TB_N; n++) acc += ref_dyad(delta[n][o]);
+        long got = (int32_t)buf[O_GB + o];
+        long d = labs(got - acc);
+        if (d > max_gb) max_gb = d;
+        if (d != 0 && bad < 60) { printf("  gB[%d] ref=%ld got=%ld\n", o, acc, got); bad++; }
+    }
+
     printf("forge_pc_wgrad CSIM  (D=%d N=%d)\n", TB_D, TB_N);
     printf("  max|gW_kernel - ref|     = %ld   (peak |gW|=%ld)\n", max_gw, worst_gw);
+    printf("  max|gB_kernel - ref|     = %ld\n", max_gb);
     printf("  max|e_down_kernel - ref| = %ld   (peak |e_down|=%ld)\n", max_ed, worst_ed);
     printf("  int32 headroom: peak values %s 2^31 (%ld)\n",
            (worst_gw < 2147483647L && worst_ed < 2147483647L) ? "<" : ">=", 2147483647L);
-    int ok = (max_gw == 0 && max_ed == 0);
+    int ok = (max_gw == 0 && max_ed == 0 && max_gb == 0);
     printf("  -> %s\n", ok ? "BIT-EXACT (kernel C++ == int64 reference)" : "MISMATCH");
     free(buf);
     return ok ? 0 : 1;

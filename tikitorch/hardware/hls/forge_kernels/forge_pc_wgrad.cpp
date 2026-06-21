@@ -6,6 +6,7 @@
 //
 //   delta[n][o]  = e[n][o] * relu_mask[n][o] * skip_gate[n][o]            (cached {0,1} gates -> SELECT)
 //   gW[o][i]     = sum_n q(delta[n][o]) * q(acts[n][i])                   (BOTH dyadic -> const 1<<(ed+ea))
+//   gB[o]        = sum_n q(delta[n][o])                                   (q(delta)=±2^k -> signed pow2 sum)
 //   e_down[n][i] = sum_o delta[n][o] * q(W[o][i]) + e[n][i]*(1-skip[n][i])(W dyadic -> var delta<<ew; + skip)
 //
 // Every product has a ±2^k operand => a SHIFT, not a multiply; the gates are {0,1} => muxes; the skip
@@ -27,7 +28,7 @@ typedef ap_int<16>  data_t;    // e / W / acts values (int16, the morph data_t r
 typedef ap_int<5>   exp_t;     // dyadic exponent 0..16 (msb position of a 16-bit magnitude)
 typedef ap_int<48>  acc_t;     // grad / error accumulator (DSP48-width signed)
 
-// flat int32 DDR buffer: [ e | W | acts | relu_mask | skip_gate | gW | e_down ]
+// flat int32 DDR buffer: [ e | W | acts | relu_mask | skip_gate | gW | e_down | gB ]
 static const int OFF_E    = 0;
 static const int OFF_W    = OFF_E    + PC_N * PC_D;
 static const int OFF_ACT  = OFF_W    + PC_D * PC_D;
@@ -35,6 +36,7 @@ static const int OFF_MASK = OFF_ACT  + PC_N * PC_D;
 static const int OFF_SKIP = OFF_MASK + PC_N * PC_D;
 static const int OFF_GW   = OFF_SKIP + PC_N * PC_D;
 static const int OFF_EDN  = OFF_GW   + PC_D * PC_D;
+static const int OFF_GB   = OFF_EDN  + PC_N * PC_D;   // bias grad gB[o], length PC_D
 
 // dyadic-quantize a value to (sign, exponent): round-half-in-LOG -> sign*2^round(log2|v|).
 // Bit-exact to tikitorch.nn.dyadic_quantize (the measured PC carrier's quantizer) via a 16-entry
@@ -101,6 +103,9 @@ void forge_pc_wgrad(int32_t *buffer) {
 #pragma HLS ARRAY_PARTITION variable=ddE cyclic factor=PC_OT dim=2
 #pragma HLS ARRAY_PARTITION variable=ddS cyclic factor=PC_OT dim=2
 #pragma HLS ARRAY_PARTITION variable=ddNZ cyclic factor=PC_OT dim=2
+#pragma HLS ARRAY_PARTITION variable=ddE complete dim=1
+#pragma HLS ARRAY_PARTITION variable=ddS complete dim=1
+#pragma HLS ARRAY_PARTITION variable=ddNZ complete dim=1
 DELTA: for (int n = 0; n < PC_N; n++)
         for (int o = 0; o < PC_D; o++) {
 #pragma HLS PIPELINE II=1
@@ -159,6 +164,20 @@ GW_NRED: for (int n = 0; n < PC_N; n++) {
             }
     }
 }
+
+    // ---- (1b) BIAS GRAD: gB[o] = sum_n q(delta[n][o])  (q(delta)=±2^ddE -> signed pow2 sum, DSP=0) ----
+GB_O: for (int o = 0; o < PC_D; o++) {
+#pragma HLS PIPELINE II=1
+        acc_t gb = 0;
+        for (int n = 0; n < PC_N; n++) {
+#pragma HLS UNROLL
+            if (ddNZ[n][o]) {
+                acc_t term = (acc_t)1 << ddE[n][o];
+                gb += ddS[n][o] ? (acc_t)(-term) : term;
+            }
+        }
+        buffer[OFF_GB + o] = (int32_t)gb;
+    }
 
     // ---- (2) ERROR ROUTE: e_down[n][i] = sum_o delta[n][o]*q(W[o][i]) + e[n][i]*(1-skip[n][i]) ----
     // delta is a FULL int -> each term is a VARIABLE SHIFT of delta by the weight exponent (forge_fwd_gemm),

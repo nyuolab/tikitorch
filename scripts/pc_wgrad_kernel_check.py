@@ -56,16 +56,17 @@ def kernel_dyad(v: torch.Tensor):
 
 
 def kernel_backward(e, W, acts, mask, skip):
-    """Pure-Python mirror of forge_pc_wgrad.cpp (the three fused ops), integer-exact."""
+    """Pure-Python mirror of forge_pc_wgrad.cpp (the four fused ops), integer-exact."""
     e, W, acts = e.double(), W.double(), acts.double()
     delta = torch.where((mask.bool() & skip.bool()), e, torch.zeros_like(e))   # gated error
     qd, _ = kernel_dyad(delta)                        # q(delta)  -> ±2^k
     qa, _ = kernel_dyad(acts)                         # q(acts)   -> ±2^k
     qw, _ = kernel_dyad(W)                            # q(W)      -> ±2^k
     gW = qd.transpose(0, 1) @ qa                      # sum_n const-shift 2^(ed+ea)
+    gB = qd.sum(0)                                    # sum_n q(delta) -> signed pow2 sum
     e_down = delta @ qw                               # sum_o variable-shift delta<<ew
     e_down = e_down + torch.where(skip.bool(), torch.zeros_like(e), e)         # skip highway
-    return gW, e_down
+    return gW, e_down, gB
 
 
 def ref_cascade(e, W, acts, mask, skip, q):
@@ -73,8 +74,9 @@ def ref_cascade(e, W, acts, mask, skip, q):
     e, W, acts = e.double(), W.double(), acts.double()
     delta = (e * skip * mask)                         # e_relu*relu_mask, has_skip path
     gW = q(delta).transpose(0, 1) @ q(acts)
+    gB = q(delta).sum(0)                              # cascade_grads: bias.grad = q(delta).sum(0)
     e_down = delta @ q(W) + e * (1.0 - skip)
-    return gW, e_down
+    return gW, e_down, gB
 
 
 if __name__ == "__main__":
@@ -85,19 +87,21 @@ if __name__ == "__main__":
     mask = (torch.rand(N, D) > 0.4).float()
     skip = (torch.rand(N, D) > 0.3).float()
 
-    gW_k, ed_k = kernel_backward(e, W, acts, mask, skip)
+    gW_k, ed_k, gB_k = kernel_backward(e, W, acts, mask, skip)
 
     # (A) reference with the kernel's OWN rounding -> must be EXACT
     q_kernel = lambda v: kernel_dyad(v)[0]
-    gW_a, ed_a = ref_cascade(e, W, acts, mask, skip, q_kernel)
+    gW_a, ed_a, gB_a = ref_cascade(e, W, acts, mask, skip, q_kernel)
     dA_gw = (gW_k - gW_a).abs().max().item()
     dA_ed = (ed_k - ed_a).abs().max().item()
+    dA_gb = (gB_k - gB_a).abs().max().item()
 
     # (B) reference with the Python carrier's dyadic_quantize — must ALSO be EXACT now
     q_py = lambda v: dyadic_quantize(v.float()).double()
-    gW_b, ed_b = ref_cascade(e, W, acts, mask, skip, q_py)
+    gW_b, ed_b, gB_b = ref_cascade(e, W, acts, mask, skip, q_py)
     dB_gw = (gW_k - gW_b).abs().max().item()
     dB_ed = (ed_k - ed_b).abs().max().item()
+    dB_gb = (gB_k - gB_b).abs().max().item()
     # confirm the kernel's dyad LUT reproduces dyadic_quantize over the whole int16 range
     allv = torch.arange(-32767, 32768)
     band = (q_kernel(allv) != q_py(allv)).float().sum().item()
@@ -105,13 +109,15 @@ if __name__ == "__main__":
     print(f"forge_pc_wgrad bit-exactness  (D={D}, N={N})\n")
     print("(A) kernel vs reference using the KERNEL's rounding (must be 0):")
     print(f"    max|gW_kernel - gW_ref|   = {dA_gw:.6g}")
+    print(f"    max|gB_kernel - gB_ref|   = {dA_gb:.6g}")
     print(f"    max|e_down_kernel - ref|  = {dA_ed:.6g}")
-    print(f"    -> {'EXACT (bit-for-bit)' if dA_gw==0 and dA_ed==0 else 'MISMATCH (bug!)'}\n")
+    print(f"    -> {'EXACT (bit-for-bit)' if dA_gw==0 and dA_ed==0 and dA_gb==0 else 'MISMATCH (bug!)'}\n")
     print("(B) kernel vs the Python carrier (cascade_grads / dyadic_quantize) — must ALSO be 0:")
     print(f"    max|gW_kernel - gW_carrier|   = {dB_gw:.6g}")
+    print(f"    max|gB_kernel - gB_carrier|   = {dB_gb:.6g}")
     print(f"    max|e_down_kernel - carrier|  = {dB_ed:.6g}")
     print(f"    kernel-dyad vs dyadic_quantize mismatches over all int16 = {int(band)}")
-    print(f"    -> {'LITERALLY BIT-EXACT to the measured carrier' if dB_gw==0 and dB_ed==0 and band==0 else 'GAP (unexpected)'}\n")
+    print(f"    -> {'LITERALLY BIT-EXACT to the measured carrier' if dB_gw==0 and dB_ed==0 and dB_gb==0 and band==0 else 'GAP (unexpected)'}\n")
     print("  Reading: (A)==0 proves the kernel IS the cascade_grads algorithm; (B)==0 proves its")
     print("  mult-free dyad reproduces dyadic_quantize exactly -> the silicon computes the measured")
     print("  PC carrier's gradient bit-for-bit, no multiply, no rounding caveat.")
