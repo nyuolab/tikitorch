@@ -104,12 +104,18 @@ int main(int argc, char** argv) {
         if (fpga_pci_write_burst(bar4, DDR_BUF_ADDR + (uint64_t)off*4, (uint32_t*)(h+off), (uint64_t)n) != 0) {
             fprintf(stderr,"write_burst @%ld failed\n", off); return 5; }
     }
-    // staging sanity: peek a few input words back and compare to what we wrote (isolates DDR
-    // staging from kernel correctness if anything later mismatches)
-    { int sane = 1; uint32_t rv; int probe[5] = {O_E+0, O_W+0, O_W+1000, O_ACT+5, O_W+(PC_D*PC_D-1)};
-      for (int p = 0; p < 5; p++) { fpga_pci_peek(bar4r, DDR_BUF_ADDR + (uint64_t)probe[p]*4, &rv);
-        if ((int32_t)rv != h[probe[p]]) { sane = 0; printf("[pc] STAGING MISMATCH @%d: wrote %d read %d\n", probe[p], h[probe[p]], (int32_t)rv); } }
-      printf("[pc] DDR staging sanity: %s\n", sane ? "OK (inputs read back correctly)" : "FAILED"); }
+    // staging sanity: peek back EVERY input word and count mismatches per region (isolates a DDR
+    // staging bug from a kernel bug). Covers e/W/acts/relu_mask/skip_gate — esp. mask/skip whose
+    // mis-staging would break the gating exactly like the observed "too-large" outputs.
+    { uint32_t rv; long me=0,mw=0,ma=0,mk=0,ms=0; long s_mk=0,s_sk=0;
+      for (int j=0;j<PC_N*PC_D;j++){ fpga_pci_peek(bar4r,DDR_BUF_ADDR+(uint64_t)(O_E+j)*4,&rv);    if((int32_t)rv!=h[O_E+j]) me++; }
+      for (int j=0;j<PC_D*PC_D;j++){ fpga_pci_peek(bar4r,DDR_BUF_ADDR+(uint64_t)(O_W+j)*4,&rv);    if((int32_t)rv!=h[O_W+j]) mw++; }
+      for (int j=0;j<PC_N*PC_D;j++){ fpga_pci_peek(bar4r,DDR_BUF_ADDR+(uint64_t)(O_ACT+j)*4,&rv);  if((int32_t)rv!=h[O_ACT+j]) ma++; }
+      for (int j=0;j<PC_N*PC_D;j++){ fpga_pci_peek(bar4r,DDR_BUF_ADDR+(uint64_t)(O_MASK+j)*4,&rv); if((int32_t)rv!=h[O_MASK+j]) mk++; s_mk+=h[O_MASK+j]; }
+      for (int j=0;j<PC_N*PC_D;j++){ fpga_pci_peek(bar4r,DDR_BUF_ADDR+(uint64_t)(O_SKIP+j)*4,&rv); if((int32_t)rv!=h[O_SKIP+j]) ms++; s_sk+=h[O_SKIP+j]; }
+      printf("[pc] staging mismatches: e %ld/%d  W %ld/%d  acts %ld/%d  mask %ld/%d  skip %ld/%d\n",
+             me,PC_N*PC_D, mw,PC_D*PC_D, ma,PC_N*PC_D, mk,PC_N*PC_D, ms,PC_N*PC_D);
+      printf("[pc] gate density (host): mask=1 in %ld/%d, skip=1 in %ld/%d\n", s_mk,PC_N*PC_D, s_sk,PC_N*PC_D); }
 
     fpga_pci_poke(bar0, R_BUFFER_0, (uint32_t)(DDR_BUF_ADDR & 0xFFFFFFFFULL));
     fpga_pci_poke(bar0, R_BUFFER_1, (uint32_t)(DDR_BUF_ADDR >> 32));
