@@ -92,8 +92,16 @@ scale where Rung-4's economics flip).
    continuous-time settling, which no digital shortcut replicates). [Pipelining the backward
    would require learned synthetic gradients (DNI) — a different, costed mechanism, not PC.]
 3. **A PC-trainable competitive sequence arch** (the architecture wall — SSM direction).
-4. **The substrate** — a deployed model-parallel PC kernel + a kernel-isolated energy
-   measurement + the analog/in-memory endgame.
+4. **The substrate.** *Backward kernel: DONE (synthesized + simulated + bit-exact),
+   `PC_BACKWARD_SILICON.md`.* The complete `cascade_grads` layer-step (routed adjoint +
+   weight grad + bias grad + error route + residual skip highway) is one fused FPGA kernel,
+   **DSP=0 / zero multiply instances, timing closed 2.920 ns on the F2 part**, and **bit-for-bit
+   identical to the measured carrier** (CPU mirror + HLS C-sim both `max|diff|=0`; the `dyad`
+   reproduces `dyadic_quantize` over all int16). Weight transport is structurally absent (the
+   route reuses the same forward `q(W)`). *Remaining:* AFI-deploy on F2 (gradient produced on
+   real silicon == `cascade_grads`), then the multi-F2 sharded run (one model across ≥2 FPGAs,
+   neighbour-only messages, no global gradient), then a kernel-isolated energy number and the
+   analog/in-memory endgame.
 
 ## Honest status
 
