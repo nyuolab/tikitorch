@@ -24,6 +24,27 @@
 // ABI mirrors forge_train_step_morph_lm.cpp: extern "C" int forge_train_step_s1(buffer, mode, a1,a2,a3).
 //   mode 0 -> do_fwd_loss (the whole forward + CE, this task). modes 1/2/3 stubbed (return 0).
 //
+// TIMING ARCHITECTURE — RESIDENT ON-CHIP STAGING (the forge_train_step_morph_lm TT_RESIDENT_W pattern):
+// the v1 of this kernel made DIRECT m_axi (gmem) reads INSIDE the compute loops — the data-dependent
+// embed gather (R=buffer[OFF_EMBED+tok*D+d]) and per-element weight/LUT reads in the GEMM / LN / head —
+// which put the long AXI read path on the critical path (5.840 ns > 4.0 ns target) and stalled II=1
+// (limited AXI ports + carried bus deps). The standalone kernels (forge_fwd_wide etc.) close at 2.920 ns
+// because they BURST-LOAD into on-chip arrays and compute locally. So here:
+//   (1) At kernel entry, BURST-LOAD every weight/LUT/token region from gmem ONCE into static on-chip
+//       arrays (sequential II=1 pipelined staging loops -> HLS infers wide bursts). Dyadic byte-codes are
+//       kept in int8 arrays, int16 tables (EMBED/W_HEAD/beta) in int16 arrays -> minimal BRAM; the
+//       reconstruction (& 0xFF / (int16_t)(.&0xFFFF)) is BIT-IDENTICAL to the v1 gmem read, so the
+//       golden is unchanged.
+//   (2) Compute the ENTIRE forward from the on-chip arrays. NO gmem access in any compute loop: the embed
+//       gather hits the on-chip EMBED array, every GEMM reads on-chip W, LN/attn/head/CE all on-chip.
+//   (3) Keep activations (R, X1, X2, attn p/jstar, relu mask, ln stats, argmax_head, logits, grad_logit)
+//       in on-chip arrays during compute, then BURST-STORE the buffer-exposed regions at the END
+//       (sequential II=1 pipelined store loops -> wide bursts).
+//   (4) ARRAY_PARTITION the GEMM operand banks (dim=1 complete, the proven forge_fwd_wide recipe) so the
+//       inner MACs/reductions pipeline II=1.
+// The math / loop bodies are otherwise VERBATIM from v1: the CPU golden in the testbench still reports
+// max|kernel-ref|==0 over all regions. Staging is purely internal; the buffer ABI + offset map UNCHANGED.
+//
 // Part xcvu47p-fsvh2892-2L-e, target 4.0 ns. csim+csynth via synth_train_step_s1.tcl.
 
 #include <stdint.h>
@@ -35,6 +56,7 @@ typedef ap_int<16>   data_t;    // activation values (int16, the morph data_t ra
 typedef ap_int<6>    exp_t;     // dyadic exponent: holds W-code 0..31 + dyad() round-bump 16 (6 bits)
 typedef ap_int<48>   acc_t;     // accumulators (DSP48-width signed)
 typedef ap_int<32>   prob_t;    // Q16 attention probability
+typedef ap_uint<512> wide_t;    // 512-bit wide bus word (16 int32 lanes) for burst staging
 #else
 #include <cstdint>
 typedef int16_t      data_t;
@@ -43,8 +65,116 @@ typedef int64_t      acc_t;     // int64 outside Vitis so the g++ standalone pat
 typedef int32_t      prob_t;
 #endif
 
+// on-chip resident weight encodings: byte-codes in int8 (wdecode masks &0xFF), int16 tables in int16,
+// LUTs / tokens / targets in int32 — minimal BRAM, reconstruction BIT-IDENTICAL to the v1 gmem read.
+typedef int8_t   code_t;        // pre-dyadic weight byte code (sign|nz|exp, 8 bits)
+typedef int16_t  half_t;        // int16 table value (EMBED / W_HEAD / LN beta)
+
 static const acc_t S1_NEG_INF = (acc_t)(-((acc_t)1 << 40));   // attn causal-mask sentinel
 static const acc_t ML_NEG_INF = (acc_t)(-2147483647LL);       // max-plus head -inf (morph value)
+
+// =============================================================================
+// burst staging helpers (forge_train_step_morph_lm burst_load_words pattern). Move a gmem region into /
+// out of an on-chip array ONCE per kernel call via 512-bit wide pipelined bursts (II=1). The decode to
+// the resident type happens HERE (at entry), NOT in the compute loops -> no AXI on the critical path.
+// All staged regions are 16-word (512-bit) aligned in the offset map (S1_AL16), so the wide path covers
+// them exactly; lengths rounded down to a wide multiple, with a scalar tail for any remainder.
+// =============================================================================
+
+// load n_words int32 from buffer[word_off..] into an int32 on-chip array.
+static void burst_load_i32(int32_t *buffer, int word_off, int32_t *dst, int n_words) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    wide_t *wide_buf = reinterpret_cast<wide_t *>(buffer);
+    int n_wide = n_words >> 4;
+    int wide_off = word_off >> 4;
+LL_W: for (int w = 0; w < n_wide; w++) {
+#pragma HLS PIPELINE II=1
+        wide_t v = wide_buf[wide_off + w];
+LL_LANE: for (int lane = 0; lane < 16; lane++) {
+#pragma HLS UNROLL
+            int hi = lane * 32 + 31, lo = lane * 32;
+            ap_int<32> x = (ap_int<32>)v.range(hi, lo);
+            dst[w * 16 + lane] = (int32_t)(int)x;
+        }
+    }
+    for (int i = (n_wide << 4); i < n_words; i++) dst[i] = buffer[word_off + i];
+#else
+    for (int i = 0; i < n_words; i++) dst[i] = buffer[word_off + i];
+#endif
+}
+
+// load n_words int32 codes from buffer and narrow each to its low byte into an int8 on-chip array.
+// (& 0xFF, sign-stored in int8: wdecode((int32_t)int8) re-masks &0xFF -> bit-identical to v1 buffer read.)
+static void burst_load_codes(int32_t *buffer, int word_off, code_t *dst, int n_words) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    wide_t *wide_buf = reinterpret_cast<wide_t *>(buffer);
+    int n_wide = n_words >> 4;
+    int wide_off = word_off >> 4;
+LC_W: for (int w = 0; w < n_wide; w++) {
+#pragma HLS PIPELINE II=1
+        wide_t v = wide_buf[wide_off + w];
+LC_LANE: for (int lane = 0; lane < 16; lane++) {
+#pragma HLS UNROLL
+            int lo = lane * 32;
+            ap_uint<8> b = (ap_uint<8>)v.range(lo + 7, lo);
+            dst[w * 16 + lane] = (code_t)(int8_t)(unsigned char)b;
+        }
+    }
+    for (int i = (n_wide << 4); i < n_words; i++) dst[i] = (code_t)(int8_t)(buffer[word_off + i] & 0xFF);
+#else
+    for (int i = 0; i < n_words; i++) dst[i] = (code_t)(int8_t)(buffer[word_off + i] & 0xFF);
+#endif
+}
+
+// load n_words int32 values from buffer and narrow each to int16 into an int16 on-chip array.
+// ((int16_t)(. & 0xFFFF) -> bit-identical to the v1 buffer read for EMBED / W_HEAD / LN beta.)
+static void burst_load_half(int32_t *buffer, int word_off, half_t *dst, int n_words) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    wide_t *wide_buf = reinterpret_cast<wide_t *>(buffer);
+    int n_wide = n_words >> 4;
+    int wide_off = word_off >> 4;
+LH_W: for (int w = 0; w < n_wide; w++) {
+#pragma HLS PIPELINE II=1
+        wide_t v = wide_buf[wide_off + w];
+LH_LANE: for (int lane = 0; lane < 16; lane++) {
+#pragma HLS UNROLL
+            int lo = lane * 32;
+            ap_uint<16> h = (ap_uint<16>)v.range(lo + 15, lo);
+            dst[w * 16 + lane] = (half_t)(int16_t)(unsigned short)h;
+        }
+    }
+    for (int i = (n_wide << 4); i < n_words; i++) dst[i] = (half_t)(int16_t)(buffer[word_off + i] & 0xFFFF);
+#else
+    for (int i = 0; i < n_words; i++) dst[i] = (half_t)(int16_t)(buffer[word_off + i] & 0xFFFF);
+#endif
+}
+
+// store n_words int32 from an on-chip array to buffer[word_off..] via wide bursts.
+static void burst_store_i32(int32_t *src, int32_t *buffer, int word_off, int n_words) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    wide_t *wide_buf = reinterpret_cast<wide_t *>(buffer);
+    int n_wide = n_words >> 4;
+    int wide_off = word_off >> 4;
+SS_W: for (int w = 0; w < n_wide; w++) {
+#pragma HLS PIPELINE II=1
+        wide_t word = 0;
+SS_LANE: for (int lane = 0; lane < 16; lane++) {
+#pragma HLS UNROLL
+            int hi = lane * 32 + 31, lo = lane * 32;
+            int32_t x = src[w * 16 + lane];
+            word.range(hi, lo) = (ap_uint<32>)(ap_int<32>)x;
+        }
+        wide_buf[wide_off + w] = word;
+    }
+    for (int i = (n_wide << 4); i < n_words; i++) buffer[word_off + i] = src[i];
+#else
+    for (int i = 0; i < n_words; i++) buffer[word_off + i] = src[i];
+#endif
+}
 
 // =============================================================================
 // dyadic primitives — VERBATIM from forge_fwd_wide.cpp / forge_layernorm.cpp.
@@ -117,11 +247,12 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 // fwd_gemm — the dyadic-MAC GEMM y[t][o] = sum_i q(x[t][i]) MAC q(W[o][i]) + bias(=0 in S1).
 // Reproduces forge_fwd_wide.cpp's inner: x dyad-quantized once, W PRE-DYADIC (wdecode inline), the
 // MAC is sign-xor + exponent-ADD + barrel-SHIFT + signed accumulate (NO multiply, DSP=0).
-// Generic over (T rows, I contraction, O outputs); buffer-resident W codes ROW-MAJOR [O][I].
-// x is held on-chip in xin[T][I]; y written to yout[T][O]. Bounded loops, II=1 inner.
+// Generic over (T rows, I contraction, O outputs); ON-CHIP-resident W byte-codes ROW-MAJOR [O][I]
+// (wcode[w_off + o*I + i], a code_t int8 staged at entry; NO gmem in the inner loop -> II=1, no AXI on
+// the critical path). x is held on-chip in xin[T][I]; y written to yout[T][O]. Bounded loops, II=1 inner.
 // =============================================================================
 template <int T, int I, int O>
-static void fwd_gemm(const data_t xin[T][I], int32_t *buffer, int w_off, data_t yout[T][O]) {
+static void fwd_gemm(const data_t xin[T][I], const code_t *wcode, int w_off, data_t yout[T][O]) {
 #pragma HLS INLINE off
     // dyad-quantize x once (q(x) = ±2^ex).
     // Partition the T (row/token) dim COMPLETE so the IRED inner loop's T-way UNROLL gets T parallel
@@ -147,7 +278,7 @@ GO: for (int o = 0; o < O; o++) {
 IRED:   for (int i = 0; i < I; i++) {
 #pragma HLS PIPELINE II=1
             bool sw, nzw; exp_t ew;
-            wdecode(buffer[w_off + o * I + i], sw, ew, nzw);
+            wdecode((int32_t)wcode[w_off + o * I + i], sw, ew, nzw);
             for (int t = 0; t < T; t++) {
 #pragma HLS UNROLL
                 exp_t ex = xE[t][i];
@@ -168,8 +299,10 @@ IRED:   for (int i = 0; i < I; i++) {
 // =============================================================================
 // layernorm_tok — fine-dyadic LayerNorm over one token row x[D] -> y[D], saving (e,nq).
 // VERBATIM math from forge_layernorm.cpp (mean=sum>>LOG2_D, meanabs rescale, dyadic gamma, beta add).
+// gamma (int8 byte-codes) + beta (int16) read from ON-CHIP arrays staged at entry -> no gmem in RESC.
 // =============================================================================
-static void layernorm_tok(const data_t x[S1_D], int32_t *buffer, int gamma_off, int beta_off,
+static void layernorm_tok(const data_t x[S1_D], const code_t *gamma, int gamma_off,
+                          const half_t *beta, int beta_off,
                           data_t y[S1_D], int &e_out, int &nq_out) {
 #pragma HLS INLINE off
     acc_t sum = 0;
@@ -206,10 +339,10 @@ RESC: for (int d = 0; d < S1_D; d++) {
         if (e >= 0)  r = r << e;
         else         r = r >> (-e);
         bool gs, gnz; exp_t ge;
-        wdecode(buffer[gamma_off + d], gs, ge, gnz);
+        wdecode((int32_t)gamma[gamma_off + d], gs, ge, gnz);
         acc_t g = gnz ? (r << (int)ge) : (acc_t)0;
         if (gnz && gs) g = -g;
-        data_t bd = (data_t)(int16_t)(buffer[beta_off + d] & 0xFFFF);
+        data_t bd = (data_t)beta[beta_off + d];
         acc_t yv = g + (acc_t)bd;
         y[d] = sat16(yv);
     }
@@ -219,12 +352,13 @@ RESC: for (int d = 0; d < S1_D; d++) {
 // attn_head — one head of attention over the whole causal sequence, soft p*V blend.
 // VERBATIM math from forge_attn.cpp: L1 score s[i][j]=-sum_d|Q-K|, exp2-LUT softmax, soft blend
 // out[i][d]=sum_j p[i][j]*V[j][d] (the ONE real multiply -> DSP), de-scaled by >>P_FRAC. Saves the
-// Q16 probs p and the argmax j* per query (for the future backward).
-// Q/K/V are [L_SEQ][DH] on-chip; out written to [L_SEQ][DH]; p saved to buffer at p_off ([L][L]).
+// Q16 probs p and the argmax j* per query (for the future backward) into ON-CHIP arrays (burst-stored
+// to gmem at the END of do_fwd_loss) -> no gmem write in the attn loops.
+// Q/K/V are [L_SEQ][DH] on-chip; out written to [L_SEQ][DH]; p_save is [L][L], jstar_save is [L].
 // =============================================================================
 static void attn_head(const data_t Q[S1_L_SEQ][S1_DH], const data_t K[S1_L_SEQ][S1_DH],
                       const data_t V[S1_L_SEQ][S1_DH], const int32_t *attn_lut,
-                      data_t out[S1_L_SEQ][S1_DH], int32_t *buffer, int p_off, int j_off) {
+                      data_t out[S1_L_SEQ][S1_DH], int32_t *p_save, int32_t *jstar_save) {
 #pragma HLS INLINE off
     static acc_t  s[S1_L_SEQ];
     static prob_t p[S1_L_SEQ];
@@ -290,35 +424,94 @@ ROW: for (int i = 0; i < S1_L_SEQ; i++) {
 #pragma HLS PIPELINE II=1
             out[i][d] = sat16(blend[d] >> S1_AT_P_FRAC);
         }
-        // save probs (Q16, post-normalize) + argmax j* for the future backward.
+        // save probs (Q16, post-normalize) + argmax j* for the future backward (ON-CHIP -> stored later).
     SAVEP: for (int j = 0; j < S1_L_SEQ; j++) {
 #pragma HLS PIPELINE II=1
-            buffer[p_off + i * S1_L_SEQ + j] = (int32_t)p[j];
+            p_save[i * S1_L_SEQ + j] = (int32_t)p[j];
         }
-        buffer[j_off + i] = jstar;
+        jstar_save[i] = jstar;
     }
 }
 
 // =============================================================================
+// On-chip RESIDENT region word-counts (logical extents; the offset map's S1_AL16 padding between
+// regions is irrelevant on-chip — we hold each region densely and burst-store its logical extent back).
+// =============================================================================
+#define S1_W_EMBED   (S1_V * S1_D)
+#define S1_W_PROJ    (S1_N_LAYERS * S1_D * S1_D)          // each of WQ/WK/WV/WO
+#define S1_W_WUP     (S1_N_LAYERS * S1_FFN * S1_D)
+#define S1_W_WDOWN   (S1_N_LAYERS * S1_D * S1_FFN)
+#define S1_W_LN      (S1_N_LAYERS * S1_D)                 // each gamma/beta
+#define S1_W_WHEAD   (S1_V * S1_D)
+#define S1_W_RALL    ((S1_N_LAYERS + 1) * S1_L_SEQ * S1_D)
+#define S1_W_ACT     (S1_N_LAYERS * S1_L_SEQ * S1_D)      // X1 / X2
+#define S1_W_LNST    (S1_N_LAYERS * S1_L_SEQ * 2)         // LN1/LN2 stats
+#define S1_W_ATTNP   (S1_N_LAYERS * S1_H * S1_L_SEQ * S1_L_SEQ)
+#define S1_W_ATTNJ   (S1_N_LAYERS * S1_H * S1_L_SEQ)
+#define S1_W_RELU    (S1_N_LAYERS * S1_L_SEQ * S1_FFN)
+#define S1_W_ARGH    (S1_L_SEQ * S1_V)
+#define S1_W_GLOG    (S1_L_SEQ * S1_V)                    // grad_logit / logits
+
+// =============================================================================
 // Mode 0: do_fwd_loss — the whole forward + CE over the whole causal sequence.
+// RESIDENT on-chip staging: burst-load every weight/LUT/token region ONCE, compute entirely on-chip
+// (no gmem in any compute loop), then burst-store every buffer-exposed region at the END.
 // =============================================================================
 static int do_fwd_loss(int32_t *buffer) {
 #pragma HLS INLINE off
 
-    // host-staged exp2 LUTs (read at runtime; static-const ROM init reads zero on the F2 AFI).
-    static int32_t ce_lut[S1_LUT_N];
+    // ---------------------------------------------------------------------
+    // (A) RESIDENT weights / LUTs / tokens — burst-loaded ONCE from gmem.
+    //     Byte-codes in int8, int16 tables in int16, LUTs/tokens in int32.
+    // ---------------------------------------------------------------------
+    static half_t  embed_oc[S1_W_EMBED];     // [V*D] int16 embed table
+    static code_t  wq_oc[S1_W_PROJ];         // [N_L][D][D] dyadic codes
+    static code_t  wk_oc[S1_W_PROJ];
+    static code_t  wv_oc[S1_W_PROJ];
+    static code_t  wo_oc[S1_W_PROJ];
+    static code_t  wup_oc[S1_W_WUP];         // [N_L][FFN][D]
+    static code_t  wdn_oc[S1_W_WDOWN];       // [N_L][D][FFN]
+    static code_t  ln1g_oc[S1_W_LN];         // gamma codes
+    static half_t  ln1b_oc[S1_W_LN];         // beta int16
+    static code_t  ln2g_oc[S1_W_LN];
+    static half_t  ln2b_oc[S1_W_LN];
+    static half_t  whead_oc[S1_W_WHEAD];     // [V][D] int16
+    static int32_t ce_lut[S1_LUT_N];         // host-staged exp2 ROMs (BRAM static-init reads zero on AFI)
     static int32_t at_lut[S1_LUT_N];
-LDLUT: for (int i = 0; i < S1_LUT_N; i++) {
-#pragma HLS PIPELINE II=1
-        ce_lut[i] = buffer[S1_OFF_CE_LUT + i];
-        at_lut[i] = buffer[S1_OFF_ATTN_LUT + i];
-    }
-
     static int32_t toks[S1_L_SEQ];
-LDTOK: for (int t = 0; t < S1_L_SEQ; t++) {
-#pragma HLS PIPELINE II=1
-        toks[t] = buffer[S1_OFF_TOKENS + t];
-    }
+    static int32_t tgts[S1_L_SEQ];
+
+    burst_load_half (buffer, S1_OFF_EMBED,    embed_oc, S1_W_EMBED);
+    burst_load_codes(buffer, S1_OFF_WQ,       wq_oc,    S1_W_PROJ);
+    burst_load_codes(buffer, S1_OFF_WK,       wk_oc,    S1_W_PROJ);
+    burst_load_codes(buffer, S1_OFF_WV,       wv_oc,    S1_W_PROJ);
+    burst_load_codes(buffer, S1_OFF_WO,       wo_oc,    S1_W_PROJ);
+    burst_load_codes(buffer, S1_OFF_W_UP,     wup_oc,   S1_W_WUP);
+    burst_load_codes(buffer, S1_OFF_W_DOWN,   wdn_oc,   S1_W_WDOWN);
+    burst_load_codes(buffer, S1_OFF_LN1_G,    ln1g_oc,  S1_W_LN);
+    burst_load_half (buffer, S1_OFF_LN1_B,    ln1b_oc,  S1_W_LN);
+    burst_load_codes(buffer, S1_OFF_LN2_G,    ln2g_oc,  S1_W_LN);
+    burst_load_half (buffer, S1_OFF_LN2_B,    ln2b_oc,  S1_W_LN);
+    burst_load_half (buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);
+    burst_load_i32  (buffer, S1_OFF_CE_LUT,   ce_lut,   S1_LUT_N);
+    burst_load_i32  (buffer, S1_OFF_ATTN_LUT, at_lut,   S1_LUT_N);
+    burst_load_i32  (buffer, S1_OFF_TOKENS,   toks,     S1_L_SEQ);
+    burst_load_i32  (buffer, S1_OFF_TARGETS,  tgts,     S1_L_SEQ);
+
+    // ---------------------------------------------------------------------
+    // (B) RESIDENT activation-save arrays — written during compute, burst-stored at END.
+    // ---------------------------------------------------------------------
+    static int32_t R_all_oc[S1_W_RALL];      // R_0..R_N_LAYERS residual snapshots
+    static int32_t X1_oc[S1_W_ACT];
+    static int32_t X2_oc[S1_W_ACT];
+    static int32_t ln1st_oc[S1_W_LNST];
+    static int32_t ln2st_oc[S1_W_LNST];
+    static int32_t attnp_oc[S1_W_ATTNP];
+    static int32_t attnj_oc[S1_W_ATTNJ];
+    static int32_t relu_oc[S1_W_RELU];
+    static int32_t argh_oc[S1_W_ARGH];
+    static int32_t glog_oc[S1_W_GLOG];
+    static int32_t logit_oc[S1_W_GLOG];
 
     // R[t][d] = EMBED[tok[t]*D + d]  (embed gather, morph LM head idiom). Saved as R layer-0 input.
     static data_t R[S1_L_SEQ][S1_D];
@@ -327,9 +520,9 @@ EMB: for (int t = 0; t < S1_L_SEQ; t++) {
         if (tok < 0) tok = 0; if (tok >= S1_V) tok = S1_V - 1;
         for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-            data_t rv = (data_t)(int16_t)(buffer[S1_OFF_EMBED + tok * S1_D + d] & 0xFFFF);
+            data_t rv = (data_t)embed_oc[tok * S1_D + d];   // on-chip embed gather (was gmem)
             R[t][d] = rv;
-            buffer[s1_off_R(0) + t * S1_D + d] = (int32_t)rv;   // save R_0 (block-0 input residual)
+            R_all_oc[0 * S1_L_SEQ * S1_D + t * S1_D + d] = (int32_t)rv;   // save R_0 (block-0 input)
         }
     }
 
@@ -358,21 +551,20 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
                 row[d] = R[t][d];
             }
             int e, nq;
-            layernorm_tok(row, buffer, s1_off_ln(S1_OFF_LN1_G, l), s1_off_ln(S1_OFF_LN1_B, l),
-                          yrow, e, nq);
-            buffer[s1_off_lnstats(S1_OFF_LN1_STATS, l) + 2 * t]     = e;
-            buffer[s1_off_lnstats(S1_OFF_LN1_STATS, l) + 2 * t + 1] = nq;
+            layernorm_tok(row, ln1g_oc, l * S1_D, ln1b_oc, l * S1_D, yrow, e, nq);
+            ln1st_oc[l * S1_L_SEQ * 2 + 2 * t]     = e;
+            ln1st_oc[l * S1_L_SEQ * 2 + 2 * t + 1] = nq;
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
                 X1[t][d] = yrow[d];
-                buffer[s1_off_act(S1_OFF_X1, l) + t * S1_D + d] = (int32_t)yrow[d];   // save LN1 out
+                X1_oc[l * S1_L_SEQ * S1_D + t * S1_D + d] = (int32_t)yrow[d];   // save LN1 out
             }
         }
 
         // ---- Q/K/V projections (each [L][D] -> [L][D]) ----
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, buffer, s1_off_w(S1_OFF_WQ, l, S1_D, S1_D), Qm);
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, buffer, s1_off_w(S1_OFF_WK, l, S1_D, S1_D), Km);
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, buffer, s1_off_w(S1_OFF_WV, l, S1_D, S1_D), Vm);
+        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, wq_oc, l * S1_D * S1_D, Qm);
+        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, wk_oc, l * S1_D * S1_D, Km);
+        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, wv_oc, l * S1_D * S1_D, Vm);
 
         // ---- per head: split D into H heads of DH, run soft causal attention, concat ----
     HEAD: for (int h = 0; h < S1_H; h++) {
@@ -384,7 +576,9 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
                     Vh[t][d] = Vm[t][h * S1_DH + d];
                 }
             }
-            attn_head(Qh, Kh, Vh, at_lut, Ah, buffer, s1_off_attn_p(l, h), s1_off_attn_j(l, h));
+            int p_base = (l * S1_H + h) * S1_L_SEQ * S1_L_SEQ;
+            int j_base = (l * S1_H + h) * S1_L_SEQ;
+            attn_head(Qh, Kh, Vh, at_lut, Ah, &attnp_oc[p_base], &attnj_oc[j_base]);
             for (int t = 0; t < S1_L_SEQ; t++) {
                 for (int d = 0; d < S1_DH; d++) {
 #pragma HLS PIPELINE II=1
@@ -394,7 +588,7 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
         }
 
         // ---- output projection [L][D] -> [L][D] then residual add ----
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(Acat, buffer, s1_off_w(S1_OFF_WO, l, S1_D, S1_D), AO);
+        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(Acat, wo_oc, l * S1_D * S1_D, AO);
     RES1: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
@@ -409,27 +603,26 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
                 row[d] = R[t][d];
             }
             int e, nq;
-            layernorm_tok(row, buffer, s1_off_ln(S1_OFF_LN2_G, l), s1_off_ln(S1_OFF_LN2_B, l),
-                          yrow, e, nq);
-            buffer[s1_off_lnstats(S1_OFF_LN2_STATS, l) + 2 * t]     = e;
-            buffer[s1_off_lnstats(S1_OFF_LN2_STATS, l) + 2 * t + 1] = nq;
+            layernorm_tok(row, ln2g_oc, l * S1_D, ln2b_oc, l * S1_D, yrow, e, nq);
+            ln2st_oc[l * S1_L_SEQ * 2 + 2 * t]     = e;
+            ln2st_oc[l * S1_L_SEQ * 2 + 2 * t + 1] = nq;
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
                 X2[t][d] = yrow[d];
-                buffer[s1_off_act(S1_OFF_X2, l) + t * S1_D + d] = (int32_t)yrow[d];
+                X2_oc[l * S1_L_SEQ * S1_D + t * S1_D + d] = (int32_t)yrow[d];
             }
         }
 
         // ---- FFN up [L][D]->[L][FFN], ReLU (save mask), down [L][FFN]->[L][D], residual add ----
-        fwd_gemm<S1_L_SEQ, S1_D, S1_FFN>(X2, buffer, s1_off_w(S1_OFF_W_UP, l, S1_FFN, S1_D), U);
+        fwd_gemm<S1_L_SEQ, S1_D, S1_FFN>(X2, wup_oc, l * S1_FFN * S1_D, U);
     RELU: for (int t = 0; t < S1_L_SEQ; t++)
             for (int k = 0; k < S1_FFN; k++) {
 #pragma HLS PIPELINE II=1
                 bool act = (U[t][k] > 0);
                 Hd[t][k] = act ? U[t][k] : (data_t)0;
-                buffer[s1_off_relu(l) + t * S1_FFN + k] = act ? 1 : 0;
+                relu_oc[l * S1_L_SEQ * S1_FFN + t * S1_FFN + k] = act ? 1 : 0;
             }
-        fwd_gemm<S1_L_SEQ, S1_FFN, S1_D>(Hd, buffer, s1_off_w(S1_OFF_W_DOWN, l, S1_D, S1_FFN), Dn);
+        fwd_gemm<S1_L_SEQ, S1_FFN, S1_D>(Hd, wdn_oc, l * S1_D * S1_FFN, Dn);
     RES2: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
@@ -440,14 +633,14 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
     SAVER: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-                buffer[s1_off_R(l + 1) + t * S1_D + d] = (int32_t)R[t][d];
+                R_all_oc[(l + 1) * S1_L_SEQ * S1_D + t * S1_D + d] = (int32_t)R[t][d];
             }
     }
 
     // ---- LM head + CE loss/grad per position ----
     acc_t loss_sum = 0;
 HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
-        int target = buffer[S1_OFF_TARGETS + t];
+        int target = tgts[t];
         if (target < 0) target = 0; if (target >= S1_V) target = S1_V - 1;
 
         // logits[v] = max_d (W_HEAD[v][d] + R[t][d]); save argmax d*.
@@ -458,7 +651,7 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
             int   idx_d = 0;
         HEAD_D: for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-                data_t Wvd = (data_t)(int16_t)(buffer[S1_OFF_W_HEAD + v * S1_D + d] & 0xFFFF);
+                data_t Wvd = (data_t)whead_oc[v * S1_D + d];   // on-chip head weight (was gmem)
                 acc_t cand = (acc_t)Wvd + (acc_t)R[t][d];
                 if (cand > mx) { mx = cand; idx_d = d; }
             }
@@ -503,8 +696,8 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
     CE_G: for (int v = 0; v < S1_V; v++) {
 #pragma HLS PIPELINE II=1
             int32_t g = e_row[v] - (v == target ? psum : 0);
-            buffer[S1_OFF_GRAD_LOGIT + t * S1_V + v] = g;
-            buffer[S1_OFF_LOGITS     + t * S1_V + v] = (int32_t)logits[v];
+            glog_oc[t * S1_V + v]  = g;
+            logit_oc[t * S1_V + v] = (int32_t)logits[v];
         }
         // loss proxy: the normalized prob mass NOT on the target (Q16) — a monotone CE proxy that is
         // bit-exact integer (no log); the algorithm golden's float CE is the convergence authority.
@@ -513,9 +706,24 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
         // save head argmax route (for the future backward sparse scatter).
     SAVEH: for (int v = 0; v < S1_V; v++) {
 #pragma HLS PIPELINE II=1
-            buffer[S1_OFF_ARGMAX_HEAD + t * S1_V + v] = ad_head[v];
+            argh_oc[t * S1_V + v] = ad_head[v];
         }
     }
+
+    // ---------------------------------------------------------------------
+    // (C) BURST-STORE every buffer-exposed region back to gmem (wide II=1 writes).
+    // ---------------------------------------------------------------------
+    burst_store_i32(R_all_oc, buffer, S1_OFF_R,           S1_W_RALL);
+    burst_store_i32(X1_oc,    buffer, s1_off_act(S1_OFF_X1, 0), S1_W_ACT);
+    burst_store_i32(X2_oc,    buffer, s1_off_act(S1_OFF_X2, 0), S1_W_ACT);
+    burst_store_i32(ln1st_oc, buffer, S1_OFF_LN1_STATS,   S1_W_LNST);
+    burst_store_i32(ln2st_oc, buffer, S1_OFF_LN2_STATS,   S1_W_LNST);
+    burst_store_i32(attnp_oc, buffer, S1_OFF_ATTN_P,      S1_W_ATTNP);
+    burst_store_i32(attnj_oc, buffer, S1_OFF_ATTN_JSTAR,  S1_W_ATTNJ);
+    burst_store_i32(relu_oc,  buffer, S1_OFF_RELU_MASK,   S1_W_RELU);
+    burst_store_i32(argh_oc,  buffer, S1_OFF_ARGMAX_HEAD, S1_W_ARGH);
+    burst_store_i32(glog_oc,  buffer, S1_OFF_GRAD_LOGIT,  S1_W_GLOG);
+    burst_store_i32(logit_oc, buffer, S1_OFF_LOGITS,      S1_W_GLOG);
     buffer[S1_OFF_LOSS + 0] = (int32_t)loss_sum;
 
     return 0;
