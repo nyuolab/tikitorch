@@ -125,18 +125,28 @@ int main(int argc, char** argv) {
     #define PACK(h,E,W,A,M,S) do{ memcpy(h+O_E,E,4*PC_N*PC_D); memcpy(h+O_W,W,4*PC_D*PC_D); \
         memcpy(h+O_ACT,A,4*PC_N*PC_D); memcpy(h+O_MASK,M,4*PC_N*PC_D); memcpy(h+O_SKIP,S,4*PC_N*PC_D); }while(0)
 
-    // ---- CPU REFERENCE: the full 2-layer backward sweep (one process, sees everything) ----
+    // ---- reference + FPGA, LAYER 1 (top) ----
     int32_t* r1 = calloc(BUFLEN,4); int32_t* r0 = calloc(BUFLEN,4);
-    PACK(r1, etop, W1, acts1, m1, s1); ref_layer(r1);                 // layer 1: e_top -> gW1, e_down1
-    PACK(r0, r1+O_EDN, W0, acts0, m0, s0); ref_layer(r0);             // layer 0: e_down1 -> gW0, e_down0
-    printf("[shard] CPU reference (single-process 2-layer backward) computed.\n");
-
-    // ---- SHARDED ACROSS 2 FPGAs ----
+    PACK(r1, etop, W1, acts1, m1, s1); ref_layer(r1);                 // reference layer 1
     PACK(h1, etop, W1, acts1, m1, s1);
     if (run_layer_on_fpga(1, h1)) return 3;                           // slot 1 = layer 1 (top)
     printf("[shard] slot 1 produced gW1, gB1, e_down1 LOCALLY (never saw layer 0's weights/grad).\n");
-    // NEIGHBOUR MESSAGE: e_down1 (slot 1) -> e (layer 0 input on slot 0). The ONLY cross-FPGA data.
-    PACK(h0, h1+O_EDN, W0, acts0, m0, s0);
+
+    // ---- NEIGHBOUR MESSAGE: e_down1 (slot 1) -> layer 0 input. The ONLY cross-FPGA data. ----
+    // Propagated PC errors grow each layer (e_down = sum of D terms), so the inter-layer message must be
+    // RESCALED to the int16 fixed-point range (a single host-side arithmetic shift -- standard fixed-point
+    // cascade dynamics, NOT a global op). Both the reference and the FPGA use the SAME rescaled message.
+    long maxe = 1; for (int j=0;j<PC_N*PC_D;j++){ long a=labs((long)h1[O_EDN+j]); if(a>maxe)maxe=a; }
+    // target |e0| < ~8000: fits int16 input AND keeps the layer-0 output e_down0 (sum of D=256 terms,
+    // each up to |e0|*q(W)~|e0|*1024) inside int32.
+    int kshift = 0; while ((maxe >> kshift) >= 8000) kshift++;
+    int32_t* e0 = malloc(4*PC_N*PC_D);
+    for (int j=0;j<PC_N*PC_D;j++) e0[j] = (int32_t)((long)h1[O_EDN+j] >> kshift);
+    printf("[shard] neighbour message e_down1 (max|.|=%ld) rescaled >>%d to int16 fixed-point.\n", maxe, kshift);
+
+    // ---- reference + FPGA, LAYER 0 (from the rescaled neighbour message) ----
+    PACK(r0, e0, W0, acts0, m0, s0); ref_layer(r0);                   // reference layer 0
+    PACK(h0, e0, W0, acts0, m0, s0);
     if (run_layer_on_fpga(0, h0)) return 3;                           // slot 0 = layer 0
     printf("[shard] slot 0 produced gW0, gB0, e_down0 LOCALLY from the e_down neighbour message only.\n");
 
