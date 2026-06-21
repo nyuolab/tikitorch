@@ -1,9 +1,11 @@
-# The PC cascade backward is multiplier-free silicon — synthesized, simulated, bit-exact
+# The PC cascade backward is multiplier-free silicon — VERIFIED BIT-EXACT ON F2
 
-**Date:** 2026-06-21. This is the first *synthesized* (not by-analogy) realization of the
-local predictive-coding credit-assignment backward as a single fused FPGA kernel. It turns
-Rung-5's structural claim — "*the PC backward IS the already-DSP=0 kernels*" — into a fact
-established by Vitis HLS C-synthesis + C-simulation against the measured carrier.
+**Date:** 2026-06-21. The local predictive-coding credit-assignment backward, realized as a
+single fused FPGA kernel and **verified bit-for-bit against `cascade_grads` running on real
+F2 silicon** (`agfi-063e2dd0d3255dcaa`). This turns Rung-5's structural claim — "*the PC
+backward IS the already-DSP=0 kernels*" — from analogy into a measured silicon fact: DSP=0,
+no multiply, weight-transport-free, and the gradient computed on-chip is identical to the
+reference. (Established by Vitis HLS C-synthesis + C-simulation **and** an on-silicon readback.)
 
 ## What was built
 
@@ -70,25 +72,41 @@ zero-multiply datapath that closes timing on the F2 silicon**. The error route r
 *same* forward dyadic weight (`q(W)`) — **weight transport is structurally absent in the
 kernel**, not just the math.
 
-## On the F2 part — AFI built, timing closed, registered (2026-06-21)
+## On the F2 part — BIT-EXACT ON SILICON (2026-06-21)
 
-The kernel is packaged into a real F2 image and registered:
+The kernel is built into a real F2 AFI and **verified bit-for-bit against `cascade_grads`
+running on the chip**:
 
 - `cl_forge_pc_ddr` (cloned from the silicon-proven `cl_forge_muzero_ddr`; kernel swapped to
   `forge_pc_wgrad`, 5-bit control slice, native 512b gmem bus into the 2→1 DDR crossbar) went
-  through Vivado **synth → place → phys-opt → route** clean.
-- **Post-route timing CLOSED**: WNS **+0.083 ns**, WHS **+0.010 ns**, TNS/THS = 0 (positive
-  setup *and* hold slack against the F2 shell). `Developer_CL.tar` produced.
-- **Registered**: `afi-0d26a69d2730f7f7a` / **`agfi-04af4e4edaf3493e2`**.
-- The on-silicon verification (`forge_pc_ddr_verify.c` + `run_pc_f2_verify.sh`): stage inputs
-  to on-card DDR via BAR4, kick, read back gW/e_down/gB, compare to an int64 `cascade_grads`
-  reference → must be bit-exact. *(Pending: F2 run once the AFI is `available`.)*
+  through Vivado synth → place → route clean, **post-route timing CLOSED** (WNS +0.077 ns,
+  WHS +0.010 ns vs the F2 shell). Registered `afi-0bd91de926f40150a` / **`agfi-063e2dd0d3255dcaa`**.
+- `forge_pc_ddr_verify.c` on an f2.6xlarge: stage the I/O buffer into on-card DDR over BAR4,
+  set the kernel buffer pointer, kick, read gW/e_down/gB back, compare to an int64
+  `cascade_grads` reference. **Result (`results/predictive_coding/f2_verify/`):**
+  - **Known-answer test** (all inputs = 1 → gW=gB=16, e_down=256): **max|diff| = 0**.
+  - **Random fixed-point inputs**: gw[0]=393216, gb[0]=480, e_down[0]=−198260, all matching
+    the reference → **max|gW| = max|e_down| = max|gB| = 0**.
+  - AP_DONE in ~0.69 ms; DDR staging verified (0 mismatches across all input regions).
+  **=> the complete multiplier-free PC backward gradient computes BIT-FOR-BIT identical to
+  `cascade_grads` on real F2 silicon.**
+
+### The silicon-only bug this caught (why on-silicon verification mattered)
+
+The first AFI was bit-exact in C-sim but **wrong on silicon** — every quantized value one power
+of 2 too high (gW 4×, gB 2×, e_down 2×). The all-1s KAT pinned it to `q(1)=2`: the dyad's
+round-up bump *always* fired because the `static const` `ceil(√2·2^k)` threshold ROM's
+**initialization did not survive Vivado synthesis** (read as ~0 on silicon). C-simulation cannot
+see this — it runs the C source, not the synthesized ROM. The same gotcha hit the morph-LM exp2
+ROM. **Fix:** the table-free 1.5× dyad (bump on the bit below the MSB) — no ROM, identical to
+the silicon-proven `forge_wgrad_probe`/muzero dyad, and training-equivalent to the √2 round
+(`pc_wgrad_round_ablation.py`, ΔMNIST +0.0012). The on-silicon gradient is bit-exact to
+`cascade_grads` under this (cheap, training-equivalent) dyadic round.
 
 ## Honest scope — what this is and is NOT
 
-- It **is** the backward layer-step kernel: C-synthesized + C-simulated bit-exact, DSP=0, and
-  now **placed-and-routed into a timing-closing F2 AFI** (`agfi-04af4e4edaf3493e2`).
-- The **on-silicon bit-exact readback** is the immediate next step (AFI validating at AWS).
+- It **is** the backward layer-step kernel: C-synthesized, C-simulated, **and verified
+  bit-exact on real F2 silicon** (`agfi-063e2dd0d3255dcaa`), DSP=0, timing-closed.
 - It is **not** a full training loop on fabric, and **not** multi-F2 sharded yet.
 - The **digital-throughput economics still stand** (Rung 4): this does not make PC faster
   than backprop on a digital fabric. The win remains **structural/substrate** — no global
