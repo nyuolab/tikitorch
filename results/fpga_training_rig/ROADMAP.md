@@ -131,10 +131,29 @@ uncertainties first.
   planned" band AT DSP=0** (DSP-as-adder now becomes headroom toward "best", not a prerequisite).
   Flagship-A ~30M-to-convergence ≈ 1–1.5 weeks on one F2. The throughput lever is exhausted (write-floor
   reached); details in `TOKS_PROJECTION.md`.
-- **STILL OPEN (next levers):** (a) BIT-EXACT CSIM of each kernel vs the CPU reference (area/timing/cycle
-  proven; HLS functional correctness argued via emulator + identical-PE diff, not yet cosim'd). (b) Integrate
-  the kernels into one S1 block trainer + DDR-streaming choreography (`forge_buffer_gpt2.hpp`) — now the
-  critical path. (c) AFI build (gated — expensive/outward; not done).
+- **S1 KERNEL SET COMPLETE + BIT-EXACT CSIM-VERIFIED (2026-06-21, Vitis csim_design + csynth_design, xcvu47p).**
+  The 5 missing transformer-block kernels authored + adversarially-verified (2 real bugs caught: a runtime
+  divide in LayerNorm, a missing fine-dyadic-rescale STE in LayerNorm-bwd) and each run csim+csynth on EC2.
+  **ALL 5 pass CSIM BIT-EXACT (max|kernel−int64ref|=0, CSim 0 errors) AND close timing:**
+
+  | kernel | csim | timing | DSP | LUT/SLR | role |
+  |---|---|---|---|---|---|
+  | `forge_xgrad_wide` | bit-exact | 2.920 ns | 0 | 5% | input-grad gx=gO@q(W) |
+  | `forge_layernorm` | bit-exact | 2.920 ns | 0 | 2% | fine-dyadic LN fwd (10,928 cyc) |
+  | `forge_layernorm_bwd` | bit-exact | 2.920 ns | 0 | 9% | LN backward (7,296 cyc) |
+  | `forge_relu` | bit-exact | 2.920 ns | 0 | 1% | ReLU fwd+bwd (1,053 cyc) |
+  | `forge_attn_bwd` | bit-exact | 3.358 ns | **384** | 19% | attention backward (the 4 allowed soft-blend/softmax multiplies) |
+
+  Combined with the measured fwd/optimizer/weight-grad kernels, **every component of the multiplier-free
+  transformer training datapath (fwd + attn + LN + ReLU + CE/LM-head[reuse] + input-grad + weight-grad +
+  dyadic-Adam) now exists, closes timing, fits, and is functionally bit-exact.** DSP profile exactly as
+  designed: 0 everywhere except the attention soft-blend (fwd 128 + bwd 384). This is the functional-
+  correctness gate (ROADMAP open-item (a)) — CLOSED for the new kernels.
+- **STILL OPEN (next):** (a) reconcile the kernel `dyad()` round-boundary (1.5·2^k) vs the Python training
+  authority `dyadic_quantize` (~1.414·2^k) so the integrated golden is deploy-faithful. (b) Author the
+  integrated `forge_train_step_s1` mode-dispatcher chaining all kernels + a CPU golden, bit-exact one-step
+  CSIM, csynth the whole block — now the critical path. (c) mode-3 N-step convergence CSIM. (d) AFI build
+  (gated — expensive/outward; not done).
 
 ## First three steps (local, no F2 builds)
 

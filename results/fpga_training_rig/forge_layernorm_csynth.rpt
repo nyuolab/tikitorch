@@ -1,0 +1,677 @@
+
+
+================================================================
+== Vitis HLS Report for 'forge_layernorm'
+================================================================
+* Date:           Sun Jun 21 20:14:43 2026
+
+* Version:        2024.1 (Build 5069499 on May 21 2024)
+* Project:        forge_layernorm_proj
+* Solution:       solution1 (Vivado IP Flow Target)
+* Product family: virtexuplusHBM
+* Target device:  xcvu47p-fsvh2892-2L-e
+
+
+================================================================
+== Performance Estimates
+================================================================
++ Timing: 
+    * Summary: 
+    +--------+---------+----------+------------+
+    |  Clock |  Target | Estimated| Uncertainty|
+    +--------+---------+----------+------------+
+    |ap_clk  |  4.00 ns|  2.920 ns|     1.08 ns|
+    +--------+---------+----------+------------+
+
++ Latency: 
+    * Summary: 
+    +---------+---------+-----------+-----------+-------+-------+---------+
+    |  Latency (cycles) |   Latency (absolute)  |    Interval   | Pipeline|
+    |   min   |   max   |    min    |    max    |  min  |  max  |   Type  |
+    +---------+---------+-----------+-----------+-------+-------+---------+
+    |    10928|    10928|  43.712 us|  43.712 us|  10929|  10929|       no|
+    +---------+---------+-----------+-----------+-------+-------+---------+
+
+    + Detail: 
+        * Instance: 
+        +-----------------------------------------------------------+-----------------------------------------------+---------+---------+----------+----------+------+------+-----------------------------------------------+
+        |                                                           |                                               |  Latency (cycles) |  Latency (absolute) |   Interval  |                    Pipeline                   |
+        |                          Instance                         |                     Module                    |   min   |   max   |    min   |    max   |  min |  max |                      Type                     |
+        +-----------------------------------------------------------+-----------------------------------------------+---------+---------+----------+----------+------+------+-----------------------------------------------+
+        |grp_burst_load_fu_708                                      |burst_load                                     |     2060|     2060|  8.240 us|  8.240 us|  2060|  2060|                                             no|
+        |grp_burst_load_1_fu_747                                    |burst_load_1                                   |      141|      141|  0.564 us|  0.564 us|   141|   141|                                             no|
+        |grp_forge_layernorm_Pipeline_LDG_fu_786                    |forge_layernorm_Pipeline_LDG                   |      131|      131|  0.524 us|  0.524 us|   129|   129|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        |grp_forge_layernorm_Pipeline_SUMX_fu_825                   |forge_layernorm_Pipeline_SUMX                  |      130|      130|  0.520 us|  0.520 us|   129|   129|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        |grp_forge_layernorm_Pipeline_CEN_fu_863                    |forge_layernorm_Pipeline_CEN                   |      131|      131|  0.524 us|  0.524 us|   129|   129|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        |grp_forge_layernorm_Pipeline_RESC_fu_934                   |forge_layernorm_Pipeline_RESC                  |      134|      134|  0.536 us|  0.536 us|   129|   129|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        |grp_forge_layernorm_Pipeline_WBY_VITIS_LOOP_209_1_fu_1074  |forge_layernorm_Pipeline_WBY_VITIS_LOOP_209_1  |     2051|     2051|  8.204 us|  8.204 us|  2049|  2049|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        |grp_forge_layernorm_Pipeline_WBS_fu_1113                   |forge_layernorm_Pipeline_WBS                   |       35|       35|  0.140 us|  0.140 us|    33|    33|  loop auto-rewind stp(delay=0 clock cycles(s))|
+        +-----------------------------------------------------------+-----------------------------------------------+---------+---------+----------+----------+------+------+-----------------------------------------------+
+
+        * Loop: 
+        +----------+---------+---------+----------+-----------+-----------+------+----------+
+        |          |  Latency (cycles) | Iteration|  Initiation Interval  | Trip |          |
+        | Loop Name|   min   |   max   |  Latency |  achieved |   target  | Count| Pipelined|
+        +----------+---------+---------+----------+-----------+-----------+------+----------+
+        |- TOK     |     6480|     6480|       405|          -|          -|    16|        no|
+        +----------+---------+---------+----------+-----------+-----------+------+----------+
+
+
+
+================================================================
+== Utilization Estimates
+================================================================
+* Summary: 
++---------------------+---------+------+---------+---------+-----+
+|         Name        | BRAM_18K|  DSP |    FF   |   LUT   | URAM|
++---------------------+---------+------+---------+---------+-----+
+|DSP                  |        -|     -|        -|        -|    -|
+|Expression           |        -|     -|        0|     1525|    -|
+|FIFO                 |        -|     -|        -|        -|    -|
+|Instance             |        2|     -|     1824|     3847|    0|
+|Memory               |        0|     -|     1160|     1753|    0|
+|Multiplexer          |        -|     -|        0|     3801|    -|
+|Register             |        -|     -|      593|        -|    -|
++---------------------+---------+------+---------+---------+-----+
+|Total                |        2|     0|     3577|    10926|    0|
++---------------------+---------+------+---------+---------+-----+
+|Available SLR        |     1344|  3008|   869120|   434560|  320|
++---------------------+---------+------+---------+---------+-----+
+|Utilization SLR (%)  |       ~0|     0|       ~0|        2|    0|
++---------------------+---------+------+---------+---------+-----+
+|Available            |     4032|  9024|  2607360|  1303680|  960|
++---------------------+---------+------+---------+---------+-----+
+|Utilization (%)      |       ~0|     0|       ~0|       ~0|    0|
++---------------------+---------+------+---------+---------+-----+
+
++ Detail: 
+    * Instance: 
+    +-----------------------------------------------------------+-----------------------------------------------+---------+----+-----+------+-----+
+    |                          Instance                         |                     Module                    | BRAM_18K| DSP|  FF |  LUT | URAM|
+    +-----------------------------------------------------------+-----------------------------------------------+---------+----+-----+------+-----+
+    |grp_burst_load_fu_708                                      |burst_load                                     |        0|   0|  128|   288|    0|
+    |grp_burst_load_1_fu_747                                    |burst_load_1                                   |        0|   0|  117|   357|    0|
+    |control_s_axi_U                                            |control_s_axi                                  |        0|   0|  106|   168|    0|
+    |grp_forge_layernorm_Pipeline_CEN_fu_863                    |forge_layernorm_Pipeline_CEN                   |        0|   0|  126|   331|    0|
+    |grp_forge_layernorm_Pipeline_LDG_fu_786                    |forge_layernorm_Pipeline_LDG                   |        0|   0|   35|    80|    0|
+    |grp_forge_layernorm_Pipeline_RESC_fu_934                   |forge_layernorm_Pipeline_RESC                  |        0|   0|  518|  1420|    0|
+    |grp_forge_layernorm_Pipeline_SUMX_fu_825                   |forge_layernorm_Pipeline_SUMX                  |        0|   0|   38|   173|    0|
+    |grp_forge_layernorm_Pipeline_WBS_fu_1113                   |forge_layernorm_Pipeline_WBS                   |        0|   0|   19|    76|    0|
+    |grp_forge_layernorm_Pipeline_WBY_VITIS_LOOP_209_1_fu_1074  |forge_layernorm_Pipeline_WBY_VITIS_LOOP_209_1  |        0|   0|   50|   245|    0|
+    |gmem_m_axi_U                                               |gmem_m_axi                                     |        2|   0|  687|   709|    0|
+    +-----------------------------------------------------------+-----------------------------------------------+---------+----+-----+------+-----+
+    |Total                                                      |                                               |        2|   0| 1824|  3847|    0|
+    +-----------------------------------------------------------+-----------------------------------------------+---------+----+-----+------+-----+
+
+    * DSP: 
+    N/A
+
+    * Memory: 
+    +-------------------------------------+-----------------------------------------+---------+----+----+-----+------+-----+------+-------------+
+    |                Memory               |                  Module                 | BRAM_18K| FF | LUT| URAM| Words| Bits| Banks| W*Bits*Banks|
+    +-------------------------------------+-----------------------------------------+---------+----+----+-----+------+-----+------+-------------+
+    |forge_layernorm_int_beta_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_19_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_20_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_21_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_22_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_23_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_24_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_25_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_26_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_beta_27_U        |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE4beta_10_U   |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE4beta_11_U   |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE4beta_12_U   |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE4beta_13_U   |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE4beta_14_U   |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE4beta_15_U   |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_U              |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_37_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_38_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_39_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_40_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_41_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_42_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_43_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_44_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_c_45_U           |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE1c_10_U      |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE1c_11_U      |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE1c_12_U      |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE1c_13_U      |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE1c_14_U      |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |p_ZZ15forge_layernormPiE1c_15_U      |forge_layernorm_int_beta_RAM_AUTO_1R1W   |        0|  16|  17|    0|     8|   16|     1|          128|
+    |forge_layernorm_int_gcode_U          |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_10_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_11_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_12_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_13_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_14_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_15_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_16_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_17_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_gcode_18_U       |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |p_ZZ15forge_layernormPiE5gcode_10_U  |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |p_ZZ15forge_layernormPiE5gcode_11_U  |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |p_ZZ15forge_layernormPiE5gcode_12_U  |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |p_ZZ15forge_layernormPiE5gcode_13_U  |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |p_ZZ15forge_layernormPiE5gcode_14_U  |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |p_ZZ15forge_layernormPiE5gcode_15_U  |forge_layernorm_int_gcode_RAM_AUTO_1R1W  |        0|   8|   9|    0|     8|    8|     1|           64|
+    |forge_layernorm_int_xx_U             |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_1_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_2_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_3_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_4_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_5_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_6_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_7_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_8_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_xx_9_U           |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2xx_10_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2xx_11_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2xx_12_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2xx_13_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2xx_14_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2xx_15_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_U             |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_28_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_29_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_30_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_31_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_32_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_33_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_34_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_35_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |forge_layernorm_int_yy_36_U          |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2yy_10_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2yy_11_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2yy_12_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2yy_13_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2yy_14_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |p_ZZ15forge_layernormPiE2yy_15_U     |forge_layernorm_int_xx_RAM_AUTO_1R1W     |        0|  16|  33|    0|   128|   16|     1|         2048|
+    |stats_U                              |stats_RAM_AUTO_1R1W                      |        0|   8|   9|    0|    32|    8|     1|          256|
+    +-------------------------------------+-----------------------------------------+---------+----+----+-----+------+-----+------+-------------+
+    |Total                                |                                         |        0|1160|1753|    0|  4512| 1160|    81|        70912|
+    +-------------------------------------+-----------------------------------------+---------+----+----+-----+------+-----+------+-------------+
+
+    * FIFO: 
+    N/A
+
+    * Expression: 
+    +---------------------------+----------+----+---+-----+------------+------------+
+    |       Variable Name       | Operation| DSP| FF| LUT | Bitwidth P0| Bitwidth P1|
+    +---------------------------+----------+----+---+-----+------------+------------+
+    |acc_1_fu_1670_p2           |         +|   0|  0|   50|          43|          43|
+    |acc_2_fu_1675_p2           |         +|   0|  0|   50|          43|          43|
+    |acc_3_fu_1721_p2           |         +|   0|  0|   50|          43|          43|
+    |acc_4_fu_1735_p2           |         +|   0|  0|   50|          43|          43|
+    |add_ln142_fu_1127_p2       |         +|   0|  0|   71|          64|          14|
+    |add_ln152_fu_1161_p2       |         +|   0|  0|   12|           5|           1|
+    |add_ln208_fu_1172_p2       |         +|   0|  0|   71|          64|          14|
+    |add_ln213_fu_1187_p2       |         +|   0|  0|   71|          64|          15|
+    |e_1_fu_1818_p2             |         +|   0|  0|   15|           8|           1|
+    |nqm4_fu_1867_p2            |         +|   0|  0|   12|           4|           4|
+    |thresh_fu_1697_p2          |         +|   0|  0|   55|          48|          48|
+    |sub68_fu_1913_p2           |         -|   0|  0|   15|           1|           8|
+    |sub_ln89_fu_1592_p2        |         -|   0|  0|   14|           1|           7|
+    |sub_ln92_1_fu_1643_p2      |         -|   0|  0|   13|           1|           6|
+    |sub_ln92_fu_1615_p2        |         -|   0|  0|   15|           2|           8|
+    |ap_condition_2116          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2128          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2132          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2136          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2140          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2144          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2148          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2152          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2156          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2160          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2164          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2168          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2172          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2176          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2180          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2184          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2188          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2192          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2196          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2200          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2204          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2208          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2212          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2216          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2220          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2224          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2228          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2232          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2236          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2240          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2244          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2248          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2252          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2256          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2260          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2264          |       and|   0|  0|    2|           1|           1|
+    |ap_condition_2268          |       and|   0|  0|    2|           1|           1|
+    |cmp54_fu_1873_p2           |      icmp|   0|  0|   12|           4|           1|
+    |cmp60_fu_1897_p2           |      icmp|   0|  0|   12|           4|           2|
+    |exact_pow2_fu_1587_p2      |      icmp|   0|  0|   47|          40|          40|
+    |icmp19_fu_1890_p2          |      icmp|   0|  0|   10|           3|           1|
+    |icmp_ln101_1_fu_1715_p2    |      icmp|   0|  0|   55|          48|          48|
+    |icmp_ln101_2_fu_1729_p2    |      icmp|   0|  0|   55|          48|          48|
+    |icmp_ln101_3_fu_1744_p2    |      icmp|   0|  0|   55|          48|          48|
+    |icmp_ln101_fu_1706_p2      |      icmp|   0|  0|   55|          48|          48|
+    |icmp_ln152_fu_1155_p2      |      icmp|   0|  0|   13|           5|           6|
+    |icmp_ln81_fu_1239_p2       |      icmp|   0|  0|   48|          41|           1|
+    |lshr_ln92_fu_1653_p2       |      lshr|   0|  0|  149|           1|          48|
+    |or_ln101_1_fu_1804_p2      |        or|   0|  0|    2|           1|           1|
+    |or_ln101_fu_1768_p2        |        or|   0|  0|    2|           1|           1|
+    |e_2_fu_1823_p3             |    select|   0|  0|    8|           1|           8|
+    |e_fu_1604_p3               |    select|   0|  0|    7|           1|           7|
+    |nq_1_fu_1810_p3            |    select|   0|  0|    4|           1|           4|
+    |nq_2_fu_1832_p3            |    select|   0|  0|    4|           1|           3|
+    |nq_fu_1774_p3              |    select|   0|  0|    4|           1|           3|
+    |scale_1_fu_1245_p3         |    select|   0|  0|   40|           1|           1|
+    |select_ln101_2_fu_1796_p3  |    select|   0|  0|    5|           1|           5|
+    |select_ln101_fu_1760_p3    |    select|   0|  0|    3|           1|           3|
+    |shl_ln88_fu_1581_p2        |       shl|   0|  0|  133|           1|          40|
+    |shl_ln92_fu_1637_p2        |       shl|   0|  0|  149|           1|          48|
+    |xor_ln101_1_fu_1755_p2     |       xor|   0|  0|    2|           1|           2|
+    |xor_ln101_2_fu_1786_p2     |       xor|   0|  0|    2|           1|           2|
+    |xor_ln101_3_fu_1791_p2     |       xor|   0|  0|    2|           1|           2|
+    |xor_ln101_fu_1750_p2       |       xor|   0|  0|    2|           1|           2|
+    |xor_ln89_fu_1598_p2        |       xor|   0|  0|    7|           7|           2|
+    +---------------------------+----------+----+---+-----+------------+------------+
+    |Total                      |          |   0|  0| 1525|         784|         760|
+    +---------------------------+----------+----+---+-----+------------+------------+
+
+    * Multiplexer: 
+    +--------------------------------------------+-----+-----------+-----+-----------+
+    |                    Name                    | LUT | Input Size| Bits| Total Bits|
+    +--------------------------------------------+-----+-----------+-----+-----------+
+    |ap_NS_fsm                                   |  181|         41|    1|         41|
+    |forge_layernorm_int_beta_19_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_19_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_19_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_20_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_20_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_20_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_21_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_21_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_21_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_22_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_22_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_22_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_23_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_23_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_23_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_24_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_24_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_24_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_25_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_25_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_25_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_26_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_26_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_26_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_27_address0        |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_27_ce0             |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_27_we0             |    9|          2|    1|          2|
+    |forge_layernorm_int_beta_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_beta_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_beta_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_37_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_37_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_37_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_38_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_38_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_38_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_39_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_39_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_39_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_40_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_40_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_40_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_41_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_41_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_41_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_42_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_42_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_42_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_43_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_43_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_43_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_44_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_44_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_44_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_45_address0           |   14|          3|    3|          9|
+    |forge_layernorm_int_c_45_ce0                |   14|          3|    1|          3|
+    |forge_layernorm_int_c_45_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_c_address0              |   14|          3|    3|          9|
+    |forge_layernorm_int_c_ce0                   |   14|          3|    1|          3|
+    |forge_layernorm_int_c_we0                   |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_10_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_10_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_10_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_11_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_11_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_11_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_12_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_12_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_12_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_13_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_13_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_13_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_14_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_14_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_14_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_15_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_15_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_15_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_16_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_16_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_16_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_17_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_17_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_17_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_18_address0       |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_18_ce0            |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_18_we0            |    9|          2|    1|          2|
+    |forge_layernorm_int_gcode_address0          |   14|          3|    3|          9|
+    |forge_layernorm_int_gcode_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_gcode_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_1_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_1_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_1_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_2_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_2_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_2_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_3_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_3_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_3_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_4_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_4_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_4_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_5_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_5_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_5_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_6_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_6_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_6_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_7_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_7_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_7_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_8_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_8_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_8_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_9_address0           |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_9_ce0                |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_9_we0                |    9|          2|    1|          2|
+    |forge_layernorm_int_xx_address0             |   20|          4|    7|         28|
+    |forge_layernorm_int_xx_ce0                  |   20|          4|    1|          4|
+    |forge_layernorm_int_xx_we0                  |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_28_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_28_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_28_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_29_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_29_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_29_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_30_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_30_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_30_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_31_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_31_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_31_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_32_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_32_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_32_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_33_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_33_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_33_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_34_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_34_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_34_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_35_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_35_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_35_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_36_address0          |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_36_ce0               |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_36_we0               |    9|          2|    1|          2|
+    |forge_layernorm_int_yy_address0             |   14|          3|    7|         21|
+    |forge_layernorm_int_yy_ce0                  |   14|          3|    1|          3|
+    |forge_layernorm_int_yy_we0                  |    9|          2|    1|          2|
+    |gmem_ARADDR                                 |   26|          5|   64|        320|
+    |gmem_ARLEN                                  |   26|          5|   32|        160|
+    |gmem_ARVALID                                |   26|          5|    1|          5|
+    |gmem_AWADDR                                 |   26|          5|   64|        320|
+    |gmem_AWLEN                                  |   26|          5|   32|        160|
+    |gmem_AWVALID                                |   20|          4|    1|          4|
+    |gmem_BREADY                                 |   20|          4|    1|          4|
+    |gmem_RREADY                                 |   20|          4|    1|          4|
+    |gmem_WDATA                                  |   14|          3|   32|         96|
+    |gmem_WSTRB                                  |   14|          3|    4|         12|
+    |gmem_WVALID                                 |   14|          3|    1|          3|
+    |gmem_blk_n_AR                               |    9|          2|    1|          2|
+    |gmem_blk_n_AW                               |    9|          2|    1|          2|
+    |gmem_blk_n_B                                |    9|          2|    1|          2|
+    |n_fu_474                                    |    9|          2|    5|         10|
+    |numer_reg_699                               |    9|          2|   48|         96|
+    |p_ZZ15forge_layernormPiE1c_10_address0      |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE1c_10_ce0           |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE1c_10_we0           |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE1c_11_address0      |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE1c_11_ce0           |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE1c_11_we0           |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE1c_12_address0      |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE1c_12_ce0           |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE1c_12_we0           |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE1c_13_address0      |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE1c_13_ce0           |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE1c_13_we0           |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE1c_14_address0      |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE1c_14_ce0           |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE1c_14_we0           |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE1c_15_address0      |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE1c_15_ce0           |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE1c_15_we0           |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2xx_10_address0     |   20|          4|    7|         28|
+    |p_ZZ15forge_layernormPiE2xx_10_ce0          |   20|          4|    1|          4|
+    |p_ZZ15forge_layernormPiE2xx_10_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2xx_11_address0     |   20|          4|    7|         28|
+    |p_ZZ15forge_layernormPiE2xx_11_ce0          |   20|          4|    1|          4|
+    |p_ZZ15forge_layernormPiE2xx_11_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2xx_12_address0     |   20|          4|    7|         28|
+    |p_ZZ15forge_layernormPiE2xx_12_ce0          |   20|          4|    1|          4|
+    |p_ZZ15forge_layernormPiE2xx_12_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2xx_13_address0     |   20|          4|    7|         28|
+    |p_ZZ15forge_layernormPiE2xx_13_ce0          |   20|          4|    1|          4|
+    |p_ZZ15forge_layernormPiE2xx_13_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2xx_14_address0     |   20|          4|    7|         28|
+    |p_ZZ15forge_layernormPiE2xx_14_ce0          |   20|          4|    1|          4|
+    |p_ZZ15forge_layernormPiE2xx_14_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2xx_15_address0     |   20|          4|    7|         28|
+    |p_ZZ15forge_layernormPiE2xx_15_ce0          |   20|          4|    1|          4|
+    |p_ZZ15forge_layernormPiE2xx_15_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2yy_10_address0     |   14|          3|    7|         21|
+    |p_ZZ15forge_layernormPiE2yy_10_ce0          |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE2yy_10_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2yy_11_address0     |   14|          3|    7|         21|
+    |p_ZZ15forge_layernormPiE2yy_11_ce0          |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE2yy_11_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2yy_12_address0     |   14|          3|    7|         21|
+    |p_ZZ15forge_layernormPiE2yy_12_ce0          |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE2yy_12_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2yy_13_address0     |   14|          3|    7|         21|
+    |p_ZZ15forge_layernormPiE2yy_13_ce0          |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE2yy_13_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2yy_14_address0     |   14|          3|    7|         21|
+    |p_ZZ15forge_layernormPiE2yy_14_ce0          |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE2yy_14_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE2yy_15_address0     |   14|          3|    7|         21|
+    |p_ZZ15forge_layernormPiE2yy_15_ce0          |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE2yy_15_we0          |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE4beta_10_address0   |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE4beta_10_ce0        |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE4beta_10_we0        |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE4beta_11_address0   |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE4beta_11_ce0        |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE4beta_11_we0        |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE4beta_12_address0   |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE4beta_12_ce0        |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE4beta_12_we0        |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE4beta_13_address0   |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE4beta_13_ce0        |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE4beta_13_we0        |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE4beta_14_address0   |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE4beta_14_ce0        |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE4beta_14_we0        |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE4beta_15_address0   |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE4beta_15_ce0        |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE4beta_15_we0        |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE5gcode_10_address0  |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE5gcode_10_ce0       |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE5gcode_10_we0       |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE5gcode_11_address0  |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE5gcode_11_ce0       |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE5gcode_11_we0       |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE5gcode_12_address0  |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE5gcode_12_ce0       |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE5gcode_12_we0       |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE5gcode_13_address0  |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE5gcode_13_ce0       |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE5gcode_13_we0       |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE5gcode_14_address0  |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE5gcode_14_ce0       |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE5gcode_14_we0       |    9|          2|    1|          2|
+    |p_ZZ15forge_layernormPiE5gcode_15_address0  |   14|          3|    3|          9|
+    |p_ZZ15forge_layernormPiE5gcode_15_ce0       |   14|          3|    1|          3|
+    |p_ZZ15forge_layernormPiE5gcode_15_we0       |    9|          2|    1|          2|
+    |p_reg_540                                   |  173|         39|    6|        234|
+    |stats_address0                              |    9|          2|    5|         10|
+    |stats_ce0                                   |    9|          2|    1|          2|
+    +--------------------------------------------+-----+-----------+-----+-----------+
+    |Total                                       | 3801|        812|  830|       3119|
+    +--------------------------------------------+-----+-----------+-----+-----------+
+
+    * Register: 
+    +------------------------------------------------------------------------+----+----+-----+-----------+
+    |                                  Name                                  | FF | LUT| Bits| Const Bits|
+    +------------------------------------------------------------------------+----+----+-----+-----------+
+    |acc_1_reg_2184                                                          |  43|   0|   43|          0|
+    |acc_2_reg_2189                                                          |  43|   0|   43|          0|
+    |add_ln152_reg_1996                                                      |   5|   0|    5|          0|
+    |ap_CS_fsm                                                               |  40|   0|   40|          0|
+    |buffer_r_read_reg_1956                                                  |  64|   0|   64|          0|
+    |cmp54_reg_2220                                                          |   1|   0|    1|          0|
+    |cmp60_reg_2230                                                          |   1|   0|    1|          0|
+    |e_2_reg_2215                                                            |   8|   0|    8|          0|
+    |e_reg_2160                                                              |   7|   0|    7|          0|
+    |grp_burst_load_1_fu_747_ap_start_reg                                    |   1|   0|    1|          0|
+    |grp_burst_load_fu_708_ap_start_reg                                      |   1|   0|    1|          0|
+    |grp_forge_layernorm_Pipeline_CEN_fu_863_ap_start_reg                    |   1|   0|    1|          0|
+    |grp_forge_layernorm_Pipeline_LDG_fu_786_ap_start_reg                    |   1|   0|    1|          0|
+    |grp_forge_layernorm_Pipeline_RESC_fu_934_ap_start_reg                   |   1|   0|    1|          0|
+    |grp_forge_layernorm_Pipeline_SUMX_fu_825_ap_start_reg                   |   1|   0|    1|          0|
+    |grp_forge_layernorm_Pipeline_WBS_fu_1113_ap_start_reg                   |   1|   0|    1|          0|
+    |grp_forge_layernorm_Pipeline_WBY_VITIS_LOOP_209_1_fu_1074_ap_start_reg  |   1|   0|    1|          0|
+    |icmp19_reg_2225                                                         |   1|   0|    1|          0|
+    |icmp_ln101_1_reg_2200                                                   |   1|   0|    1|          0|
+    |icmp_ln101_2_reg_2205                                                   |   1|   0|    1|          0|
+    |icmp_ln101_3_reg_2210                                                   |   1|   0|    1|          0|
+    |icmp_ln101_reg_2195                                                     |   1|   0|    1|          0|
+    |n_1_reg_1988                                                            |   5|   0|    5|          0|
+    |n_fu_474                                                                |   5|   0|    5|          0|
+    |numer_reg_699                                                           |  48|   0|   48|          0|
+    |p_reg_540                                                               |   6|   0|    6|          0|
+    |scale_1_reg_2026                                                        |  40|   0|   40|          0|
+    |sext_ln89_reg_2165                                                      |   8|   0|    8|          0|
+    |sub68_reg_2240                                                          |   8|   0|    8|          0|
+    |tmp_48_reg_2235                                                         |   1|   0|    1|          0|
+    |tmp_49_reg_2245                                                         |   1|   0|    1|          0|
+    |trunc_ln152_reg_2001                                                    |   4|   0|    4|          0|
+    |trunc_ln2_reg_2009                                                      |  62|   0|   62|          0|
+    |trunc_ln3_reg_2015                                                      |  62|   0|   62|          0|
+    |trunc_ln4_reg_2021                                                      |  16|   0|   16|          0|
+    |trunc_ln_reg_1977                                                       |  62|   0|   62|          0|
+    |zext_ln79_reg_2033                                                      |  40|   0|   43|          3|
+    +------------------------------------------------------------------------+----+----+-----+-----------+
+    |Total                                                                   | 593|   0|  596|          3|
+    +------------------------------------------------------------------------+----+----+-----+-----------+
+
+
+
+================================================================
+== Interface
+================================================================
+* Summary: 
++-----------------------+-----+-----+------------+-----------------+--------------+
+|       RTL Ports       | Dir | Bits|  Protocol  |  Source Object  |    C Type    |
++-----------------------+-----+-----+------------+-----------------+--------------+
+|s_axi_control_AWVALID  |   in|    1|       s_axi|          control|        scalar|
+|s_axi_control_AWREADY  |  out|    1|       s_axi|          control|        scalar|
+|s_axi_control_AWADDR   |   in|    5|       s_axi|          control|        scalar|
+|s_axi_control_WVALID   |   in|    1|       s_axi|          control|        scalar|
+|s_axi_control_WREADY   |  out|    1|       s_axi|          control|        scalar|
+|s_axi_control_WDATA    |   in|   32|       s_axi|          control|        scalar|
+|s_axi_control_WSTRB    |   in|    4|       s_axi|          control|        scalar|
+|s_axi_control_ARVALID  |   in|    1|       s_axi|          control|        scalar|
+|s_axi_control_ARREADY  |  out|    1|       s_axi|          control|        scalar|
+|s_axi_control_ARADDR   |   in|    5|       s_axi|          control|        scalar|
+|s_axi_control_RVALID   |  out|    1|       s_axi|          control|        scalar|
+|s_axi_control_RREADY   |   in|    1|       s_axi|          control|        scalar|
+|s_axi_control_RDATA    |  out|   32|       s_axi|          control|        scalar|
+|s_axi_control_RRESP    |  out|    2|       s_axi|          control|        scalar|
+|s_axi_control_BVALID   |  out|    1|       s_axi|          control|        scalar|
+|s_axi_control_BREADY   |   in|    1|       s_axi|          control|        scalar|
+|s_axi_control_BRESP    |  out|    2|       s_axi|          control|        scalar|
+|ap_clk                 |   in|    1|  ap_ctrl_hs|  forge_layernorm|  return value|
+|ap_rst_n               |   in|    1|  ap_ctrl_hs|  forge_layernorm|  return value|
+|interrupt              |  out|    1|  ap_ctrl_hs|  forge_layernorm|  return value|
+|m_axi_gmem_AWVALID     |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWREADY     |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWADDR      |  out|   64|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWID        |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWLEN       |  out|    8|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWSIZE      |  out|    3|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWBURST     |  out|    2|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWLOCK      |  out|    2|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWCACHE     |  out|    4|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWPROT      |  out|    3|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWQOS       |  out|    4|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWREGION    |  out|    4|       m_axi|             gmem|       pointer|
+|m_axi_gmem_AWUSER      |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_WVALID      |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_WREADY      |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_WDATA       |  out|   32|       m_axi|             gmem|       pointer|
+|m_axi_gmem_WSTRB       |  out|    4|       m_axi|             gmem|       pointer|
+|m_axi_gmem_WLAST       |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_WID         |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_WUSER       |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARVALID     |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARREADY     |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARADDR      |  out|   64|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARID        |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARLEN       |  out|    8|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARSIZE      |  out|    3|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARBURST     |  out|    2|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARLOCK      |  out|    2|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARCACHE     |  out|    4|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARPROT      |  out|    3|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARQOS       |  out|    4|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARREGION    |  out|    4|       m_axi|             gmem|       pointer|
+|m_axi_gmem_ARUSER      |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_RVALID      |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_RREADY      |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_RDATA       |   in|   32|       m_axi|             gmem|       pointer|
+|m_axi_gmem_RLAST       |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_RID         |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_RUSER       |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_RRESP       |   in|    2|       m_axi|             gmem|       pointer|
+|m_axi_gmem_BVALID      |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_BREADY      |  out|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_BRESP       |   in|    2|       m_axi|             gmem|       pointer|
+|m_axi_gmem_BID         |   in|    1|       m_axi|             gmem|       pointer|
+|m_axi_gmem_BUSER       |   in|    1|       m_axi|             gmem|       pointer|
++-----------------------+-----+-----+------------+-----------------+--------------+
+
