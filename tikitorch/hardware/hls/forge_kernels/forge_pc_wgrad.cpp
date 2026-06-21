@@ -68,6 +68,16 @@ LD: for (int i = 0; i < n; i++) {
     }
 }
 
+// contiguous wide write: a sequential int32 store the HLS auto-widens to 512b (max_widen_bitwidth),
+// so the gmem bundle matches the proven 512b DDR CL (no 32b->512b width converter needed).
+static inline void burst_store(int32_t *buf, int off, const int32_t *src, int n) {
+#pragma HLS INLINE off
+ST: for (int i = 0; i < n; i++) {
+#pragma HLS PIPELINE II=1
+        buf[off + i] = src[i];
+    }
+}
+
 void forge_pc_wgrad(int32_t *buffer) {
 #pragma HLS INTERFACE m_axi port=buffer offset=slave bundle=gmem max_widen_bitwidth=512
 #pragma HLS INTERFACE s_axilite port=buffer
@@ -133,6 +143,11 @@ QA: for (int n = 0; n < PC_N; n++)
             for (int i = 0; i < PC_D; i++) { dyad(wbuf[o * PC_D + i], wS[o][i], wE[o][i], wNZ[o][i]); }
     }
 
+    // on-chip output staging -> contiguous wide burst-store at the end (512b gmem, proven-CL-compatible)
+    static int32_t gw_local[PC_D * PC_D];
+    static int32_t edn_local[PC_N * PC_D];
+    static int32_t gb_local[PC_D];
+
     // ---- (1) WEIGHT GRAD: gW[o][i] = sum_n q(delta[n][o]) * q(acts[n][i]) (both dyadic -> const shift) ----
 GW_OTILE: for (int ot = 0; ot < PC_D; ot += PC_OT) {
 GW_ITILE:  for (int it = 0; it < PC_D; it += PC_IT) {
@@ -160,7 +175,7 @@ GW_NRED: for (int n = 0; n < PC_N; n++) {
         for (int r = 0; r < PC_OT; r++)
             for (int c = 0; c < PC_IT; c++) {
 #pragma HLS PIPELINE II=1
-                buffer[OFF_GW + (ot + r) * PC_D + (it + c)] = (int32_t)acc[r][c];
+                gw_local[(ot + r) * PC_D + (it + c)] = (int32_t)acc[r][c];
             }
     }
 }
@@ -176,7 +191,7 @@ GB_O: for (int o = 0; o < PC_D; o++) {
                 gb += ddS[n][o] ? (acc_t)(-term) : term;
             }
         }
-        buffer[OFF_GB + o] = (int32_t)gb;
+        gb_local[o] = (int32_t)gb;
     }
 
     // ---- (2) ERROR ROUTE: e_down[n][i] = sum_o delta[n][o]*q(W[o][i]) + e[n][i]*(1-skip[n][i]) ----
@@ -203,8 +218,13 @@ ER_ORED: for (int o = 0; o < PC_D; o++) {
 #pragma HLS PIPELINE II=1
             // residual skip highway: where the skip won (skip_gate==0) the raw error passes through
             acc_t skip_term = (sk[n][it + c] == 0) ? (acc_t)ee[n][it + c] : (acc_t)0;
-            buffer[OFF_EDN + n * PC_D + (it + c)] = (int32_t)(er[c] + skip_term);
+            edn_local[n * PC_D + (it + c)] = (int32_t)(er[c] + skip_term);
         }
     }
 }
+
+    // ---- (3) contiguous wide burst-stores: gW, e_down, gB -> DDR buffer (512b bursts) ----
+    burst_store(buffer, OFF_GW,  gw_local,  PC_D * PC_D);
+    burst_store(buffer, OFF_EDN, edn_local, PC_N * PC_D);
+    burst_store(buffer, OFF_GB,  gb_local,  PC_D);
 }
