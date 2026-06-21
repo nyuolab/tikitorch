@@ -42,11 +42,10 @@
 #define AP_DONE    0x02
 #define DDR_BUF_ADDR 0x0ULL
 
-static const int THRESH[16] = {2,3,6,12,23,46,91,182,363,725,1449,2897,5793,11586,23171,46341};
-static long ref_dyad(long v) {                          // == kernel dyad / dyadic_quantize (sqrt2 round)
+static long ref_dyad(long v) {                          // == kernel dyad: table-free 1.5x round (no ROM)
     long a = v < 0 ? -v : v; if (a == 0) return 0;
     int msb = 0; for (int b = 15; b >= 1; b--) if ((a >> b) & 1) { msb = b; break; }
-    if (a >= THRESH[msb]) msb++;
+    if (msb >= 1 && ((a >> (msb - 1)) & 1)) msb++;       // bump on bit below MSB
     long m = 1L << msb; return v < 0 ? -m : m;
 }
 static double now_s(){ struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return t.tv_sec + t.tv_nsec*1e-9; }

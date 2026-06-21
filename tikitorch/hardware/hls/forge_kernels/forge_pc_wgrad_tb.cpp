@@ -25,13 +25,12 @@ static const int BUFLEN = O_GB   + TB_D;
 
 void forge_pc_wgrad(ap_uint<512> *buffer);         // the design under test (native 512b word bus)
 
-// reference dyad: sign*2^e via ceil(sqrt(2)*2^msb) threshold (== kernel DYAD_THRESH, == dyadic_quantize)
-static const int THRESH[16] = {2,3,6,12,23,46,91,182,363,725,1449,2897,5793,11586,23171,46341};
+// reference dyad: sign*2^e, table-free 1.5x round (bump on bit below MSB) == the kernel dyad
 static long ref_dyad(long v) {
     long a = v < 0 ? -v : v;
     if (a == 0) return 0;
     int msb = 0; for (int b = 15; b >= 1; b--) { if ((a >> b) & 1) { msb = b; break; } }
-    if (a >= THRESH[msb]) msb++;
+    if (msb >= 1 && ((a >> (msb - 1)) & 1)) msb++;       // bump on bit below MSB (1.5x, no ROM)
     long m = 1L << msb;
     return v < 0 ? -m : m;
 }

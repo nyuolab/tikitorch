@@ -27,18 +27,14 @@ D, N = 256, 16                        # must match forge_pc_wgrad.cpp PC_D, PC_N
 torch.manual_seed(0)
 
 
-# THRESH[m] = ceil(sqrt(2)*2^m): bump |v| to 2^(m+1) iff |v| >= THRESH[m]. Reproduces
-# tikitorch.nn.dyadic_quantize (round-half-in-log) bit-for-bit over all int16 (0 mismatch),
-# mult-free (a constant LUT + comparator). Mirrors forge_pc_wgrad.cpp DYAD_THRESH exactly.
-DYAD_THRESH = [2, 3, 6, 12, 23, 46, 91, 182, 363, 725, 1449, 2897, 5793, 11586, 23171, 46341]
-
-
 def kernel_dyad(v: torch.Tensor):
     """EXACT mirror of the C++ dyad(): returns (sign*2^e as float, nz mask).
 
-    a = |v| (int); msb = highest set bit; bump to msb+1 iff a >= ceil(sqrt(2)*2^msb) (the
-    DYAD_THRESH LUT) -> round-half-in-log == dyadic_quantize. Matches forge_pc_wgrad.cpp
-    dyad() bit-for-bit on int16, and is itself bit-exact to dyadic_quantize.
+    a = |v| (int); msb = highest set bit; bump to msb+1 iff the bit below the MSB is set (the
+    table-FREE 1.5x round). Matches forge_pc_wgrad.cpp dyad() bit-for-bit on int16. (A const
+    ceil(sqrt2*2^msb) ROM was tried for literal bit-exactness to dyadic_quantize, but the ROM
+    init did not survive Vivado synth -> q one power too high on silicon; the table-free 1.5x
+    round needs no ROM and is training-equivalent, see pc_wgrad_round_ablation.py.)
     """
     vi = v.round().to(torch.int64)
     a = vi.abs()
@@ -47,8 +43,8 @@ def kernel_dyad(v: torch.Tensor):
     for b in range(15, 0, -1):                       # priority encode (b=15..1, as in PRIO loop)
         hit = ((a >> b) & 1).bool() & (msb == 0)
         msb = torch.where(hit, torch.full_like(a, b), msb)
-    thr = torch.tensor(DYAD_THRESH, dtype=a.dtype)[msb.clamp(0, 15)]
-    msb = torch.where(nz & (a >= thr), msb + 1, msb)     # round half in log (== dyadic_quantize)
+    below = ((a >> (msb - 1).clamp(min=0)) & 1).bool()   # bit just below the MSB
+    msb = torch.where(nz & (msb >= 1) & below, msb + 1, msb)
     sign = torch.where(vi < 0, -torch.ones_like(a), torch.ones_like(a))
     val = sign.to(torch.float64) * torch.pow(2.0, msb.to(torch.float64))
     val = torch.where(nz, val, torch.zeros_like(val))
@@ -99,25 +95,22 @@ if __name__ == "__main__":
     # (B) reference with the Python carrier's dyadic_quantize — must ALSO be EXACT now
     q_py = lambda v: dyadic_quantize(v.float()).double()
     gW_b, ed_b, gB_b = ref_cascade(e, W, acts, mask, skip, q_py)
-    dB_gw = (gW_k - gW_b).abs().max().item()
-    dB_ed = (ed_k - ed_b).abs().max().item()
-    dB_gb = (gB_k - gB_b).abs().max().item()
-    # confirm the kernel's dyad LUT reproduces dyadic_quantize over the whole int16 range
+    rel_gw = ((gW_k - gW_b).abs().sum() / gW_b.abs().sum().clamp(min=1)).item()
+    rel_ed = ((ed_k - ed_b).abs().sum() / ed_b.abs().sum().clamp(min=1)).item()
     allv = torch.arange(-32767, 32768)
-    band = (q_kernel(allv) != q_py(allv)).float().sum().item()
+    band = (q_kernel(allv) != q_py(allv)).float().mean().item()
 
     print(f"forge_pc_wgrad bit-exactness  (D={D}, N={N})\n")
-    print("(A) kernel vs reference using the KERNEL's rounding (must be 0):")
+    print("(A) kernel vs reference using the KERNEL's (table-free 1.5x) rounding (must be 0):")
     print(f"    max|gW_kernel - gW_ref|   = {dA_gw:.6g}")
     print(f"    max|gB_kernel - gB_ref|   = {dA_gb:.6g}")
     print(f"    max|e_down_kernel - ref|  = {dA_ed:.6g}")
     print(f"    -> {'EXACT (bit-for-bit)' if dA_gw==0 and dA_ed==0 and dA_gb==0 else 'MISMATCH (bug!)'}\n")
-    print("(B) kernel vs the Python carrier (cascade_grads / dyadic_quantize) — must ALSO be 0:")
-    print(f"    max|gW_kernel - gW_carrier|   = {dB_gw:.6g}")
-    print(f"    max|gB_kernel - gB_carrier|   = {dB_gb:.6g}")
-    print(f"    max|e_down_kernel - carrier|  = {dB_ed:.6g}")
-    print(f"    kernel-dyad vs dyadic_quantize mismatches over all int16 = {int(band)}")
-    print(f"    -> {'LITERALLY BIT-EXACT to the measured carrier' if dB_gw==0 and dB_ed==0 and dB_gb==0 and band==0 else 'GAP (unexpected)'}\n")
-    print("  Reading: (A)==0 proves the kernel IS the cascade_grads algorithm; (B)==0 proves its")
-    print("  mult-free dyad reproduces dyadic_quantize exactly -> the silicon computes the measured")
-    print("  PC carrier's gradient bit-for-bit, no multiply, no rounding caveat.")
+    print("(B) kernel (1.5x round) vs the Python carrier (dyadic_quantize, sqrt2 round) — benign gap:")
+    print(f"    L1-relative gW gap        = {rel_gw:.4%}")
+    print(f"    L1-relative e_down gap    = {rel_ed:.4%}")
+    print(f"    dyad-rounding band [1.414,1.5)x2^k = {band:.2%}")
+    print("\n  Reading: (A)==0 proves the kernel IS the cascade_grads algorithm. (B) is the benign,")
+    print("  TRAINING-EQUIVALENT gap between the deployed table-free 1.5x round and the sqrt2 round")
+    print("  (pc_wgrad_round_ablation.py: MNIST cascade delta +0.0012). The faithful sqrt2 round was")
+    print("  reverted because its const-ROM threshold did not survive FPGA synthesis (the iter-5 KAT bug).")
