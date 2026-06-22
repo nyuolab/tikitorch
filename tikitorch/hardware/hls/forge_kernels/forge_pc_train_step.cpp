@@ -159,8 +159,8 @@ F1: for (int n = 0; n < TN; n++)
 #pragma HLS PIPELINE II=1
             acc_t acc = 0;
             for (int i = 0; i < TD; i++) {
-                acc_t term = ((acc_t)h1[n][i]) << w1E[c*TD+i];
-                if (w1NZ[c*TD+i]) acc += w1S[c*TD+i] ? (acc_t)(-term) : term;
+                acc_t term = ((acc_t)h1[n][i]) << w1E[c][i];
+                if (w1NZ[c][i]) acc += w1S[c][i] ? (acc_t)(-term) : term;
             }
             lg[n][c] = acc;
             acc_t al = acc < 0 ? (acc_t)(-acc) : acc;
@@ -200,8 +200,8 @@ ED: for (int n = 0; n < TN; n++)
 #pragma HLS PIPELINE II=1
             acc_t acc = 0;
             for (int c = 0; c < TC; c++) {
-                acc_t term = ((acc_t)e1[n][c]) << w1E[c*TD+i];   // real e1 << ew
-                if (w1NZ[c*TD+i]) acc += w1S[c*TD+i] ? (acc_t)(-term) : term;
+                acc_t term = ((acc_t)e1[n][c]) << w1E[c][i];     // real e1 << ew
+                if (w1NZ[c][i]) acc += w1S[c][i] ? (acc_t)(-term) : term;
             }
             acc_t d = mask0[n][i] ? acc : (acc_t)0;             // delta0 = e_down1 * relu_mask
             edn[n][i] = d;
