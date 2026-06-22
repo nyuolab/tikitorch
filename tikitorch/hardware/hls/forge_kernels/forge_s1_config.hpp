@@ -110,7 +110,55 @@ static const int S1_OFF_GRAD_LOGIT = S1_OFF_ARGMAX_HEAD + S1_AL16(S1_L_SEQ * S1_
 static const int S1_OFF_LOGITS     = S1_OFF_GRAD_LOGIT  + S1_AL16(S1_L_SEQ * S1_V);     // [L_SEQ*V]
 static const int S1_OFF_LOSS       = S1_OFF_LOGITS      + S1_AL16(S1_L_SEQ * S1_V);     // [16] scalar(s)
 
-static const int S1_BUFLEN         = S1_OFF_LOSS + 16;   // total int32 words; already a multiple of 16
+// ----------------------------------------------------------------------------
+// GRADIENT regions (written by mode 1 = backward; consumed by mode 2 = dyadic-Adam).
+// APPENDED after the mode-0 map (every mode-0 offset above is UNCHANGED). Each weight
+// gradient region is the SAME logical size as its weight region; gradients accumulate as
+// int32 FULL precision (summed over the L_SEQ positions), so one int32 word per weight.
+// (The weights themselves are dyadic byte-codes / int16; their gradients are int32.)
+//   G_EMBED   : [V*D]                 — embed-table grad (sparse scatter, embed bwd)
+//   G_WQ/WK/WV/WO : [N_L*D*D] each     — Q/K/V/O projection weight grads (wgrad GEMM)
+//   G_W_UP    : [N_L*FFN*D]            — FFN up weight grad
+//   G_W_DOWN  : [N_L*D*FFN]            — FFN down weight grad
+//   G_LN1_G/B, G_LN2_G/B : [N_L*D] each — LN gamma-grad + beta-grad (per channel)
+//   G_W_HEAD  : [V*D]                  — tied LM-head weight grad (sparse scatter)
+// ----------------------------------------------------------------------------
+static const int S1_OFF_G_EMBED   = S1_OFF_LOSS      + 16;                              // [V*D]
+static const int S1_OFF_G_WQ      = S1_OFF_G_EMBED   + S1_AL16(S1_V * S1_D);            // [N_L][D][D]
+static const int S1_OFF_G_WK      = S1_OFF_G_WQ      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_G_WV      = S1_OFF_G_WK      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_G_WO      = S1_OFF_G_WV      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_G_W_UP    = S1_OFF_G_WO      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);   // [N_L][FFN][D]
+static const int S1_OFF_G_W_DOWN  = S1_OFF_G_W_UP    + S1_AL16(S1_N_LAYERS * S1_FFN * S1_D); // [N_L][D][FFN]
+static const int S1_OFF_G_LN1_G   = S1_OFF_G_W_DOWN  + S1_AL16(S1_N_LAYERS * S1_D * S1_FFN); // [N_L][D]
+static const int S1_OFF_G_LN1_B   = S1_OFF_G_LN1_G   + S1_AL16(S1_N_LAYERS * S1_D);          // [N_L][D]
+static const int S1_OFF_G_LN2_G   = S1_OFF_G_LN1_B   + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_G_LN2_B   = S1_OFF_G_LN2_G   + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_G_W_HEAD  = S1_OFF_G_LN2_B   + S1_AL16(S1_N_LAYERS * S1_D);          // [V*D]
+
+// ----------------------------------------------------------------------------
+// SCRATCH grad regions (mode-1 intermediate activation grads, exposed to the buffer so
+// the testbench can bit-check them; the kernel holds them on-chip during compute and
+// burst-stores at the end, like the mode-0 activation saves). Each int32, FULL precision.
+//   GR    : residual-stream grad gR[t][d]   (L_SEQ*D) — the running backward residual
+//   GX1   : LN1-output grad gX1[t][d]       (L_SEQ*D)
+//   GX2   : LN2-output grad gX2[t][d]       (L_SEQ*D)
+//   GHD   : FFN-hidden (post-ReLU) grad gHd[t][k] (L_SEQ*FFN)
+//   GU    : FFN-up (pre-ReLU) grad gU[t][k]      (L_SEQ*FFN)
+//   GACAT : concatenated-attn-output grad gAcat[t][d] (L_SEQ*D)
+//   GQ/GK/GV : per-head-concatenated Q/K/V grads (L_SEQ*D each)
+// ----------------------------------------------------------------------------
+static const int S1_OFF_GR      = S1_OFF_G_W_HEAD + S1_AL16(S1_V * S1_D);               // [L_SEQ*D]
+static const int S1_OFF_GX1     = S1_OFF_GR      + S1_AL16(S1_L_SEQ * S1_D);
+static const int S1_OFF_GX2     = S1_OFF_GX1     + S1_AL16(S1_L_SEQ * S1_D);
+static const int S1_OFF_GHD     = S1_OFF_GX2     + S1_AL16(S1_L_SEQ * S1_D);            // [L_SEQ*FFN]
+static const int S1_OFF_GU      = S1_OFF_GHD     + S1_AL16(S1_L_SEQ * S1_FFN);          // [L_SEQ*FFN]
+static const int S1_OFF_GACAT   = S1_OFF_GU      + S1_AL16(S1_L_SEQ * S1_FFN);          // [L_SEQ*D]
+static const int S1_OFF_GQ      = S1_OFF_GACAT   + S1_AL16(S1_L_SEQ * S1_D);            // [L_SEQ*D]
+static const int S1_OFF_GK      = S1_OFF_GQ      + S1_AL16(S1_L_SEQ * S1_D);
+static const int S1_OFF_GV      = S1_OFF_GK      + S1_AL16(S1_L_SEQ * S1_D);
+
+static const int S1_BUFLEN         = S1_OFF_GV + S1_AL16(S1_L_SEQ * S1_D);   // total int32 words; multiple of 16
 
 // ---- per-region addressing helpers (layer-major; collapse to single-layer at l=0) ----
 // weight rows are ROW-MAJOR [O][I]; a layer's slab is l*(O*I).
@@ -122,5 +170,9 @@ static inline int s1_off_R(int l)                       { return S1_OFF_R + l * 
 static inline int s1_off_attn_p(int l, int h)           { return S1_OFF_ATTN_P + (l * S1_H + h) * S1_L_SEQ * S1_L_SEQ; }
 static inline int s1_off_attn_j(int l, int h)           { return S1_OFF_ATTN_JSTAR + (l * S1_H + h) * S1_L_SEQ; }
 static inline int s1_off_relu(int l)                    { return S1_OFF_RELU_MASK + l * S1_L_SEQ * S1_FFN; }
+
+// gradient-region layer-major helpers (mirror s1_off_w / s1_off_ln; weight grads are ROW-MAJOR [O][I]).
+static inline int s1_off_gw(int base, int l, int O, int I) { return base + l * (O * I); }   // [l][o][i]
+static inline int s1_off_gln(int base, int l)              { return base + l * S1_D; }       // [l][d]
 
 #endif  // FORGE_S1_CONFIG_HPP

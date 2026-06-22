@@ -199,6 +199,32 @@ PRIO: for (int b = 15; b >= 1; b--) {
     e = msb;
 }
 
+// dyadic-quantize a FULL-PRECISION (int32-range) gradient to (sign, exponent). Same round-to-nearest
+// rule as dyad(), but scans the WHOLE 31-bit magnitude (NOT truncated to int16). The S1 backward's
+// upstream grads are int32 (the Q16 CE-grad scale alone is ~2^16, amplified by the GEMM chain), so the
+// wgrad gO operand MUST be quantized from its full magnitude — charlm does dyadic_quantize(gf) on the
+// full-precision gradient, NOT on an int16-clamped one. (The standalone forge_wgrad_df3 int16-limits gO
+// because its CSIM TB stays in |g|<600; the integrated trainer at Q16 grad scale needs this wide form.)
+// exp can reach ~30 (+1 round-bump => 31); exp_t (ap_int<6>, -32..31) holds it. The x operand stays
+// int16 (forward activations ARE sat16'd), so only the gO side widens.
+static inline void dyad_wide(acc_t v, bool &sgn, exp_t &e, bool &nz) {
+#pragma HLS INLINE
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    ap_uint<32> a = (v < 0) ? (ap_uint<32>)(acc_t)(-v) : (ap_uint<32>)(acc_t)v;
+#else
+    uint32_t a = (v < 0) ? (uint32_t)(-v) : (uint32_t)v;
+#endif
+    sgn = (v < 0);
+    nz = (a != 0);
+    exp_t msb = 0;
+PRIOW: for (int b = 30; b >= 1; b--) {
+#pragma HLS UNROLL
+        if ((a >> b) & 1) { msb = (exp_t)b; break; }
+    }
+    if (msb >= 1 && ((a >> ((int)msb - 1)) & 1)) msb = msb + 1;   // bump on bit below MSB
+    e = msb;
+}
+
 // decode a PRE-DYADIC weight byte code: bit7=sign, bit5=nonzero, bits4..0=exponent.
 static inline void wdecode(int32_t code, bool &sgn, exp_t &e, bool &nz) {
 #pragma HLS INLINE
@@ -730,6 +756,648 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
 }
 
 // =============================================================================
+// ======================  MODE 1 (BACKWARD) — do_bwd  =========================
+// =============================================================================
+// Reverses the mode-0 forward chain to compute EVERY gradient for one transformer block, reading the
+// activations mode 0 saved (R_all / X1 / X2 / LN stats / relu mask / argmax_head / grad_logit) and the
+// resident weights. COMPOSES the CSIM-VERIFIED backward kernels as inlined helpers, math BIT-IDENTICAL:
+//   - forge_xgrad_wide.cpp : gx[t][i] = sum_o gO[t][o] * q(W[o][i])  (gO FULL, W dyadic-shift; DSP=0)
+//   - forge_wgrad_df3.cpp  : gW[o][i] = sum_t q(gO[t][o]) * q(x[t][i]) (BOTH dyadic -> shift; DSP=0)
+//   - forge_attn_bwd.cpp   : gQ/gK/gV (soft-blend + softmax multiplies on DSP; L1 sign(Q-K) mult-free)
+//   - forge_layernorm_bwd  : gx + g_gamma + g_beta (STE gamma pass-through + invq rescale; DSP=0)
+//   - forge_relu.cpp       : gx = mask ? gO : 0
+// MULTIPLIER-FREE except the attn-bwd soft-blend/softmax multiplies (forge_attn_bwd's irreducible DSPs).
+// RESIDENT ON-CHIP: burst-load weights + saved acts once, compute the reverse chain on-chip, burst-store
+// every g_* region at the END (the morph_lm TT_RESIDENT_W pattern that closed mode 0).
+//
+// dyad()/wdecode()/fdyad()/apply_invq are the SAME helpers as the forward, so the int64 golden is bit-exact.
+
+// apply the per-token fine-dyadic RESCALE invq=(nq/4)*2^e to a grad/value via shift-add (forge_layernorm_bwd
+// apply_invq, BIT-IDENTICAL to the forward rescale chain). NO multiply.
+static inline acc_t s1_apply_invq(acc_t v, int e, int nq) {
+#pragma HLS INLINE
+    int nqm4 = nq - (1 << S1_MBITS);
+    acc_t cn = v << S1_MBITS;
+    if (nqm4 >= 1) cn += v;
+    if (nqm4 >= 2) cn += v;
+    if (nqm4 >= 3) cn += v;
+    acc_t r = cn >> S1_MBITS;
+    if (e >= 0) r = r << e;
+    else        r = r >> (-e);
+    return r;
+}
+
+static inline int32_t sat32(acc_t v) {
+#pragma HLS INLINE
+    if (v >  (acc_t)2147483647LL)    return  2147483647;
+    if (v < (acc_t)(-2147483648LL))  return (int32_t)(-2147483648LL);
+    return (int32_t)v;
+}
+
+// -----------------------------------------------------------------------------
+// xgrad_gemm — gx[t][i] = sum_o gO[t][o] * q(W[o][i]).  gO held FULL int32 on-chip; W decoded inline.
+// Reduces over o (transposed-W access vs the forward), output-stationary on (t,i). VERBATIM forge_xgrad_wide
+// asymmetric dyadic MAC: term = (gO << ew), sign folded, NO multiply (DSP=0).  W ROW-MAJOR [O][I].
+// -----------------------------------------------------------------------------
+template <int T, int I, int O>
+static void xgrad_gemm(const int32_t gO[T][O], const code_t *wcode, int w_off, int32_t gx[T][I]) {
+#pragma HLS INLINE off
+XG_I: for (int i = 0; i < I; i++) {
+        acc_t acc[T];
+#pragma HLS ARRAY_PARTITION variable=acc complete
+        for (int t = 0; t < T; t++) {
+#pragma HLS UNROLL
+            acc[t] = 0;
+        }
+XG_O:   for (int o = 0; o < O; o++) {
+#pragma HLS PIPELINE II=1
+            bool sw, nzw; exp_t ew;
+            wdecode((int32_t)wcode[w_off + o * I + i], sw, ew, nzw);
+            for (int t = 0; t < T; t++) {
+#pragma HLS UNROLL
+                acc_t g = (acc_t)gO[t][o];
+                acc_t shifted = g << (int)ew;          // gO * 2^ew (barrel shift; gO keeps its sign)
+                if (nzw) acc[t] += sw ? (acc_t)(-shifted) : shifted;
+            }
+        }
+        for (int t = 0; t < T; t++) {
+#pragma HLS UNROLL
+            gx[t][i] = sat32(acc[t]);
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// wgrad_gemm — gW[o][i] = sum_t q(gO[t][o]) * q(x[t][i]).  BOTH operands dyadic-quantized (forge_wgrad_df3):
+// each product = ±2^(eo+ei) (sign-xor + exp-ADD + barrel shift + signed accumulate), NO multiply (DSP=0).
+// The contraction is over t (the L_SEQ positions). gW ROW-MAJOR [O][I], int32 full precision, ACCUMULATED.
+// -----------------------------------------------------------------------------
+template <int T, int I, int O>
+static void wgrad_gemm(const int32_t gO[T][O], const data_t xin[T][I], int32_t *gW, int gw_off) {
+#pragma HLS INLINE off
+    // dyad-quantize gO and x once (q(.) = ±2^e). Partition T complete so the t-reduction lanes read in parallel.
+    static exp_t goE[T][O]; static bool goS[T][O]; static bool goNZ[T][O];
+    static exp_t xE[T][I];  static bool xS[T][I];  static bool xNZ[T][I];
+#pragma HLS ARRAY_PARTITION variable=goE  complete dim=1
+#pragma HLS ARRAY_PARTITION variable=goS  complete dim=1
+#pragma HLS ARRAY_PARTITION variable=goNZ complete dim=1
+#pragma HLS ARRAY_PARTITION variable=xE   complete dim=1
+#pragma HLS ARRAY_PARTITION variable=xS   complete dim=1
+#pragma HLS ARRAY_PARTITION variable=xNZ  complete dim=1
+QGO: for (int t = 0; t < T; t++)
+        for (int o = 0; o < O; o++) {
+#pragma HLS PIPELINE II=1
+            dyad_wide((acc_t)gO[t][o], goS[t][o], goE[t][o], goNZ[t][o]);  // FULL int32 grad (no int16 wrap)
+        }
+QXW: for (int t = 0; t < T; t++)
+        for (int i = 0; i < I; i++) {
+#pragma HLS PIPELINE II=1
+            dyad((data_t)xin[t][i], xS[t][i], xE[t][i], xNZ[t][i]);
+        }
+WG_O: for (int o = 0; o < O; o++) {
+WG_I:   for (int i = 0; i < I; i++) {
+#pragma HLS PIPELINE II=1
+            acc_t acc = 0;
+            for (int t = 0; t < T; t++) {
+#pragma HLS UNROLL
+                exp_t eo = goE[t][o]; exp_t ei = xE[t][i];
+                int e = (int)eo + (int)ei;
+                acc_t term = (acc_t)1 << e;
+                bool neg = goS[t][o] ^ xS[t][i];
+                bool nz  = goNZ[t][o] & xNZ[t][i];
+                if (nz) acc += neg ? (acc_t)(-term) : term;
+            }
+            gW[gw_off + o * I + i] += sat32(acc);
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// attn_head_bwd — VERBATIM forge_attn_bwd math (one head). Re-derives p from Q,K (BIT-IDENTICAL to the
+// forward attn_head: L1 score -> exp2 ROM -> pow2-ceil normalize), then the soft-attention backward:
+//   gV[j][d] += p[i][j]*gOut[i][d]        (multiply -> DSP)
+//   gp[i][j]  = sum_d gOut[i][d]*V[j][d]  (multiply -> DSP)
+//   ex[i]     = (sum_j p*gp) >> P_FRAC ; gs[i][j] = (p*(gp-ex)) >> P_FRAC   (multiply -> DSP)
+//   gQ[i][d] += -sgn(Q-K)*gs ; gK[j][d] += +sgn(Q-K)*gs                     (MULT-FREE conditional add)
+// gQ/gK/gV are int32 on-chip accumulators (zeroed by the caller per head). gOut is FULL int32.
+// -----------------------------------------------------------------------------
+static void attn_head_bwd(const data_t Q[S1_L_SEQ][S1_DH], const data_t K[S1_L_SEQ][S1_DH],
+                          const data_t V[S1_L_SEQ][S1_DH], const int32_t gOut[S1_L_SEQ][S1_DH],
+                          const int32_t *attn_lut,
+                          int32_t gQ[S1_L_SEQ][S1_DH], int32_t gK[S1_L_SEQ][S1_DH],
+                          int32_t gV[S1_L_SEQ][S1_DH]) {
+#pragma HLS INLINE off
+    static acc_t  s[S1_L_SEQ];
+    static prob_t p[S1_L_SEQ];
+    static int32_t gp[S1_L_SEQ];
+    static int32_t gs[S1_L_SEQ];
+
+AB_ROW: for (int i = 0; i < S1_L_SEQ; i++) {
+        // --- re-derive L1 scores (causal) ---
+        acc_t rowmax = S1_NEG_INF;
+    AB_SCORE: for (int j = 0; j < S1_L_SEQ; j++) {
+#pragma HLS PIPELINE II=1
+            if (j > i) { s[j] = S1_NEG_INF; continue; }
+            acc_t l1 = 0;
+        AB_DABS: for (int d = 0; d < S1_DH; d++) {
+#pragma HLS UNROLL
+                data_t diff = Q[i][d] - K[j][d];
+                acc_t a = (diff < 0) ? (acc_t)(-diff) : (acc_t)diff;
+                l1 += a;
+            }
+            acc_t sc = -l1;
+            s[j] = sc;
+            if (sc > rowmax) rowmax = sc;
+        }
+        // --- softmax via exp2 ROM (Q16) + pow2-ceil normalize ---
+        acc_t rowsum = 0;
+    AB_EXP: for (int j = 0; j < S1_L_SEQ; j++) {
+#pragma HLS PIPELINE II=1
+            if (j > i) { p[j] = 0; continue; }
+            acc_t gap = (rowmax - s[j]) >> S1_AT_DELTA_SHIFT;
+            int idx = (int)gap;
+            if (idx < 0) idx = 0;
+            if (idx > S1_LUT_N - 1) idx = S1_LUT_N - 1;
+            prob_t pv = (prob_t)attn_lut[idx];
+            p[j] = pv;
+            rowsum += (acc_t)pv;
+        }
+        int sh = 0;
+    AB_NSH: for (int b = 0; b < 16; b++) {
+#pragma HLS UNROLL
+            if ((rowsum >> sh) > ((acc_t)1 << S1_AT_P_FRAC)) sh++;
+        }
+    AB_NRM: for (int j = 0; j < S1_L_SEQ; j++) {
+#pragma HLS PIPELINE II=1
+            p[j] = p[j] >> sh;
+        }
+        // --- (b) gp[j] = sum_d gOut[i][d]*V[j][d] ; expnum = sum_j p*gp  (multiplies -> DSP) ---
+        acc_t expnum = 0;
+    AB_GP: for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+            acc_t dot = 0;
+            for (int d = 0; d < S1_DH; d++) {
+#pragma HLS UNROLL
+                dot += (acc_t)((acc_t)gOut[i][d] * (acc_t)V[j][d]);   // multiply
+            }
+            int32_t gpj = (int32_t)dot;
+            gp[j] = gpj;
+            expnum += (acc_t)((acc_t)p[j] * (acc_t)gpj);              // multiply
+        }
+        int32_t ex = (int32_t)(expnum >> S1_AT_P_FRAC);
+        // --- (c) gs[j] = (p[j]*(gp[j]-ex)) >> P_FRAC  (multiply -> DSP) ---
+    AB_GS: for (int j = 0; j < S1_L_SEQ; j++) {
+#pragma HLS PIPELINE II=1
+            if (j > i) { gs[j] = 0; continue; }
+            int32_t centered = (int32_t)(gp[j] - ex);
+            acc_t prod = (acc_t)((acc_t)p[j] * (acc_t)centered);      // multiply
+            gs[j] = (int32_t)(prod >> S1_AT_P_FRAC);
+        }
+        // --- (a) gV[j][d] += p[i][j]*gOut[i][d]  (multiply -> DSP, mirrors fwd p*V) ---
+    AB_GV: for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+            prob_t pj = p[j];
+            for (int d = 0; d < S1_DH; d++) {
+#pragma HLS UNROLL
+                acc_t t = (acc_t)((acc_t)pj * (acc_t)gOut[i][d]);     // multiply
+                gV[j][d] = sat32((acc_t)gV[j][d] + (t >> S1_AT_P_FRAC));
+            }
+        }
+        // --- (d) L1-score subgradient (MULT-FREE conditional add) ---
+    AB_SUBG: for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+            acc_t gsj = (acc_t)gs[j];
+            for (int d = 0; d < S1_DH; d++) {
+#pragma HLS UNROLL
+                data_t diff = Q[i][d] - K[j][d];
+                if (diff > 0) {           // sgn=+1: gQ -= gs ; gK += gs
+                    gQ[i][d] = sat32((acc_t)gQ[i][d] - gsj);
+                    gK[j][d] = sat32((acc_t)gK[j][d] + gsj);
+                } else if (diff < 0) {    // sgn=-1: gQ += gs ; gK -= gs
+                    gQ[i][d] = sat32((acc_t)gQ[i][d] + gsj);
+                    gK[j][d] = sat32((acc_t)gK[j][d] - gsj);
+                }
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// ln_gamma_grad — g_gamma[d] += sum_t gY[t][d] * q(r[t][d]), where r[t][d] is the pre-gamma rescaled
+// centered value of the LayerNorm (r = c*(nq/4)*2^e, c = x-mean), recomputed from the PRE-NORM residual
+// row Rin[t][:] using the SAVED per-token (e,nq) — BIT-IDENTICAL to the forward layernorm_tok rescale.
+// r is dyadic-quantized (forge_layernorm_bwd c_hat-code contract) so the product is gY << dyad(r).exp
+// (sign-folded) — NO multiply (DSP=0). The gamma scale is a per-channel learnable ±2^k; this is its grad.
+// -----------------------------------------------------------------------------
+static void ln_gamma_grad(const data_t Rin[S1_L_SEQ][S1_D], const int32_t *lnst, int l,
+                          const int32_t gY[S1_L_SEQ][S1_D], int32_t *gGamma, int gg_off) {
+#pragma HLS INLINE off
+LNG_T: for (int t = 0; t < S1_L_SEQ; t++) {
+        // recompute mean + c (sat16) over the pre-norm row, exactly as layernorm_tok.
+        acc_t sum = 0;
+    LNG_SUM: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            sum += (acc_t)Rin[t][d];
+        }
+        acc_t mean = sum >> S1_LOG2_D;
+        int e  = lnst[l * S1_L_SEQ * 2 + 2 * t];
+        int nq = lnst[l * S1_L_SEQ * 2 + 2 * t + 1];
+        int nqm4 = nq - (1 << S1_MBITS);
+    LNG_D: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            acc_t cv = (acc_t)sat16((acc_t)Rin[t][d] - mean);
+            acc_t cn = cv << S1_MBITS;
+            if (nqm4 >= 1) cn += cv;
+            if (nqm4 >= 2) cn += cv;
+            if (nqm4 >= 3) cn += cv;
+            acc_t r = cn >> S1_MBITS;
+            if (e >= 0) r = r << e;
+            else        r = r >> (-e);
+            // dyadic-quantize r, then g_gamma += gY << dyad(r).exp (sign-folded). NO multiply.
+            bool rs, rnz; exp_t re;
+            dyad(sat16(r), rs, re, rnz);
+            if (rnz) {
+                acc_t term = (acc_t)gY[t][d] << (int)re;
+                bool neg = rs;   // r's sign flips; gY's sign already in term
+                gGamma[gg_off + d] = sat32((acc_t)gGamma[gg_off + d] + (neg ? (acc_t)(-term) : term));
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Mode 1: do_bwd — the whole backward chain over the causal sequence (reverse of do_fwd_loss).
+// RESIDENT on-chip: burst-load every weight + saved activation ONCE, compute the reverse chain entirely
+// on-chip, then burst-store every gradient region at the END.
+// =============================================================================
+static int do_bwd(int32_t *buffer) {
+#pragma HLS INLINE off
+
+    // ---------------------------------------------------------------------
+    // (A) RESIDENT weights / LUTs / tokens — burst-loaded ONCE (same encodings as mode 0).
+    // ---------------------------------------------------------------------
+    static half_t  embed_oc[S1_W_EMBED];
+    static code_t  wq_oc[S1_W_PROJ];
+    static code_t  wk_oc[S1_W_PROJ];
+    static code_t  wv_oc[S1_W_PROJ];
+    static code_t  wo_oc[S1_W_PROJ];
+    static code_t  wup_oc[S1_W_WUP];
+    static code_t  wdn_oc[S1_W_WDOWN];
+    static code_t  ln1g_oc[S1_W_LN];
+    static half_t  ln1b_oc[S1_W_LN];   (void)ln1b_oc;   // beta not needed in bwd (its grad is a column sum)
+    static code_t  ln2g_oc[S1_W_LN];
+    static half_t  ln2b_oc[S1_W_LN];   (void)ln2b_oc;
+    static half_t  whead_oc[S1_W_WHEAD];
+    static int32_t at_lut[S1_LUT_N];
+    static int32_t toks[S1_L_SEQ];
+
+    burst_load_half (buffer, S1_OFF_EMBED,    embed_oc, S1_W_EMBED);   (void)embed_oc;
+    burst_load_codes(buffer, S1_OFF_WQ,       wq_oc,    S1_W_PROJ);
+    burst_load_codes(buffer, S1_OFF_WK,       wk_oc,    S1_W_PROJ);
+    burst_load_codes(buffer, S1_OFF_WV,       wv_oc,    S1_W_PROJ);
+    burst_load_codes(buffer, S1_OFF_WO,       wo_oc,    S1_W_PROJ);
+    burst_load_codes(buffer, S1_OFF_W_UP,     wup_oc,   S1_W_WUP);
+    burst_load_codes(buffer, S1_OFF_W_DOWN,   wdn_oc,   S1_W_WDOWN);
+    burst_load_codes(buffer, S1_OFF_LN1_G,    ln1g_oc,  S1_W_LN);
+    burst_load_half (buffer, S1_OFF_LN1_B,    ln1b_oc,  S1_W_LN);
+    burst_load_codes(buffer, S1_OFF_LN2_G,    ln2g_oc,  S1_W_LN);
+    burst_load_half (buffer, S1_OFF_LN2_B,    ln2b_oc,  S1_W_LN);
+    burst_load_half (buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);
+    burst_load_i32  (buffer, S1_OFF_ATTN_LUT, at_lut,   S1_LUT_N);
+    burst_load_i32  (buffer, S1_OFF_TOKENS,   toks,     S1_L_SEQ);
+
+    // ---------------------------------------------------------------------
+    // (B) RESIDENT saved activations from mode 0.
+    // ---------------------------------------------------------------------
+    static int32_t R_all_oc[S1_W_RALL];
+    static int32_t X1_oc[S1_W_ACT];
+    static int32_t X2_oc[S1_W_ACT];
+    static int32_t ln1st_oc[S1_W_LNST];
+    static int32_t ln2st_oc[S1_W_LNST];
+    static int32_t relu_oc[S1_W_RELU];
+    static int32_t argh_oc[S1_W_ARGH];
+    static int32_t glog_oc[S1_W_GLOG];
+
+    burst_load_i32(buffer, S1_OFF_R,           R_all_oc, S1_W_RALL);
+    burst_load_i32(buffer, s1_off_act(S1_OFF_X1, 0), X1_oc, S1_W_ACT);
+    burst_load_i32(buffer, s1_off_act(S1_OFF_X2, 0), X2_oc, S1_W_ACT);
+    burst_load_i32(buffer, S1_OFF_LN1_STATS,   ln1st_oc, S1_W_LNST);
+    burst_load_i32(buffer, S1_OFF_LN2_STATS,   ln2st_oc, S1_W_LNST);
+    burst_load_i32(buffer, S1_OFF_RELU_MASK,   relu_oc,  S1_W_RELU);
+    burst_load_i32(buffer, S1_OFF_ARGMAX_HEAD, argh_oc,  S1_W_ARGH);
+    burst_load_i32(buffer, S1_OFF_GRAD_LOGIT,  glog_oc,  S1_W_GLOG);
+
+    // ---------------------------------------------------------------------
+    // (C) RESIDENT gradient accumulators (zeroed) + intermediate grad scratch.
+    // ---------------------------------------------------------------------
+    static int32_t gEMBED_oc[S1_W_EMBED];
+    static int32_t gWQ_oc[S1_W_PROJ];
+    static int32_t gWK_oc[S1_W_PROJ];
+    static int32_t gWV_oc[S1_W_PROJ];
+    static int32_t gWO_oc[S1_W_PROJ];
+    static int32_t gWUP_oc[S1_W_WUP];
+    static int32_t gWDN_oc[S1_W_WDOWN];
+    static int32_t gLN1G_oc[S1_W_LN];
+    static int32_t gLN1B_oc[S1_W_LN];
+    static int32_t gLN2G_oc[S1_W_LN];
+    static int32_t gLN2B_oc[S1_W_LN];
+    static int32_t gWHEAD_oc[S1_W_WHEAD];
+
+ZG_E: for (int i = 0; i < S1_W_EMBED; i++) { gEMBED_oc[i] = 0; gWHEAD_oc[i] = 0; }
+ZG_P: for (int i = 0; i < S1_W_PROJ; i++) { gWQ_oc[i]=0; gWK_oc[i]=0; gWV_oc[i]=0; gWO_oc[i]=0; }
+ZG_U: for (int i = 0; i < S1_W_WUP; i++)   gWUP_oc[i] = 0;
+ZG_D: for (int i = 0; i < S1_W_WDOWN; i++)  gWDN_oc[i] = 0;
+ZG_L: for (int i = 0; i < S1_W_LN; i++) { gLN1G_oc[i]=0; gLN1B_oc[i]=0; gLN2G_oc[i]=0; gLN2B_oc[i]=0; }
+
+    // gR — the running backward residual stream (output-grad of the block; built by the head bwd).
+    static int32_t gR[S1_L_SEQ][S1_D];
+    // intermediate grad scratch (buffer-exposed at the END for the bit-check).
+    static int32_t gX1_oc[S1_L_SEQ][S1_D];
+    static int32_t gX2_oc[S1_L_SEQ][S1_D];
+
+    // ---------------------------------------------------------------------
+    // (1) LM-head backward (max-plus adjoint, SPARSE): route grad_logit[t][v] through saved argmax d*.
+    //     gR[t][d*] += grad_logit[t][v]  AND  g_W_HEAD[v][d*] += grad_logit[t][v].   (morph head-scatter)
+    // ---------------------------------------------------------------------
+GR_ZERO: for (int t = 0; t < S1_L_SEQ; t++)
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            gR[t][d] = 0;
+        }
+HEAD_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
+        for (int v = 0; v < S1_V; v++) {
+#pragma HLS PIPELINE II=4
+            int32_t g = glog_oc[t * S1_V + v];
+            if (g == 0) continue;
+            int dstar = argh_oc[t * S1_V + v];
+            if (dstar < 0 || dstar >= S1_D) continue;
+            gWHEAD_oc[v * S1_D + dstar] += g;
+            gR[t][dstar] = sat32((acc_t)gR[t][dstar] + (acc_t)g);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // (2) per layer (REVERSE).
+    // ---------------------------------------------------------------------
+    static int32_t gDn[S1_L_SEQ][S1_D];
+    static int32_t gHd[S1_L_SEQ][S1_FFN];
+    static int32_t gU[S1_L_SEQ][S1_FFN];
+    static int32_t gX2v[S1_L_SEQ][S1_D];
+    static int32_t gAcat[S1_L_SEQ][S1_D];
+    static int32_t gQv[S1_L_SEQ][S1_D];
+    static int32_t gKv[S1_L_SEQ][S1_D];
+    static int32_t gVv[S1_L_SEQ][S1_D];
+    static int32_t gX1v[S1_L_SEQ][S1_D];
+
+    // recomputed forward intermediates needed by the wgrad/attn backward (X1 saved; Acat/Hd recomputed).
+    static data_t X1m[S1_L_SEQ][S1_D];
+    static data_t X2m[S1_L_SEQ][S1_D];
+    static data_t Qm[S1_L_SEQ][S1_D];
+    static data_t Km[S1_L_SEQ][S1_D];
+    static data_t Vm[S1_L_SEQ][S1_D];
+    static data_t Qh[S1_L_SEQ][S1_DH];
+    static data_t Kh[S1_L_SEQ][S1_DH];
+    static data_t Vh[S1_L_SEQ][S1_DH];
+    static data_t Acatm[S1_L_SEQ][S1_D];
+    static data_t Hdm[S1_L_SEQ][S1_FFN];
+    static int32_t gOuth[S1_L_SEQ][S1_DH];
+    static int32_t gQh[S1_L_SEQ][S1_DH];
+    static int32_t gKh[S1_L_SEQ][S1_DH];
+    static int32_t gVh[S1_L_SEQ][S1_DH];
+
+BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
+        const int l = S1_N_LAYERS - 1 - lr;
+
+        // === recompute the forward intermediates of layer l from its saved input residual R_l. ===
+        // X1 = LN1(R_l) was saved; X2 = LN2(R_after_attn) was saved. Q/K/V = GEMM(X1); Acat from attn;
+        // Hd = relu(GEMM(X2)). We need X1m/X2m (wgrad x-operand), Qm/Km/Vm + Acatm (attn + Wo wgrad),
+        // Hdm (W_down wgrad). All BIT-IDENTICAL to the forward.
+    LD_X1: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                X1m[t][d] = (data_t)X1_oc[l * S1_L_SEQ * S1_D + t * S1_D + d];
+                X2m[t][d] = (data_t)X2_oc[l * S1_L_SEQ * S1_D + t * S1_D + d];
+            }
+        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1m, wq_oc, l * S1_D * S1_D, Qm);
+        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1m, wk_oc, l * S1_D * S1_D, Km);
+        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1m, wv_oc, l * S1_D * S1_D, Vm);
+    RC_HEAD: for (int h = 0; h < S1_H; h++) {
+            static data_t Ahh[S1_L_SEQ][S1_DH];
+            static int32_t p_dummy[S1_L_SEQ * S1_L_SEQ];
+            static int32_t j_dummy[S1_L_SEQ];
+            for (int t = 0; t < S1_L_SEQ; t++)
+                for (int d = 0; d < S1_DH; d++) {
+#pragma HLS PIPELINE II=1
+                    Qh[t][d] = Qm[t][h * S1_DH + d];
+                    Kh[t][d] = Km[t][h * S1_DH + d];
+                    Vh[t][d] = Vm[t][h * S1_DH + d];
+                }
+            attn_head(Qh, Kh, Vh, at_lut, Ahh, p_dummy, j_dummy);
+            for (int t = 0; t < S1_L_SEQ; t++)
+                for (int d = 0; d < S1_DH; d++) {
+#pragma HLS PIPELINE II=1
+                    Acatm[t][h * S1_DH + d] = Ahh[t][d];
+                }
+        }
+        // Hd = relu(GEMM(X2, W_up)) — recompute U then gate by the SAVED relu mask (bit-identical to fwd).
+        static data_t Um[S1_L_SEQ][S1_FFN];
+        fwd_gemm<S1_L_SEQ, S1_D, S1_FFN>(X2m, wup_oc, l * S1_FFN * S1_D, Um);
+    RC_RELU: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int k = 0; k < S1_FFN; k++) {
+#pragma HLS PIPELINE II=1
+                Hdm[t][k] = (relu_oc[l * S1_L_SEQ * S1_FFN + t * S1_FFN + k] != 0) ? Um[t][k] : (data_t)0;
+            }
+
+        // === residual2 split: gR feeds BOTH the FFN-down output (gDn) AND the skip (gR kept). ===
+    RES2_BWD: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                gDn[t][d] = gR[t][d];          // gradient into the FFN branch output
+            }
+
+        // === FFN down-GEMM bwd: gHd = xgrad(gDn, W_down)  ; g_W_down += wgrad(gDn, Hd). ===
+        xgrad_gemm<S1_L_SEQ, S1_FFN, S1_D>(gDn, wdn_oc, l * S1_D * S1_FFN, gHd);
+        wgrad_gemm<S1_L_SEQ, S1_FFN, S1_D>(gDn, Hdm, gWDN_oc, l * S1_D * S1_FFN);
+
+        // === ReLU bwd: gU = mask ? gHd : 0. ===
+    RELU_BWD: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int k = 0; k < S1_FFN; k++) {
+#pragma HLS PIPELINE II=1
+                gU[t][k] = (relu_oc[l * S1_L_SEQ * S1_FFN + t * S1_FFN + k] != 0) ? gHd[t][k] : 0;
+            }
+
+        // === FFN up-GEMM bwd: gX2 = xgrad(gU, W_up)  ; g_W_up += wgrad(gU, X2). ===
+        xgrad_gemm<S1_L_SEQ, S1_D, S1_FFN>(gU, wup_oc, l * S1_FFN * S1_D, gX2v);
+        wgrad_gemm<S1_L_SEQ, S1_D, S1_FFN>(gU, X2m, gWUP_oc, l * S1_FFN * S1_D);
+    SV_GX2: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                gX2_oc[t][d] = gX2v[t][d];
+            }
+
+        // === LN2 backward: gY=gX2 -> gR_pre + g_LN2_gamma + g_LN2_beta. The gradient ADDS to gR (the
+        //     residual skip already in gR), matching the forward R = R + Dn ; X2 = LN2(R). ===
+    LN2_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
+            int e_n  = ln2st_oc[l * S1_L_SEQ * 2 + 2 * t];
+            int nq_n = ln2st_oc[l * S1_L_SEQ * 2 + 2 * t + 1];
+            // recompute r[d] (pre-gamma rescaled c) from the layer's pre-LN2 residual = R_after_attn,
+            // which equals R_l-output-of-attn-residual. The forward fed LN2 from R post-RES1; that exact
+            // value is X2's pre-norm source. We recompute c -> r from R_attn = (R_l + AO). But we only
+            // need r for g_gamma's dyad(r) magnitude; r is BIT-IDENTICAL to the forward rescale of c.
+            // Source residual for LN2 = the saved R after attn-residual. We reconstruct it below.
+            // (handled by ln_backward_row which recomputes c->r from the given pre-norm row.)
+            acc_t g_c[S1_D];
+            acc_t gsum = 0;
+        LN2_GSTE: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                bool gsn, gnz; exp_t ge;
+                wdecode((int32_t)ln2g_oc[l * S1_D + d], gsn, ge, gnz);
+                acc_t gchat = gnz ? ((acc_t)gX2v[t][d] << (int)ge) : (acc_t)0;
+                if (gnz && gsn) gchat = -gchat;
+                acc_t gd = s1_apply_invq(gchat, e_n, nq_n);
+                g_c[d] = gd;
+                gsum += gd;
+            }
+            acc_t mean = gsum >> S1_LOG2_D;
+        LN2_GSUB: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                gR[t][d] = sat32((acc_t)gR[t][d] + (g_c[d] - mean));
+                gLN2B_oc[l * S1_D + d] = sat32((acc_t)gLN2B_oc[l * S1_D + d] + (acc_t)gX2v[t][d]);
+            }
+        }
+        // g_LN2_gamma[d] += sum_t gX2[t][d] * q(r2[t][d])  (r2 = pre-gamma rescaled c of LN2; dyadic -> shift).
+        // recompute r2 from the pre-LN2 residual R_attn = R_l + AO. R_l is R_all[l]; AO = Acat@Wo (=R_attn-R_l).
+        // We reconstruct R_attn as R_all[l] residual stream BEFORE the FFN residual add but AFTER attn:
+        //   R_attn[t][d] = sat16(R_all[l][t][d] + AO[t][d]).  AO = fwd_gemm(Acat, Wo).
+        static data_t AOm[S1_L_SEQ][S1_D];
+        static data_t Rattn[S1_L_SEQ][S1_D];
+        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(Acatm, wo_oc, l * S1_D * S1_D, AOm);
+    RC_RATTN: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                Rattn[t][d] = sat16((acc_t)R_all_oc[l * S1_L_SEQ * S1_D + t * S1_D + d] + (acc_t)AOm[t][d]);
+            }
+        ln_gamma_grad(Rattn, ln2st_oc, l, gX2v, gLN2G_oc, l * S1_D);
+
+        // === residual1 split: gR feeds BOTH the attn-output (Wo) branch AND the skip. ===
+        static int32_t gAO[S1_L_SEQ][S1_D];
+    RES1_BWD: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                gAO[t][d] = gR[t][d];
+            }
+
+        // === Wo bwd: gAcat = xgrad(gAO, Wo) ; g_Wo += wgrad(gAO, Acat). ===
+        xgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gAO, wo_oc, l * S1_D * S1_D, gAcat);
+        wgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gAO, Acatm, gWO_oc, l * S1_D * S1_D);
+
+        // === attention backward per head -> gQ/gK/gV (assembled into gQv/gKv/gVv over the heads). ===
+    ATTN_BWD_H: for (int h = 0; h < S1_H; h++) {
+            for (int t = 0; t < S1_L_SEQ; t++)
+                for (int d = 0; d < S1_DH; d++) {
+#pragma HLS PIPELINE II=1
+                    Qh[t][d] = Qm[t][h * S1_DH + d];
+                    Kh[t][d] = Km[t][h * S1_DH + d];
+                    Vh[t][d] = Vm[t][h * S1_DH + d];
+                    gOuth[t][d] = gAcat[t][h * S1_DH + d];
+                    gQh[t][d] = 0; gKh[t][d] = 0; gVh[t][d] = 0;
+                }
+            attn_head_bwd(Qh, Kh, Vh, gOuth, at_lut, gQh, gKh, gVh);
+            for (int t = 0; t < S1_L_SEQ; t++)
+                for (int d = 0; d < S1_DH; d++) {
+#pragma HLS PIPELINE II=1
+                    gQv[t][h * S1_DH + d] = gQh[t][d];
+                    gKv[t][h * S1_DH + d] = gKh[t][d];
+                    gVv[t][h * S1_DH + d] = gVh[t][d];
+                }
+        }
+
+        // === Q/K/V bwd: gX1 = xgrad(gQ,Wq) + xgrad(gK,Wk) + xgrad(gV,Wv) (ACCUMULATE the 3 paths);
+        //     g_Wq/g_Wk/g_Wv += wgrad(gQ/gK/gV, X1). ===
+        static int32_t gX1q[S1_L_SEQ][S1_D];
+        static int32_t gX1k[S1_L_SEQ][S1_D];
+        static int32_t gX1vv[S1_L_SEQ][S1_D];
+        xgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gQv, wq_oc, l * S1_D * S1_D, gX1q);
+        xgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gKv, wk_oc, l * S1_D * S1_D, gX1k);
+        xgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gVv, wv_oc, l * S1_D * S1_D, gX1vv);
+        wgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gQv, X1m, gWQ_oc, l * S1_D * S1_D);
+        wgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gKv, X1m, gWK_oc, l * S1_D * S1_D);
+        wgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gVv, X1m, gWV_oc, l * S1_D * S1_D);
+    ACC_GX1: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                gX1v[t][d] = sat32((acc_t)gX1q[t][d] + (acc_t)gX1k[t][d] + (acc_t)gX1vv[t][d]);
+                gX1_oc[t][d] = gX1v[t][d];
+            }
+
+        // === LN1 backward: gY=gX1 -> gR + g_LN1_gamma + g_LN1_beta. ADDS to gR (the residual1 skip). ===
+    LN1_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
+            int e_n  = ln1st_oc[l * S1_L_SEQ * 2 + 2 * t];
+            int nq_n = ln1st_oc[l * S1_L_SEQ * 2 + 2 * t + 1];
+            acc_t g_c[S1_D];
+            acc_t gsum = 0;
+        LN1_GSTE: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                bool gsn, gnz; exp_t ge;
+                wdecode((int32_t)ln1g_oc[l * S1_D + d], gsn, ge, gnz);
+                acc_t gchat = gnz ? ((acc_t)gX1v[t][d] << (int)ge) : (acc_t)0;
+                if (gnz && gsn) gchat = -gchat;
+                acc_t gd = s1_apply_invq(gchat, e_n, nq_n);
+                g_c[d] = gd;
+                gsum += gd;
+            }
+            acc_t mean = gsum >> S1_LOG2_D;
+        LN1_GSUB: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                gR[t][d] = sat32((acc_t)gR[t][d] + (g_c[d] - mean));
+                gLN1B_oc[l * S1_D + d] = sat32((acc_t)gLN1B_oc[l * S1_D + d] + (acc_t)gX1v[t][d]);
+            }
+        }
+        // g_LN1_gamma[d] += sum_t gX1[t][d] * q(r1[t][d]); r1 from the pre-LN1 residual = R_all[l] (block input).
+        static data_t Rin1[S1_L_SEQ][S1_D];
+    RC_RIN1: for (int t = 0; t < S1_L_SEQ; t++)
+            for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+                Rin1[t][d] = (data_t)R_all_oc[l * S1_L_SEQ * S1_D + t * S1_D + d];
+            }
+        ln_gamma_grad(Rin1, ln1st_oc, l, gX1v, gLN1G_oc, l * S1_D);
+    }
+
+    // ---------------------------------------------------------------------
+    // (3) embed backward (SPARSE): g_EMBED[tok[t]*D + d] += gR[t][d].
+    // ---------------------------------------------------------------------
+EMB_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
+        int tok = toks[t];
+        if (tok < 0) tok = 0; if (tok >= S1_V) tok = S1_V - 1;
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            if (gR[t][d] != 0) gEMBED_oc[tok * S1_D + d] = sat32((acc_t)gEMBED_oc[tok * S1_D + d] + (acc_t)gR[t][d]);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // (D) BURST-STORE every gradient region + the intermediate grads (for the bit-check).
+    // ---------------------------------------------------------------------
+    burst_store_i32(gEMBED_oc, buffer, S1_OFF_G_EMBED,  S1_W_EMBED);
+    burst_store_i32(gWQ_oc,    buffer, S1_OFF_G_WQ,     S1_W_PROJ);
+    burst_store_i32(gWK_oc,    buffer, S1_OFF_G_WK,     S1_W_PROJ);
+    burst_store_i32(gWV_oc,    buffer, S1_OFF_G_WV,     S1_W_PROJ);
+    burst_store_i32(gWO_oc,    buffer, S1_OFF_G_WO,     S1_W_PROJ);
+    burst_store_i32(gWUP_oc,   buffer, S1_OFF_G_W_UP,   S1_W_WUP);
+    burst_store_i32(gWDN_oc,   buffer, S1_OFF_G_W_DOWN, S1_W_WDOWN);
+    burst_store_i32(gLN1G_oc,  buffer, S1_OFF_G_LN1_G,  S1_W_LN);
+    burst_store_i32(gLN1B_oc,  buffer, S1_OFF_G_LN1_B,  S1_W_LN);
+    burst_store_i32(gLN2G_oc,  buffer, S1_OFF_G_LN2_G,  S1_W_LN);
+    burst_store_i32(gLN2B_oc,  buffer, S1_OFF_G_LN2_B,  S1_W_LN);
+    burst_store_i32(gWHEAD_oc, buffer, S1_OFF_G_W_HEAD, S1_W_WHEAD);
+    burst_store_i32(&gR[0][0],     buffer, S1_OFF_GR,    S1_L_SEQ * S1_D);
+    burst_store_i32(&gX1_oc[0][0], buffer, S1_OFF_GX1,   S1_L_SEQ * S1_D);
+    burst_store_i32(&gX2_oc[0][0], buffer, S1_OFF_GX2,   S1_L_SEQ * S1_D);
+
+    return 0;
+}
+
+// =============================================================================
 // Top-level dispatcher — mirror forge_train_step_morph_lm.cpp ABI/pragmas.
 // =============================================================================
 extern "C" int forge_train_step_s1(
@@ -753,8 +1421,8 @@ extern "C" int forge_train_step_s1(
 
     (void)a1; (void)a2; (void)a3;
     if (mode == 0) return do_fwd_loss(buffer);
-    // modes 1 (BWD), 2 (OPT), 3 (TRAIN_RUN) stubbed for S1 phase-A; offsets are allocated.
-    if (mode == 1) return 0;
+    if (mode == 1) return do_bwd(buffer);
+    // modes 2 (OPT), 3 (TRAIN_RUN) stubbed for S1 phase-A; offsets are allocated.
     if (mode == 2) return 0;
     if (mode == 3) return 0;
     return 99;
