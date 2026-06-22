@@ -282,6 +282,25 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 #define S1_GEMM_OMAX  S1_FFN      // 512
 
 // =============================================================================
+// AREA FIX — NARROW LANE WIDTH. The engines inherited the throughput-optimized wide tiling from the
+// standalone kernels: complete dim=1 partition of the [TMAX][*] operand banks + a TMAX(=128)-way inner
+// reduction UNROLL. That makes each shared engine huge (~128 parallel MAC lanes) -> 1.35M LUT = 103% of
+// the whole device. S1 is a CORRECTNESS / CONVERGENCE proof, NOT a throughput kernel (the tok/s story is
+// the standalone optimized kernels + projection, already done), so we narrow the parallelism to a SMALL
+// lane width: partition the T (token) dim CYCLIC factor=LANE, UNROLL the inner T-reduction factor=LANE,
+// and accumulate over T in LANE-wide chunks. Latency grows ~TMAX/LANE x (irrelevant for S1); area drops
+// ~TMAX/LANE x. BIT-EXACT-PRESERVING: an integer reduction is order-independent (no overflow — int48/int32
+// headroom already verified < 2^31), so a LANE-wide chunked accumulation produces the IDENTICAL total as
+// the full 128-way unroll — only the SCHEDULE changes, never the result. PIPELINE II=1 still holds because
+// the cyclic-by-LANE partition gives LANE conflict-free reads/cycle for the LANE-wide inner unroll.
+// LANE=16 (at most 32). S1_GEMM_TMAX MUST be a multiple of LANE (128 % 16 == 0) so the cyclic banks and
+// the chunked loop tile evenly.
+// =============================================================================
+#ifndef S1_LANE
+#define S1_LANE 16
+#endif
+
+// =============================================================================
 // fwd_gemm — the dyadic-MAC GEMM y[t][o] = sum_i q(x[t][i]) MAC q(W[o][i]) + bias(=0 in S1).
 // Reproduces forge_fwd_wide.cpp's inner: x dyad-quantized once, W PRE-DYADIC (wdecode inline), the
 // MAC is sign-xor + exponent-ADD + barrel-SHIFT + signed accumulate (NO multiply, DSP=0).
@@ -299,42 +318,48 @@ static void fwd_gemm(const data_t *xin, const code_t *wcode, int w_off, data_t *
     // reads of xE/xS/xNZ[*][i] per cycle (the forge_fwd_wide dim=1 partition recipe). Without this the
     // T-way-unrolled MAC can't hit II=1 on a single BRAM port (II would balloon -> schedule blowup).
     static exp_t xE[S1_GEMM_TMAX][S1_GEMM_IMAX]; static bool xS[S1_GEMM_TMAX][S1_GEMM_IMAX]; static bool xNZ[S1_GEMM_TMAX][S1_GEMM_IMAX];
-#pragma HLS ARRAY_PARTITION variable=xE  complete dim=1
-#pragma HLS ARRAY_PARTITION variable=xS  complete dim=1
-#pragma HLS ARRAY_PARTITION variable=xNZ complete dim=1
+#pragma HLS ARRAY_PARTITION variable=xE  cyclic factor=S1_LANE dim=1
+#pragma HLS ARRAY_PARTITION variable=xS  cyclic factor=S1_LANE dim=1
+#pragma HLS ARRAY_PARTITION variable=xNZ cyclic factor=S1_LANE dim=1
 QX: for (int t = 0; t < M; t++)
         for (int i = 0; i < I; i++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT min=128 max=512
             dyad(xin[t * I + i], xS[t][i], xE[t][i], xNZ[t][i]);
         }
-    // output-stationary: for each output o, stream the i-reduction over all T rows.
+    // output-stationary: for each output o, stream the i-reduction over all T rows. The T (token) reduction
+    // is NARROWED to LANE-wide chunks: cyclic-by-LANE banks give LANE conflict-free reads/cycle so the inner
+    // LANE-way UNROLL pipelines II=1; the outer tt chunk loop walks the FULL T range in TMAX/LANE steps.
+    // BIT-EXACT: integer adds, same total as the old full-T unroll (order-independent, no overflow).
 GO: for (int o = 0; o < O; o++) {
         acc_t acc[S1_GEMM_TMAX];
-#pragma HLS ARRAY_PARTITION variable=acc complete
+#pragma HLS ARRAY_PARTITION variable=acc cyclic factor=S1_LANE
         for (int t = 0; t < M; t++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
             acc[t] = 0;
         }
 IRED:   for (int i = 0; i < I; i++) {
-#pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=128 max=512
             bool sw, nzw; exp_t ew;
             wdecode((int32_t)wcode[w_off + o * I + i], sw, ew, nzw);
-            for (int t = 0; t < S1_GEMM_TMAX; t++) {
+TT:         for (int tt = 0; tt < S1_GEMM_TMAX; tt += S1_LANE) {
+#pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=128 max=512
+                for (int tl = 0; tl < S1_LANE; tl++) {
 #pragma HLS UNROLL
-                if (t < M) {
-                    exp_t ex = xE[t][i];
-                    int e = (int)ew + (int)ex;
-                    acc_t term = (acc_t)1 << e;
-                    bool neg = sw ^ xS[t][i];
-                    bool nz  = nzw & xNZ[t][i];
-                    if (nz) acc[t] += neg ? (acc_t)(-term) : term;
+                    int t = tt + tl;
+                    if (t < M) {
+                        exp_t ex = xE[t][i];
+                        int e = (int)ew + (int)ex;
+                        acc_t term = (acc_t)1 << e;
+                        bool neg = sw ^ xS[t][i];
+                        bool nz  = nzw & xNZ[t][i];
+                        if (nz) acc[t] += neg ? (acc_t)(-term) : term;
+                    }
                 }
             }
         }
         for (int t = 0; t < M; t++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
             yout[t * O + o] = sat16(acc[t]);   // cast to int16 activation range (LN/attn consume int16)
         }
     }
@@ -407,7 +432,7 @@ static void attn_head(const data_t Q[S1_L_SEQ][S1_DH], const data_t K[S1_L_SEQ][
     static acc_t  s[S1_L_SEQ];
     static prob_t p[S1_L_SEQ];
     static acc_t  blend[S1_DH];
-#pragma HLS ARRAY_PARTITION variable=blend complete
+#pragma HLS ARRAY_PARTITION variable=blend cyclic factor=S1_LANE
 
 ROW: for (int i = 0; i < S1_L_SEQ; i++) {
         acc_t rowmax = S1_NEG_INF;
@@ -418,7 +443,7 @@ ROW: for (int i = 0; i < S1_L_SEQ; i++) {
             if (j > i) { s[j] = S1_NEG_INF; continue; }
             acc_t l1 = 0;
         DABS: for (int d = 0; d < S1_DH; d++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
                 data_t diff = Q[i][d] - K[j][d];
                 acc_t a = (diff < 0) ? (acc_t)(-diff) : (acc_t)diff;
                 l1 += a;
@@ -452,14 +477,14 @@ ROW: for (int i = 0; i < S1_L_SEQ; i++) {
         }
 
     BINIT: for (int d = 0; d < S1_DH; d++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
             blend[d] = 0;
         }
     BLEND: for (int j = 0; j <= i; j++) {
 #pragma HLS PIPELINE II=1
             prob_t pj = p[j];
             for (int d = 0; d < S1_DH; d++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
                 blend[d] += (acc_t)((acc_t)pj * (acc_t)V[j][d]);   // THE ONE MULTIPLY -> DSP
             }
         }
@@ -830,27 +855,32 @@ static void xgrad_gemm(const int32_t *gO, const code_t *wcode, int w_off, int32_
 #pragma HLS INLINE off
 XG_I: for (int i = 0; i < I; i++) {
         acc_t acc[S1_GEMM_TMAX];
-#pragma HLS ARRAY_PARTITION variable=acc complete
+#pragma HLS ARRAY_PARTITION variable=acc cyclic factor=S1_LANE
         for (int t = 0; t < M; t++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
             acc[t] = 0;
         }
+        // NARROWED T-reduction: LANE-wide chunks (cyclic acc banks -> LANE adds/cycle, II=1). The full-T
+        // reduction is the same integer total (order-independent) -> BIT-EXACT, just more cycles.
 XG_O:   for (int o = 0; o < O; o++) {
-#pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=128 max=512
             bool sw, nzw; exp_t ew;
             wdecode((int32_t)wcode[w_off + o * I + i], sw, ew, nzw);
-            for (int t = 0; t < S1_GEMM_TMAX; t++) {
+XG_TT:      for (int tt = 0; tt < S1_GEMM_TMAX; tt += S1_LANE) {
+#pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=128 max=512
+                for (int tl = 0; tl < S1_LANE; tl++) {
 #pragma HLS UNROLL
-                if (t < M) {
-                    acc_t g = (acc_t)gO[t * O + o];
-                    acc_t shifted = g << (int)ew;          // gO * 2^ew (barrel shift; gO keeps its sign)
-                    if (nzw) acc[t] += sw ? (acc_t)(-shifted) : shifted;
+                    int t = tt + tl;
+                    if (t < M) {
+                        acc_t g = (acc_t)gO[t * O + o];
+                        acc_t shifted = g << (int)ew;      // gO * 2^ew (barrel shift; gO keeps its sign)
+                        if (nzw) acc[t] += sw ? (acc_t)(-shifted) : shifted;
+                    }
                 }
             }
         }
         for (int t = 0; t < M; t++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
             gx[t * I + i] = sat32(acc[t]);
         }
     }
@@ -869,12 +899,12 @@ static void wgrad_gemm(const int32_t *gO, const data_t *xin, int32_t *gW, int gw
     // dyad-quantize gO and x once (q(.) = ±2^e). Partition T complete so the t-reduction lanes read in parallel.
     static exp_t goE[S1_GEMM_TMAX][S1_GEMM_OMAX]; static bool goS[S1_GEMM_TMAX][S1_GEMM_OMAX]; static bool goNZ[S1_GEMM_TMAX][S1_GEMM_OMAX];
     static exp_t xE[S1_GEMM_TMAX][S1_GEMM_IMAX];  static bool xS[S1_GEMM_TMAX][S1_GEMM_IMAX];  static bool xNZ[S1_GEMM_TMAX][S1_GEMM_IMAX];
-#pragma HLS ARRAY_PARTITION variable=goE  complete dim=1
-#pragma HLS ARRAY_PARTITION variable=goS  complete dim=1
-#pragma HLS ARRAY_PARTITION variable=goNZ complete dim=1
-#pragma HLS ARRAY_PARTITION variable=xE   complete dim=1
-#pragma HLS ARRAY_PARTITION variable=xS   complete dim=1
-#pragma HLS ARRAY_PARTITION variable=xNZ  complete dim=1
+#pragma HLS ARRAY_PARTITION variable=goE  cyclic factor=S1_LANE dim=1
+#pragma HLS ARRAY_PARTITION variable=goS  cyclic factor=S1_LANE dim=1
+#pragma HLS ARRAY_PARTITION variable=goNZ cyclic factor=S1_LANE dim=1
+#pragma HLS ARRAY_PARTITION variable=xE   cyclic factor=S1_LANE dim=1
+#pragma HLS ARRAY_PARTITION variable=xS   cyclic factor=S1_LANE dim=1
+#pragma HLS ARRAY_PARTITION variable=xNZ  cyclic factor=S1_LANE dim=1
 QGO: for (int t = 0; t < M; t++)
         for (int o = 0; o < O; o++) {
 #pragma HLS PIPELINE II=1
@@ -887,21 +917,37 @@ QXW: for (int t = 0; t < M; t++)
 #pragma HLS LOOP_TRIPCOUNT min=128 max=512
             dyad((data_t)xin[t * I + i], xS[t][i], xE[t][i], xNZ[t][i]);
         }
+    // NARROWED T-reduction: instead of a single full-TMAX unrolled accumulate, keep LANE partial sums
+    // (cyclic banks -> LANE conflict-free reads/cycle, inner LANE UNROLL pipelines the tt chunk loop II=1),
+    // then sum the LANE partials. BIT-EXACT: integer adds, same total (order-independent, int48 headroom).
 WG_O: for (int o = 0; o < O; o++) {
 WG_I:   for (int i = 0; i < I; i++) {
+            acc_t psum[S1_LANE];
+#pragma HLS ARRAY_PARTITION variable=psum complete
+            for (int tl = 0; tl < S1_LANE; tl++) {
+#pragma HLS UNROLL
+                psum[tl] = 0;
+            }
+WG_TT:      for (int tt = 0; tt < S1_GEMM_TMAX; tt += S1_LANE) {
 #pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT min=128 max=512
-            acc_t acc = 0;
-            for (int t = 0; t < S1_GEMM_TMAX; t++) {
+                for (int tl = 0; tl < S1_LANE; tl++) {
 #pragma HLS UNROLL
-                if (t < M) {
-                    exp_t eo = goE[t][o]; exp_t ei = xE[t][i];
-                    int e = (int)eo + (int)ei;
-                    acc_t term = (acc_t)1 << e;
-                    bool neg = goS[t][o] ^ xS[t][i];
-                    bool nz  = goNZ[t][o] & xNZ[t][i];
-                    if (nz) acc += neg ? (acc_t)(-term) : term;
+                    int t = tt + tl;
+                    if (t < M) {
+                        exp_t eo = goE[t][o]; exp_t ei = xE[t][i];
+                        int e = (int)eo + (int)ei;
+                        acc_t term = (acc_t)1 << e;
+                        bool neg = goS[t][o] ^ xS[t][i];
+                        bool nz  = goNZ[t][o] & xNZ[t][i];
+                        if (nz) psum[tl] += neg ? (acc_t)(-term) : term;
+                    }
                 }
+            }
+            acc_t acc = 0;
+            for (int tl = 0; tl < S1_LANE; tl++) {
+#pragma HLS UNROLL
+                acc += psum[tl];
             }
             gW[gw_off + o * I + i] += sat32(acc);
         }
@@ -936,7 +982,7 @@ AB_ROW: for (int i = 0; i < S1_L_SEQ; i++) {
             if (j > i) { s[j] = S1_NEG_INF; continue; }
             acc_t l1 = 0;
         AB_DABS: for (int d = 0; d < S1_DH; d++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
                 data_t diff = Q[i][d] - K[j][d];
                 acc_t a = (diff < 0) ? (acc_t)(-diff) : (acc_t)diff;
                 l1 += a;
@@ -973,7 +1019,7 @@ AB_ROW: for (int i = 0; i < S1_L_SEQ; i++) {
 #pragma HLS PIPELINE II=1
             acc_t dot = 0;
             for (int d = 0; d < S1_DH; d++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
                 dot += (acc_t)((acc_t)gOut[i][d] * (acc_t)V[j][d]);   // multiply
             }
             int32_t gpj = (int32_t)dot;
@@ -994,7 +1040,7 @@ AB_ROW: for (int i = 0; i < S1_L_SEQ; i++) {
 #pragma HLS PIPELINE II=1
             prob_t pj = p[j];
             for (int d = 0; d < S1_DH; d++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
                 acc_t t = (acc_t)((acc_t)pj * (acc_t)gOut[i][d]);     // multiply
                 gV[j][d] = sat32((acc_t)gV[j][d] + (t >> S1_AT_P_FRAC));
             }
@@ -1004,7 +1050,7 @@ AB_ROW: for (int i = 0; i < S1_L_SEQ; i++) {
 #pragma HLS PIPELINE II=1
             acc_t gsj = (acc_t)gs[j];
             for (int d = 0; d < S1_DH; d++) {
-#pragma HLS UNROLL
+#pragma HLS UNROLL factor=S1_LANE
                 data_t diff = Q[i][d] - K[j][d];
                 if (diff > 0) {           // sgn=+1: gQ -= gs ; gK += gs
                     gQ[i][d] = sat32((acc_t)gQ[i][d] - gsj);
