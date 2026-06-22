@@ -162,12 +162,25 @@ uncertainties first.
   authoritative + self-consistent (the integrated int64 golden uses it). Latency 3.06M cyc/12.2 ms for one
   128-token forward through 1 block (integrated GEMM is un-throughput-tuned; the df3/wide2 techniques apply
   later — correctness/timing is the S1 goal, not tok/s).
-- **STILL OPEN (next):** (a) author mode 1 (backward: CE-grad → max-plus-head adjoint scatter → FFN xgrad/
-  wgrad → residual split → attn_bwd → LN_bwd → embed scatter, reusing the CSIM-verified backward kernels) +
-  mode 2 (dyadic-Adam) + mode 3 (fused one-kick trainer), all on-chip-resident; bit-exact one-step CSIM +
-  csynth. (b) mode-3 N-step convergence CSIM vs the charlm 2.481 trajectory. (c) AFI build (gated). Note: at
-  86% LUT/SLR for the forward alone, the full trainer likely spans ~2 SLRs → multi-SLR floorplanning for AFI
-  (device has 3).
+- **S1 FORWARD+BACKWARD — ✅ CSIM BIT-EXACT + CLOSES TIMING + FITS THE DEVICE (2026-06-22).** `forge_train_step_s1`
+  mode 0 (forward+CE) + mode 1 (backward: LM-head max-plus adjoint scatter → FFN xgrad/wgrad → ReLU → LN2 bwd →
+  residual split → Wo bwd → per-head attn_bwd → Q/K/V bwd with gX1 accumulation → LN1 bwd → embed scatter),
+  composing the CSIM-verified backward kernels on-chip-resident. **Vitis csim "FWD BIT-EXACT ; BWD BIT-EXACT"
+  (all 9 forward + 15 gradient regions max|kernel−int64ref|=0, 0 errors), closes 3.197 ns ≤ 4.0, fits: 31% LUT /
+  68% BRAM / 4% DSP (448 = attn only) / 2% URAM of the device.** Two area iterations got it to fit: (i) the
+  monolithic fwd+bwd was 116% device LUT (a separate inlined GEMM PE per call site); resource-sharing
+  (de-templatize + ALLOCATION instances=1) only reached 103%; (ii) the decisive fix was NARROWING the compute
+  engines from the throughput-optimized 128-wide tiling to S1_LANE=16 (cyclic partition + chunked partial-sum
+  reduction) — bit-exact-preserving (integer reduction is order-independent), ~3.3× smaller (1.35M → 415k LUT).
+  S1 is a correctness/convergence proof, so trading the wide tiling for area is correct (the throughput story is
+  the standalone optimized kernels + the tok/s projection). An adversarial pass also caught a load-bearing
+  faithfulness bug (wgrad gO int16-wrapped at the Q16 grad scale → fixed with dyad_wide). **The complete
+  multiplier-free transformer forward+backward training computation is now functionally correct, timing-closing,
+  and silicon-buildable.**
+- **STILL OPEN (next):** (a) mode 2 (dyadic-Adam per region) + mode 3 (fused one-kick trainer: zero-grads → fwd
+  sweep → bwd sweep → opt); bit-exact one-step CSIM. (b) mode-3 N-step convergence CSIM (loss decreases / tracks
+  the charlm 2.481 trajectory) — the on-fabric-training proof. (c) AFI build (gated — clone cl_forge_muzero
+  on-chip pattern; the trainer fits one SLR LUT-wise, BRAM spans ~2 SLRs → standard floorplan, device has 3).
 
 ## First three steps (local, no F2 builds)
 
