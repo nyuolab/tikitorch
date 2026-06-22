@@ -70,7 +70,7 @@ def backward(x, y, logits, h1, mask0, W1):
     delta1 = e1
     gW1 = dyad(delta1).t() @ dyad(h1)              # last layer (no relu mask)
     e_down1 = delta1 @ dyad(W1)
-    delta0 = e_down1 * mask0
+    delta0 = mshift(e_down1 * mask0, 13)           # max-shift delta0 into int16 (matches the kernel)
     gW0 = dyad(delta0).t() @ dyad(x)
     return gW0, gW1
 
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     m0 = torch.zeros(D, D, dtype=torch.float64); m1 = torch.zeros(D, D, dtype=torch.float64)  # int momentum counters
     MCAP, STEP = 7.0, 1                            # counter cap; integer SignSGD step
     gen = torch.Generator().manual_seed(1)
-    BATCH, EPOCHS = 128, 8
+    BATCH, EPOCHS = int(os.environ.get("PC_BATCH", 128)), int(os.environ.get("PC_EPOCHS", 8))
     print(f"  init test acc = {accuracy(Xte, Yte, W0, W1):.4f}", flush=True)
     nb = Xtr.shape[0] // BATCH
     for ep in range(EPOCHS):

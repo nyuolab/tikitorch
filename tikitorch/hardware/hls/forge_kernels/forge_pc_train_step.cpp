@@ -13,7 +13,7 @@
 #include <ap_int.h>
 
 #define TD   256     // square width
-#define TN   16      // microbatch
+#define TN   32      // microbatch (>=32 needed to train; N=16 too noisy for the max-shift norm, validated)
 #define TC   10      // classes (first C outputs of layer 1 are the logits)
 #define TOT  8       // weight-grad output-tile rows
 #define TIT  64      // weight-grad output-tile cols (PE lanes)
