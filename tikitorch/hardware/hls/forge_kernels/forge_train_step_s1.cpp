@@ -270,54 +270,72 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 }
 
 // =============================================================================
+// MAX operand dims — one physical engine per GEMM class is sized to the LARGEST shape any call site uses
+// (T<=L_SEQ=128 rows, I<=FFN=512 contraction, O<=FFN=512 outputs). The de-templatized runtime-dim
+// functions below size their on-chip operand banks to these maxima and bound their loops by the runtime
+// args, so a smaller call (e.g. D x D) simply iterates fewer times on the SAME hardware. With ALLOCATION
+// function instances=...,limit=1 in do_fwd_loss/do_bwd, HLS builds ONE engine of each class and
+// time-multiplexes every call site (trading latency for area — the S1 area fix).
+// =============================================================================
+#define S1_GEMM_TMAX  S1_L_SEQ    // 128
+#define S1_GEMM_IMAX  S1_FFN      // 512
+#define S1_GEMM_OMAX  S1_FFN      // 512
+
+// =============================================================================
 // fwd_gemm — the dyadic-MAC GEMM y[t][o] = sum_i q(x[t][i]) MAC q(W[o][i]) + bias(=0 in S1).
 // Reproduces forge_fwd_wide.cpp's inner: x dyad-quantized once, W PRE-DYADIC (wdecode inline), the
 // MAC is sign-xor + exponent-ADD + barrel-SHIFT + signed accumulate (NO multiply, DSP=0).
-// Generic over (T rows, I contraction, O outputs); ON-CHIP-resident W byte-codes ROW-MAJOR [O][I]
-// (wcode[w_off + o*I + i], a code_t int8 staged at entry; NO gmem in the inner loop -> II=1, no AXI on
-// the critical path). x is held on-chip in xin[T][I]; y written to yout[T][O]. Bounded loops, II=1 inner.
+// RUNTIME-DIM (M rows, I contraction, O outputs) — ONE physical engine, banks sized to the MAX dims,
+// loops bounded by the runtime args. ON-CHIP-resident W byte-codes ROW-MAJOR [O][I] (wcode[w_off+o*I+i],
+// a code_t int8 staged at entry; NO gmem in the inner loop -> II=1, no AXI on the critical path). x is
+// held FLAT on-chip ROW-MAJOR [M][I] (xin[t*I + i]); y written FLAT ROW-MAJOR [M][O] (yout[t*O + o]).
+// The math/order is VERBATIM the templated version (just runtime-bounded) -> the int64 golden is unchanged.
 // =============================================================================
-template <int T, int I, int O>
-static void fwd_gemm(const data_t xin[T][I], const code_t *wcode, int w_off, data_t yout[T][O]) {
+static void fwd_gemm(const data_t *xin, const code_t *wcode, int w_off, data_t *yout,
+                     int M, int I, int O) {
 #pragma HLS INLINE off
     // dyad-quantize x once (q(x) = ±2^ex).
     // Partition the T (row/token) dim COMPLETE so the IRED inner loop's T-way UNROLL gets T parallel
     // reads of xE/xS/xNZ[*][i] per cycle (the forge_fwd_wide dim=1 partition recipe). Without this the
     // T-way-unrolled MAC can't hit II=1 on a single BRAM port (II would balloon -> schedule blowup).
-    static exp_t xE[T][I]; static bool xS[T][I]; static bool xNZ[T][I];
+    static exp_t xE[S1_GEMM_TMAX][S1_GEMM_IMAX]; static bool xS[S1_GEMM_TMAX][S1_GEMM_IMAX]; static bool xNZ[S1_GEMM_TMAX][S1_GEMM_IMAX];
 #pragma HLS ARRAY_PARTITION variable=xE  complete dim=1
 #pragma HLS ARRAY_PARTITION variable=xS  complete dim=1
 #pragma HLS ARRAY_PARTITION variable=xNZ complete dim=1
-QX: for (int t = 0; t < T; t++)
+QX: for (int t = 0; t < M; t++)
         for (int i = 0; i < I; i++) {
 #pragma HLS PIPELINE II=1
-            dyad(xin[t][i], xS[t][i], xE[t][i], xNZ[t][i]);
+#pragma HLS LOOP_TRIPCOUNT min=128 max=512
+            dyad(xin[t * I + i], xS[t][i], xE[t][i], xNZ[t][i]);
         }
     // output-stationary: for each output o, stream the i-reduction over all T rows.
 GO: for (int o = 0; o < O; o++) {
-        acc_t acc[T];
+        acc_t acc[S1_GEMM_TMAX];
 #pragma HLS ARRAY_PARTITION variable=acc complete
-        for (int t = 0; t < T; t++) {
+        for (int t = 0; t < M; t++) {
 #pragma HLS UNROLL
             acc[t] = 0;
         }
 IRED:   for (int i = 0; i < I; i++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=128 max=512
             bool sw, nzw; exp_t ew;
             wdecode((int32_t)wcode[w_off + o * I + i], sw, ew, nzw);
-            for (int t = 0; t < T; t++) {
+            for (int t = 0; t < S1_GEMM_TMAX; t++) {
 #pragma HLS UNROLL
-                exp_t ex = xE[t][i];
-                int e = (int)ew + (int)ex;
-                acc_t term = (acc_t)1 << e;
-                bool neg = sw ^ xS[t][i];
-                bool nz  = nzw & xNZ[t][i];
-                if (nz) acc[t] += neg ? (acc_t)(-term) : term;
+                if (t < M) {
+                    exp_t ex = xE[t][i];
+                    int e = (int)ew + (int)ex;
+                    acc_t term = (acc_t)1 << e;
+                    bool neg = sw ^ xS[t][i];
+                    bool nz  = nzw & xNZ[t][i];
+                    if (nz) acc[t] += neg ? (acc_t)(-term) : term;
+                }
             }
         }
-        for (int t = 0; t < T; t++) {
+        for (int t = 0; t < M; t++) {
 #pragma HLS UNROLL
-            yout[t][o] = sat16(acc[t]);   // cast to int16 activation range (LN/attn consume int16)
+            yout[t * O + o] = sat16(acc[t]);   // cast to int16 activation range (LN/attn consume int16)
         }
     }
 }
@@ -485,6 +503,12 @@ ROW: for (int i = 0; i < S1_L_SEQ; i++) {
 // =============================================================================
 static int do_fwd_loss(int32_t *buffer) {
 #pragma HLS INLINE off
+    // AREA FIX — force ONE physical engine of each helper, time-multiplexed across all call sites.
+    // Without this HLS builds a separate PE per call site (7x fwd_gemm + per-call attn/LN) and the LUT
+    // count blows past the device. ALLOCATION limit=1 serializes the calls (latency tradeoff, OK for S1).
+#pragma HLS ALLOCATION function instances=fwd_gemm limit=1
+#pragma HLS ALLOCATION function instances=attn_head limit=1
+#pragma HLS ALLOCATION function instances=layernorm_tok limit=1
 
     // ---------------------------------------------------------------------
     // (A) RESIDENT weights / LUTs / tokens — burst-loaded ONCE from gmem.
@@ -588,9 +612,9 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
         }
 
         // ---- Q/K/V projections (each [L][D] -> [L][D]) ----
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, wq_oc, l * S1_D * S1_D, Qm);
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, wk_oc, l * S1_D * S1_D, Km);
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1, wv_oc, l * S1_D * S1_D, Vm);
+        fwd_gemm(&X1[0][0], wq_oc, l * S1_D * S1_D, &Qm[0][0], S1_L_SEQ, S1_D, S1_D);
+        fwd_gemm(&X1[0][0], wk_oc, l * S1_D * S1_D, &Km[0][0], S1_L_SEQ, S1_D, S1_D);
+        fwd_gemm(&X1[0][0], wv_oc, l * S1_D * S1_D, &Vm[0][0], S1_L_SEQ, S1_D, S1_D);
 
         // ---- per head: split D into H heads of DH, run soft causal attention, concat ----
     HEAD: for (int h = 0; h < S1_H; h++) {
@@ -614,7 +638,7 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
         }
 
         // ---- output projection [L][D] -> [L][D] then residual add ----
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(Acat, wo_oc, l * S1_D * S1_D, AO);
+        fwd_gemm(&Acat[0][0], wo_oc, l * S1_D * S1_D, &AO[0][0], S1_L_SEQ, S1_D, S1_D);
     RES1: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
@@ -640,7 +664,7 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
         }
 
         // ---- FFN up [L][D]->[L][FFN], ReLU (save mask), down [L][FFN]->[L][D], residual add ----
-        fwd_gemm<S1_L_SEQ, S1_D, S1_FFN>(X2, wup_oc, l * S1_FFN * S1_D, U);
+        fwd_gemm(&X2[0][0], wup_oc, l * S1_FFN * S1_D, &U[0][0], S1_L_SEQ, S1_D, S1_FFN);
     RELU: for (int t = 0; t < S1_L_SEQ; t++)
             for (int k = 0; k < S1_FFN; k++) {
 #pragma HLS PIPELINE II=1
@@ -648,7 +672,7 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
                 Hd[t][k] = act ? U[t][k] : (data_t)0;
                 relu_oc[l * S1_L_SEQ * S1_FFN + t * S1_FFN + k] = act ? 1 : 0;
             }
-        fwd_gemm<S1_L_SEQ, S1_FFN, S1_D>(Hd, wdn_oc, l * S1_D * S1_FFN, Dn);
+        fwd_gemm(&Hd[0][0], wdn_oc, l * S1_D * S1_FFN, &Dn[0][0], S1_L_SEQ, S1_FFN, S1_D);
     RES2: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
@@ -798,31 +822,36 @@ static inline int32_t sat32(acc_t v) {
 // xgrad_gemm — gx[t][i] = sum_o gO[t][o] * q(W[o][i]).  gO held FULL int32 on-chip; W decoded inline.
 // Reduces over o (transposed-W access vs the forward), output-stationary on (t,i). VERBATIM forge_xgrad_wide
 // asymmetric dyadic MAC: term = (gO << ew), sign folded, NO multiply (DSP=0).  W ROW-MAJOR [O][I].
+// RUNTIME-DIM (M rows, I, O) — ONE engine, loops runtime-bounded. gO FLAT ROW-MAJOR [M][O] (gO[t*O+o]);
+// gx FLAT ROW-MAJOR [M][I] (gx[t*I+i]). Math/order VERBATIM the templated version -> golden unchanged.
 // -----------------------------------------------------------------------------
-template <int T, int I, int O>
-static void xgrad_gemm(const int32_t gO[T][O], const code_t *wcode, int w_off, int32_t gx[T][I]) {
+static void xgrad_gemm(const int32_t *gO, const code_t *wcode, int w_off, int32_t *gx,
+                       int M, int I, int O) {
 #pragma HLS INLINE off
 XG_I: for (int i = 0; i < I; i++) {
-        acc_t acc[T];
+        acc_t acc[S1_GEMM_TMAX];
 #pragma HLS ARRAY_PARTITION variable=acc complete
-        for (int t = 0; t < T; t++) {
+        for (int t = 0; t < M; t++) {
 #pragma HLS UNROLL
             acc[t] = 0;
         }
 XG_O:   for (int o = 0; o < O; o++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=128 max=512
             bool sw, nzw; exp_t ew;
             wdecode((int32_t)wcode[w_off + o * I + i], sw, ew, nzw);
-            for (int t = 0; t < T; t++) {
+            for (int t = 0; t < S1_GEMM_TMAX; t++) {
 #pragma HLS UNROLL
-                acc_t g = (acc_t)gO[t][o];
-                acc_t shifted = g << (int)ew;          // gO * 2^ew (barrel shift; gO keeps its sign)
-                if (nzw) acc[t] += sw ? (acc_t)(-shifted) : shifted;
+                if (t < M) {
+                    acc_t g = (acc_t)gO[t * O + o];
+                    acc_t shifted = g << (int)ew;          // gO * 2^ew (barrel shift; gO keeps its sign)
+                    if (nzw) acc[t] += sw ? (acc_t)(-shifted) : shifted;
+                }
             }
         }
-        for (int t = 0; t < T; t++) {
+        for (int t = 0; t < M; t++) {
 #pragma HLS UNROLL
-            gx[t][i] = sat32(acc[t]);
+            gx[t * I + i] = sat32(acc[t]);
         }
     }
 }
@@ -831,41 +860,48 @@ XG_O:   for (int o = 0; o < O; o++) {
 // wgrad_gemm — gW[o][i] = sum_t q(gO[t][o]) * q(x[t][i]).  BOTH operands dyadic-quantized (forge_wgrad_df3):
 // each product = ±2^(eo+ei) (sign-xor + exp-ADD + barrel shift + signed accumulate), NO multiply (DSP=0).
 // The contraction is over t (the L_SEQ positions). gW ROW-MAJOR [O][I], int32 full precision, ACCUMULATED.
+// RUNTIME-DIM (M=T rows, I, O) — ONE engine, banks sized to MAX, loops runtime-bounded. gO FLAT
+// ROW-MAJOR [M][O] (gO[t*O+o]); xin FLAT ROW-MAJOR [M][I] (xin[t*I+i]). Math/order VERBATIM -> golden same.
 // -----------------------------------------------------------------------------
-template <int T, int I, int O>
-static void wgrad_gemm(const int32_t gO[T][O], const data_t xin[T][I], int32_t *gW, int gw_off) {
+static void wgrad_gemm(const int32_t *gO, const data_t *xin, int32_t *gW, int gw_off,
+                       int M, int I, int O) {
 #pragma HLS INLINE off
     // dyad-quantize gO and x once (q(.) = ±2^e). Partition T complete so the t-reduction lanes read in parallel.
-    static exp_t goE[T][O]; static bool goS[T][O]; static bool goNZ[T][O];
-    static exp_t xE[T][I];  static bool xS[T][I];  static bool xNZ[T][I];
+    static exp_t goE[S1_GEMM_TMAX][S1_GEMM_OMAX]; static bool goS[S1_GEMM_TMAX][S1_GEMM_OMAX]; static bool goNZ[S1_GEMM_TMAX][S1_GEMM_OMAX];
+    static exp_t xE[S1_GEMM_TMAX][S1_GEMM_IMAX];  static bool xS[S1_GEMM_TMAX][S1_GEMM_IMAX];  static bool xNZ[S1_GEMM_TMAX][S1_GEMM_IMAX];
 #pragma HLS ARRAY_PARTITION variable=goE  complete dim=1
 #pragma HLS ARRAY_PARTITION variable=goS  complete dim=1
 #pragma HLS ARRAY_PARTITION variable=goNZ complete dim=1
 #pragma HLS ARRAY_PARTITION variable=xE   complete dim=1
 #pragma HLS ARRAY_PARTITION variable=xS   complete dim=1
 #pragma HLS ARRAY_PARTITION variable=xNZ  complete dim=1
-QGO: for (int t = 0; t < T; t++)
+QGO: for (int t = 0; t < M; t++)
         for (int o = 0; o < O; o++) {
 #pragma HLS PIPELINE II=1
-            dyad_wide((acc_t)gO[t][o], goS[t][o], goE[t][o], goNZ[t][o]);  // FULL int32 grad (no int16 wrap)
+#pragma HLS LOOP_TRIPCOUNT min=128 max=512
+            dyad_wide((acc_t)gO[t * O + o], goS[t][o], goE[t][o], goNZ[t][o]);  // FULL int32 grad (no int16 wrap)
         }
-QXW: for (int t = 0; t < T; t++)
+QXW: for (int t = 0; t < M; t++)
         for (int i = 0; i < I; i++) {
 #pragma HLS PIPELINE II=1
-            dyad((data_t)xin[t][i], xS[t][i], xE[t][i], xNZ[t][i]);
+#pragma HLS LOOP_TRIPCOUNT min=128 max=512
+            dyad((data_t)xin[t * I + i], xS[t][i], xE[t][i], xNZ[t][i]);
         }
 WG_O: for (int o = 0; o < O; o++) {
 WG_I:   for (int i = 0; i < I; i++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=128 max=512
             acc_t acc = 0;
-            for (int t = 0; t < T; t++) {
+            for (int t = 0; t < S1_GEMM_TMAX; t++) {
 #pragma HLS UNROLL
-                exp_t eo = goE[t][o]; exp_t ei = xE[t][i];
-                int e = (int)eo + (int)ei;
-                acc_t term = (acc_t)1 << e;
-                bool neg = goS[t][o] ^ xS[t][i];
-                bool nz  = goNZ[t][o] & xNZ[t][i];
-                if (nz) acc += neg ? (acc_t)(-term) : term;
+                if (t < M) {
+                    exp_t eo = goE[t][o]; exp_t ei = xE[t][i];
+                    int e = (int)eo + (int)ei;
+                    acc_t term = (acc_t)1 << e;
+                    bool neg = goS[t][o] ^ xS[t][i];
+                    bool nz  = goNZ[t][o] & xNZ[t][i];
+                    if (nz) acc += neg ? (acc_t)(-term) : term;
+                }
             }
             gW[gw_off + o * I + i] += sat32(acc);
         }
@@ -1032,6 +1068,16 @@ LNG_T: for (int t = 0; t < S1_L_SEQ; t++) {
 // =============================================================================
 static int do_bwd(int32_t *buffer) {
 #pragma HLS INLINE off
+    // AREA FIX — force ONE physical engine of each helper, time-multiplexed across all call sites.
+    // do_bwd is the dominant area consumer: it INLINES xgrad_gemm + wgrad_gemm per linear (~14 GEMM PEs)
+    // plus fwd_gemm recompute, attn_head/attn_head_bwd and ln_gamma_grad. ALLOCATION limit=1 builds ONE
+    // engine of each class and serializes the call sites (latency tradeoff, acceptable for the S1 proof).
+#pragma HLS ALLOCATION function instances=fwd_gemm limit=1
+#pragma HLS ALLOCATION function instances=xgrad_gemm limit=1
+#pragma HLS ALLOCATION function instances=wgrad_gemm limit=1
+#pragma HLS ALLOCATION function instances=attn_head limit=1
+#pragma HLS ALLOCATION function instances=attn_head_bwd limit=1
+#pragma HLS ALLOCATION function instances=ln_gamma_grad limit=1
 
     // ---------------------------------------------------------------------
     // (A) RESIDENT weights / LUTs / tokens — burst-loaded ONCE (same encodings as mode 0).
@@ -1178,9 +1224,9 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
                 X1m[t][d] = (data_t)X1_oc[l * S1_L_SEQ * S1_D + t * S1_D + d];
                 X2m[t][d] = (data_t)X2_oc[l * S1_L_SEQ * S1_D + t * S1_D + d];
             }
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1m, wq_oc, l * S1_D * S1_D, Qm);
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1m, wk_oc, l * S1_D * S1_D, Km);
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(X1m, wv_oc, l * S1_D * S1_D, Vm);
+        fwd_gemm(&X1m[0][0], wq_oc, l * S1_D * S1_D, &Qm[0][0], S1_L_SEQ, S1_D, S1_D);
+        fwd_gemm(&X1m[0][0], wk_oc, l * S1_D * S1_D, &Km[0][0], S1_L_SEQ, S1_D, S1_D);
+        fwd_gemm(&X1m[0][0], wv_oc, l * S1_D * S1_D, &Vm[0][0], S1_L_SEQ, S1_D, S1_D);
     RC_HEAD: for (int h = 0; h < S1_H; h++) {
             static data_t Ahh[S1_L_SEQ][S1_DH];
             static int32_t p_dummy[S1_L_SEQ * S1_L_SEQ];
@@ -1201,7 +1247,7 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
         }
         // Hd = relu(GEMM(X2, W_up)) — recompute U then gate by the SAVED relu mask (bit-identical to fwd).
         static data_t Um[S1_L_SEQ][S1_FFN];
-        fwd_gemm<S1_L_SEQ, S1_D, S1_FFN>(X2m, wup_oc, l * S1_FFN * S1_D, Um);
+        fwd_gemm(&X2m[0][0], wup_oc, l * S1_FFN * S1_D, &Um[0][0], S1_L_SEQ, S1_D, S1_FFN);
     RC_RELU: for (int t = 0; t < S1_L_SEQ; t++)
             for (int k = 0; k < S1_FFN; k++) {
 #pragma HLS PIPELINE II=1
@@ -1216,8 +1262,8 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
             }
 
         // === FFN down-GEMM bwd: gHd = xgrad(gDn, W_down)  ; g_W_down += wgrad(gDn, Hd). ===
-        xgrad_gemm<S1_L_SEQ, S1_FFN, S1_D>(gDn, wdn_oc, l * S1_D * S1_FFN, gHd);
-        wgrad_gemm<S1_L_SEQ, S1_FFN, S1_D>(gDn, Hdm, gWDN_oc, l * S1_D * S1_FFN);
+        xgrad_gemm(&gDn[0][0], wdn_oc, l * S1_D * S1_FFN, &gHd[0][0], S1_L_SEQ, S1_FFN, S1_D);
+        wgrad_gemm(&gDn[0][0], &Hdm[0][0], gWDN_oc, l * S1_D * S1_FFN, S1_L_SEQ, S1_FFN, S1_D);
 
         // === ReLU bwd: gU = mask ? gHd : 0. ===
     RELU_BWD: for (int t = 0; t < S1_L_SEQ; t++)
@@ -1227,8 +1273,8 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
             }
 
         // === FFN up-GEMM bwd: gX2 = xgrad(gU, W_up)  ; g_W_up += wgrad(gU, X2). ===
-        xgrad_gemm<S1_L_SEQ, S1_D, S1_FFN>(gU, wup_oc, l * S1_FFN * S1_D, gX2v);
-        wgrad_gemm<S1_L_SEQ, S1_D, S1_FFN>(gU, X2m, gWUP_oc, l * S1_FFN * S1_D);
+        xgrad_gemm(&gU[0][0], wup_oc, l * S1_FFN * S1_D, &gX2v[0][0], S1_L_SEQ, S1_D, S1_FFN);
+        wgrad_gemm(&gU[0][0], &X2m[0][0], gWUP_oc, l * S1_FFN * S1_D, S1_L_SEQ, S1_D, S1_FFN);
     SV_GX2: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
@@ -1271,7 +1317,7 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
         //   R_attn[t][d] = sat16(R_all[l][t][d] + AO[t][d]).  AO = fwd_gemm(Acat, Wo).
         static data_t AOm[S1_L_SEQ][S1_D];
         static data_t Rattn[S1_L_SEQ][S1_D];
-        fwd_gemm<S1_L_SEQ, S1_D, S1_D>(Acatm, wo_oc, l * S1_D * S1_D, AOm);
+        fwd_gemm(&Acatm[0][0], wo_oc, l * S1_D * S1_D, &AOm[0][0], S1_L_SEQ, S1_D, S1_D);
     RC_RATTN: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
@@ -1288,8 +1334,8 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
             }
 
         // === Wo bwd: gAcat = xgrad(gAO, Wo) ; g_Wo += wgrad(gAO, Acat). ===
-        xgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gAO, wo_oc, l * S1_D * S1_D, gAcat);
-        wgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gAO, Acatm, gWO_oc, l * S1_D * S1_D);
+        xgrad_gemm(&gAO[0][0], wo_oc, l * S1_D * S1_D, &gAcat[0][0], S1_L_SEQ, S1_D, S1_D);
+        wgrad_gemm(&gAO[0][0], &Acatm[0][0], gWO_oc, l * S1_D * S1_D, S1_L_SEQ, S1_D, S1_D);
 
         // === attention backward per head -> gQ/gK/gV (assembled into gQv/gKv/gVv over the heads). ===
     ATTN_BWD_H: for (int h = 0; h < S1_H; h++) {
@@ -1317,12 +1363,12 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
         static int32_t gX1q[S1_L_SEQ][S1_D];
         static int32_t gX1k[S1_L_SEQ][S1_D];
         static int32_t gX1vv[S1_L_SEQ][S1_D];
-        xgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gQv, wq_oc, l * S1_D * S1_D, gX1q);
-        xgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gKv, wk_oc, l * S1_D * S1_D, gX1k);
-        xgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gVv, wv_oc, l * S1_D * S1_D, gX1vv);
-        wgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gQv, X1m, gWQ_oc, l * S1_D * S1_D);
-        wgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gKv, X1m, gWK_oc, l * S1_D * S1_D);
-        wgrad_gemm<S1_L_SEQ, S1_D, S1_D>(gVv, X1m, gWV_oc, l * S1_D * S1_D);
+        xgrad_gemm(&gQv[0][0], wq_oc, l * S1_D * S1_D, &gX1q[0][0],  S1_L_SEQ, S1_D, S1_D);
+        xgrad_gemm(&gKv[0][0], wk_oc, l * S1_D * S1_D, &gX1k[0][0],  S1_L_SEQ, S1_D, S1_D);
+        xgrad_gemm(&gVv[0][0], wv_oc, l * S1_D * S1_D, &gX1vv[0][0], S1_L_SEQ, S1_D, S1_D);
+        wgrad_gemm(&gQv[0][0], &X1m[0][0], gWQ_oc, l * S1_D * S1_D, S1_L_SEQ, S1_D, S1_D);
+        wgrad_gemm(&gKv[0][0], &X1m[0][0], gWK_oc, l * S1_D * S1_D, S1_L_SEQ, S1_D, S1_D);
+        wgrad_gemm(&gVv[0][0], &X1m[0][0], gWV_oc, l * S1_D * S1_D, S1_L_SEQ, S1_D, S1_D);
     ACC_GX1: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
