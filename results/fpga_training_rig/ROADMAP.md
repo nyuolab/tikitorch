@@ -149,11 +149,25 @@ uncertainties first.
   dyadic-Adam) now exists, closes timing, fits, and is functionally bit-exact.** DSP profile exactly as
   designed: 0 everywhere except the attention soft-blend (fwd 128 + bwd 384). This is the functional-
   correctness gate (ROADMAP open-item (a)) — CLOSED for the new kernels.
-- **STILL OPEN (next):** (a) reconcile the kernel `dyad()` round-boundary (1.5·2^k) vs the Python training
-  authority `dyadic_quantize` (~1.414·2^k) so the integrated golden is deploy-faithful. (b) Author the
-  integrated `forge_train_step_s1` mode-dispatcher chaining all kernels + a CPU golden, bit-exact one-step
-  CSIM, csynth the whole block — now the critical path. (c) mode-3 N-step convergence CSIM. (d) AFI build
-  (gated — expensive/outward; not done).
+- **S1 INTEGRATED FORWARD — ✅ CSIM BIT-EXACT + CLOSES TIMING (2026-06-22, Vitis csim_design+csynth_design).**
+  `forge_train_step_s1` mode 0 = a WHOLE transformer forward + cross-entropy as ONE kernel (embed → LN1 →
+  Q/K/V dyadic GEMM → 2-head soft causal attn → Wo → residual → LN2 → FFN(up→ReLU→down) → residual →
+  max-plus LM-head → balanced-LUT CE grad). **csim BIT-EXACT (max|kernel−int64ref|=0 over all 9 regions, 0
+  errors), closes 2.920 ns ≤ 4.0, DSP=128 (attention soft-blend only — mult-free invariant holds), fits one
+  SLR (86% LUT / 43% BRAM / 5% URAM).** Timing took 2 rounds: first cut missed at 5.840 ns (direct gmem/AXI
+  gathers in the embed/LN/CE compute loops were the critical path + an II-violation swarm); fixed via the
+  morph_lm TT_RESIDENT_W on-chip resident-staging pattern (burst-load weights/tokens/LUTs once → compute
+  on-chip → burst-store) with the math/ABI/golden UNCHANGED → 2.920 ns. The `dyad()` round-faithfulness
+  question (1.5·2^k vs the Python authority ~1.414·2^k) is RESOLVED by making the hardware dyad rule
+  authoritative + self-consistent (the integrated int64 golden uses it). Latency 3.06M cyc/12.2 ms for one
+  128-token forward through 1 block (integrated GEMM is un-throughput-tuned; the df3/wide2 techniques apply
+  later — correctness/timing is the S1 goal, not tok/s).
+- **STILL OPEN (next):** (a) author mode 1 (backward: CE-grad → max-plus-head adjoint scatter → FFN xgrad/
+  wgrad → residual split → attn_bwd → LN_bwd → embed scatter, reusing the CSIM-verified backward kernels) +
+  mode 2 (dyadic-Adam) + mode 3 (fused one-kick trainer), all on-chip-resident; bit-exact one-step CSIM +
+  csynth. (b) mode-3 N-step convergence CSIM vs the charlm 2.481 trajectory. (c) AFI build (gated). Note: at
+  86% LUT/SLR for the forward alone, the full trainer likely spans ~2 SLRs → multi-SLR floorplanning for AFI
+  (device has 3).
 
 ## First three steps (local, no F2 builds)
 
