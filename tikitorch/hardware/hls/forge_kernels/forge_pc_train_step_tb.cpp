@@ -78,16 +78,19 @@ int main() {
 
     // ---- run the kernel + compare ----
     forge_pc_train_step((ap_uint<512>*)buf);
-    long dW0=0,dW1=0,dM0=0,dM1=0;
+    long dW0=0,dW1=0,dM0=0,dM1=0; long nW0=0,nW1=0,shown=0;
     for(int i=0;i<TD*TD;i++){
-        long a=labs((long)buf[O_W0+i]-rW0[i]); if(a>dW0)dW0=a;
-        long b=labs((long)buf[O_W1+i]-rW1[i]); if(b>dW1)dW1=b;
+        long a=labs((long)buf[O_W0+i]-rW0[i]); if(a>dW0)dW0=a; if(a)nW0++;
+        long b=labs((long)buf[O_W1+i]-rW1[i]); if(b>dW1)dW1=b; if(b)nW1++;
         long c=labs((long)buf[O_MOM0+i]-rM0[i]); if(c>dM0)dM0=c;
         long d=labs((long)buf[O_MOM1+i]-rM1[i]); if(d>dM1)dM1=d;
+        if(a && shown<8){ printf("  W0[%d]: kernel=%d ref=%ld (mom0 kernel=%d ref=%ld, gW0sign=%d)\n",
+            i, buf[O_W0+i], rW0[i], buf[O_MOM0+i], rM0[i], sgn(gW0[i])); shown++; }
     }
     printf("forge_pc_train_step CSIM (D=%d N=%d C=%d): one step\n", TD, TN, TC);
     printf("  sh0=%d sh1=%d shd=%d\n", sh0, sh1, shd);
-    printf("  max|W0-ref|=%ld  max|W1-ref|=%ld  max|mom0-ref|=%ld  max|mom1-ref|=%ld\n", dW0,dW1,dM0,dM1);
+    printf("  max|W0-ref|=%ld (%ld/%d differ)  max|W1-ref|=%ld (%ld/%d)  max|mom0|=%ld  max|mom1|=%ld\n",
+           dW0,nW0,TD*TD, dW1,nW1,TC*TD, dM0,dM1);
     int ok = (dW0|dW1|dM0|dM1)==0;
     printf("  -> %s\n", ok ? "BIT-EXACT (kernel step == int64 reference)" : "MISMATCH");
     free(buf);
