@@ -61,6 +61,7 @@ up
 if [ -n "\$VERIFY" ]; then ( sudo /tmp/pcverify 0 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
 else ( sudo /tmp/pctrain 0 /tmp/pc_mnist "\$EPOCHS" 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true; fi
 for f in img build train; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
+for w in trainedW0.i32 trainedW1.i32; do [ -f /tmp/\$w ] && aws s3 cp /tmp/\$w "\$S3_RESULTS/\$w" --only-show-errors || true; done
 echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 up; shutdown -h now
 UDEOF

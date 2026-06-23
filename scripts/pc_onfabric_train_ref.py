@@ -32,7 +32,10 @@ def dyad(v):                                       # table-free 1.5x dyadic quan
 def mshift(t, target_bits):                        # max-shift norm: right-shift so |t|max ~ 2^target_bits
     m = int(t.abs().max().item())
     if m <= 0: return t
-    sh = max(0, m.bit_length() - target_bits)
+    # PC_KERNEL_SHIFT=1 reproduces the FABRIC kernel's norm_shift (s = highest_bit_pos - target =
+    # bit_length-1-target) -- one less than this recipe -> activations 2x bigger. Diagnostic only.
+    off = 1 if os.environ.get("PC_KERNEL_SHIFT") else 0
+    sh = max(0, m.bit_length() - target_bits - off)
     return torch.div(t, 1 << sh, rounding_mode="floor")
 
 
@@ -66,7 +69,8 @@ def backward(x, y, logits, h1, mask0, W1):
         p = torch.softmax((logits - logits.max(1, keepdim=True).values).double(), dim=1)
         e1[:, :C] = p - oh
     else:                                           # MSE top error (DEFAULT, kernel uses this): pure subtraction
-        e1[:, :C] = logits.double() - oh * 8        # target = +8 for the true class (mshift'd logit scale)
+        tgt = int(os.environ.get("PC_TGT", 8))
+        e1[:, :C] = logits.double() - oh * tgt      # target = +tgt for the true class (mshift'd logit scale)
     delta1 = e1
     gW1 = dyad(delta1).t() @ dyad(h1)              # last layer (no relu mask)
     e_down1 = delta1 @ dyad(W1)
@@ -87,16 +91,21 @@ def accuracy(X, Y, W0, W1):
 if __name__ == "__main__":
     (Xtr, Ytr), (Xte, Yte) = load_mnist_16()
     print(f"downsampled MNIST 16x16=256: train {tuple(Xtr.shape)}, test {tuple(Xte.shape)}", flush=True)
-    W0 = (torch.randn(D, D) * 4).round().double()
-    W1 = (torch.randn(D, D) * 4).round().double()
+    if os.environ.get("PC_UNIFINIT"):              # reproduce the C driver's init: uniform int in -4..4
+        W0 = torch.randint(-4, 5, (D, D)).double()
+        W1 = torch.randint(-4, 5, (D, D)).double()
+    else:
+        W0 = (torch.randn(D, D) * 4).round().double()
+        W1 = (torch.randn(D, D) * 4).round().double()
     m0 = torch.zeros(D, D, dtype=torch.float64); m1 = torch.zeros(D, D, dtype=torch.float64)  # int momentum counters
     MCAP, STEP = 7.0, 1                            # counter cap; integer SignSGD step
     gen = torch.Generator().manual_seed(1)
     BATCH, EPOCHS = int(os.environ.get("PC_BATCH", 128)), int(os.environ.get("PC_EPOCHS", 8))
     print(f"  init test acc = {accuracy(Xte, Yte, W0, W1):.4f}", flush=True)
     nb = Xtr.shape[0] // BATCH
+    noshuf = os.environ.get("PC_NOSHUF")
     for ep in range(EPOCHS):
-        perm = torch.randperm(Xtr.shape[0], generator=gen)
+        perm = torch.arange(Xtr.shape[0]) if noshuf else torch.randperm(Xtr.shape[0], generator=gen)
         step = max(1, STEP if ep < 4 else 0)       # keep step=1 (integer); rely on momentum, not lr decay
         for b in range(nb):
             idx = perm[b*BATCH:(b+1)*BATCH]
