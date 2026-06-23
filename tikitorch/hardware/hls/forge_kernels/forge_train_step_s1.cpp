@@ -1738,10 +1738,25 @@ static inline int32_t s1_encode_fine(acc_t wq, int32_t prev_code, bool allow_cla
 //   load W_fp/g/m/v tile -> per-lane Adam update -> store W_fp/m/v + the re-quantized code/value + g=0.
 // init_only=1: grad is treated as ZERO (Adam is a no-op: m,v,W_fp unchanged) and ONLY the re-quantize
 // runs — the code-init path (populate codes/values from the staged W_fp without moving the weights).
+//
+// TIMING SPLIT (csynth named the critical path as two priority encoders in series in ONE comb stage:
+// s1_dyad_exp(vn) THEN dyad() inside s1_encode_fine — 4.266 ns > 4.0 ns target). The element work is split
+// into TWO sequential II=1 passes so neither pass holds both encoders:
+//   PASS A (ADAM_R): load g/m/v/W_fp -> m,v EMA -> se=s1_dyad_exp(vn) [encoder #1] -> step -> dw -> W_fp_new
+//                    (+weight decay) -> STORE W_fp_new, m, v, zero grad. For VALUE regions the deploy slot
+//                    IS W_fp_new (no re-quantize), so it is written here too.
+//   PASS B (ADAM_Q): CODE regions ONLY — load W_fp_new -> s1_encode_fine(dyad(W_fp_new)) [encoder #2] with
+//                    the |Δexp|<=1 clamp vs the prev deploy code -> STORE the deploy code.
+// The two passes are BIT-EXACT to the original single pass: PASS A writes exactly the int32 W_fp value the
+// single pass formerly fed straight into s1_encode_fine, and PASS B reads it back. The elements are
+// independent (each p touches distinct buffer offsets; PASS B reads R.wfp_off written by PASS A and the
+// untouched R.dst_off prev code), so II=1 holds for both passes. On init_only PASS A leaves W_fp/m/v/g
+// untouched (Adam no-op) and PASS B re-quantizes from the staged W_fp — identical to the old init path.
 static void dyadic_adam_region(int32_t *buffer, const s1_opt_region_t &R, bool init_only) {
 #pragma HLS INLINE off
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
     int n = R.n;
+    // ---- PASS A: Adam update -> W_fp_new (one priority encoder: s1_dyad_exp) ----
 ADAM_R: for (int base = 0; base < n; base += S1_OPT_LANE) {
 #pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT min=128 max=589824
@@ -1749,17 +1764,27 @@ ADAM_R: for (int base = 0; base < n; base += S1_OPT_LANE) {
 #pragma HLS UNROLL
             int p = base + lane;
             if (p < n) {
-                acc_t g = init_only ? (acc_t)0 : (acc_t)(int32_t)buffer[R.g_off  + p];
+                if (init_only) {
+                    // Adam no-op on init: leave W_fp/m/v/g untouched. CODE regions re-quantize the staged
+                    // W_fp in PASS B; VALUE regions have no encoder, so populate the deploy slot here from
+                    // the staged master (== old single-pass init: dst = (int16)wfp, unchanged weights).
+                    if (!R.is_code) {
+                        data_t wfp = (data_t)(int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
+                        buffer[R.dst_off + p] = (int32_t)(int16_t)wfp;
+                    }
+                    continue;
+                }
+                acc_t g = (acc_t)(int32_t)buffer[R.g_off  + p];
                 acc_t m = (acc_t)(int32_t)buffer[R.m_off + p];
                 acc_t v = (acc_t)(int32_t)buffer[R.v_off + p];
                 acc_t absg = (g < 0) ? (acc_t)(-g) : g;
                 acc_t mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
                 acc_t vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
-                int se = s1_dyad_exp(vn);
+                int se = s1_dyad_exp(vn);                    // PRIORITY ENCODER #1 (alone in this stage)
                 acc_t step = mn >> se;                       // m / 2^round(log2 v)  (arith shift, keeps sign)
                 if (R.is_code) {
                     // FINE FIXED-POINT code master (int32 at scale 2^Q_CODE): nudge by a small fraction of a
-                    // code unit, re-quantize the deploy code from the rounded master via dyad() + exp-clamp.
+                    // code unit; the deploy code is re-quantized from W_fp_new in PASS B (encoder #2).
                     acc_t wq  = (acc_t)(int32_t)buffer[R.wfp_off + p];
                     acc_t dw  = step >> S1_LR_SHIFT_CODE;    // fine lr = 2^-LR_SHIFT_CODE of a code unit
 #if S1_CODE_WD_SHIFT
@@ -1767,27 +1792,37 @@ ADAM_R: for (int base = 0; base < n; base += S1_OPT_LANE) {
 #else
                     acc_t wd  = 0;
 #endif
-                    acc_t wn  = init_only ? wq : (acc_t)sat32((acc_t)wq - dw - wd);
-                    if (!init_only) {
-                        buffer[R.m_off + p]   = (int32_t)mn;
-                        buffer[R.v_off + p]   = (int32_t)vn;
-                        buffer[R.wfp_off + p] = (int32_t)wn;     // store the full int32 fixed-point master
-                        buffer[R.g_off + p]   = 0;
-                    }
-                    buffer[R.dst_off + p] = s1_encode_fine(wn, buffer[R.dst_off + p], !init_only);
+                    acc_t wn  = (acc_t)sat32((acc_t)wq - dw - wd);
+                    buffer[R.m_off + p]   = (int32_t)mn;
+                    buffer[R.v_off + p]   = (int32_t)vn;
+                    buffer[R.wfp_off + p] = (int32_t)wn;     // store the full int32 fixed-point master
+                    buffer[R.g_off + p]   = 0;
                 } else {
                     // VALUE master (EMBED/W_HEAD/LN beta): int16 unit scale, coarse LR_SHIFT (unchanged — it
-                    // SCATTERS, no fan-in blow-up, and already trains stably in FREEZE_CODES).
+                    // SCATTERS, no fan-in blow-up). No re-quantize: the deploy slot IS W_fp_new, written here.
                     data_t wfp = (data_t)(int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
                     acc_t dw   = step >> S1_LR_SHIFT;        // lr = 2^-LR_SHIFT
-                    data_t wn  = init_only ? wfp : sat16((acc_t)wfp - dw);
-                    if (!init_only) {
-                        buffer[R.m_off + p]   = (int32_t)mn;
-                        buffer[R.v_off + p]   = (int32_t)vn;
-                        buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
-                        buffer[R.g_off + p]   = 0;
-                    }
+                    data_t wn  = sat16((acc_t)wfp - dw);
+                    buffer[R.m_off + p]   = (int32_t)mn;
+                    buffer[R.v_off + p]   = (int32_t)vn;
+                    buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
+                    buffer[R.g_off + p]   = 0;
                     buffer[R.dst_off + p] = (int32_t)(int16_t)wn;
+                }
+            }
+        }
+    }
+    // ---- PASS B: re-quantize CODE regions W_fp_new -> deploy code (one priority encoder: dyad in encode) ----
+    if (R.is_code) {
+ADAM_Q: for (int base = 0; base < n; base += S1_OPT_LANE) {
+#pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=128 max=589824
+            for (int lane = 0; lane < S1_OPT_LANE; lane++) {
+#pragma HLS UNROLL
+                int p = base + lane;
+                if (p < n) {
+                    acc_t wn = (acc_t)(int32_t)buffer[R.wfp_off + p];   // W_fp_new from PASS A (or staged W_fp on init)
+                    buffer[R.dst_off + p] = s1_encode_fine(wn, buffer[R.dst_off + p], !init_only);  // PRIORITY ENCODER #2
                 }
             }
         }
