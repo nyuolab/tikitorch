@@ -74,7 +74,15 @@ int main(int argc,char**argv){
     // init weights (small random int), zero momentum; stage all once -> persist in DDR
     srand(12345);
     for(int i=0;i<D*D;i++){ hbuf[O_W0+i]=(rand()%9)-4; hbuf[O_W1+i]=(rand()%9)-4; hbuf[O_MOM0+i]=0; hbuf[O_MOM1+i]=0; }
+    int32_t* initW0=malloc(4*D*D); memcpy(initW0, hbuf+O_W0, 4*D*D);   // snapshot init to detect evolution
     stage(0, BUFLEN);
+    // diag: 1 kick, then read W0/W1 back -> did the kernel's update persist in DDR across the kick?
+    { for(int n=0;n<N;n++){ for(int i=0;i<D;i++) hbuf[O_X+n*D+i]=Xtr[n*D+i]; for(int c=0;c<C;c++) hbuf[O_TGT+n*D+c]=0; hbuf[O_TGT+n*D+Ytr[n]]=8; }
+      stage(O_X, 2*N*D); kick();
+      int32_t* w=malloc(4*D*D); readw(O_W0,w,D*D); long ch=0; for(int j=0;j<D*D;j++) if(w[j]!=initW0[j]) ch++;
+      printf("[diag] after 1 kick: %ld/%d W0 weights changed from init (W0[0]:%d->%d, W0[1]:%d->%d)\n",
+             ch, D*D, initW0[0], w[0], initW0[1], w[1]);
+      free(w); fflush(stdout); }
 
     int32_t *W0=malloc(4*D*D), *W1=malloc(4*D*D);
     int nb = Ntr / N;
