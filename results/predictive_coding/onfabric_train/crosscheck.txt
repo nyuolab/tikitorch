@@ -1,0 +1,5 @@
+loaded on-fabric weights: |W0|max=9380 |W1|max=9380 (nz W0=62748/65536)
+RECIPE-EVAL of ON-FABRIC weights: test acc = 0.7413
+  pred histogram (per class 0..9): [1007, 1164, 2858, 864, 1063, 38, 978, 964, 2, 1062]
+  -> if this matches the driver's on-fabric accuracy, the fabric-trained weights are
+     genuinely good and the host predict() == kernel forward (independent confirmation).

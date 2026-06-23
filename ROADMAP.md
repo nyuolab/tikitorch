@@ -116,9 +116,9 @@ Docs: `results/predictive_coding/{TRAINING_AT_SCALE,PC_BACKWARD_SILICON,MULTI_F2
 
 | result | status | evidence |
 |---|---|---|
-| **PC backward = bit-exact silicon** | ✅ | `forge_pc_wgrad` (full `cascade_grads` layer-step: routed adjoint + weight grad + bias grad + error route + residual skip), DSP=0, 2.920 ns, AGFI `agfi-063e2dd0d3255dcaa`; on-chip readback == `cascade_grads` `max\|diff\|=0` (known-answer + random). Weight transport **structurally absent** (route reuses the forward `q(W)`). |
+| **PC backward = bit-exact silicon** | ✅ | `forge_pc_wgrad` (full `cascade_grads` layer-step: routed adjoint + weight grad + bias grad + error route + residual skip), DSP=0, 2.920 ns, AGFI `agfi-063e2dd0d3255dcaa`; on-chip readback == `cascade_grads` `max\|diff\|=0` (known-answer + random). **Transpose-free**: the error route reuses the *forward* `q(W)` in place — no separately-stored/synced transposed buffer (this is *not* the bio "weight-transport-free" property, which would need separate feedback weights; the hardware win is no transpose copy + no cross-chip weight movement in the shard). |
 | **Sharded across 2 physical FPGAs** | ✅ | 2-layer backward across an f2.12xlarge's slots 0+1, ONLY a single neighbour error message between them (no global gradient / transport / barrier) → bit-exact to single-process `cascade_grads`. Silicon realization of the gloo `pc_model_parallel.py` proof. |
-| **Fully-on-fabric trainer** | validated; AFI building | `forge_pc_train_step` — one kick = forward + cascade backward + SignSGD-momentum update, weights persist in DDR. Recipe trains 16×16 MNIST to **~95%** in pure integer / shift-add / compare (DSP=0); kernel synthesizes mult-free (2.920 ns, 54% FF) + **csim bit-exact**. On-fabric training **run** pending the AFI build. |
+| **Fully-on-fabric trainer = trains on silicon** | ✅ | `forge_pc_train_step` — one kick = forward + cascade backward + SignSGD-momentum update, weights+momentum persist in DDR; host only stages a batch + kicks. Pipelined forward (FF 20%, HLS ~8 min), **`DSP_MULT=0`** (1 DSP as an adder), timing-closed **WNS +0.196 ns**, AGFI `agfi-0fdc38db9da6add74`. **On-fabric RUN measured:** 16×16 MNIST chance → **0.7475** over 5 epochs (batch 32, uniform init), entirely on the FPGA; an independent recipe-forward eval of the dumped weights = 0.7413 (cross-confirms). Recipe ceiling ~0.81 at this config / ~0.90 best. Bug found+fixed: kernel `norm_shift` off-by-one (1 less shift than the recipe) stalled training at chance despite a bit-exact one-step verify; compensated host-side (loss target 8→16, no rebuild). Details: `ONFABRIC_TRAINING.md` (honesty-audited). |
 
 **Honest scope.** These prove the **substrate** (multiplier-free + no-global-coordination credit
 assignment *runs and trains* on real silicon) — **not** a throughput win: per the Rung-4 fabric-sim,
@@ -134,12 +134,14 @@ localized it in one cheap run; fix = table-free dyad); and inter-layer PC errors
 a fixed-point rescale of the neighbour message is load-bearing (same activation-scaling the muzero net
 needed).
 
-- [ ] **On-fabric training RUN** — `run_pc_train_f2.sh` once the `cl_forge_pc_train_ddr` AFI is available:
-      host stages batches + kicks; accuracy climbs entirely on the FPGA.
+- [x] **On-fabric training RUN** — `run_pc_train_f2.sh` on `agfi-0fdc38db9da6add74`: host stages
+      batches + kicks; accuracy climbed **chance → 0.7475** entirely on the FPGA. ✅ (`ONFABRIC_TRAINING.md`)
+- [x] **Make the train-step build cheap** — pipelined the forward reduction (was a 256-wide unroll @ 54% FF,
+      ~2 h HLS): FF → 20%, HLS → ~8 min, timing closed WNS +0.196 ns, compute unchanged (csim still bit-exact). ✅
 - [ ] **Deeper / network-distributed shard** — ≥3 layers across ≥3 FPGAs (f2.48xlarge = 8), then TCP
       neighbour messages across separate hosts (true no-shared-host messaging).
-- [ ] **Make the train-step build cheap** — the kernel's 256-wide forward unroll costs ~2 h HLS + 54% FF;
-      a pipelined reduction cuts HLS to ~20 min + lowers congestion (compute unchanged → csim stays exact).
+- [ ] **Longer/bigger on-fabric run** — batch 128 + randn init + more epochs to chase the recipe's ~0.90
+      ceiling on fabric (this run was a 5-epoch, batch-32 correctness demo at 0.75).
 
 ## CONSTRAINT CLARIFICATION — the invariant is MULTIPLIER-FREE, not DSP=0
 
