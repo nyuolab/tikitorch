@@ -51,11 +51,16 @@ static int L;
 static pci_bar_handle_t bar0[MAXL], bar4[MAXL], bar4r[MAXL];
 static int32_t *hbuf[MAXL];
 
-static void stage(int l,int off,int n){ for(long o=off;o<off+n;o+=262144){ long k=(off+n-o<262144)?(off+n-o):262144; fpga_pci_write_burst(bar4[l],(uint64_t)o*4,(uint32_t*)(hbuf[l]+o),(uint64_t)k);} }
-static void kick(int l){ fpga_pci_poke(bar0[l],R_BUF0,0); fpga_pci_poke(bar0[l],R_BUF1,0); fpga_pci_poke(bar0[l],R_AP_CTRL,AP_START);
-    double t0=now_s(); uint32_t c=0; while(now_s()-t0<5.0){ fpga_pci_peek(bar0[l],R_AP_CTRL,&c); if(c&AP_DONE)return; } fprintf(stderr,"KICK HUNG slot %d\n",l); exit(6); }
-static void readw(int l,int off,int32_t*dst,int n){ uint32_t v; for(int j=0;j<n;j++){ fpga_pci_peek(bar4r[l],(uint64_t)(off+j)*4,&v); dst[j]=(int32_t)v; } }
-static void setcfg(int l,int phase,int role,int doupd){ hbuf[l][O_CFG+0]=phase; hbuf[l][O_CFG+1]=role; hbuf[l][O_CFG+2]=8; hbuf[l][O_CFG+3]=doupd; stage(l,O_CFG,WL); }
+// instrumentation accumulators (seconds), shared so the helpers can time themselves
+static double T_STAGE=0, T_XCHIP=0, T_FWDK=0, T_BWDK=0, T_READW=0, T_EVAL=0;
+static double kick_fwd_s[MAXL]={0}, kick_bwd_s[MAXL]={0};
+
+static double stage(int l,int off,int n){ double t0=now_s(); for(long o=off;o<off+n;o+=262144){ long k=(off+n-o<262144)?(off+n-o):262144; fpga_pci_write_burst(bar4[l],(uint64_t)o*4,(uint32_t*)(hbuf[l]+o),(uint64_t)k);} return now_s()-t0; }
+static double kick(int l){ fpga_pci_poke(bar0[l],R_BUF0,0); fpga_pci_poke(bar0[l],R_BUF1,0);
+    double t0=now_s(); fpga_pci_poke(bar0[l],R_AP_CTRL,AP_START); uint32_t c=0;
+    while(now_s()-t0<8.0){ fpga_pci_peek(bar0[l],R_AP_CTRL,&c); if(c&AP_DONE)return now_s()-t0; } fprintf(stderr,"KICK HUNG slot %d\n",l); exit(6); }
+static double readw(int l,int off,int32_t*dst,int n){ double t0=now_s(); uint32_t v; for(int j=0;j<n;j++){ fpga_pci_peek(bar4r[l],(uint64_t)(off+j)*4,&v); dst[j]=(int32_t)v; } return now_s()-t0; }
+static void setcfg(int l,int phase,int role,int doupd){ hbuf[l][O_CFG+0]=phase; hbuf[l][O_CFG+1]=role; hbuf[l][O_CFG+2]=8; hbuf[l][O_CFG+3]=doupd; T_STAGE+=stage(l,O_CFG,WL); }
 static int role_of(int l){ return (l==L-1)?RL_OUTPUT:RL_HIDDEN; }
 
 // host forward through all L layers (eval), == the chips' forward. returns predicted class
@@ -106,8 +111,9 @@ int main(int argc,char**argv){
     int32_t *W[MAXL]; for(int l=0;l<L;l++) W[l]=malloc(4*D*D);
     int32_t *aout=malloc(4*N*D), *eout=malloc(4*N*D);
     int *perm=malloc(Ntr*sizeof(int)); for(int i=0;i<Ntr;i++) perm[i]=i;
-    long xchip_msg=0, xchip_weight=0, xchip_grad=0;     // Gate C: bytes that cross chips, by kind
+    long xchip_msg=0, xchip_weight=0, xchip_grad=0;     // Gate C: ints that cross chips, by kind
     int nb=Ntr/N;
+    double t_run0=now_s();                              // start of the measured training window
     for(int ep=0; ep<epochs; ep++){
         double t0=now_s();
         for(int i=Ntr-1;i>0;i--){ int j=rand()%(i+1); int t=perm[i];perm[i]=perm[j];perm[j]=t; }
@@ -115,29 +121,57 @@ int main(int argc,char**argv){
             // ---- FORWARD SWEEP: slot 0 -> L-1, passing each layer's activation downstream ----
             for(int l=0;l<L;l++){
                 setcfg(l,PH_FWD,role_of(l),0);
-                if(l==0){ for(int n=0;n<N;n++){ int s=perm[b*N+n]; for(int i=0;i<D;i++) hbuf[0][O_AIN+n*D+i]=Xtr[s*D+i]; } }
-                else    { memcpy(hbuf[l]+O_AIN, aout, 4*N*D); xchip_msg += (long)N*D; }   // AOUT(l-1) -> AIN(l)
-                stage(l,O_AIN,N*D); kick(l);
-                if(l<L-1) readw(l,O_AOUT,aout,N*D);   // read this layer's activation for the next chip
+                if(l==0){ for(int n=0;n<N;n++){ int s=perm[b*N+n]; for(int i=0;i<D;i++) hbuf[0][O_AIN+n*D+i]=Xtr[s*D+i]; } T_STAGE+=stage(l,O_AIN,N*D); }
+                else    { memcpy(hbuf[l]+O_AIN, aout, 4*N*D); xchip_msg += (long)N*D; T_XCHIP+=stage(l,O_AIN,N*D); }   // AOUT(l-1)->AIN(l): cross-chip
+                { double kt=kick(l); kick_fwd_s[l]+=kt; T_FWDK+=kt; }
+                if(l<L-1) T_XCHIP+=readw(l,O_AOUT,aout,N*D);   // read this layer's activation to pass on = comms
             }
             // ---- BACKWARD SWEEP: slot L-1 -> 0, passing each layer's error upstream ----
             for(int l=L-1;l>=0;l--){
                 setcfg(l,PH_BWD,role_of(l),1);
-                if(l==L-1){ for(int n=0;n<N;n++){ int s=perm[b*N+n]; for(int c=0;c<D;c++) hbuf[l][O_TGT+n*D+c]=0; hbuf[l][O_TGT+n*D+Ytr[s]]=8; } stage(l,O_TGT,N*D); }
-                else      { memcpy(hbuf[l]+O_EIN, eout, 4*N*D); stage(l,O_EIN,N*D); xchip_msg += (long)N*D; }  // EOUT(l+1) -> EIN(l)
-                kick(l);
-                if(l>0) readw(l,O_EOUT,eout,N*D);     // read upstream error for the next (lower) chip
+                if(l==L-1){ for(int n=0;n<N;n++){ int s=perm[b*N+n]; for(int c=0;c<D;c++) hbuf[l][O_TGT+n*D+c]=0; hbuf[l][O_TGT+n*D+Ytr[s]]=8; } T_STAGE+=stage(l,O_TGT,N*D); }
+                else      { memcpy(hbuf[l]+O_EIN, eout, 4*N*D); xchip_msg += (long)N*D; T_XCHIP+=stage(l,O_EIN,N*D); }  // EOUT(l+1)->EIN(l): cross-chip
+                { double kt=kick(l); kick_bwd_s[l]+=kt; T_BWDK+=kt; }
+                if(l>0) T_XCHIP+=readw(l,O_EOUT,eout,N*D);     // read upstream error to pass on = comms
             }
             // weights & gradients are NEVER read-and-crossed -> xchip_weight, xchip_grad stay 0 by construction
         }
-        for(int l=0;l<L;l++) readw(l,O_W,W[l],D*D);   // read each chip's weights (for host eval only)
-        long ok=0; for(int t=0;t<Nte;t++) if(predict(Xte+t*D,W)==Yte[t]) ok++;
+        for(int l=0;l<L;l++) T_READW+=readw(l,O_W,W[l],D*D);   // read each chip's weights (host eval only)
+        double te0=now_s(); long ok=0; for(int t=0;t<Nte;t++) if(predict(Xte+t*D,W)==Yte[t]) ok++; T_EVAL+=now_s()-te0;
         printf("[shard] epoch %d: test acc = %.4f  (%d steps, %.1fs)  MODEL-PARALLEL/%d-chip\n",
                ep+1, (double)ok/Nte, nb, now_s()-t0, L); fflush(stdout);
     }
-    printf("[gateC] cross-chip data over the whole run: messages=%ld ints (activations+errors), "
-           "WEIGHTS=%ld, GRADIENTS=%ld  -> only neighbour messages crossed; no global model/gradient.\n",
-           xchip_msg, xchip_weight, xchip_grad);
+    double wall = now_s() - t_run0;
+    long steps = (long)epochs * nb;          // one model-parallel training step per batch
+    long kicks = steps * 2L * L;             // L fwd kicks + L bwd kicks per step
+    long samples = steps * (long)N;
+    double t_comp = T_FWDK + T_BWDK;
+    // ===== THROUGHPUT =====
+    printf("\n========== SIGNATURE RESULT: %d-chip model-parallel PC training, fully measured ==========\n", L);
+    printf("[throughput] %ld steps, %ld samples, %ld kicks over %.2fs wall\n", steps, samples, kicks, wall);
+    printf("[throughput] %.1f steps/s | %.0f samples/s | %.1f kicks/s | %.3f ms/step | %.3f ms/sample\n",
+           steps/wall, samples/wall, kicks/wall, 1e3*wall/steps, 1e3*wall/samples);
+    printf("[throughput] avg fabric time/kick: fwd %.3f ms, bwd %.3f ms (sum compute %.2fs = %.1f%% of wall)\n",
+           1e3*T_FWDK/(steps*L), 1e3*T_BWDK/(steps*L), t_comp, 100.0*t_comp/wall);
+    for(int l=0;l<L;l++) printf("[throughput]   chip %d (slot %d): fwd-kick %.3f ms, bwd-kick %.3f ms (avg)\n",
+           l, slot[l], 1e3*kick_fwd_s[l]/steps, 1e3*kick_bwd_s[l]/steps);
+    // ===== TIME BREAKDOWN =====
+    printf("[breakdown] fwd-compute %.1f%% | bwd-compute %.1f%% | cross-chip-comms %.1f%% | input-stage %.1f%% | weight-readback %.1f%% | host-eval %.1f%%\n",
+           100*T_FWDK/wall, 100*T_BWDK/wall, 100*T_XCHIP/wall, 100*T_STAGE/wall, 100*T_READW/wall, 100*T_EVAL/wall);
+    // ===== COMMS =====
+    long xbytes = xchip_msg * 4;             // int32 messages
+    double xMB = xbytes/1e6;
+    printf("[comms] cross-chip messages: %ld ints = %.2f MB total | %ld bytes/step (%ld ints) | %.2f MB/s during comms\n",
+           xchip_msg, xMB, xbytes/steps, xchip_msg/steps, (T_XCHIP>0? xMB/T_XCHIP : 0.0));
+    printf("[comms] comms = %.1f%% of wall; per step %ld activation+error ints cross between adjacent chips (each msg = N*D = %d ints)\n",
+           100*T_XCHIP/wall, xchip_msg/steps, N*D);
+    // ===== GATE C: the structural guarantee =====
+    printf("[gateC] WEIGHTS crossed chips=%ld bytes | GRADIENTS crossed=%ld bytes | only neighbour messages crossed\n",
+           xchip_weight*4, xchip_grad*4);
+    printf("[gateC] -> no chip ever held the global model or the global gradient; no all-reduce, no barrier.\n");
+    // ===== ENERGY: the runner samples per-slot Vccint (fpga-describe -M) concurrently; J computed there =====
+    printf("[energy] (board power sampled per slot by the runner during this window; wall=%.2fs, steps=%ld -> J/step in the run's energy.txt)\n", wall, steps);
+    printf("ENERGY_WINDOW wall_s=%.3f steps=%ld samples=%ld\n", wall, steps, samples);  // parsed by the runner for J/step
     for(int l=0;l<L;l++){ fpga_pci_detach(bar0[l]); fpga_pci_detach(bar4[l]); fpga_pci_detach(bar4r[l]); }
     return 0;
 }

@@ -59,8 +59,42 @@ mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.
 mkdir -p /tmp/pc_mnist; for f in train_x.i8 train_y.u8 test_x.i8 test_y.u8; do aws s3 cp "\$BINS_S3/\$f" /tmp/pc_mnist/\$f --only-show-errors; done
 gcc -O2 -std=gnu11 -I"\$SDK/include" /opt/tiki/tikitorch/fpga/silicon/forge_pc_train_shard.c -lfpga_mgmt -o /tmp/pcshard 2>&1 | tee /tmp/build.txt
 up
-( sudo /tmp/pcshard "\$EPOCHS" /tmp/pc_mnist \$SLOTS 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
-for f in img build train; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
+# Vccint (core rail) energy: read 'Last measured: N watts' under each slot's Vccint. helper:
+vcc(){ sudo \$FD -S \$1 -M 2>&1 | awk 'BEGIN{IGNORECASE=1} /vccint/{f=1} f&&/last measured/{for(i=1;i<=NF;i++)if(\$i~/^[0-9]+\$/){print \$i;exit}}'; }
+echo "== IDLE Vccint (per slot, pre-run) ==" | tee /tmp/power.txt
+for s in \$SLOTS; do echo "idle slot=\$s W=\$(vcc \$s)" | tee -a /tmp/power.txt; done
+# run the instrumented driver in the BACKGROUND; sample per-slot Vccint concurrently every ~2s
+rm -f /tmp/scdone
+( sudo /tmp/pcshard "\$EPOCHS" /tmp/pc_mnist \$SLOTS 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt; touch /tmp/scdone ) &
+while [ ! -f /tmp/scdone ]; do TS=\$(date +%s.%N); for s in \$SLOTS; do echo "during t=\$TS slot=\$s W=\$(vcc \$s)"; done >> /tmp/power.txt; sleep 2; done
+wait
+# compute energy (J, J/step) from the sampled Vccint + the driver's ENERGY_WINDOW line
+python3 - <<'PY' | tee /tmp/energy.txt
+import re
+slots={}; idle={}
+for ln in open('/tmp/power.txt'):
+    m=re.search(r'(idle|during).*slot=(\d+).*W=(\d+)', ln)
+    if not m: continue
+    ph,s,w=m.group(1),int(m.group(2)),int(m.group(3))
+    if ph=='idle': idle[s]=w
+    else: slots.setdefault(s,[]).append(w)
+wall=steps=samples=None
+for ln in open('/tmp/train.txt'):
+    m=re.search(r'ENERGY_WINDOW wall_s=([\d.]+) steps=(\d+) samples=(\d+)', ln)
+    if m: wall,steps,samples=float(m.group(1)),int(m.group(2)),int(m.group(3))
+print("=== ENERGY (Vccint core rail, per slot) ===")
+tot_avg=0.0; tot_idle=0.0
+for s in sorted(slots):
+    a=sum(slots[s])/len(slots[s]); i=idle.get(s,0); tot_avg+=a; tot_idle+=i
+    print(f"slot {s}: Vccint avg-during {a:.2f} W (idle {i} W, dynamic {a-i:+.2f} W; n={len(slots[s])})")
+if wall:
+    E=tot_avg*wall; Edyn=(tot_avg-tot_idle)*wall
+    print(f"board Vccint: during {tot_avg:.2f} W, idle {tot_idle:.2f} W  | wall {wall:.2f}s, {steps} steps")
+    print(f"ENERGY: {E:.1f} J total ({E/steps*1e3:.2f} mJ/step, {E/samples*1e3:.3f} mJ/sample)")
+    print(f"ENERGY(dynamic, during-idle): {Edyn:.1f} J ({Edyn/steps*1e3:.2f} mJ/step)")
+    print("NOTE: Vccint is the core rail (not whole-board); a DSP_MULT=0 core's dynamic draw is often at/below the sensor's 1W resolution -> dynamic may read ~0 (honest: structural demo, not a power record).")
+PY
+for f in img build train power energy; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
 echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 up; shutdown -h now
 UDEOF
