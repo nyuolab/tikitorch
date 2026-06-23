@@ -24,7 +24,8 @@ KERNEL_TCL="${KERNEL_TCL:-synth_pc_wgrad.tcl}"             # HLS the PC backward
 KERNEL_PROJ="${KERNEL_PROJ:-forge_pc_wgrad_proj}"
 ROLE="${ROLE:-tiki-sweep-runner}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-STATE_DIR="$PROJECT_DIR/.tiki_pc_afibuild_state"; mkdir -p "$STATE_DIR"
+STATE_DIR="${STATE_DIR:-$PROJECT_DIR/.tiki_pc_afibuild_state}"; mkdir -p "$STATE_DIR"
+EC2_NAME="${EC2_NAME:-tiki-pc-afibuild}"
 STATE_FILE="$STATE_DIR/run.env"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
@@ -48,7 +49,7 @@ cmd_launch(){
     if INSTANCE_ID="$(aws_ ec2 run-instances --image-id "$AMI" --instance-type "$INSTANCE_TYPE" \
         --iam-instance-profile "Name=$ROLE" --instance-initiated-shutdown-behavior terminate \
         --block-device-mappings 'DeviceName=/dev/sda1,Ebs={VolumeSize=200,VolumeType=gp3}' \
-        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=tiki-pc-afibuild},{Key=tiki-sweep,Value=$TAG}]" \
+        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$EC2_NAME},{Key=tiki-sweep,Value=$TAG}]" \
         --user-data "file://$UD" --query 'Instances[0].InstanceId' --output text 2>"$STATE_DIR/launch.err")"; then break; fi
     tries=$((tries+1))
     if grep -qi "instance profile" "$STATE_DIR/launch.err" && [ "$tries" -lt 6 ]; then echo "IAM not propagated (try $tries)"; sleep 10; continue; fi
