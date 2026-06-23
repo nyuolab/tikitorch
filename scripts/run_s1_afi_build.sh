@@ -21,6 +21,7 @@ REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null ||
 INSTANCE_TYPE="${INSTANCE_TYPE:-z1d.2xlarge}"            # AWS-recommended Vivado build instance
 AMI="${AMI:-ami-092fc5deb8f3c0f7d}"                       # FPGA Developer AMI (Vivado+Vitis+aws-fpga); proven by probe
 MAX_MINUTES="${MAX_MINUTES:-360}"                         # S1 is ~5x muzero: HLS+csim ~15m + synth ~25m + P&R ~3h + margin
+CLOCK_RECIPE="${CLOCK_RECIPE:-A1}"                        # A1=250MHz (default); A0=125MHz eases routing/closure on the big S1 design
 CL="${CL:-cl_forge_train_step_s1}"
 PKG_REL="${PKG_REL:-tikitorch/hardware/hdk/cl_forge_train_step_s1}"   # CL package (design/ + build/)
 KERNEL_TCL="${KERNEL_TCL:-synth_train_step_s1.tcl}"        # HLS the TRAINER kernel (top forge_train_step_s1); runs csim (bit-exact gate) + csynth
@@ -143,7 +144,7 @@ chmod +x "\$BUILD_PY" 2>/dev/null
 cd "\$(dirname "\$BUILD_PY")"
 echo "=== aws_build_dcp_from_cl START \$(date -u) ==="
 # capture the FULL build output (tail -80 previously hid generate_dcp_tarball); upload it whole
-./aws_build_dcp_from_cl.py --cl "\$CL" --no-encrypt > /tmp/aws_build.full.log 2>&1; echo "BUILD_RC=\$?"
+./aws_build_dcp_from_cl.py --cl "\$CL" --clock_recipe_a ${CLOCK_RECIPE} --no-encrypt > /tmp/aws_build.full.log 2>&1; echo "BUILD_RC=\$?"
 tail -100 /tmp/aws_build.full.log
 aws s3 cp /tmp/aws_build.full.log "\$S3_RESULTS/aws_build.full.log" --only-show-errors || true
 echo "=== build done \$(date -u) ==="
