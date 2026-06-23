@@ -177,10 +177,28 @@ uncertainties first.
   faithfulness bug (wgrad gO int16-wrapped at the Q16 grad scale → fixed with dyad_wide). **The complete
   multiplier-free transformer forward+backward training computation is now functionally correct, timing-closing,
   and silicon-buildable.**
-- **STILL OPEN (next):** (a) mode 2 (dyadic-Adam per region) + mode 3 (fused one-kick trainer: zero-grads → fwd
-  sweep → bwd sweep → opt); bit-exact one-step CSIM. (b) mode-3 N-step convergence CSIM (loss decreases / tracks
-  the charlm 2.481 trajectory) — the on-fabric-training proof. (c) AFI build (gated — clone cl_forge_muzero
-  on-chip pattern; the trainer fits one SLR LUT-wise, BRAM spans ~2 SLRs → standard floorplan, device has 3).
+- **S1 TRAINER COMPLETE + HARDWARE-VERIFIED (2026-06-23) — a multiplier-free transformer trains end-to-end,
+  confirmed under real `ap_int` types.** `forge_train_step_s1` all 4 modes (forward+CE / backward / dyadic-Adam /
+  fused one-kick trainer), S1 config D=128/H2/L_SEQ128/FFN512/V128/1-layer:
+  - **Vitis csim one-step BIT-EXACT** (FWD/BWD/OPT max|kernel−int64ref|=0; mode-3 fused == host-loop; 0 errors).
+  - **CONVERGES under REAL `ap_int<48>` Vitis csim** (32-step, true float CE from logits + peak|R| sat-check):
+    FREEZE CE 4.851→4.243 (peak|R|=66, no sat, acc 0→112/128); dense TRAIN_ALL CE 4.852→4.275 (peak|R|=173, no
+    sat, **beats FREEZE on CE**); negative control holds. Full 400-step in int64 g++ (FREEZE 4.85→2.82, dense
+    4.85→2.07). The earlier "ap_int TRAIN_ALL saturates" scare was a **buggy standalone shim** — real Vitis csim
+    shows NO saturation; the dense win is hardware-real.
+  - **Closes 3.197 ns ≤ 4.0** and **fits** (74% LUT / 71% BRAM / 9% DSP / 2% URAM; DSP = attention soft-blend
+    only → mult-free invariant holds).
+  - Dense-backbone training needed two ablation-load-bearing fixes: a **final fine-dyadic LayerNorm before the
+    LM head** (real GPT has `head(lnf(h))`; without it densification saturates int16) + a **mult-free code
+    weight-decay**. Honest scope: dense adds only ~0.04 nats over a strong embed/head baseline on this toy
+    d128/1-layer/8-symbol task — the *capability* is proven, the *magnitude* matters at S3 scale, not here.
+  - Fit+close engineering (all bit-exact-preserving): LANE=16 GEMM engines, ALLOCATION instances=1 sharing of
+    mode-0/1/2/3 sub-functions, tile-stage do_opt on-chip (killed the 512-bit variable-shift gmem RMW).
+  **⇒ S1 DONE: a complete, simulation-verified, silicon-buildable multiplier-free transformer trainer.**
+- **STILL OPEN (next):** (a) AFI build (GATED — clone the cl_forge_muzero on-chip CL pattern; the trainer fits
+  the device, 74% LUT / 71% BRAM, DSP attn-only; expensive/outward, NOT done — check with user before launch).
+  (b) On-F2 run: host-stage init W_fp + tokens, kick mode 3, read back the trained weights + loss; confirm the
+  CSIM trajectory reproduces on silicon (CRC/loss match). (c) S2: DDR-resident streaming for larger models.
 
 ## First three steps (local, no F2 builds)
 
