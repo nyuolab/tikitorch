@@ -16,6 +16,13 @@
 #define C 10
 #define H1_BITS 7
 #define LG_BITS 4
+// The fabric kernel's norm_shift uses s = highest_bit_pos - target (= bit_length-1-target), one less
+// than the validated recipe's bit_length-target -> activations/logits come out 2x larger on fabric.
+// argmax (predict) is shift-invariant so this is harmless for eval, but in TRAINING it halves the
+// effective logit-vs-target gap and stalls learning at chance. Compensate host-side by DOUBLING the
+// true-class target (8 -> 16): restores the gradient asymmetry, no AFI rebuild. (Recipe confirms:
+// PC_KERNEL_SHIFT=1 -> 0.098 stuck; +PC_TGT=16 -> 0.896.)
+#define TGT 16
 #define O_W0   0
 #define O_W1   (O_W0   + D*D)
 #define O_MOM0 (O_W1   + D*D)
@@ -77,7 +84,7 @@ int main(int argc,char**argv){
     int32_t* initW0=malloc(4*D*D); memcpy(initW0, hbuf+O_W0, 4*D*D);   // snapshot init to detect evolution
     stage(0, BUFLEN);
     // diag: 1 kick, then read W0/W1 back -> did the kernel's update persist in DDR across the kick?
-    { for(int n=0;n<N;n++){ for(int i=0;i<D;i++) hbuf[O_X+n*D+i]=Xtr[n*D+i]; for(int c=0;c<C;c++) hbuf[O_TGT+n*D+c]=0; hbuf[O_TGT+n*D+Ytr[n]]=8; }
+    { for(int n=0;n<N;n++){ for(int i=0;i<D;i++) hbuf[O_X+n*D+i]=Xtr[n*D+i]; for(int c=0;c<C;c++) hbuf[O_TGT+n*D+c]=0; hbuf[O_TGT+n*D+Ytr[n]]=TGT; }
       stage(O_X, 2*N*D); kick();
       int32_t* w=malloc(4*D*D); readw(O_W0,w,D*D); long ch=0; for(int j=0;j<D*D;j++) if(w[j]!=initW0[j]) ch++;
       printf("[diag] after 1 kick: %ld/%d W0 weights changed from init (W0[0]:%d->%d, W0[1]:%d->%d)\n",
@@ -92,16 +99,20 @@ int main(int argc,char**argv){
             for(int n=0;n<N;n++){ int s=b*N+n;
                 for(int i=0;i<D;i++) hbuf[O_X+n*D+i]=Xtr[s*D+i];
                 for(int c=0;c<C;c++) hbuf[O_TGT+n*D+c]=0;
-                hbuf[O_TGT+n*D+Ytr[s]]=8;
+                hbuf[O_TGT+n*D+Ytr[s]]=TGT;
             }
             stage(O_X, 2*N*D);          // stage just this batch's x+tgt (weights/mom persist in DDR)
             kick();                      // one on-fabric training step
         }
         readw(O_W0,W0,D*D); readw(O_W1,W1,D*D);   // read trained weights back, eval on host
-        long ok=0; for(int t=0;t<Nte;t++) if(predict(Xte+t*D,W0,W1)==Yte[t]) ok++;
-        printf("[train] epoch %d: test acc = %.4f  (%d kicks, %.1fs)  ON-FABRIC\n", ep+1, (double)ok/Nte, nb, now_s()-t0);
-        fflush(stdout);
+        long ok=0; int hist[C]={0}; for(int t=0;t<Nte;t++){ int p=predict(Xte+t*D,W0,W1); hist[p]++; if(p==Yte[t]) ok++; }
+        printf("[train] epoch %d: test acc = %.4f  (%d kicks, %.1fs)  ON-FABRIC  pred-hist=[", ep+1, (double)ok/Nte, nb, now_s()-t0);
+        for(int c=0;c<C;c++) printf("%d ", hist[c]); printf("]\n"); fflush(stdout);
     }
+    // dump trained weights so the host can re-eval with the Python recipe (driver-predict vs training check)
+    { FILE*f=fopen("/tmp/trainedW0.i32","wb"); fwrite(W0,4,D*D,f); fclose(f);
+      f=fopen("/tmp/trainedW1.i32","wb"); fwrite(W1,4,D*D,f); fclose(f);
+      printf("[train] dumped trained W0/W1 (|W0[0]|=%d, sample W1 row0: %d %d %d)\n", W0[0], W1[0],W1[1],W1[2]); }
     fpga_pci_detach(bar0); fpga_pci_detach(bar4); fpga_pci_detach(bar4r);
     return 0;
 }
