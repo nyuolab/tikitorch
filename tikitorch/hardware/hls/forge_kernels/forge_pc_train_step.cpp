@@ -125,17 +125,16 @@ QW: for (int o = 0; o < TD; o++)
     acc_t mxh = 0;
 F0: for (int n = 0; n < TN; n++) {
         for (int o = 0; o < TD; o++) {
-#pragma HLS PIPELINE II=1
             acc_t acc = 0;
-            for (int i = 0; i < TD; i++) {
+        F0I: for (int i = 0; i < TD; i++) {            // PIPELINE the reduction (1 MAC/cyc), do NOT unroll
+#pragma HLS PIPELINE II=1                              // 256-wide => low FF, closes timing in the full CL
                 acc_t term = ((acc_t)xx[n][i]) << w0E[o][i];     // real x << ew (shift)
                 if (w0NZ[o][i]) acc += w0S[o][i] ? (acc_t)(-term) : term;
             }
             pre0[n][o] = acc;
             mask0[n][o] = (acc > 0);
-            acc_t r = acc > 0 ? acc : (acc_t)0;
-            acc_t ar = r;                                         // track max |relu|
-            if (ar > mxh) mxh = ar;
+            acc_t r = acc > 0 ? acc : (acc_t)0;                   // track max |relu|
+            if (r > mxh) mxh = r;
         }
     }
     int sh0 = norm_shift(mxh, H1_BITS);
@@ -156,9 +155,9 @@ H1N: for (int n = 0; n < TN; n++)
     acc_t mxl = 0;
 F1: for (int n = 0; n < TN; n++)
         for (int c = 0; c < TC; c++) {
-#pragma HLS PIPELINE II=1
             acc_t acc = 0;
-            for (int i = 0; i < TD; i++) {
+        F1I: for (int i = 0; i < TD; i++) {            // pipelined reduction (not unrolled)
+#pragma HLS PIPELINE II=1
                 acc_t term = ((acc_t)h1[n][i]) << w1E[c][i];
                 if (w1NZ[c][i]) acc += w1S[c][i] ? (acc_t)(-term) : term;
             }
