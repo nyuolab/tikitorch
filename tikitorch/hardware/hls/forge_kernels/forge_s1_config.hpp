@@ -158,7 +158,108 @@ static const int S1_OFF_GQ      = S1_OFF_GACAT   + S1_AL16(S1_L_SEQ * S1_D);    
 static const int S1_OFF_GK      = S1_OFF_GQ      + S1_AL16(S1_L_SEQ * S1_D);
 static const int S1_OFF_GV      = S1_OFF_GK      + S1_AL16(S1_L_SEQ * S1_D);
 
-static const int S1_BUFLEN         = S1_OFF_GV + S1_AL16(S1_L_SEQ * S1_D);   // total int32 words; multiple of 16
+// ----------------------------------------------------------------------------
+// OPTIMIZER regions (mode 2 = dyadic-Adam; mode 3 = fused trainer). APPENDED after the mode-0/1 map —
+// EVERY offset above is UNCHANGED (mode 0/1 are bit-exact-frozen). The QAT master-weight scheme:
+//
+//   W_fp  : FULL-PRECISION master weight (int16, ONE per int32 lane, like EMBED/W_HEAD). One W_fp region
+//           per learnable weight. The optimizer accumulates the (sub-ulp) Adam step into W_fp; the forward
+//           never reads W_fp — it reads the int8 dyadic CODE region (WQ.. / LN*_G) or the int16 VALUE
+//           region (EMBED / W_HEAD / LN*_B). After each Adam step mode 2 RE-QUANTIZES the master:
+//             - CODE   weights (WQ/WK/WV/WO/W_UP/W_DOWN/LN1_G/LN2_G): code = s1_encode(dyad(W_fp))
+//               (the SAME dyad() rule the forward decodes — self-consistent, deploy-faithful).
+//             - VALUE  weights (EMBED/W_HEAD/LN1_B/LN2_B): the int16 master IS the value; mode 2 copies
+//               W_fp straight into the value region (no re-encode).
+//   M / V : dyadic-Adam EMA state (int32 each, ONE per int32 lane), same element count as the weight.
+//           m = m - (m>>B1) + (g>>B1) ; v = v - (v>>B2) + (|g|>>B2)  (forge_dyadic_adam recipe, B1=B2=3).
+//
+// CODE-INIT contract: the host stages the INITIAL W_fp (full precision). The matching CODE / VALUE region
+// the forward reads is produced by RE-QUANTIZING W_fp:
+//   (a) mode 3 (do_train_run) re-quantizes ALL masters into codes/values ONCE at entry (before step 0's
+//       forward), so the first forward reads valid codes; OR
+//   (b) the host calls mode 2 with a1=S1_OPT_INIT (grad treated as zero -> Adam is a no-op, only the
+//       re-quantize runs), which populates the codes/values from the staged W_fp without moving weights.
+// The one-step bit-exact TB stages W_fp AND the matching code/value (== s1_encode(dyad(W_fp)) / W_fp) so
+// mode-0 reads valid codes BEFORE any optimizer step; mode 2 then updates W_fp + re-quantizes.
+//
+// Region ORDER mirrors the weight map (EMBED, WQ, WK, WV, WO, W_UP, W_DOWN, LN1_G, LN1_B, LN2_G, LN2_B,
+// W_HEAD), tripled (W_fp, then M, then V), each 16-aligned.
+// ----------------------------------------------------------------------------
+// --- W_fp master-weight regions (int16 value, one per int32 lane) ---
+static const int S1_OFF_WFP_EMBED  = S1_OFF_GV       + S1_AL16(S1_L_SEQ * S1_D);            // [V*D]
+static const int S1_OFF_WFP_WQ     = S1_OFF_WFP_EMBED + S1_AL16(S1_V * S1_D);               // [N_L][D][D]
+static const int S1_OFF_WFP_WK     = S1_OFF_WFP_WQ    + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_WFP_WV     = S1_OFF_WFP_WK    + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_WFP_WO     = S1_OFF_WFP_WV    + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_WFP_W_UP   = S1_OFF_WFP_WO    + S1_AL16(S1_N_LAYERS * S1_D * S1_D);   // [N_L][FFN][D]
+static const int S1_OFF_WFP_W_DOWN = S1_OFF_WFP_W_UP  + S1_AL16(S1_N_LAYERS * S1_FFN * S1_D); // [N_L][D][FFN]
+static const int S1_OFF_WFP_LN1_G  = S1_OFF_WFP_W_DOWN+ S1_AL16(S1_N_LAYERS * S1_D * S1_FFN); // [N_L][D]
+static const int S1_OFF_WFP_LN1_B  = S1_OFF_WFP_LN1_G + S1_AL16(S1_N_LAYERS * S1_D);          // [N_L][D]
+static const int S1_OFF_WFP_LN2_G  = S1_OFF_WFP_LN1_B + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_WFP_LN2_B  = S1_OFF_WFP_LN2_G + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_WFP_W_HEAD = S1_OFF_WFP_LN2_B + S1_AL16(S1_N_LAYERS * S1_D);          // [V*D]
+
+// --- M (dyadic-Adam first moment) regions (int32) ---
+static const int S1_OFF_M_EMBED    = S1_OFF_WFP_W_HEAD+ S1_AL16(S1_V * S1_D);
+static const int S1_OFF_M_WQ       = S1_OFF_M_EMBED   + S1_AL16(S1_V * S1_D);
+static const int S1_OFF_M_WK       = S1_OFF_M_WQ      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_M_WV       = S1_OFF_M_WK      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_M_WO       = S1_OFF_M_WV      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_M_W_UP     = S1_OFF_M_WO      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_M_W_DOWN   = S1_OFF_M_W_UP    + S1_AL16(S1_N_LAYERS * S1_FFN * S1_D);
+static const int S1_OFF_M_LN1_G    = S1_OFF_M_W_DOWN  + S1_AL16(S1_N_LAYERS * S1_D * S1_FFN);
+static const int S1_OFF_M_LN1_B    = S1_OFF_M_LN1_G   + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_M_LN2_G    = S1_OFF_M_LN1_B   + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_M_LN2_B    = S1_OFF_M_LN2_G   + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_M_W_HEAD   = S1_OFF_M_LN2_B   + S1_AL16(S1_N_LAYERS * S1_D);
+
+// --- V (dyadic-Adam second moment = EMA of |g|) regions (int32) ---
+static const int S1_OFF_V_EMBED    = S1_OFF_M_W_HEAD  + S1_AL16(S1_V * S1_D);
+static const int S1_OFF_V_WQ       = S1_OFF_V_EMBED   + S1_AL16(S1_V * S1_D);
+static const int S1_OFF_V_WK       = S1_OFF_V_WQ      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_V_WV       = S1_OFF_V_WK      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_V_WO       = S1_OFF_V_WV      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_V_W_UP     = S1_OFF_V_WO      + S1_AL16(S1_N_LAYERS * S1_D * S1_D);
+static const int S1_OFF_V_W_DOWN   = S1_OFF_V_W_UP    + S1_AL16(S1_N_LAYERS * S1_FFN * S1_D);
+static const int S1_OFF_V_LN1_G    = S1_OFF_V_W_DOWN  + S1_AL16(S1_N_LAYERS * S1_D * S1_FFN);
+static const int S1_OFF_V_LN1_B    = S1_OFF_V_LN1_G   + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_V_LN2_G    = S1_OFF_V_LN1_B   + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_V_LN2_B    = S1_OFF_V_LN2_G   + S1_AL16(S1_N_LAYERS * S1_D);
+static const int S1_OFF_V_W_HEAD   = S1_OFF_V_LN2_B   + S1_AL16(S1_N_LAYERS * S1_D);
+
+// dyadic-Adam constants (== forge_dyadic_adam.cpp; == charlm dyadic-Adam betas 0.875 = 1 - 2^-3).
+#define S1_ADAM_B1     3      // first-moment EMA shift: m += (g - m) >> B1   (beta1 = 1 - 2^-3)
+#define S1_ADAM_B2     3      // second-moment EMA shift: v += (|g| - v) >> B2 (beta2 = 1 - 2^-3)
+// learning rate = 2^-LR_SHIFT (a shift; W_fp -= step >> LR_SHIFT). NOTE the step is ALREADY normalized by
+// the dyadic-Adam adaptive scale (step = m >> round(log2 v) ≈ sign(m)·O(1) — the dyadic analog of Adam's
+// m/√v ≈ ±1), so on the int16 MASTER the natural integer learning rate is 2^0=1: each step nudges W_fp by
+// the O(1) normalized amount, accumulating to cross dyad() power-of-2 boundaries (code weights) and to
+// move the int16 values (EMBED/W_HEAD/beta). forge_dyadic_adam.cpp uses LR_SHIFT=12 because its weights
+// are int32 at a ~2^12 fixed-point scale; the S1 int16 master is at unit scale -> LR_SHIFT=0. Tune per-rig.
+#ifndef S1_LR_SHIFT
+#define S1_LR_SHIFT    0
+#endif
+
+// mode-2 a1 selector: a normal Adam step (default) vs init-only re-quantize (grad ignored, Adam no-op).
+#define S1_OPT_STEP    0      // a1=0 -> full dyadic-Adam step + re-quantize + grad-zero
+#define S1_OPT_INIT    1      // a1=1 -> re-quantize codes/values from the staged W_fp ONLY (no weight move)
+
+// mode-2/3 a2 selector: which weights the optimizer MOVES.
+//   S1_OPT_TRAIN_ALL    : every learnable region steps (the dense PRE-DYADIC CODE backbone INCLUDED).
+//   S1_OPT_FREEZE_CODES : the dense code weights (is_code=1: Wq/Wk/Wv/Wo/W_up/W_down/LN1_g/LN2_g) are
+//        FROZEN — their grad is dropped, master+code untouched — and only the SCATTER/VALUE weights
+//        (EMBED, W_HEAD, LN1_b/LN2_b) train. This is the QAT "frozen-quantized-backbone, train the
+//        embeddings + head" regime, and is the configuration in which the dyadic-Adam trainer is STABLE:
+//        with the full dense stack trainable, the dyadic re-quantize RATCHETS the code magnitudes upward
+//        (a ±1 int16-master nudge crosses a dyad() power-of-2 boundary, doubling the code), which drives
+//        the residual stream into the int16 saturation ceiling and collapses the max-plus head to uniform
+//        logits (no learning — the all-trainable "convergence" was a saturation artifact). FREEZE_CODES
+//        keeps the verified dyadic backbone fixed and lets the scatter weights genuinely reduce the CE.
+//        (init re-quantizes EVERY code regardless, so the first forward reads valid codes for all regions.)
+#define S1_OPT_TRAIN_ALL    0
+#define S1_OPT_FREEZE_CODES 1
+
+static const int S1_BUFLEN         = S1_OFF_V_W_HEAD + S1_AL16(S1_V * S1_D);   // total int32 words; multiple of 16
 
 // ---- per-region addressing helpers (layer-major; collapse to single-layer at l=0) ----
 // weight rows are ROW-MAJOR [O][I]; a layer's slab is l*(O*I).
@@ -174,5 +275,31 @@ static inline int s1_off_relu(int l)                    { return S1_OFF_RELU_MAS
 // gradient-region layer-major helpers (mirror s1_off_w / s1_off_ln; weight grads are ROW-MAJOR [O][I]).
 static inline int s1_off_gw(int base, int l, int O, int I) { return base + l * (O * I); }   // [l][o][i]
 static inline int s1_off_gln(int base, int l)              { return base + l * S1_D; }       // [l][d]
+
+// ----------------------------------------------------------------------------
+// OPTIMIZER region descriptor table — mode 2 (do_opt) walks this once. Each learnable weight has a
+// 5-tuple { grad off, W_fp off, M off, V off, code/value off, element count, is_code }. is_code=1 means
+// the forward reads an int8 dyadic CODE produced by s1_encode(dyad(W_fp)); is_code=0 means the forward
+// reads the int16 VALUE which is just W_fp copied through (EMBED / W_HEAD / LN beta). The element count is
+// the LOGICAL extent (the kernel iterates this many params; the S1_AL16 padding between regions is unread).
+// ----------------------------------------------------------------------------
+#define S1_NUM_OPT_REGIONS 12
+struct s1_opt_region_t { int g_off, wfp_off, m_off, v_off, dst_off, n, is_code; };
+// dst_off = the CODE region (is_code=1) or VALUE region (is_code=0) the forward reads.
+static const s1_opt_region_t S1_OPT_REGIONS[S1_NUM_OPT_REGIONS] = {
+    // grad,            W_fp,               M,                V,                dst (code/value),  n,                              is_code
+    { S1_OFF_G_EMBED,   S1_OFF_WFP_EMBED,   S1_OFF_M_EMBED,   S1_OFF_V_EMBED,   S1_OFF_EMBED,   S1_V * S1_D,                 0 }, // EMBED  value
+    { S1_OFF_G_WQ,      S1_OFF_WFP_WQ,      S1_OFF_M_WQ,      S1_OFF_V_WQ,      S1_OFF_WQ,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wq     code
+    { S1_OFF_G_WK,      S1_OFF_WFP_WK,      S1_OFF_M_WK,      S1_OFF_V_WK,      S1_OFF_WK,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wk     code
+    { S1_OFF_G_WV,      S1_OFF_WFP_WV,      S1_OFF_M_WV,      S1_OFF_V_WV,      S1_OFF_WV,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wv     code
+    { S1_OFF_G_WO,      S1_OFF_WFP_WO,      S1_OFF_M_WO,      S1_OFF_V_WO,      S1_OFF_WO,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wo     code
+    { S1_OFF_G_W_UP,    S1_OFF_WFP_W_UP,    S1_OFF_M_W_UP,    S1_OFF_V_W_UP,    S1_OFF_W_UP,    S1_N_LAYERS * S1_FFN * S1_D, 1 }, // W_up   code
+    { S1_OFF_G_W_DOWN,  S1_OFF_WFP_W_DOWN,  S1_OFF_M_W_DOWN,  S1_OFF_V_W_DOWN,  S1_OFF_W_DOWN,  S1_N_LAYERS * S1_D * S1_FFN, 1 }, // W_down code
+    { S1_OFF_G_LN1_G,   S1_OFF_WFP_LN1_G,   S1_OFF_M_LN1_G,   S1_OFF_V_LN1_G,   S1_OFF_LN1_G,   S1_N_LAYERS * S1_D,          1 }, // LN1 g  code
+    { S1_OFF_G_LN1_B,   S1_OFF_WFP_LN1_B,   S1_OFF_M_LN1_B,   S1_OFF_V_LN1_B,   S1_OFF_LN1_B,   S1_N_LAYERS * S1_D,          0 }, // LN1 b  value
+    { S1_OFF_G_LN2_G,   S1_OFF_WFP_LN2_G,   S1_OFF_M_LN2_G,   S1_OFF_V_LN2_G,   S1_OFF_LN2_G,   S1_N_LAYERS * S1_D,          1 }, // LN2 g  code
+    { S1_OFF_G_LN2_B,   S1_OFF_WFP_LN2_B,   S1_OFF_M_LN2_B,   S1_OFF_V_LN2_B,   S1_OFF_LN2_B,   S1_N_LAYERS * S1_D,          0 }, // LN2 b  value
+    { S1_OFF_G_W_HEAD,  S1_OFF_WFP_W_HEAD,  S1_OFF_M_W_HEAD,  S1_OFF_V_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 0 }, // W_HEAD value
+};
 
 #endif  // FORGE_S1_CONFIG_HPP

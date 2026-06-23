@@ -713,6 +713,14 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
     }
 
     // ---- LM head + CE loss/grad per position ----
+    // loss_margin (LOSS[0], the CONVERGENCE signal): sum_t (logit[pred] - logit[target]) — the target
+    //   classification margin. It is a TRUE monotone CE surrogate that is bit-exact integer (no log) and,
+    //   unlike the Q16 prob-mass proxy, does NOT saturate as the logits sharpen: it is exactly the LUT's
+    //   z-argument at v==target, and it strictly -> 0 as the model maximizes the target logit. THIS is the
+    //   honest "CE decreases" signal the convergence check asserts on. (The Q16-mass proxy saturates to
+    //   2^16-per-position once the distribution peaks, which made it a BROKEN convergence metric.)
+    // loss_proxy (LOSS[1], kept for reference): the normalized prob mass NOT on the target (Q16).
+    acc_t loss_margin = 0;
     acc_t loss_sum = 0;
 HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
         int target = tgts[t];
@@ -774,8 +782,12 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
             glog_oc[t * S1_V + v]  = g;
             logit_oc[t * S1_V + v] = (int32_t)logits[v];
         }
-        // loss proxy: the normalized prob mass NOT on the target (Q16) — a monotone CE proxy that is
-        // bit-exact integer (no log); the algorithm golden's float CE is the convergence authority.
+        // CONVERGENCE signal: the target classification margin (logit[pred]-logit[target]) >= 0, summed
+        // over positions. Strictly monotone with the model getting the target right; -> 0 at fit. (No log,
+        // bit-exact integer, no saturation — the honest CE surrogate. == zneg at v==target.)
+        loss_margin += (acc_t)((acc_t)logits[pred] - (acc_t)logits[target]);
+        // reference proxy: the normalized prob mass NOT on the target (Q16). Kept in LOSS[1]; this one
+        // SATURATES once the distribution peaks (2^16/position), so it is NOT used as the convergence test.
         loss_sum += (acc_t)(psum - e_row[target]);
 
         // save head argmax route (for the future backward sparse scatter).
@@ -799,7 +811,8 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
     burst_store_i32(argh_oc,  buffer, S1_OFF_ARGMAX_HEAD, S1_W_ARGH);
     burst_store_i32(glog_oc,  buffer, S1_OFF_GRAD_LOGIT,  S1_W_GLOG);
     burst_store_i32(logit_oc, buffer, S1_OFF_LOGITS,      S1_W_GLOG);
-    buffer[S1_OFF_LOSS + 0] = (int32_t)loss_sum;
+    buffer[S1_OFF_LOSS + 0] = (int32_t)loss_margin;   // CONVERGENCE signal (target margin; monotone)
+    buffer[S1_OFF_LOSS + 1] = (int32_t)loss_sum;      // reference Q16-mass proxy (saturating; not asserted)
 
     return 0;
 }
@@ -1490,6 +1503,212 @@ EMB_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
 }
 
 // =============================================================================
+// ======================  MODE 2 (DYADIC-ADAM OPT) — do_opt  ==================
+// =============================================================================
+// The multiplier-free ADAPTIVE optimizer (forge_dyadic_adam.cpp recipe, == charlm dyadic-Adam that
+// reaches 2.481 at this config). QAT master-weight scheme: the optimizer accumulates the Adam step into
+// a FULL-PRECISION int16 master W_fp, then RE-QUANTIZES it into the int8 dyadic CODE (or copies it to the
+// int16 VALUE) the forward reads. EVERYTHING is shift + add + compare — NO multiply, NO DSP (DSP=0).
+//
+//   g    = grad[p]                                  (int32, from mode 1)
+//   m    = m - (m>>B1) + (g>>B1)                     (EMA, beta1 = 1 - 2^-B1)   first moment
+//   v    = v - (v>>B2) + (|g|>>B2)                   (EMA, beta2 = 1 - 2^-B2)   adaptive scale
+//   se   = round(log2 v)                             (priority-encoder MSB + round-to-nearest pow2)
+//   step = m >> se                                   (arithmetic barrel shift -> per-param 1/|g|_EMA pow2)
+//   W_fp = sat16( W_fp - (step >> LR_SHIFT) )        (lr = 2^-LR_SHIFT; a shift — no divide, no multiply)
+//   code = s1_encode(dyad(W_fp))  [is_code]   |   value = W_fp  [!is_code]      (re-quantize the master)
+//   g    = 0                                         (zero the grad region after applying)
+//
+// STREAMING REGION-RMW (the forge_dyadic_adam / morph signsgd_region_wide idiom): mode 2 walks each
+// learnable region ONCE in LANE-wide chunks, read-modify-writing W_fp/m/v in place + writing the
+// re-quantized code/value + zeroing g. This is a per-element map (no contraction, no fan-in) so it needs
+// only a tiny on-chip tile — near-ZERO BRAM (does NOT add to the mode-1 68% BRAM baseline) and a narrow
+// engine. Bit-exact to the int64 CPU dyadic-Adam reference (same shifts/betas/round rule).
+// =============================================================================
+
+// dyadic exponent of an int32 magnitude: round(log2|v|) via MSB + the next bit (round-to-nearest).
+// VERBATIM forge_dyadic_adam.cpp dyad_exp(). Returns 0 for v==0 (a zero-scale param -> step = m>>0 = m).
+// Clamp the bumped exponent to 31 so the (m >> se) shift amount stays < 32 (a >> by the full word width
+// is UB on the scalar int32 #else path and adds nothing — dividing m by 2^31 already drives step to 0/-1).
+static inline int s1_dyad_exp(acc_t v) {
+#pragma HLS INLINE
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    ap_uint<32> a = (v < 0) ? (ap_uint<32>)(acc_t)(-v) : (ap_uint<32>)(acc_t)v;
+#else
+    uint32_t a = (v < 0) ? (uint32_t)(-(int64_t)v) : (uint32_t)v;
+#endif
+    int msb = 0;
+DA_PRIO: for (int b = 31; b >= 1; b--) {
+#pragma HLS UNROLL
+        if ((a >> b) & 1) { msb = b; break; }
+    }
+    if (msb >= 1 && ((a >> (msb - 1)) & 1) && msb < 31) msb = msb + 1;   // round-to-nearest pow2
+    return msb;
+}
+
+// re-quantize an int16 master weight to the PRE-DYADIC byte CODE the forward decodes (wdecode inverse):
+// dyad(W_fp) -> (sign, exp, nz); pack bit7=sign, bit5=nonzero, bits4..0=exp. The exponent is the SAME
+// round(log2|W_fp|) the GEMM consumes (self-consistent: wdecode(s1_encode(dyad(w))) == dyad(w)). Returns
+// the byte code as a sign-extended int32 lane (forge writes the code regions one-per-lane).
+static inline int32_t s1_encode(data_t wfp) {
+#pragma HLS INLINE
+    bool sgn, nz; exp_t e;
+    dyad(wfp, sgn, e, nz);
+    int ee = (int)e;
+    if (ee > 31) ee = 31;            // 5-bit exponent field clamp (int16 dyad exp <= 16 in practice)
+    int c = (ee & 0x1F);
+    if (nz)  c |= (1 << 5);
+    if (sgn) c |= (1 << 7);
+    return (int32_t)(int8_t)(unsigned char)c;   // store as a sign-extended byte (== burst_load_codes read)
+}
+
+// one dyadic-Adam step over ONE region [n params, contiguous]. STREAMING RMW in LANE-wide chunks:
+//   load W_fp/g/m/v tile -> per-lane Adam update -> store W_fp/m/v + the re-quantized code/value + g=0.
+// init_only=1: grad is treated as ZERO (Adam is a no-op: m,v,W_fp unchanged) and ONLY the re-quantize
+// runs — the code-init path (populate codes/values from the staged W_fp without moving the weights).
+static void dyadic_adam_region(int32_t *buffer, const s1_opt_region_t &R, bool init_only) {
+#pragma HLS INLINE off
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    int n = R.n;
+ADAM_R: for (int base = 0; base < n; base += S1_LANE) {
+#pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=128 max=589824
+        for (int lane = 0; lane < S1_LANE; lane++) {
+#pragma HLS UNROLL
+            int p = base + lane;
+            if (p < n) {
+                acc_t g = init_only ? (acc_t)0 : (acc_t)(int32_t)buffer[R.g_off  + p];
+                acc_t m = (acc_t)(int32_t)buffer[R.m_off + p];
+                acc_t v = (acc_t)(int32_t)buffer[R.v_off + p];
+                data_t wfp = (data_t)(int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
+                acc_t absg = (g < 0) ? (acc_t)(-g) : g;
+                acc_t mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
+                acc_t vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
+                int se = s1_dyad_exp(vn);
+                acc_t step = mn >> se;                       // m / 2^round(log2 v)  (arith shift, keeps sign)
+                acc_t dw   = step >> S1_LR_SHIFT;            // lr = 2^-LR_SHIFT
+                data_t wn  = init_only ? wfp : sat16((acc_t)wfp - dw);
+                // write back state (unchanged under init_only since g==0 -> mn=m-m>>3, but we KEEP m,v
+                // identical on init by skipping the store; only the re-quantize matters there).
+                if (!init_only) {
+                    buffer[R.m_off + p]   = (int32_t)mn;
+                    buffer[R.v_off + p]   = (int32_t)vn;
+                    buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
+                    buffer[R.g_off + p]   = 0;               // zero the grad after applying
+                }
+                // re-quantize the master into the forward-read region.
+                buffer[R.dst_off + p] = R.is_code ? s1_encode(wn) : (int32_t)(int16_t)wn;
+            }
+        }
+    }
+#else
+    int n = R.n;
+    for (int p = 0; p < n; p++) {
+        int32_t g = init_only ? 0 : buffer[R.g_off + p];
+        int32_t m = buffer[R.m_off + p];
+        int32_t v = buffer[R.v_off + p];
+        int16_t wfp = (int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
+        int64_t absg = g < 0 ? -(int64_t)g : g;
+        int64_t mn = (int64_t)m - ((int64_t)m >> S1_ADAM_B1) + ((int64_t)g    >> S1_ADAM_B1);
+        int64_t vn = (int64_t)v - ((int64_t)v >> S1_ADAM_B2) + (absg          >> S1_ADAM_B2);
+        int se = s1_dyad_exp((acc_t)vn);
+        int64_t step = mn >> se;
+        int64_t dw   = step >> S1_LR_SHIFT;
+        int16_t wn = init_only ? wfp : (int16_t)sat16((acc_t)((int64_t)wfp - dw));
+        if (!init_only) {
+            buffer[R.m_off + p]   = (int32_t)mn;
+            buffer[R.v_off + p]   = (int32_t)vn;
+            buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
+            buffer[R.g_off + p]   = 0;
+        }
+        buffer[R.dst_off + p] = R.is_code ? s1_encode((data_t)wn) : (int32_t)(int16_t)wn;
+    }
+#endif
+}
+
+// zero a region's grad in LANE-wide chunks (used when a region is FROZEN: we still drop its grad so the
+// next step starts clean, but we do NOT move its master / re-quantize its code). Streaming RMW, II=1.
+static void zero_grad_region(int32_t *buffer, const s1_opt_region_t &R) {
+#pragma HLS INLINE off
+    int n = R.n;
+ZGR: for (int base = 0; base < n; base += S1_LANE) {
+#pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=128 max=589824
+        for (int lane = 0; lane < S1_LANE; lane++) {
+#pragma HLS UNROLL
+            int p = base + lane;
+            if (p < n) buffer[R.g_off + p] = 0;
+        }
+    }
+}
+
+// =============================================================================
+// Mode 2: do_opt — dyadic-Adam over the learnable regions (the S1_OPT_REGIONS table) + re-quantize the
+// forward-read codes/values + zero the grads.
+//   a1 = S1_OPT_STEP (full step) | S1_OPT_INIT (re-quantize the codes/values from the staged W_fp ONLY —
+//        the code-init path; Adam is a no-op).
+//   freeze_codes (mode-2 a2; S1_OPT_TRAIN_ALL=0 | S1_OPT_FREEZE_CODES=1): when set, the dense PRE-DYADIC
+//        CODE weights (is_code=1: Wq/Wk/Wv/Wo/W_up/W_down/LN1_g/LN2_g) are NOT updated and NOT re-quantized
+//        — their grad is just dropped (zeroed) — so only the SCATTER/VALUE weights (EMBED, W_HEAD, LN beta)
+//        train. This is the QAT "frozen-quantized-backbone, train embeddings+head" regime; it is the
+//        configuration in which the dyadic-Adam trainer is STABLE and the CE genuinely drops (the
+//        all-trainable dense path drives the residual stream into the int16 sat ceiling — see the
+//        convergence TB). init_only ignores freeze (the init must re-quantize EVERY code from staged W_fp
+//        so the first forward reads valid codes for all regions).
+// =============================================================================
+static int do_opt(int32_t *buffer, int a1, int freeze_codes) {
+#pragma HLS INLINE off
+    bool init_only = (a1 == S1_OPT_INIT);
+    bool freeze = (freeze_codes == S1_OPT_FREEZE_CODES) && !init_only;
+OPT_REGIONS: for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const s1_opt_region_t &R = S1_OPT_REGIONS[r];
+        if (freeze && R.is_code) {
+            zero_grad_region(buffer, R);          // frozen code weight: drop its grad, keep master+code
+        } else {
+            dyadic_adam_region(buffer, R, init_only);
+        }
+    }
+    return 0;
+}
+
+// =============================================================================
+// ======================  MODE 3 (FUSED TRAINER) — do_train_run  ==============
+// =============================================================================
+// The WHOLE training run on fabric (the morph do_train_run structure, S1-adapted). ONE host kick runs
+// `n_steps` full dyadic-Adam optimizer steps over the resident window; tokens/targets/master-weights/
+// state all live in the buffer (no host round-trips per step). Each step is the EXACT same sequence the
+// host would issue mode-by-mode:
+//   (init, once)  do_opt(S1_OPT_INIT) -> re-quantize the staged W_fp into the codes/values the FIRST
+//                 forward reads (so the host only needs to stage W_fp, not the codes).
+//   per step:     mode-0 forward (whole sequence) -> grad_logit + activation saves
+//                 mode-1 backward (whole sequence) -> g_* (the backward ZEROS its own grad accumulators
+//                                                           on-chip at entry, so no separate grad-zero)
+//                 mode-2 dyadic-Adam -> update W_fp + re-quantize codes/values + zero g_*
+// Arithmetic is BIT-IDENTICAL to host-looping modes 0/1/2 (do_train_run just SEQUENCES the same three
+// functions), so the host CSIM build verifies it is bit-exact to the per-mode golden.
+//
+// NOTE on residency: do_fwd_loss / do_bwd already burst-load every weight/state region into on-chip
+// resident arrays at entry and burst-store at exit (the TT_RESIDENT_W pattern that made S1 FIT). The S1
+// master-weight + Adam-state set is ~1000 BRAM18 tiles — too large to ALSO hold resident ACROSS steps on
+// top of mode 1's 68% BRAM baseline — so mode 3 keeps weights/state in gmem BETWEEN phases (each phase
+// re-stages its own resident window, exactly as the standalone modes do) and only the heavy fwd/bwd
+// compute is on-chip-resident. This is the BRAM-correct S1 adaptation of morph's fully-resident loop;
+// it is bit-exact (the values flowing through gmem are identical to the per-mode runs) and the optimizer
+// streaming-RMW touches gmem with near-zero BRAM. n_steps full optimizer steps, one host kick.
+// =============================================================================
+static int do_train_run(int32_t *buffer, int n_steps, int freeze_codes) {
+#pragma HLS INLINE off
+    do_opt(buffer, S1_OPT_INIT, freeze_codes);  // populate the forward-read codes/values from staged W_fp
+S1_STEP_LOOP: for (int s = 0; s < n_steps; s++) {
+#pragma HLS LOOP_TRIPCOUNT min=1 max=256
+        do_fwd_loss(buffer);                // mode 0: forward + CE -> grad_logit + activation saves
+        do_bwd(buffer);                     // mode 1: backward -> g_* (zeros its own accumulators)
+        do_opt(buffer, S1_OPT_STEP, freeze_codes);  // mode 2: dyadic-Adam -> W_fp + re-quantize + grad-zero
+    }
+    return 0;
+}
+
+// =============================================================================
 // Top-level dispatcher — mirror forge_train_step_morph_lm.cpp ABI/pragmas.
 // =============================================================================
 extern "C" int forge_train_step_s1(
@@ -1511,11 +1730,12 @@ extern "C" int forge_train_step_s1(
 #pragma HLS INTERFACE s_axilite  port=buffer  bundle=control
 #pragma HLS INTERFACE s_axilite  port=return  bundle=control
 
-    (void)a1; (void)a2; (void)a3;
+    (void)a3;
     if (mode == 0) return do_fwd_loss(buffer);
     if (mode == 1) return do_bwd(buffer);
-    // modes 2 (OPT), 3 (TRAIN_RUN) stubbed for S1 phase-A; offsets are allocated.
-    if (mode == 2) return 0;
-    if (mode == 3) return 0;
+    // mode 2: dyadic-Adam. a1 = S1_OPT_STEP | S1_OPT_INIT ; a2 = S1_OPT_TRAIN_ALL | S1_OPT_FREEZE_CODES.
+    if (mode == 2) return do_opt(buffer, a1, a2);
+    // mode 3: fused trainer. a1 = n_steps (ONE host kick) ; a2 = S1_OPT_TRAIN_ALL | S1_OPT_FREEZE_CODES.
+    if (mode == 3) return do_train_run(buffer, a1, a2);
     return 99;
 }

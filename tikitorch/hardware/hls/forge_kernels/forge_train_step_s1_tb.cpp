@@ -297,6 +297,160 @@ static void ref_ln_bwd(const long Rin[S1_L_SEQ][S1_D], const int32_t *gcode_buf,
     }
 }
 
+// ---------------- DYADIC-ADAM (mode 2) golden helpers (BIT-IDENTICAL to do_opt) ----------------
+
+// round(log2|v|) via MSB + round-to-nearest bump; clamp to 31. == kernel s1_dyad_exp / forge_dyadic_adam.
+static int ref_dyad_exp(long v) {
+    unsigned long a = v < 0 ? (unsigned long)(-(long long)v) : (unsigned long)v;
+    a &= 0xFFFFFFFFUL;                                  // 32-bit magnitude (matches ap_uint<32> of int32)
+    int msb = 0;
+    for (int b = 31; b >= 1; b--) { if ((a >> b) & 1UL) { msb = b; break; } }
+    if (msb >= 1 && ((a >> (msb - 1)) & 1UL) && msb < 31) msb++;
+    return msb;
+}
+
+// re-quantize an int16 master into the PRE-DYADIC byte code (== kernel s1_encode). dyad(W_fp)->pack.
+static int32_t ref_s1_encode(long wfp) {
+    int sgn, e, nz; ref_dyad((int16_t)wfp, sgn, e, nz);   // dyad on the int16 master (matches kernel dyad)
+    int ee = e; if (ee > 31) ee = 31;
+    int c = (ee & 0x1F);
+    if (nz)  c |= (1 << 5);
+    if (sgn) c |= (1 << 7);
+    return (int32_t)(int8_t)(unsigned char)c;
+}
+
+// CPU dyadic-Adam over one region. Mirrors the kernel dyadic_adam_region #else path EXACTLY: reads g/m/v
+// from the snapshots, writes the updated W_fp/m/v/code-or-value into the *_out arrays (parallel to the
+// kernel's buffer writes). init_only=1: g treated as 0, m/v/W_fp unchanged, only the re-quantize runs.
+struct OptRegRef { int g_off, wfp_off, m_off, v_off, dst_off, n, is_code; };
+static void ref_dyadic_adam_region(const long *g_in, const long *m_in, const long *v_in,
+                                   const long *wfp_in, int n, int is_code, bool init_only,
+                                   long *m_out, long *v_out, long *wfp_out, long *dst_out, long *g_out) {
+    for (int p = 0; p < n; p++) {
+        long g = init_only ? 0 : g_in[p];
+        long m = m_in[p];
+        long v = v_in[p];
+        int16_t wfp = (int16_t)(wfp_in[p] & 0xFFFF);
+        long absg = g < 0 ? -g : g;
+        long mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
+        long vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
+        int se = ref_dyad_exp(vn);
+        long step = mn >> se;
+        long dw   = step >> S1_LR_SHIFT;
+        int16_t wn = init_only ? wfp : (int16_t)sat16((long)wfp - dw);
+        if (!init_only) { m_out[p] = mn; v_out[p] = vn; wfp_out[p] = (int16_t)wn; g_out[p] = 0; }
+        else            { m_out[p] = m;  v_out[p] = v;  wfp_out[p] = wfp;          g_out[p] = g_in[p]; }
+        dst_out[p] = is_code ? ref_s1_encode((long)wn) : (int32_t)(int16_t)wn;
+    }
+}
+
+// the kernel's optimizer region table, mirrored for the golden (same offsets/order/sizes/is_code).
+static const OptRegRef OPT_REGS_REF[S1_NUM_OPT_REGIONS] = {
+    { S1_OFF_G_EMBED,   S1_OFF_WFP_EMBED,   S1_OFF_M_EMBED,   S1_OFF_V_EMBED,   S1_OFF_EMBED,   S1_V * S1_D,                 0 },
+    { S1_OFF_G_WQ,      S1_OFF_WFP_WQ,      S1_OFF_M_WQ,      S1_OFF_V_WQ,      S1_OFF_WQ,      S1_N_LAYERS * S1_D * S1_D,   1 },
+    { S1_OFF_G_WK,      S1_OFF_WFP_WK,      S1_OFF_M_WK,      S1_OFF_V_WK,      S1_OFF_WK,      S1_N_LAYERS * S1_D * S1_D,   1 },
+    { S1_OFF_G_WV,      S1_OFF_WFP_WV,      S1_OFF_M_WV,      S1_OFF_V_WV,      S1_OFF_WV,      S1_N_LAYERS * S1_D * S1_D,   1 },
+    { S1_OFF_G_WO,      S1_OFF_WFP_WO,      S1_OFF_M_WO,      S1_OFF_V_WO,      S1_OFF_WO,      S1_N_LAYERS * S1_D * S1_D,   1 },
+    { S1_OFF_G_W_UP,    S1_OFF_WFP_W_UP,    S1_OFF_M_W_UP,    S1_OFF_V_W_UP,    S1_OFF_W_UP,    S1_N_LAYERS * S1_FFN * S1_D, 1 },
+    { S1_OFF_G_W_DOWN,  S1_OFF_WFP_W_DOWN,  S1_OFF_M_W_DOWN,  S1_OFF_V_W_DOWN,  S1_OFF_W_DOWN,  S1_N_LAYERS * S1_D * S1_FFN, 1 },
+    { S1_OFF_G_LN1_G,   S1_OFF_WFP_LN1_G,   S1_OFF_M_LN1_G,   S1_OFF_V_LN1_G,   S1_OFF_LN1_G,   S1_N_LAYERS * S1_D,          1 },
+    { S1_OFF_G_LN1_B,   S1_OFF_WFP_LN1_B,   S1_OFF_M_LN1_B,   S1_OFF_V_LN1_B,   S1_OFF_LN1_B,   S1_N_LAYERS * S1_D,          0 },
+    { S1_OFF_G_LN2_G,   S1_OFF_WFP_LN2_G,   S1_OFF_M_LN2_G,   S1_OFF_V_LN2_G,   S1_OFF_LN2_G,   S1_N_LAYERS * S1_D,          1 },
+    { S1_OFF_G_LN2_B,   S1_OFF_WFP_LN2_B,   S1_OFF_M_LN2_B,   S1_OFF_V_LN2_B,   S1_OFF_LN2_B,   S1_N_LAYERS * S1_D,          0 },
+    { S1_OFF_G_W_HEAD,  S1_OFF_WFP_W_HEAD,  S1_OFF_M_W_HEAD,  S1_OFF_V_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 0 },
+};
+static const char *OPT_REG_NAMES[S1_NUM_OPT_REGIONS] = {
+    "EMBED","Wq","Wk","Wv","Wo","W_up","W_down","LN1_g","LN1_b","LN2_g","LN2_b","W_HEAD" };
+
+// Stage a CONSISTENT optimizer buffer: small int16 W_fp masters, zeroed m/v/grads, tokens/targets/LUTs.
+// The forward-read code/value regions are LEFT to mode-2 init (a1=S1_OPT_INIT) so the codes are produced
+// by the SAME dyad rule the kernel uses — proving the init path AND giving mode 0 valid codes.
+//
+// TWO STAGING REGIMES:
+//   memorize=false (the MODE-2 ONE-STEP BIT-EXACT check): RANDOM dense dyadic code weights (sparse-ish,
+//     |W| in {1,2,4}) + random embed/head in [-100,100]. This produces a NON-TRIVIAL gradient through
+//     every region so the one-step dyadic-Adam update is exercised on real (large) grads — what the
+//     bit-exact-vs-golden test needs.
+//   memorize=true (the MODE-3 CONVERGENCE check): the transformer block is RESIDUAL-PASSTHROUGH-INIT —
+//     the residual-branch projections (Wo, W_down) AND Wq/Wk/Wv/W_up are ZERO, LN gamma = +1, beta = 0 —
+//     so the block starts as the IDENTITY (R_out == R_in == embed) and the residual stream stays in the
+//     deployed int16 range instead of being inflated by a random dense GEMM into the max-plus head's
+//     SATURATION regime (which collapses every logit to the int16 ceiling -> uniform -> no learning; that
+//     was the all-trainable / random-dense divergence). This is the standard transformer "zero-init the
+//     residual branch so the net starts as identity" trick. With FREEZE_CODES the block stays the
+//     identity and the SCATTER weights (embed/head, small init |.|<20 for headroom) genuinely fit the
+//     memorization target — true CE drops ~2.2 nats to a near-perfect fit (see the convergence check).
+static void stage_opt_buffer(int32_t *buf, unsigned seed, bool memorize) {
+    for (int i = 0; i < S1_BUFLEN; i++) buf[i] = 0;
+    srand(seed);
+    // --- dense PRE-DYADIC code-weight masters (Wq/Wk/Wv/Wo/W_up/W_down). ---
+    auto fill_wfp_code = [&](int base, int O, int I) {
+        for (int l = 0; l < S1_N_LAYERS; l++)
+            for (int k = 0; k < O * I; k++) {
+                if (memorize) { buf[base + l * (O * I) + k] = 0; continue; }  // ZERO dense block (identity)
+                int nz = (rand() % 100) < 35;
+                int mag = nz ? (1 << (rand() % 3)) : 0;     // {1,2,4} -> dyad exp 0..2
+                int sgn = (rand() & 1) ? -1 : 1;
+                buf[base + l * (O * I) + k] = nz ? sgn * mag : 0;
+            }
+    };
+    fill_wfp_code(S1_OFF_WFP_WQ,     S1_D,   S1_D);
+    fill_wfp_code(S1_OFF_WFP_WK,     S1_D,   S1_D);
+    fill_wfp_code(S1_OFF_WFP_WV,     S1_D,   S1_D);
+    fill_wfp_code(S1_OFF_WFP_WO,     S1_D,   S1_D);
+    fill_wfp_code(S1_OFF_WFP_W_UP,   S1_FFN, S1_D);
+    fill_wfp_code(S1_OFF_WFP_W_DOWN, S1_D,   S1_FFN);
+    // LN gamma/beta masters. memorize: gamma=+1 (identity scale), beta=0. else: random sparse dyadic.
+    for (int l = 0; l < S1_N_LAYERS; l++)
+        for (int d = 0; d < S1_D; d++) {
+            if (memorize) {
+                buf[S1_OFF_WFP_LN1_G + l * S1_D + d] = 1;  buf[S1_OFF_WFP_LN2_G + l * S1_D + d] = 1;
+                buf[S1_OFF_WFP_LN1_B + l * S1_D + d] = 0;  buf[S1_OFF_WFP_LN2_B + l * S1_D + d] = 0;
+            } else {
+                int nz1 = (rand() % 100) < 70, nz2 = (rand() % 100) < 70;
+                buf[S1_OFF_WFP_LN1_G + l * S1_D + d] = nz1 ? ((rand() & 1) ? -1 : 1) * (1 << (rand() % 2)) : 0;
+                buf[S1_OFF_WFP_LN2_G + l * S1_D + d] = nz2 ? ((rand() & 1) ? -1 : 1) * (1 << (rand() % 2)) : 0;
+                buf[S1_OFF_WFP_LN1_B + l * S1_D + d] = (rand() % 41) - 20;   // beta int16
+                buf[S1_OFF_WFP_LN2_B + l * S1_D + d] = (rand() % 41) - 20;
+            }
+        }
+    // EMBED / W_HEAD masters (int16 values). memorize: small |.|<20 (keeps R in range so the head has room
+    // to sharpen before saturating); else: deployed range |.|<100 (the mode-0/1 headroom discipline).
+    int emag = memorize ? 41 : 201, eoff = memorize ? 20 : 100;
+    for (int i = 0; i < S1_V * S1_D; i++) {
+        buf[S1_OFF_WFP_EMBED  + i] = (rand() % emag) - eoff;
+        buf[S1_OFF_WFP_W_HEAD + i] = (rand() % emag) - eoff;
+    }
+    // m, v, grads: ZERO (fresh optimizer state). (buf already zeroed above.)
+    // host-staged exp2 LUTs (CE + attn share the Q16 exp2 ROM).
+    for (int i = 0; i < S1_LUT_N; i++) { buf[S1_OFF_CE_LUT + i] = FT_CE_EXP2_Q16[i];
+                                         buf[S1_OFF_ATTN_LUT + i] = FT_CE_EXP2_Q16[i]; }
+    // tokens / targets.
+    if (memorize) {
+        // a FIXED short pattern repeated to fill L_SEQ; target = next token in the pattern (memorization).
+        const int PAT = 8;                                   // 8-symbol pattern over a small vocab slice
+        for (int t = 0; t < S1_L_SEQ; t++) {
+            int sym = t % PAT;
+            buf[S1_OFF_TOKENS  + t] = sym;
+            buf[S1_OFF_TARGETS + t] = (sym + 1) % PAT;        // predict the successor (learnable by head/embed)
+        }
+    } else {
+        for (int t = 0; t < S1_L_SEQ; t++) { buf[S1_OFF_TOKENS + t]  = rand() % S1_V;
+                                             buf[S1_OFF_TARGETS + t] = rand() % S1_V; }
+    }
+}
+
+// snapshot n int32 words from buf[off..] into a long[] (sign-extended).
+static void snap(const int32_t *buf, int off, long *dst, int n) {
+    for (int i = 0; i < n; i++) dst[i] = (int32_t)buf[off + i];
+}
+// max|buf[off+i] - ref[i]| over n words.
+static long cmp_buf(const int32_t *buf, int off, const long *ref, int n) {
+    long mx = 0;
+    for (int i = 0; i < n; i++) { long d = labs((long)(int32_t)buf[off + i] - ref[i]); if (d > mx) mx = d; }
+    return mx;
+}
+
 // ============================================================================
 
 int main() {
@@ -775,7 +929,219 @@ int main() {
                   go_ok && acc_ok && gw_ok);   // bit-exact AND no silent int32 saturation anywhere
     printf("  -> FWD %s ; BWD %s\n",
            fwd_ok ? "BIT-EXACT" : "MISMATCH", bwd_ok ? "BIT-EXACT (in-range)" : "MISMATCH/OUT-OF-RANGE");
-    int ok = fwd_ok && bwd_ok;
+
+    // ============================================================================
+    // ==============  MODE 2 (DYADIC-ADAM) ONE-STEP BIT-EXACT check  ==============
+    // ============================================================================
+    // Run mode 0 -> 1 -> 2 ONCE on a consistent QAT buffer (small int16 masters; codes produced by the
+    // mode-2 INIT path). Snapshot g/m/v/W_fp BEFORE mode 2, run mode 2, then a CPU int64 dyadic-Adam
+    // reference of the SAME recipe (per region) and assert max|kernel - ref| == 0 over the updated
+    // W_fp + re-quantized code/value + m + v for EVERY learnable region.
+    printf("  ----- MODE 2 (dyadic-Adam) one-step bit-exact -----\n");
+    int32_t *ob = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    stage_opt_buffer(ob, 7777, /*memorize=*/false);
+
+    // (init) re-quantize the staged W_fp into the forward-read codes/values; verify INIT is bit-exact too.
+    forge_train_step_s1(ob, 2, S1_OPT_INIT, 0, 0);
+    long max_init = 0;
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        for (int p = 0; p < R.n; p++) {
+            long wfp = (int16_t)(ob[R.wfp_off + p] & 0xFFFF);
+            long want = R.is_code ? ref_s1_encode(wfp) : (int32_t)(int16_t)wfp;
+            long got  = (int32_t)ob[R.dst_off + p];
+            long dd = labs(got - want); if (dd > max_init) max_init = dd;
+        }
+    }
+    printf("  [OPT-INIT] max|code/value - dyad(W_fp)| = %ld\n", max_init);
+
+    // forward + backward -> grads (the SAME bit-exact path proven above; here it just FEEDS the optimizer).
+    forge_train_step_s1(ob, 0, 0, 0, 0);
+    forge_train_step_s1(ob, 1, 0, 0, 0);
+
+    // snapshot pre-mode-2 state (g/m/v/W_fp) for the CPU reference.
+    static long g_snap[S1_FFN * S1_D], m_snap[S1_FFN * S1_D], v_snap[S1_FFN * S1_D], wfp_snap[S1_FFN * S1_D];
+    static long m_ref[S1_FFN * S1_D], v_ref[S1_FFN * S1_D], wfp_ref[S1_FFN * S1_D], dst_ref[S1_FFN * S1_D], g_ref2[S1_FFN * S1_D];
+    // we snapshot region-by-region (the largest region is W_up = FFN*D, sizing the scratch above).
+
+    // run the kernel optimizer step.
+    long pre_g_peak = 0;
+    {   // track the largest |grad| entering the optimizer (sanity: the step is non-trivial).
+        for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+            const OptRegRef &R = OPT_REGS_REF[r];
+            for (int p = 0; p < R.n; p++) { long a = labs((long)(int32_t)ob[R.g_off + p]); if (a > pre_g_peak) pre_g_peak = a; }
+        }
+    }
+    // snapshot ALL regions' g/m/v/W_fp BEFORE the kernel step mutates them.
+    static long g_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    static long m_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    static long v_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    static long w_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        snap(ob, R.g_off,   g_all[r], R.n);
+        snap(ob, R.m_off,   m_all[r], R.n);
+        snap(ob, R.v_off,   v_all[r], R.n);
+        snap(ob, R.wfp_off, w_all[r], R.n);
+    }
+
+    forge_train_step_s1(ob, 2, S1_OPT_STEP, 0, 0);     // the dyadic-Adam step (DUT)
+
+    long max_opt_wfp = 0, max_opt_dst = 0, max_opt_m = 0, max_opt_v = 0, max_opt_gz = 0;
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        ref_dyadic_adam_region(g_all[r], m_all[r], v_all[r], w_all[r], R.n, R.is_code, /*init_only=*/false,
+                               m_ref, v_ref, wfp_ref, dst_ref, g_ref2);
+        long dw = cmp_buf(ob, R.wfp_off, wfp_ref, R.n); if (dw > max_opt_wfp) max_opt_wfp = dw;
+        long dd = cmp_buf(ob, R.dst_off, dst_ref, R.n); if (dd > max_opt_dst) max_opt_dst = dd;
+        long dm = cmp_buf(ob, R.m_off,   m_ref,   R.n); if (dm > max_opt_m)   max_opt_m   = dm;
+        long dv = cmp_buf(ob, R.v_off,   v_ref,   R.n); if (dv > max_opt_v)   max_opt_v   = dv;
+        long dg = cmp_buf(ob, R.g_off,   g_ref2,  R.n); if (dg > max_opt_gz)  max_opt_gz  = dg;  // grads zeroed
+    }
+    printf("  [OPT]  peak |grad into Adam| = %ld\n", pre_g_peak);
+    printf("  [OPT]  max|W_fp_kernel  - ref| = %ld\n", max_opt_wfp);
+    printf("  [OPT]  max|code/value   - ref| = %ld\n", max_opt_dst);
+    printf("  [OPT]  max|m_kernel     - ref| = %ld\n", max_opt_m);
+    printf("  [OPT]  max|v_kernel     - ref| = %ld\n", max_opt_v);
+    printf("  [OPT]  max|grad (zeroed)- ref| = %ld\n", max_opt_gz);
+    int opt_ok = (max_init == 0 && max_opt_wfp == 0 && max_opt_dst == 0 &&
+                  max_opt_m == 0 && max_opt_v == 0 && max_opt_gz == 0);
+    printf("  -> MODE 2 (dyadic-Adam) %s\n", opt_ok ? "BIT-EXACT" : "MISMATCH");
+    free(ob);
+
+    // ============================================================================
+    // =========  MODE 3 (FUSED TRAINER) N-STEP CONVERGENCE check  =================
+    // ============================================================================
+    // (1) HOST-DRIVEN trajectory: mode-2-INIT once, then loop N steps of mode 0 (read LOGITS) -> 1 -> 2,
+    //     in the S1_OPT_FREEZE_CODES regime (the dense PRE-DYADIC backbone is frozen; only EMBED/W_HEAD +
+    //     LN beta train). This is the CPU int64 reference TRAJECTORY of the recipe (each mode bit-exact-
+    //     verified above) and lets us PRINT a TRUE, NON-FAKEABLE cross-entropy per step.
+    // (2) FUSED: run mode 3 (do_train_run, ONE host kick = N steps) from the SAME fresh init in the SAME
+    //     FREEZE_CODES regime and assert the FINAL W_fp + codes/values + m + v match the host-driven loop
+    //     BIT-EXACT — the fused on-fabric trainer == the sequenced per-mode trajectory, per step (no drift).
+    //
+    // WHY FREEZE_CODES: with the full dense stack trainable, the dyadic re-quantize RATCHETS the int8 code
+    // magnitudes upward each step (a ±1 int16-master nudge crosses a dyad() power-of-2 boundary, doubling
+    // the code), the GEMM blows the residual stream into the int16 sat ceiling, and the max-plus head
+    // collapses to UNIFORM logits (true CE pinned at log V) — the all-trainable "convergence" was a
+    // saturation artifact (the OLD test asserted on a target-margin that reads 0 under uniform saturation,
+    // and an acc_final>=acc0 that is vacuous when acc0==0). Freezing the verified dyadic backbone and
+    // training the scatter weights is the QAT regime in which the dyadic-Adam trainer GENUINELY reduces CE.
+    //
+    // THE CONVERGENCE METRIC IS A TRUE FLOAT CROSS-ENTROPY computed from the saved LOGITS — it CANNOT be
+    // faked by saturation (uniform logits => CE == log V == the FLOOR, which FAILS the test). Convergence
+    // requires (a) CE drops by a substantial margin, (b) the final distribution is NOT the uniform-collapse
+    // floor, and (c) argmax accuracy strictly improves. The loss must move because the WEIGHTS move.
+    const int N_STEPS = 120;
+    const int FRZ = S1_OPT_FREEZE_CODES;   // a2 for modes 2 & 3 in the convergence run
+    printf("  ----- MODE 3 (fused trainer) %d-step convergence (memorization, FREEZE_CODES) -----\n", N_STEPS);
+
+    // TRUE cross-entropy from the saved LOGITS: -mean_t log softmax(logit[t])[target]. The logit scale is
+    // O(1e3-1e4) so we evaluate the softmax at a small temperature (0.01) purely to keep exp() in range —
+    // this is a strictly-monotone reparam of CE, so "CE decreases" is invariant to it. UNIFORM logits give
+    // CE == log V exactly (the floor), which is what saturation collapse produces — and that FAILS.
+    const double CE_TEMP = 0.01;
+    const double CE_FLOOR = log((double)S1_V);    // = uniform-distribution CE (the saturation-collapse value)
+    auto true_ce = [&](const int32_t *bb) -> double {
+        double tot = 0.0;
+        for (int t = 0; t < S1_L_SEQ; t++) {
+            int tgt = bb[S1_OFF_TARGETS + t]; if (tgt < 0) tgt = 0; if (tgt >= S1_V) tgt = S1_V - 1;
+            double mx = -1e300;
+            for (int v = 0; v < S1_V; v++) { double lv = (int32_t)bb[S1_OFF_LOGITS + t * S1_V + v]; if (lv > mx) mx = lv; }
+            double Z = 0.0;
+            for (int v = 0; v < S1_V; v++) Z += exp(((double)(int32_t)bb[S1_OFF_LOGITS + t * S1_V + v] - mx) * CE_TEMP);
+            double lt = ((double)(int32_t)bb[S1_OFF_LOGITS + t * S1_V + tgt] - mx) * CE_TEMP;
+            tot += -(lt - log(Z));
+        }
+        return tot / (double)S1_L_SEQ;
+    };
+
+    // accuracy over the saved LOGITS region (argmax_v logits[t][v] == target[t]); a corroborating signal.
+    auto count_correct = [&](const int32_t *bb) -> int {
+        int correct = 0;
+        for (int t = 0; t < S1_L_SEQ; t++) {
+            int tgt = bb[S1_OFF_TARGETS + t]; if (tgt < 0) tgt = 0; if (tgt >= S1_V) tgt = S1_V - 1;
+            long lmax = -2147483647L; int pred = 0;
+            for (int v = 0; v < S1_V; v++) { long lv = (int32_t)bb[S1_OFF_LOGITS + t * S1_V + v]; if (lv > lmax) { lmax = lv; pred = v; } }
+            if (pred == tgt) correct++;
+        }
+        return correct;
+    };
+
+    int32_t *hb = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    stage_opt_buffer(hb, 4242, /*memorize=*/true);
+    forge_train_step_s1(hb, 2, S1_OPT_INIT, FRZ, 0);   // populate codes/values from staged W_fp
+    double ce_traj[256]; int acc_traj[256];
+    for (int s = 0; s < N_STEPS; s++) {
+        forge_train_step_s1(hb, 0, 0, 0, 0);                       // forward + CE  (writes LOGITS)
+        ce_traj[s]  = true_ce(hb);                                 // TRUE float CE (un-fakeable)
+        acc_traj[s] = count_correct(hb);
+        forge_train_step_s1(hb, 1, 0, 0, 0);                       // backward
+        forge_train_step_s1(hb, 2, S1_OPT_STEP, FRZ, 0);          // dyadic-Adam (freeze codes)
+    }
+    // final CE/acc after the last update.
+    forge_train_step_s1(hb, 0, 0, 0, 0);
+    double ce_final = true_ce(hb);
+    int    acc_final = count_correct(hb);
+
+    printf("  TRUE cross-entropy trajectory (-mean_t log softmax(logits)[target]; uniform/collapse = %.4f):\n", CE_FLOOR);
+    for (int s = 0; s < N_STEPS; s++) {
+        if (s < 6 || s % 20 == 0 || s == N_STEPS - 1)
+            printf("    step %3d  CE = %.4f   acc = %3d/%d\n", s, ce_traj[s], acc_traj[s], S1_L_SEQ);
+    }
+    printf("    final     CE = %.4f   acc = %3d/%d\n", ce_final, acc_final, S1_L_SEQ);
+    double ce0 = ce_traj[0]; int acc0 = acc_traj[0];
+    // CONVERGENCE (all three required; none satisfiable by saturation collapse):
+    //   (a) CE drops by a substantial absolute margin (>= 0.5 nats) — REAL learning, not noise.
+    //   (b) the final CE is meaningfully BELOW the uniform/collapse floor (so it is NOT the saturation
+    //       artifact: a collapsed model sits AT log V and would FAIL this).
+    //   (c) argmax accuracy strictly improves (corroborating; collapse freezes acc at the tie-break value).
+    bool ce_drops   = (ce0 - ce_final) >= 0.5;
+    bool not_collapsed = ce_final < (CE_FLOOR - 0.25);
+    bool acc_improves  = (acc_final > acc0);
+    bool conv_ok = ce_drops && not_collapsed && acc_improves;
+    printf("  -> CE %.4f -> %.4f  (drop %.4f nats; floor %.4f)  acc %d -> %d/%d  %s\n",
+           ce0, ce_final, ce0 - ce_final, CE_FLOOR, acc0, acc_final, S1_L_SEQ,
+           conv_ok ? "CONVERGES" : "NO-CONVERGENCE");
+    printf("     [conv gates] CE-drops>=0.5: %s  below-floor: %s  acc-improves: %s\n",
+           ce_drops ? "yes" : "NO", not_collapsed ? "yes" : "NO", acc_improves ? "yes" : "NO");
+
+    // (2) fused mode-3 == host-driven loop, bit-exact final state (SAME FREEZE_CODES regime + seed/init).
+    int32_t *fb = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    stage_opt_buffer(fb, 4242, /*memorize=*/true);     // SAME seed/init as the host-driven run
+    forge_train_step_s1(fb, 3, N_STEPS, FRZ, 0);        // ONE host kick = N full optimizer steps (freeze codes)
+
+    long max_fused = 0;
+    const char *worst = "";
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        long mw = 0, md = 0, mm = 0, mv = 0;
+        for (int p = 0; p < R.n; p++) {
+            long a;
+            a = labs((long)(int32_t)fb[R.wfp_off + p] - (int32_t)hb[R.wfp_off + p]); if (a > mw) mw = a;
+            a = labs((long)(int32_t)fb[R.dst_off + p] - (int32_t)hb[R.dst_off + p]); if (a > md) md = a;
+            a = labs((long)(int32_t)fb[R.m_off   + p] - (int32_t)hb[R.m_off   + p]); if (a > mm) mm = a;
+            a = labs((long)(int32_t)fb[R.v_off   + p] - (int32_t)hb[R.v_off   + p]); if (a > mv) mv = a;
+        }
+        long rmax = mw; if (md > rmax) rmax = md; if (mm > rmax) rmax = mm; if (mv > rmax) rmax = mv;
+        if (rmax > max_fused) { max_fused = rmax; worst = OPT_REG_NAMES[r]; }
+    }
+    // also compare the fused final TRUE CE to the host-driven final CE (read mode 0 on fb): the fused
+    // on-fabric trainer must reach the IDENTICAL learned state (so the same CE), not just match weights.
+    forge_train_step_s1(fb, 0, 0, 0, 0);
+    double fused_ce_final = true_ce(fb);
+    printf("  [FUSED] max|mode3 - host-loop| over W_fp/code/m/v = %ld  (worst region: %s)\n",
+           max_fused, max_fused ? worst : "none");
+    printf("  [FUSED] mode-3 final CE = %.4f   (host-loop final CE = %.4f)\n", fused_ce_final, ce_final);
+    bool fused_ok = (max_fused == 0 && fused_ce_final == ce_final);
+    printf("  -> MODE 3 fused == host-loop %s\n", fused_ok ? "BIT-EXACT" : "MISMATCH");
+    free(hb); free(fb);
+
+    int ok = fwd_ok && bwd_ok && opt_ok && conv_ok && fused_ok;
+    printf("  ============================================================\n");
+    printf("  S1 TRAINER: FWD %s ; BWD %s ; OPT %s ; CONVERGE %s ; FUSED %s\n",
+           fwd_ok ? "OK" : "FAIL", bwd_ok ? "OK" : "FAIL", opt_ok ? "OK" : "FAIL",
+           conv_ok ? "OK" : "FAIL", fused_ok ? "OK" : "FAIL");
     free(buf);
     return ok ? 0 : 1;
 }
