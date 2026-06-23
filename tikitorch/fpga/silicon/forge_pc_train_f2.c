@@ -78,9 +78,16 @@ int main(int argc,char**argv){
     if(fpga_pci_attach(slot,FPGA_APP_PF,APP_PF_BAR4,0,&bar4r)){fprintf(stderr,"bar4r\n");return 4;}
     hbuf=calloc(BUFLEN,4);
 
-    // init weights (small random int), zero momentum; stage all once -> persist in DDR
+    // init weights ~ round(randn*4), zero momentum; stage all once -> persist in DDR.
+    // randn*4 (Gaussian) beats uniform[-4,4] for training (the recipe's init); integer Gaussian via
+    // Irwin-Hall (sum of 12 U[0,1) - 6 ~ N(0,1)), scaled by 4 + rounded -> no libm dependence.
     srand(12345);
-    for(int i=0;i<D*D;i++){ hbuf[O_W0+i]=(rand()%9)-4; hbuf[O_W1+i]=(rand()%9)-4; hbuf[O_MOM0+i]=0; hbuf[O_MOM1+i]=0; }
+    for(int i=0;i<D*D;i++){
+        double g0=0, g1=0; for(int k=0;k<12;k++){ g0+=rand()/(double)RAND_MAX; g1+=rand()/(double)RAND_MAX; }
+        hbuf[O_W0+i]=(int)(4.0*(g0-6.0) + (g0>=6.0?0.5:-0.5));   // round(4*N(0,1))
+        hbuf[O_W1+i]=(int)(4.0*(g1-6.0) + (g1>=6.0?0.5:-0.5));
+        hbuf[O_MOM0+i]=0; hbuf[O_MOM1+i]=0;
+    }
     int32_t* initW0=malloc(4*D*D); memcpy(initW0, hbuf+O_W0, 4*D*D);   // snapshot init to detect evolution
     stage(0, BUFLEN);
     // diag: 1 kick, then read W0/W1 back -> did the kernel's update persist in DDR across the kick?
@@ -93,10 +100,12 @@ int main(int argc,char**argv){
 
     int32_t *W0=malloc(4*D*D), *W1=malloc(4*D*D);
     int nb = Ntr / N;
+    int *perm=malloc(Ntr*sizeof(int)); for(int i=0;i<Ntr;i++) perm[i]=i;   // sample order, shuffled per epoch
     for(int ep=0; ep<epochs; ep++){
         double t0=now_s();
+        for(int i=Ntr-1;i>0;i--){ int j=rand()%(i+1); int t=perm[i]; perm[i]=perm[j]; perm[j]=t; } // Fisher-Yates
         for(int b=0; b<nb; b++){
-            for(int n=0;n<N;n++){ int s=b*N+n;
+            for(int n=0;n<N;n++){ int s=perm[b*N+n];   // shuffled sample index (was sequential s=b*N+n)
                 for(int i=0;i<D;i++) hbuf[O_X+n*D+i]=Xtr[s*D+i];
                 for(int c=0;c<C;c++) hbuf[O_TGT+n*D+c]=0;
                 hbuf[O_TGT+n*D+Ytr[s]]=TGT;
