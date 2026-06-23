@@ -7,7 +7,7 @@ set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"
 REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null || echo us-east-1)}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-f2.6xlarge}"; AMI="${AMI:-ami-092fc5deb8f3c0f7d}"
-AGFI="${AGFI:?set AGFI}"; EPOCHS="${EPOCHS:-5}"; MAX_MINUTES="${MAX_MINUTES:-40}"; ROLE="${ROLE:-tiki-sweep-runner}"
+AGFI="${AGFI:?set AGFI}"; EPOCHS="${EPOCHS:-5}"; MAX_MINUTES="${MAX_MINUTES:-40}"; ROLE="${ROLE:-tiki-sweep-runner}"; VERIFY="${VERIFY:-}"
 BINS_S3="${BINS_S3:-s3://tiki-sweep-739966866637/pc_mnist_bins}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_pc_train_f2_state"; mkdir -p "$STATE_DIR"; STATE_FILE="$STATE_DIR/run.env"
@@ -43,7 +43,7 @@ render_user_data(){
 shutdown -h +${MAX_MINUTES} dl || true
 exec > /var/log/tiki-pctrain.log 2>&1
 set -x; export HOME=/root
-S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; AGFI="${AGFI}"; EPOCHS="${EPOCHS}"; BINS_S3="${BINS_S3}"
+S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; AGFI="${AGFI}"; EPOCHS="${EPOCHS}"; BINS_S3="${BINS_S3}"; VERIFY="${VERIFY}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-pctrain.log "\$S3_RESULTS/pctrain.log" --only-show-errors || true; }
 trap up EXIT
 echo "BOOT \$(date -u)"; hostname
@@ -56,8 +56,10 @@ sudo \$FD -S 0 2>&1 | tee /tmp/img.txt; up
 mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.tgz && break; sleep 8; done && tar xzf s.tgz
 mkdir -p /tmp/pc_mnist; for f in train_x.i8 train_y.u8 test_x.i8 test_y.u8; do aws s3 cp "\$BINS_S3/\$f" /tmp/pc_mnist/\$f --only-show-errors; done
 gcc -O2 -std=gnu11 -I"\$SDK/include" /opt/tiki/tikitorch/fpga/silicon/forge_pc_train_f2.c -lfpga_mgmt -o /tmp/pctrain 2>&1 | tee /tmp/build.txt
+gcc -O2 -std=gnu11 -I"\$SDK/include" /opt/tiki/tikitorch/fpga/silicon/forge_pc_train_verify.c -lfpga_mgmt -o /tmp/pcverify 2>&1 | tee -a /tmp/build.txt
 up
-( sudo /tmp/pctrain 0 /tmp/pc_mnist "\$EPOCHS" 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
+if [ -n "\$VERIFY" ]; then ( sudo /tmp/pcverify 0 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
+else ( sudo /tmp/pctrain 0 /tmp/pc_mnist "\$EPOCHS" 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true; fi
 for f in img build train; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
 echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 up; shutdown -h now
