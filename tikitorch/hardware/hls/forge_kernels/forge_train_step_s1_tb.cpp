@@ -319,28 +319,76 @@ static int32_t ref_s1_encode(long wfp) {
     return (int32_t)(int8_t)(unsigned char)c;
 }
 
+static inline long sat32g_fwd(long v) {   // == kernel sat32 (int32 clamp); local copy for the encode-fine
+    if (v >  2147483647L)  return  2147483647L;
+    if (v < -2147483648L)  return -2147483648L;
+    return v;
+}
+
+// FINE FIXED-POINT code re-quantize (== kernel s1_encode_fine). wq = int32 master at scale 2^Q_CODE;
+// round-half-away-from-zero to the integer code value, dyad() it, +/-1 exponent clamp vs prev_code
+// (skipped when allow_clamp=false, i.e. init). BIT-IDENTICAL integer arithmetic to the kernel.
+static int32_t ref_s1_encode_fine(long wq, int32_t prev_code, bool allow_clamp) {
+    long aw = (wq < 0) ? -wq : wq;
+    long half = 1L << (S1_Q_CODE - 1);
+    long mag = (aw + half) >> S1_Q_CODE;
+    long wr = (wq < 0) ? -(long)sat16(mag) : (long)sat16(mag);
+    int sgn, e, nz; ref_dyad((int16_t)wr, sgn, e, nz);
+    int ee = e;
+#if S1_CODE_EXP_CLAMP
+    if (allow_clamp) {
+        unsigned pc = (unsigned)(prev_code & 0xFF); int pnz = (pc >> 5) & 1; int pe = (int)(pc & 0x1F);
+        if (nz) {
+            if (pnz) { if (ee > pe + 1) ee = pe + 1; if (ee < pe - 1) ee = pe - 1; if (ee < 0) ee = 0; }
+            else     { ee = 0; }
+        }
+    }
+#endif
+    if (ee > 31) ee = 31;
+    int c = (ee & 0x1F);
+    if (nz)  c |= (1 << 5);
+    if (sgn) c |= (1 << 7);
+    return (int32_t)(int8_t)(unsigned char)c;
+}
+
 // CPU dyadic-Adam over one region. Mirrors the kernel dyadic_adam_region #else path EXACTLY: reads g/m/v
 // from the snapshots, writes the updated W_fp/m/v/code-or-value into the *_out arrays (parallel to the
-// kernel's buffer writes). init_only=1: g treated as 0, m/v/W_fp unchanged, only the re-quantize runs.
+// kernel's buffer writes). is_code regions use the FINE FIXED-POINT master (int32 at scale 2^Q_CODE) +
+// exp-clamp; value regions use the int16 unit master. dst_in = the deploy code/value BEFORE this step
+// (for the code exp-clamp). init_only=1: g treated as 0, m/v/W_fp unchanged, only the re-quantize runs.
 struct OptRegRef { int g_off, wfp_off, m_off, v_off, dst_off, n, is_code; };
 static void ref_dyadic_adam_region(const long *g_in, const long *m_in, const long *v_in,
-                                   const long *wfp_in, int n, int is_code, bool init_only,
+                                   const long *wfp_in, const long *dst_in, int n, int is_code, bool init_only,
                                    long *m_out, long *v_out, long *wfp_out, long *dst_out, long *g_out) {
     for (int p = 0; p < n; p++) {
         long g = init_only ? 0 : g_in[p];
         long m = m_in[p];
         long v = v_in[p];
-        int16_t wfp = (int16_t)(wfp_in[p] & 0xFFFF);
         long absg = g < 0 ? -g : g;
         long mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
         long vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
         int se = ref_dyad_exp(vn);
         long step = mn >> se;
-        long dw   = step >> S1_LR_SHIFT;
-        int16_t wn = init_only ? wfp : (int16_t)sat16((long)wfp - dw);
-        if (!init_only) { m_out[p] = mn; v_out[p] = vn; wfp_out[p] = (int16_t)wn; g_out[p] = 0; }
-        else            { m_out[p] = m;  v_out[p] = v;  wfp_out[p] = wfp;          g_out[p] = g_in[p]; }
-        dst_out[p] = is_code ? ref_s1_encode((long)wn) : (int32_t)(int16_t)wn;
+        if (is_code) {
+            long wq = (int32_t)wfp_in[p];                       // full int32 fixed-point master
+            long dw = step >> S1_LR_SHIFT_CODE;
+#if S1_CODE_WD_SHIFT
+            long wd = (long)wq >> S1_CODE_WD_SHIFT;             // multiplier-free weight decay
+#else
+            long wd = 0;
+#endif
+            long wn = init_only ? wq : sat32g_fwd((long)wq - dw - wd);
+            if (!init_only) { m_out[p] = mn; v_out[p] = vn; wfp_out[p] = (int32_t)wn; g_out[p] = 0; }
+            else            { m_out[p] = m;  v_out[p] = v;  wfp_out[p] = wq;           g_out[p] = g_in[p]; }
+            dst_out[p] = ref_s1_encode_fine(wn, (int32_t)dst_in[p], !init_only);
+        } else {
+            int16_t wfp = (int16_t)(wfp_in[p] & 0xFFFF);
+            long dw   = step >> S1_LR_SHIFT;
+            int16_t wn = init_only ? wfp : (int16_t)sat16((long)wfp - dw);
+            if (!init_only) { m_out[p] = mn; v_out[p] = vn; wfp_out[p] = (int16_t)wn; g_out[p] = 0; }
+            else            { m_out[p] = m;  v_out[p] = v;  wfp_out[p] = wfp;          g_out[p] = g_in[p]; }
+            dst_out[p] = (int32_t)(int16_t)wn;
+        }
     }
 }
 
@@ -357,10 +405,12 @@ static const OptRegRef OPT_REGS_REF[S1_NUM_OPT_REGIONS] = {
     { S1_OFF_G_LN1_B,   S1_OFF_WFP_LN1_B,   S1_OFF_M_LN1_B,   S1_OFF_V_LN1_B,   S1_OFF_LN1_B,   S1_N_LAYERS * S1_D,          0 },
     { S1_OFF_G_LN2_G,   S1_OFF_WFP_LN2_G,   S1_OFF_M_LN2_G,   S1_OFF_V_LN2_G,   S1_OFF_LN2_G,   S1_N_LAYERS * S1_D,          1 },
     { S1_OFF_G_LN2_B,   S1_OFF_WFP_LN2_B,   S1_OFF_M_LN2_B,   S1_OFF_V_LN2_B,   S1_OFF_LN2_B,   S1_N_LAYERS * S1_D,          0 },
+    { S1_OFF_G_LNF_G,   S1_OFF_WFP_LNF_G,   S1_OFF_M_LNF_G,   S1_OFF_V_LNF_G,   S1_OFF_LNF_G,   S1_D,                        1 },
+    { S1_OFF_G_LNF_B,   S1_OFF_WFP_LNF_B,   S1_OFF_M_LNF_B,   S1_OFF_V_LNF_B,   S1_OFF_LNF_B,   S1_D,                        0 },
     { S1_OFF_G_W_HEAD,  S1_OFF_WFP_W_HEAD,  S1_OFF_M_W_HEAD,  S1_OFF_V_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 0 },
 };
 static const char *OPT_REG_NAMES[S1_NUM_OPT_REGIONS] = {
-    "EMBED","Wq","Wk","Wv","Wo","W_up","W_down","LN1_g","LN1_b","LN2_g","LN2_b","W_HEAD" };
+    "EMBED","Wq","Wk","Wv","Wo","W_up","W_down","LN1_g","LN1_b","LN2_g","LN2_b","LN_F_g","LN_F_b","W_HEAD" };
 
 // Stage a CONSISTENT optimizer buffer: small int16 W_fp masters, zeroed m/v/grads, tokens/targets/LUTs.
 // The forward-read code/value regions are LEFT to mode-2 init (a1=S1_OPT_INIT) so the codes are produced
@@ -383,7 +433,9 @@ static const char *OPT_REG_NAMES[S1_NUM_OPT_REGIONS] = {
 static void stage_opt_buffer(int32_t *buf, unsigned seed, bool memorize) {
     for (int i = 0; i < S1_BUFLEN; i++) buf[i] = 0;
     srand(seed);
-    // --- dense PRE-DYADIC code-weight masters (Wq/Wk/Wv/Wo/W_up/W_down). ---
+    // --- dense PRE-DYADIC code-weight masters (Wq/Wk/Wv/Wo/W_up/W_down). FINE FIXED-POINT: the host stages
+    //     the master as (weight << S1_Q_CODE); the optimizer re-quantizes the deploy code from it via dyad().
+    const long QC = (1L << S1_Q_CODE);
     auto fill_wfp_code = [&](int base, int O, int I) {
         for (int l = 0; l < S1_N_LAYERS; l++)
             for (int k = 0; k < O * I; k++) {
@@ -391,7 +443,7 @@ static void stage_opt_buffer(int32_t *buf, unsigned seed, bool memorize) {
                 int nz = (rand() % 100) < 35;
                 int mag = nz ? (1 << (rand() % 3)) : 0;     // {1,2,4} -> dyad exp 0..2
                 int sgn = (rand() & 1) ? -1 : 1;
-                buf[base + l * (O * I) + k] = nz ? sgn * mag : 0;
+                buf[base + l * (O * I) + k] = (int32_t)(nz ? (long)sgn * mag * QC : 0);  // << Q_CODE
             }
     };
     fill_wfp_code(S1_OFF_WFP_WQ,     S1_D,   S1_D);
@@ -400,20 +452,30 @@ static void stage_opt_buffer(int32_t *buf, unsigned seed, bool memorize) {
     fill_wfp_code(S1_OFF_WFP_WO,     S1_D,   S1_D);
     fill_wfp_code(S1_OFF_WFP_W_UP,   S1_FFN, S1_D);
     fill_wfp_code(S1_OFF_WFP_W_DOWN, S1_D,   S1_FFN);
-    // LN gamma/beta masters. memorize: gamma=+1 (identity scale), beta=0. else: random sparse dyadic.
+    // LN gamma (code, fine fixed-point << Q_CODE) / beta (value, int16). memorize: gamma=+1, beta=0.
     for (int l = 0; l < S1_N_LAYERS; l++)
         for (int d = 0; d < S1_D; d++) {
             if (memorize) {
-                buf[S1_OFF_WFP_LN1_G + l * S1_D + d] = 1;  buf[S1_OFF_WFP_LN2_G + l * S1_D + d] = 1;
+                buf[S1_OFF_WFP_LN1_G + l * S1_D + d] = (int32_t)QC;  buf[S1_OFF_WFP_LN2_G + l * S1_D + d] = (int32_t)QC;
                 buf[S1_OFF_WFP_LN1_B + l * S1_D + d] = 0;  buf[S1_OFF_WFP_LN2_B + l * S1_D + d] = 0;
             } else {
                 int nz1 = (rand() % 100) < 70, nz2 = (rand() % 100) < 70;
-                buf[S1_OFF_WFP_LN1_G + l * S1_D + d] = nz1 ? ((rand() & 1) ? -1 : 1) * (1 << (rand() % 2)) : 0;
-                buf[S1_OFF_WFP_LN2_G + l * S1_D + d] = nz2 ? ((rand() & 1) ? -1 : 1) * (1 << (rand() % 2)) : 0;
+                buf[S1_OFF_WFP_LN1_G + l * S1_D + d] = (int32_t)(nz1 ? (long)((rand() & 1) ? -1 : 1) * (1 << (rand() % 2)) * QC : 0);
+                buf[S1_OFF_WFP_LN2_G + l * S1_D + d] = (int32_t)(nz2 ? (long)((rand() & 1) ? -1 : 1) * (1 << (rand() % 2)) * QC : 0);
                 buf[S1_OFF_WFP_LN1_B + l * S1_D + d] = (rand() % 41) - 20;   // beta int16
                 buf[S1_OFF_WFP_LN2_B + l * S1_D + d] = (rand() % 41) - 20;
             }
         }
+    // final-LN (LN_F) masters: memorize -> gamma=+1 (normalize), beta=0; random -> small dyadic gamma + beta.
+    for (int d = 0; d < S1_D; d++) {
+        if (memorize) {
+            buf[S1_OFF_WFP_LNF_G + d] = (int32_t)QC; buf[S1_OFF_WFP_LNF_B + d] = 0;
+        } else {
+            int nz = (rand() % 100) < 70;
+            buf[S1_OFF_WFP_LNF_G + d] = (int32_t)(nz ? (long)((rand() & 1) ? -1 : 1) * (1 << (rand() % 2)) * QC : 0);
+            buf[S1_OFF_WFP_LNF_B + d] = (rand() % 41) - 20;
+        }
+    }
     // EMBED / W_HEAD masters (int16 values). memorize: small |.|<20 (keeps R in range so the head has room
     // to sharpen before saturating); else: deployed range |.|<100 (the mode-0/1 headroom discipline).
     int emag = memorize ? 41 : 201, eoff = memorize ? 20 : 100;
@@ -438,6 +500,59 @@ static void stage_opt_buffer(int32_t *buf, unsigned seed, bool memorize) {
         for (int t = 0; t < S1_L_SEQ; t++) { buf[S1_OFF_TOKENS + t]  = rand() % S1_V;
                                              buf[S1_OFF_TARGETS + t] = rand() % S1_V; }
     }
+}
+
+// Stage a buffer for the TRAIN_ALL convergence probe: the memorization task (8-symbol successor) with a
+// SMALL-NONZERO sparse dyadic CODE init (density% nonzero, |w|=1 at scale 2^Q_CODE), so the dense backbone
+// receives a NON-ZERO gradient (the zero/identity init of stage_opt_buffer(memorize=true) gives the dense
+// code weights EXACTLY-ZERO gradient — W_up=0 -> Hd=relu(0)=0 -> g_Wdn uses Hd=0; W_down=0 -> gHd=0 ->
+// g_Wup uses gU=0; Wo=0 -> gAcat=0 -> attn-bwd gOut=0 -> gV=0 and gQ/gK=sign(Q-K=0)=0 — so under the
+// identity init TRAIN_ALL CANNOT move the dense codes at all; it is silently == FREEZE_CODES). A small
+// nonzero init breaks that degeneracy so the dense-backbone training can be HONESTLY exercised.
+// embed/head small (|.|<embmag) keeps R in the deployed range at init.
+static void stage_train_all(int32_t *buf, unsigned seed, int densepct, int embmag) {
+    for (int i = 0; i < S1_BUFLEN; i++) buf[i] = 0;
+    srand(seed);
+    const long QC = (1L << S1_Q_CODE);
+    auto fc = [&](int base, int O, int I) {
+        for (int l = 0; l < S1_N_LAYERS; l++)
+            for (int k = 0; k < O * I; k++) {
+                int nz = (rand() % 100) < densepct; int sg = (rand() & 1) ? -1 : 1;
+                buf[base + l * (O * I) + k] = (int32_t)(nz ? (long)sg * QC : 0);   // |w|=1 << Q_CODE
+            }
+    };
+    fc(S1_OFF_WFP_WQ, S1_D, S1_D); fc(S1_OFF_WFP_WK, S1_D, S1_D); fc(S1_OFF_WFP_WV, S1_D, S1_D);
+    fc(S1_OFF_WFP_WO, S1_D, S1_D); fc(S1_OFF_WFP_W_UP, S1_FFN, S1_D); fc(S1_OFF_WFP_W_DOWN, S1_D, S1_FFN);
+    for (int l = 0; l < S1_N_LAYERS; l++)
+        for (int d = 0; d < S1_D; d++) {
+            buf[S1_OFF_WFP_LN1_G + l * S1_D + d] = (int32_t)QC; buf[S1_OFF_WFP_LN2_G + l * S1_D + d] = (int32_t)QC;
+            buf[S1_OFF_WFP_LN1_B + l * S1_D + d] = 0;            buf[S1_OFF_WFP_LN2_B + l * S1_D + d] = 0;
+        }
+    for (int d = 0; d < S1_D; d++) { buf[S1_OFF_WFP_LNF_G + d] = (int32_t)QC; buf[S1_OFF_WFP_LNF_B + d] = 0; }
+    for (int i = 0; i < S1_V * S1_D; i++) {
+        buf[S1_OFF_WFP_EMBED  + i] = (rand() % (2 * embmag + 1)) - embmag;
+        buf[S1_OFF_WFP_W_HEAD + i] = (rand() % (2 * embmag + 1)) - embmag;
+    }
+    for (int i = 0; i < S1_LUT_N; i++) { buf[S1_OFF_CE_LUT + i] = FT_CE_EXP2_Q16[i];
+                                         buf[S1_OFF_ATTN_LUT + i] = FT_CE_EXP2_Q16[i]; }
+    const int PAT = 8;
+    for (int t = 0; t < S1_L_SEQ; t++) { int sym = t % PAT; buf[S1_OFF_TOKENS + t] = sym; buf[S1_OFF_TARGETS + t] = (sym + 1) % PAT; }
+}
+
+// count how many deploy code BYTES (is_code regions) differ from a snapshot — the honest discriminator of
+// "did the dense backbone actually TRAIN" vs "codes never moved (silently == FREEZE)".
+static int count_code_changes(const int32_t *bb, const int8_t *snap_codes) {
+    int dsts[] = { S1_OFF_WQ, S1_OFF_WK, S1_OFF_WV, S1_OFF_WO, S1_OFF_W_UP, S1_OFF_W_DOWN, S1_OFF_LN1_G, S1_OFF_LN2_G };
+    int ns[]   = { S1_D*S1_D, S1_D*S1_D, S1_D*S1_D, S1_D*S1_D, S1_FFN*S1_D, S1_D*S1_FFN, S1_D, S1_D };
+    int off = 0, ch = 0;
+    for (int r = 0; r < 8; r++) { for (int p = 0; p < ns[r]; p++) { int8_t c = (int8_t)(bb[dsts[r] + p] & 0xFF); if (c != snap_codes[off + p]) ch++; } off += ns[r]; }
+    return ch;
+}
+static void snapshot_codes(const int32_t *bb, int8_t *out) {
+    int dsts[] = { S1_OFF_WQ, S1_OFF_WK, S1_OFF_WV, S1_OFF_WO, S1_OFF_W_UP, S1_OFF_W_DOWN, S1_OFF_LN1_G, S1_OFF_LN2_G };
+    int ns[]   = { S1_D*S1_D, S1_D*S1_D, S1_D*S1_D, S1_D*S1_D, S1_FFN*S1_D, S1_D*S1_FFN, S1_D, S1_D };
+    int off = 0;
+    for (int r = 0; r < 8; r++) { for (int p = 0; p < ns[r]; p++) out[off + p] = (int8_t)(bb[dsts[r] + p] & 0xFF); off += ns[r]; }
 }
 
 // snapshot n int32 words from buf[off..] into a long[] (sign-extended).
@@ -496,6 +611,12 @@ int main() {
     };
     fill_ln(S1_OFF_LN1_G, S1_OFF_LN1_B);
     fill_ln(S1_OFF_LN2_G, S1_OFF_LN2_B);
+    // ---- final-LN (LN_F) gamma (dyadic code) + beta (int16) — single LN, one entry per channel ----
+    for (int d = 0; d < S1_D; d++) {
+        int nz = (rand() % 100) < 70 ? 1 : 0;
+        buf[S1_OFF_LNF_G + d] = make_code(rand() & 1, nz, rand() % 2);
+        buf[S1_OFF_LNF_B + d] = (rand() % 41) - 20;
+    }
 
     // ---- tied LM-head weights (plain int16, |.| < 100; same deployed-range bound as embed) ----
     for (int i = 0; i < S1_V * S1_D; i++) buf[S1_OFF_W_HEAD + i] = (rand() % 201) - 100;
@@ -522,6 +643,8 @@ int main() {
     static long P_g[S1_H][S1_L_SEQ][S1_L_SEQ]; static int J_g[S1_H][S1_L_SEQ];
     static int RM_g[S1_L_SEQ][S1_FFN];
     static int LN1_e[S1_L_SEQ], LN1_q[S1_L_SEQ], LN2_e[S1_L_SEQ], LN2_q[S1_L_SEQ];
+    static int LNF_e[S1_L_SEQ], LNF_q[S1_L_SEQ];
+    static long Rn[S1_L_SEQ][S1_D];   // LN_F(R_fin) — the head input (== R_fin when S1_USE_LNF==0)
 
     // embed gather
     for (int t = 0; t < S1_L_SEQ; t++) {
@@ -577,6 +700,18 @@ int main() {
                                              if (labs(R[t][d]) > peak) peak = labs(R[t][d]); }
     }
 
+    // ---- final LayerNorm (LN_F) -> Rn (head input). When S1_USE_LNF==0, Rn==R (no LN_F). ----
+#if S1_USE_LNF
+    for (int t = 0; t < S1_L_SEQ; t++) {
+        long row[S1_D], yr[S1_D];
+        for (int d = 0; d < S1_D; d++) row[d] = R[t][d];
+        ref_ln(row, buf, S1_OFF_LNF_G, S1_OFF_LNF_B, yr, LNF_e[t], LNF_q[t]);
+        for (int d = 0; d < S1_D; d++) Rn[t][d] = yr[d];
+    }
+#else
+    for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) Rn[t][d] = R[t][d];
+#endif
+
     // ---- compare saved activations ----
     long max_R = 0, max_X1 = 0, max_X2 = 0, max_P = 0, max_J = 0, max_RM = 0, max_LNST = 0;
     int bad = 0;
@@ -592,6 +727,12 @@ int main() {
         long e2 = labs(k2e - LN2_e[t]), q2 = labs(k2q - LN2_q[t]);
         if (e1 > max_LNST) max_LNST = e1; if (q1 > max_LNST) max_LNST = q1;
         if (e2 > max_LNST) max_LNST = e2; if (q2 > max_LNST) max_LNST = q2;
+#if S1_USE_LNF
+        long kfe = (int32_t)buf[S1_OFF_LNF_STATS + 2 * t];
+        long kfq = (int32_t)buf[S1_OFF_LNF_STATS + 2 * t + 1];
+        long ef = labs(kfe - LNF_e[t]), qf = labs(kfq - LNF_q[t]);
+        if (ef > max_LNST) max_LNST = ef; if (qf > max_LNST) max_LNST = qf;
+#endif
     }
     for (int t = 0; t < S1_L_SEQ; t++)
         for (int d = 0; d < S1_D; d++) {
@@ -629,7 +770,7 @@ int main() {
             long mx = -2147483647L;
             for (int d = 0; d < S1_D; d++) {
                 long Wvd = (int16_t)(buf[S1_OFF_W_HEAD + v * S1_D + d] & 0xFFFF);
-                long cand = Wvd + R[t][d];
+                long cand = Wvd + Rn[t][d];
                 if (cand > mx) mx = cand;
             }
             logits[v] = sat16(mx);
@@ -704,12 +845,28 @@ int main() {
     static long bDn[S1_L_SEQ][S1_D]; ref_gemm<S1_L_SEQ, S1_FFN, S1_D>(bHd, buf, S1_OFF_W_DOWN, bDn);
     static long Rfin[S1_L_SEQ][S1_D];
     for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) Rfin[t][d] = sat16(Rattn[t][d] + bDn[t][d]);
+    // LN_F(Rfin) -> Rnf (the head input) + its (e,nq) stats. Rnf==Rfin when S1_USE_LNF==0.
+    static long Rnf[S1_L_SEQ][S1_D]; static int bLNFe[S1_L_SEQ], bLNFq[S1_L_SEQ];
+#if S1_USE_LNF
+    for (int t = 0; t < S1_L_SEQ; t++) {
+        long row[S1_D], yr[S1_D]; for (int d = 0; d < S1_D; d++) row[d] = Rfin[t][d];
+        ref_ln(row, buf, S1_OFF_LNF_G, S1_OFF_LNF_B, yr, bLNFe[t], bLNFq[t]);
+        for (int d = 0; d < S1_D; d++) Rnf[t][d] = yr[d];
+    }
+#else
+    for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) Rnf[t][d] = Rfin[t][d];
+#endif
 
     // --- LM head argmax d* + grad_logit (golden; == forward, recomputed for the head-scatter) ---
+    // The head reads Rnf (LN_F output), so the scatter accumulates into gRn_ref (head-input grad); LN_F bwd
+    // then maps gRn_ref -> gR_ref (+ g_LNF gamma/beta).
     static long gR_ref[S1_L_SEQ][S1_D];
+    static long gRn_ref[S1_L_SEQ][S1_D];
+    static long gLNFG_ref[S1_D], gLNFB_ref[S1_D];
     static long gWHEAD_ref[S1_V * S1_D];
     for (int i = 0; i < S1_V * S1_D; i++) gWHEAD_ref[i] = 0;
-    for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) gR_ref[t][d] = 0;
+    for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) { gR_ref[t][d] = 0; gRn_ref[t][d] = 0; }
+    for (int d = 0; d < S1_D; d++) { gLNFG_ref[d] = 0; gLNFB_ref[d] = 0; }
     for (int t = 0; t < S1_L_SEQ; t++) {
         int target = buf[S1_OFF_TARGETS + t]; if (target < 0) target = 0; if (target >= S1_V) target = S1_V - 1;
         long logits[S1_V]; int adh[S1_V];
@@ -717,7 +874,7 @@ int main() {
             long mx = -2147483647L; int idd = 0;
             for (int d = 0; d < S1_D; d++) {
                 long Wvd = (int16_t)(buf[S1_OFF_W_HEAD + v * S1_D + d] & 0xFFFF);
-                long cand = Wvd + Rfin[t][d];
+                long cand = Wvd + Rnf[t][d];
                 if (cand > mx) { mx = cand; idd = d; }
             }
             logits[v] = sat16(mx); adh[v] = idd;
@@ -727,15 +884,26 @@ int main() {
         for (int v = 0; v < S1_V; v++) { long zneg = logits[pred] - logits[v]; int idx = (int)(zneg >> S1_CE_ZSHIFT); if (idx > 255) idx = 255; if (idx < 0) idx = 0; e_row[v] = FT_CE_EXP2_Q16[idx]; Ssum += e_row[v]; }
         int sh2 = 0; for (int b = 0; b < 8; b++) if ((Ssum >> sh2) > 65536) sh2++;
         long psum = 0; for (int v = 0; v < S1_V; v++) { e_row[v] = e_row[v] >> sh2; psum += e_row[v]; }
-        // head scatter: gR[t][d*] += g ; gWHEAD[v][d*] += g
+        // head scatter: gRn[t][d*] += g ; gWHEAD[v][d*] += g
         for (int v = 0; v < S1_V; v++) {
             long g = e_row[v] - (v == target ? psum : 0);
             if (g == 0) continue;
             int dstar = adh[v];
             gWHEAD_ref[v * S1_D + dstar] += g;
-            gR_ref[t][dstar] = sat32g(gR_ref[t][dstar] + g);
+            gRn_ref[t][dstar] = sat32g(gRn_ref[t][dstar] + g);
         }
     }
+#if S1_USE_LNF
+    // --- LN_F backward: gY=gRn_ref -> gR_ref + g_LNF_gamma/beta (== ref_ln_bwd against the LN_F gamma codes
+    //     and Rfin pre-norm). LN_F is a single LN, so its stats are bLNFe/bLNFq. ---
+    {
+        static long gRf_add[S1_L_SEQ][S1_D];
+        ref_ln_bwd(Rfin, buf, S1_OFF_LNF_G, gRn_ref, bLNFe, bLNFq, gRf_add, gLNFG_ref, gLNFB_ref, 0);
+        for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) gR_ref[t][d] = sat32g(gR_ref[t][d] + gRf_add[t][d]);
+    }
+#else
+    for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) gR_ref[t][d] = gRn_ref[t][d];
+#endif
 
     // --- gradient accumulators (golden) ---
     static long gEMBED_ref[S1_V * S1_D];
@@ -830,6 +998,12 @@ int main() {
     long m_gl1b  = cmp_region("g_LN1_b",   S1_OFF_G_LN1_B,  gLN1B_ref,  S1_D);
     long m_gl2g  = cmp_region("g_LN2_g",   S1_OFF_G_LN2_G,  gLN2G_ref,  S1_D);
     long m_gl2b  = cmp_region("g_LN2_b",   S1_OFF_G_LN2_B,  gLN2B_ref,  S1_D);
+#if S1_USE_LNF
+    long m_glfg  = cmp_region("g_LN_F_g",  S1_OFF_G_LNF_G,  gLNFG_ref,  S1_D);
+    long m_glfb  = cmp_region("g_LN_F_b",  S1_OFF_G_LNF_B,  gLNFB_ref,  S1_D);
+#else
+    long m_glfg = 0, m_glfb = 0;
+#endif
     long m_gwh   = cmp_region("g_W_HEAD",  S1_OFF_G_W_HEAD, gWHEAD_ref, S1_V*S1_D);
     long m_gr = 0, m_gx1 = 0, m_gx2 = 0;
     for (int t = 0; t < S1_L_SEQ; t++)
@@ -903,6 +1077,10 @@ int main() {
     printf("  [BWD]  max|g_LN1_b   - ref| = %ld\n", m_gl1b);
     printf("  [BWD]  max|g_LN2_g   - ref| = %ld\n", m_gl2g);
     printf("  [BWD]  max|g_LN2_b   - ref| = %ld\n", m_gl2b);
+#if S1_USE_LNF
+    printf("  [BWD]  max|g_LN_F_g  - ref| = %ld\n", m_glfg);
+    printf("  [BWD]  max|g_LN_F_b  - ref| = %ld\n", m_glfb);
+#endif
     printf("  [BWD]  max|g_W_HEAD  - ref| = %ld\n", m_gwh);
     printf("  [BWD]  max|gR        - ref| = %ld\n", m_gr);
     printf("  [BWD]  max|gX1       - ref| = %ld\n", m_gx1);
@@ -925,7 +1103,8 @@ int main() {
                   max_RM == 0 && max_LNST == 0 && max_logit == 0 && max_grad == 0);
     int bwd_ok = (m_gemb == 0 && m_gwq == 0 && m_gwk == 0 && m_gwv == 0 && m_gwo == 0 &&
                   m_gwup == 0 && m_gwdn == 0 && m_gl1g == 0 && m_gl1b == 0 && m_gl2g == 0 &&
-                  m_gl2b == 0 && m_gwh == 0 && m_gr == 0 && m_gx1 == 0 && m_gx2 == 0 &&
+                  m_gl2b == 0 && m_glfg == 0 && m_glfb == 0 && m_gwh == 0 && m_gr == 0 &&
+                  m_gx1 == 0 && m_gx2 == 0 &&
                   go_ok && acc_ok && gw_ok);   // bit-exact AND no silent int32 saturation anywhere
     printf("  -> FWD %s ; BWD %s\n",
            fwd_ok ? "BIT-EXACT" : "MISMATCH", bwd_ok ? "BIT-EXACT (in-range)" : "MISMATCH/OUT-OF-RANGE");
@@ -947,8 +1126,14 @@ int main() {
     for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
         const OptRegRef &R = OPT_REGS_REF[r];
         for (int p = 0; p < R.n; p++) {
-            long wfp = (int16_t)(ob[R.wfp_off + p] & 0xFFFF);
-            long want = R.is_code ? ref_s1_encode(wfp) : (int32_t)(int16_t)wfp;
+            long want;
+            if (R.is_code) {
+                // FINE FIXED-POINT code master: init re-quantizes via dyad(round(master/2^Q)), no clamp.
+                want = ref_s1_encode_fine((int32_t)ob[R.wfp_off + p], /*prev_code=*/0, /*allow_clamp=*/false);
+            } else {
+                long wfp = (int16_t)(ob[R.wfp_off + p] & 0xFFFF);
+                want = (int32_t)(int16_t)wfp;
+            }
             long got  = (int32_t)ob[R.dst_off + p];
             long dd = labs(got - want); if (dd > max_init) max_init = dd;
         }
@@ -972,17 +1157,19 @@ int main() {
             for (int p = 0; p < R.n; p++) { long a = labs((long)(int32_t)ob[R.g_off + p]); if (a > pre_g_peak) pre_g_peak = a; }
         }
     }
-    // snapshot ALL regions' g/m/v/W_fp BEFORE the kernel step mutates them.
+    // snapshot ALL regions' g/m/v/W_fp + the deploy code (for the exp-clamp prev_code) BEFORE the step.
     static long g_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
     static long m_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
     static long v_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
     static long w_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    static long d_all[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
     for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
         const OptRegRef &R = OPT_REGS_REF[r];
         snap(ob, R.g_off,   g_all[r], R.n);
         snap(ob, R.m_off,   m_all[r], R.n);
         snap(ob, R.v_off,   v_all[r], R.n);
         snap(ob, R.wfp_off, w_all[r], R.n);
+        snap(ob, R.dst_off, d_all[r], R.n);
     }
 
     forge_train_step_s1(ob, 2, S1_OPT_STEP, 0, 0);     // the dyadic-Adam step (DUT)
@@ -990,7 +1177,7 @@ int main() {
     long max_opt_wfp = 0, max_opt_dst = 0, max_opt_m = 0, max_opt_v = 0, max_opt_gz = 0;
     for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
         const OptRegRef &R = OPT_REGS_REF[r];
-        ref_dyadic_adam_region(g_all[r], m_all[r], v_all[r], w_all[r], R.n, R.is_code, /*init_only=*/false,
+        ref_dyadic_adam_region(g_all[r], m_all[r], v_all[r], w_all[r], d_all[r], R.n, R.is_code, /*init_only=*/false,
                                m_ref, v_ref, wfp_ref, dst_ref, g_ref2);
         long dw = cmp_buf(ob, R.wfp_off, wfp_ref, R.n); if (dw > max_opt_wfp) max_opt_wfp = dw;
         long dd = cmp_buf(ob, R.dst_off, dst_ref, R.n); if (dd > max_opt_dst) max_opt_dst = dd;
@@ -1137,11 +1324,135 @@ int main() {
     printf("  -> MODE 3 fused == host-loop %s\n", fused_ok ? "BIT-EXACT" : "MISMATCH");
     free(hb); free(fb);
 
+    // ============================================================================
+    // ====  TRAIN_ALL (DENSE-CODE BACKBONE TRAINABLE) convergence + negative control  ====
+    // ============================================================================
+    // The OPEN research question: with the dense PRE-DYADIC CODE backbone ALSO trainable (a2 =
+    // S1_OPT_TRAIN_ALL=0; Wq/Wk/Wv/Wo/W_up/W_down + LN gamma step too), does the model still converge —
+    // or does the all-trainable dyadic re-quantize drive saturation/collapse? This block runs the SAME
+    // memorization task with a SMALL-NONZERO sparse dyadic code init (so the dense backbone gets a real
+    // gradient — the identity init gives the dense codes exactly-zero gradient, see stage_train_all), at
+    // a2=TRAIN_ALL, and reports the TRUE float CE trajectory + the honest discriminator
+    // "code-bytes-changed" (did the dense codes actually move, or is TRAIN_ALL silently == FREEZE).
+    //
+    // NEGATIVE CONTROL: from the SAME init, run only forward (NO backward, NO optimizer step) for the same
+    // horizon. CE MUST stay flat (no weight moves => no learning). If the "convergence" above moved the CE,
+    // it must be the WEIGHTS moving, not an artifact of re-reading logits.
+    printf("  ----- TRAIN_ALL (dense-code backbone trainable) convergence + negative control -----\n");
+    printf("        [fine fixed-pt code master: Q_CODE=%d, LR_SHIFT_CODE=%d, EXP_CLAMP=%d, CODE_WD_SHIFT=%d, USE_LNF=%d]\n",
+           S1_Q_CODE, S1_LR_SHIFT_CODE, S1_CODE_EXP_CLAMP, S1_CODE_WD_SHIFT, S1_USE_LNF);
+    static int8_t ta_init_codes[262144];
+    const int TA_DENSE = 5;    // 5% nonzero dyadic code init (gives the dense backbone gradient signal)
+    const int TA_EMB   = 20;   // small embed/head init -> R in deployed range at start
+    // The dense-backbone benefit over FREEZE GROWS with the horizon (measured: ~0.04 nats @120 -> ~0.05 @400
+    // steps, all-seeds-consistent). Use a longer horizon for the TRAIN_ALL block so the ablation has a clear,
+    // un-fakeable margin. (The FREEZE convergence + fused bit-exact checks above keep the shorter N_STEPS.)
+    const int TA_STEPS = 400;
+
+    // (A) TRAIN_ALL trajectory.
+    int32_t *tb = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    stage_train_all(tb, 4242, TA_DENSE, TA_EMB);
+    forge_train_step_s1(tb, 2, S1_OPT_INIT, S1_OPT_TRAIN_ALL, 0);
+    snapshot_codes(tb, ta_init_codes);
+    forge_train_step_s1(tb, 0, 0, 0, 0);
+    double ta_ce0 = true_ce(tb); int ta_acc0 = count_correct(tb);
+    for (int s = 0; s < TA_STEPS; s++) {
+        forge_train_step_s1(tb, 0, 0, 0, 0);
+        forge_train_step_s1(tb, 1, 0, 0, 0);
+        forge_train_step_s1(tb, 2, S1_OPT_STEP, S1_OPT_TRAIN_ALL, 0);
+    }
+    forge_train_step_s1(tb, 0, 0, 0, 0);
+    double ta_ce_final = true_ce(tb); int ta_acc_final = count_correct(tb);
+    int ta_code_changes = count_code_changes(tb, ta_init_codes);
+    long ta_peakR = 0;
+    for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) { long a = labs((long)(int32_t)tb[s1_off_R(S1_N_LAYERS) + t*S1_D + d]); if (a > ta_peakR) ta_peakR = a; }
+
+    // (A2) FUSED mode-3 TRAIN_ALL == host-driven TRAIN_ALL loop, bit-exact final state (proves the
+    //      on-fabric fused trainer matches the per-mode loop even with the dense CODE backbone trainable —
+    //      i.e. the fine fixed-point master + exp-clamp re-quantize is fused-faithful, not just freeze-only).
+    int32_t *tfb = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    stage_train_all(tfb, 4242, TA_DENSE, TA_EMB);
+    forge_train_step_s1(tfb, 3, TA_STEPS, S1_OPT_TRAIN_ALL, 0);
+    long ta_max_fused = 0; const char *ta_worst = "";
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        long rm = 0;
+        for (int p = 0; p < R.n; p++) {
+            long a;
+            a = labs((long)(int32_t)tfb[R.wfp_off + p] - (int32_t)tb[R.wfp_off + p]); if (a > rm) rm = a;
+            a = labs((long)(int32_t)tfb[R.dst_off + p] - (int32_t)tb[R.dst_off + p]); if (a > rm) rm = a;
+            a = labs((long)(int32_t)tfb[R.m_off   + p] - (int32_t)tb[R.m_off   + p]); if (a > rm) rm = a;
+            a = labs((long)(int32_t)tfb[R.v_off   + p] - (int32_t)tb[R.v_off   + p]); if (a > rm) rm = a;
+        }
+        if (rm > ta_max_fused) { ta_max_fused = rm; ta_worst = OPT_REG_NAMES[r]; }
+    }
+    bool ta_fused_ok = (ta_max_fused == 0);
+    free(tfb);
+
+    // (A3) DECISIVE DISCRIMINATOR — does the DENSE BACKBONE genuinely HELP, or is the CE drop entirely the
+    //      SCATTER/VALUE weights (embed/head/LN beta) that train under TRAIN_ALL anyway? Run FREEZE_CODES
+    //      from the IDENTICAL init/seed/horizon (only the dense codes differ: TRAIN_ALL steps them, FREEZE
+    //      holds them) and compare the final TRUE CE. If TRAIN_ALL < FREEZE, the trainable dense codes are
+    //      genuinely contributing; if TRAIN_ALL >= FREEZE, the codes move but add nothing (the "codes-moved"
+    //      gate alone is NOT proof of benefit — Q=10/no-WD showed codes that move yet match FREEZE exactly).
+    //      This is the un-fakeable "the dense backbone helps" test: it ablates ONLY the code trainability.
+    int32_t *zb = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    stage_train_all(zb, 4242, TA_DENSE, TA_EMB);
+    forge_train_step_s1(zb, 2, S1_OPT_INIT, S1_OPT_FREEZE_CODES, 0);
+    for (int s = 0; s < TA_STEPS; s++) {
+        forge_train_step_s1(zb, 0, 0, 0, 0);
+        forge_train_step_s1(zb, 1, 0, 0, 0);
+        forge_train_step_s1(zb, 2, S1_OPT_STEP, S1_OPT_FREEZE_CODES, 0);
+    }
+    forge_train_step_s1(zb, 0, 0, 0, 0);
+    double frz_ce_final = true_ce(zb);
+    free(zb);
+
+    // (B) NEGATIVE CONTROL: same init, forward-only (no bwd, no opt) — CE must NOT move.
+    int32_t *nb = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    stage_train_all(nb, 4242, TA_DENSE, TA_EMB);
+    forge_train_step_s1(nb, 2, S1_OPT_INIT, S1_OPT_TRAIN_ALL, 0);
+    forge_train_step_s1(nb, 0, 0, 0, 0);
+    double nc_ce0 = true_ce(nb);
+    for (int s = 0; s < TA_STEPS; s++) forge_train_step_s1(nb, 0, 0, 0, 0);   // forward only
+    double nc_ce_final = true_ce(nb);
+
+    printf("  TRAIN_ALL:  CE %.4f -> %.4f  (drop %.4f nats; floor %.4f)  acc %d -> %d/%d  peak|R|=%ld\n",
+           ta_ce0, ta_ce_final, ta_ce0 - ta_ce_final, CE_FLOOR, ta_acc0, ta_acc_final, S1_L_SEQ, ta_peakR);
+    printf("  TRAIN_ALL:  dense code bytes changed from init = %d  (0 => codes never moved == FREEZE; >0 => dense backbone genuinely stepped)\n", ta_code_changes);
+    printf("  ABLATION :  TRAIN_ALL final CE %.4f  vs  FREEZE(same init) final CE %.4f  (TA - FRZ = %+.4f; <0 => dense codes HELP)\n",
+           ta_ce_final, frz_ce_final, ta_ce_final - frz_ce_final);
+    printf("  NEG-CTRL :  forward-only CE %.4f -> %.4f  (drift %.4f; must be ~0)\n",
+           nc_ce0, nc_ce_final, nc_ce0 - nc_ce_final);
+    bool ta_ce_drops    = (ta_ce0 - ta_ce_final) >= 0.5;
+    bool ta_not_collapsed = ta_ce_final < (CE_FLOOR - 0.25);
+    bool ta_acc_improves  = (ta_acc_final > ta_acc0);
+    bool ta_codes_moved   = (ta_code_changes > 0);          // the dense backbone GENUINELY stepped
+    bool ta_no_saturation = (ta_peakR < 32767);             // residual not pinned at the int16 ceiling
+    bool ta_beats_freeze  = (ta_ce_final < frz_ce_final - 1e-9);  // the DECISIVE gate: trainable codes HELP
+    bool nc_holds         = (nc_ce_final >= nc_ce0 - 1e-9); // forward-only does NOT improve (drift <= 0)
+    // GENUINE = converges WITHOUT collapse/saturation AND the dense codes ACTUALLY HELP (beat FREEZE). The
+    // codes-moved + no-saturation + below-floor gates rule out the two failure modes (frozen / saturated);
+    // ta_beats_freeze rules out the third (codes move but contribute nothing).
+    bool train_all_genuine = ta_ce_drops && ta_not_collapsed && ta_acc_improves && ta_codes_moved &&
+                             ta_no_saturation && ta_beats_freeze;
+    printf("     [TRAIN_ALL gates] CE-drops>=0.5: %s  below-floor: %s  acc-improves: %s  codes-moved: %s  no-saturation: %s  beats-FREEZE: %s\n",
+           ta_ce_drops ? "yes" : "NO", ta_not_collapsed ? "yes" : "NO", ta_acc_improves ? "yes" : "NO",
+           ta_codes_moved ? "yes" : "NO", ta_no_saturation ? "yes" : "NO", ta_beats_freeze ? "yes" : "NO");
+    printf("     [neg control] forward-only does NOT improve: %s\n", nc_holds ? "yes" : "NO");
+    printf("  [FUSED-TA] max|mode3(TRAIN_ALL) - host-loop| over W_fp/code/m/v = %ld  (worst: %s) -> %s\n",
+           ta_max_fused, ta_max_fused ? ta_worst : "none", ta_fused_ok ? "BIT-EXACT" : "MISMATCH");
+    printf("  -> TRAIN_ALL (dense backbone genuinely trains) %s ; negative control %s ; fused %s\n",
+           train_all_genuine ? "YES" : "NO (see honest report)", nc_holds ? "HOLDS" : "VIOLATED",
+           ta_fused_ok ? "BIT-EXACT" : "MISMATCH");
+    free(tb); free(nb);
+
     int ok = fwd_ok && bwd_ok && opt_ok && conv_ok && fused_ok;
     printf("  ============================================================\n");
-    printf("  S1 TRAINER: FWD %s ; BWD %s ; OPT %s ; CONVERGE %s ; FUSED %s\n",
+    printf("  S1 TRAINER: FWD %s ; BWD %s ; OPT %s ; CONVERGE(FREEZE) %s ; FUSED %s ; TRAIN_ALL %s\n",
            fwd_ok ? "OK" : "FAIL", bwd_ok ? "OK" : "FAIL", opt_ok ? "OK" : "FAIL",
-           conv_ok ? "OK" : "FAIL", fused_ok ? "OK" : "FAIL");
+           conv_ok ? "OK" : "FAIL", fused_ok ? "OK" : "FAIL",
+           train_all_genuine ? "GENUINE-TRAIN" : "DOES-NOT-GENUINELY-TRAIN");
     free(buf);
     return ok ? 0 : 1;
 }

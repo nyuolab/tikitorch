@@ -550,6 +550,10 @@ static int do_fwd_loss(int32_t *buffer) {
     static half_t  ln1b_oc[S1_W_LN];         // beta int16
     static code_t  ln2g_oc[S1_W_LN];
     static half_t  ln2b_oc[S1_W_LN];
+#if S1_USE_LNF
+    static code_t  lnfg_oc[S1_D];            // final-LN gamma codes
+    static half_t  lnfb_oc[S1_D];            // final-LN beta int16
+#endif
     static half_t  whead_oc[S1_W_WHEAD];     // [V][D] int16
     static int32_t ce_lut[S1_LUT_N];         // host-staged exp2 ROMs (BRAM static-init reads zero on AFI)
     static int32_t at_lut[S1_LUT_N];
@@ -567,6 +571,10 @@ static int do_fwd_loss(int32_t *buffer) {
     burst_load_half (buffer, S1_OFF_LN1_B,    ln1b_oc,  S1_W_LN);
     burst_load_codes(buffer, S1_OFF_LN2_G,    ln2g_oc,  S1_W_LN);
     burst_load_half (buffer, S1_OFF_LN2_B,    ln2b_oc,  S1_W_LN);
+#if S1_USE_LNF
+    burst_load_codes(buffer, S1_OFF_LNF_G,    lnfg_oc,  S1_D);
+    burst_load_half (buffer, S1_OFF_LNF_B,    lnfb_oc,  S1_D);
+#endif
     burst_load_half (buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);
     burst_load_i32  (buffer, S1_OFF_CE_LUT,   ce_lut,   S1_LUT_N);
     burst_load_i32  (buffer, S1_OFF_ATTN_LUT, at_lut,   S1_LUT_N);
@@ -581,6 +589,9 @@ static int do_fwd_loss(int32_t *buffer) {
     static int32_t X2_oc[S1_W_ACT];
     static int32_t ln1st_oc[S1_W_LNST];
     static int32_t ln2st_oc[S1_W_LNST];
+#if S1_USE_LNF
+    static int32_t lnfst_oc[S1_L_SEQ * 2];   // final-LN (e,nq) per token
+#endif
     static int32_t attnp_oc[S1_W_ATTNP];
     static int32_t attnj_oc[S1_W_ATTNJ];
     static int32_t relu_oc[S1_W_RELU];
@@ -712,6 +723,35 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
             }
     }
 
+    // ---- FINAL LayerNorm (LN_F) before the LM head (S1_USE_LNF). Normalizes the head INPUT so the
+    //      max-plus head reads a bounded Rn[t][d] regardless of how large the raw residual R grew when the
+    //      dense backbone densifies (the TRAIN_ALL saturation fix; mirrors charlm `head(lnf(h))`). Pure
+    //      shift/add/compare (the same layernorm_tok the blocks use). Save LN_F (e,nq) stats for the bwd. ----
+    static data_t Rn[S1_L_SEQ][S1_D];
+#if S1_USE_LNF
+LNF: for (int t = 0; t < S1_L_SEQ; t++) {
+        data_t row[S1_D], yrow[S1_D];
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            row[d] = R[t][d];
+        }
+        int e, nq;
+        layernorm_tok(row, lnfg_oc, 0, lnfb_oc, 0, yrow, e, nq);
+        lnfst_oc[2 * t]     = e;
+        lnfst_oc[2 * t + 1] = nq;
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            Rn[t][d] = yrow[d];
+        }
+    }
+#else
+LNF_ID: for (int t = 0; t < S1_L_SEQ; t++)
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            Rn[t][d] = R[t][d];
+        }
+#endif
+
     // ---- LM head + CE loss/grad per position ----
     // loss_margin (LOSS[0], the CONVERGENCE signal): sum_t (logit[pred] - logit[target]) — the target
     //   classification margin. It is a TRUE monotone CE surrogate that is bit-exact integer (no log) and,
@@ -726,7 +766,7 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
         int target = tgts[t];
         if (target < 0) target = 0; if (target >= S1_V) target = S1_V - 1;
 
-        // logits[v] = max_d (W_HEAD[v][d] + R[t][d]); save argmax d*.
+        // logits[v] = max_d (W_HEAD[v][d] + Rn[t][d]); save argmax d*.  (Rn = LN_F(R) when S1_USE_LNF.)
         static data_t  logits[S1_V];
         static int32_t ad_head[S1_V];
     HEAD_V: for (int v = 0; v < S1_V; v++) {
@@ -735,7 +775,7 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
         HEAD_D: for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
                 data_t Wvd = (data_t)whead_oc[v * S1_D + d];   // on-chip head weight (was gmem)
-                acc_t cand = (acc_t)Wvd + (acc_t)R[t][d];
+                acc_t cand = (acc_t)Wvd + (acc_t)Rn[t][d];
                 if (cand > mx) { mx = cand; idx_d = d; }
             }
             logits[v] = sat16(mx);
@@ -805,6 +845,9 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
     burst_store_i32(X2_oc,    buffer, s1_off_act(S1_OFF_X2, 0), S1_W_ACT);
     burst_store_i32(ln1st_oc, buffer, S1_OFF_LN1_STATS,   S1_W_LNST);
     burst_store_i32(ln2st_oc, buffer, S1_OFF_LN2_STATS,   S1_W_LNST);
+#if S1_USE_LNF
+    burst_store_i32(lnfst_oc, buffer, S1_OFF_LNF_STATS,   S1_L_SEQ * 2);
+#endif
     burst_store_i32(attnp_oc, buffer, S1_OFF_ATTN_P,      S1_W_ATTNP);
     burst_store_i32(attnj_oc, buffer, S1_OFF_ATTN_JSTAR,  S1_W_ATTNJ);
     burst_store_i32(relu_oc,  buffer, S1_OFF_RELU_MASK,   S1_W_RELU);
@@ -1152,6 +1195,10 @@ static int do_bwd(int32_t *buffer) {
     static half_t  ln1b_oc[S1_W_LN];   (void)ln1b_oc;   // beta not needed in bwd (its grad is a column sum)
     static code_t  ln2g_oc[S1_W_LN];
     static half_t  ln2b_oc[S1_W_LN];   (void)ln2b_oc;
+#if S1_USE_LNF
+    static code_t  lnfg_oc[S1_D];      // final-LN gamma codes (needed for LN_F bwd)
+    static half_t  lnfb_oc[S1_D];   (void)lnfb_oc;   // beta not needed in bwd (its grad is a column sum)
+#endif
     static half_t  whead_oc[S1_W_WHEAD];
     static int32_t at_lut[S1_LUT_N];
     static int32_t toks[S1_L_SEQ];
@@ -1167,6 +1214,10 @@ static int do_bwd(int32_t *buffer) {
     burst_load_half (buffer, S1_OFF_LN1_B,    ln1b_oc,  S1_W_LN);
     burst_load_codes(buffer, S1_OFF_LN2_G,    ln2g_oc,  S1_W_LN);
     burst_load_half (buffer, S1_OFF_LN2_B,    ln2b_oc,  S1_W_LN);
+#if S1_USE_LNF
+    burst_load_codes(buffer, S1_OFF_LNF_G,    lnfg_oc,  S1_D);
+    burst_load_half (buffer, S1_OFF_LNF_B,    lnfb_oc,  S1_D);
+#endif
     burst_load_half (buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);
     burst_load_i32  (buffer, S1_OFF_ATTN_LUT, at_lut,   S1_LUT_N);
     burst_load_i32  (buffer, S1_OFF_TOKENS,   toks,     S1_L_SEQ);
@@ -1179,6 +1230,9 @@ static int do_bwd(int32_t *buffer) {
     static int32_t X2_oc[S1_W_ACT];
     static int32_t ln1st_oc[S1_W_LNST];
     static int32_t ln2st_oc[S1_W_LNST];
+#if S1_USE_LNF
+    static int32_t lnfst_oc[S1_L_SEQ * 2];
+#endif
     static int32_t relu_oc[S1_W_RELU];
     static int32_t argh_oc[S1_W_ARGH];
     static int32_t glog_oc[S1_W_GLOG];
@@ -1188,6 +1242,9 @@ static int do_bwd(int32_t *buffer) {
     burst_load_i32(buffer, s1_off_act(S1_OFF_X2, 0), X2_oc, S1_W_ACT);
     burst_load_i32(buffer, S1_OFF_LN1_STATS,   ln1st_oc, S1_W_LNST);
     burst_load_i32(buffer, S1_OFF_LN2_STATS,   ln2st_oc, S1_W_LNST);
+#if S1_USE_LNF
+    burst_load_i32(buffer, S1_OFF_LNF_STATS,   lnfst_oc, S1_L_SEQ * 2);
+#endif
     burst_load_i32(buffer, S1_OFF_RELU_MASK,   relu_oc,  S1_W_RELU);
     burst_load_i32(buffer, S1_OFF_ARGMAX_HEAD, argh_oc,  S1_W_ARGH);
     burst_load_i32(buffer, S1_OFF_GRAD_LOGIT,  glog_oc,  S1_W_GLOG);
@@ -1206,6 +1263,10 @@ static int do_bwd(int32_t *buffer) {
     static int32_t gLN1B_oc[S1_W_LN];
     static int32_t gLN2G_oc[S1_W_LN];
     static int32_t gLN2B_oc[S1_W_LN];
+#if S1_USE_LNF
+    static int32_t gLNFG_oc[S1_D];
+    static int32_t gLNFB_oc[S1_D];
+#endif
     static int32_t gWHEAD_oc[S1_W_WHEAD];
 
 ZG_E: for (int i = 0; i < S1_W_EMBED; i++) { gEMBED_oc[i] = 0; gWHEAD_oc[i] = 0; }
@@ -1213,6 +1274,9 @@ ZG_P: for (int i = 0; i < S1_W_PROJ; i++) { gWQ_oc[i]=0; gWK_oc[i]=0; gWV_oc[i]=
 ZG_U: for (int i = 0; i < S1_W_WUP; i++)   gWUP_oc[i] = 0;
 ZG_D: for (int i = 0; i < S1_W_WDOWN; i++)  gWDN_oc[i] = 0;
 ZG_L: for (int i = 0; i < S1_W_LN; i++) { gLN1G_oc[i]=0; gLN1B_oc[i]=0; gLN2G_oc[i]=0; gLN2B_oc[i]=0; }
+#if S1_USE_LNF
+ZG_F: for (int i = 0; i < S1_D; i++) { gLNFG_oc[i]=0; gLNFB_oc[i]=0; }
+#endif
 
     // gR — the running backward residual stream (output-grad of the block; built by the head bwd).
     static int32_t gR[S1_L_SEQ][S1_D];
@@ -1222,12 +1286,16 @@ ZG_L: for (int i = 0; i < S1_W_LN; i++) { gLN1G_oc[i]=0; gLN1B_oc[i]=0; gLN2G_oc
 
     // ---------------------------------------------------------------------
     // (1) LM-head backward (max-plus adjoint, SPARSE): route grad_logit[t][v] through saved argmax d*.
-    //     gR[t][d*] += grad_logit[t][v]  AND  g_W_HEAD[v][d*] += grad_logit[t][v].   (morph head-scatter)
+    //     The head reads Rn = LN_F(R_fin) (the head INPUT), so the scatter accumulates into gRn[t][d*]:
+    //       gRn[t][d*] += grad_logit[t][v]  AND  g_W_HEAD[v][d*] += grad_logit[t][v].   (morph head-scatter)
+    //     Then LN_F backward maps gRn -> gR (+ g_LNF_gamma/beta). When S1_USE_LNF=0, Rn==R so gR==gRn.
     // ---------------------------------------------------------------------
-GR_ZERO: for (int t = 0; t < S1_L_SEQ; t++)
+    static int32_t gRn[S1_L_SEQ][S1_D];
+GRN_ZERO: for (int t = 0; t < S1_L_SEQ; t++)
         for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-            gR[t][d] = 0;
+            gRn[t][d] = 0;
+            gR[t][d]  = 0;
         }
 HEAD_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
         for (int v = 0; v < S1_V; v++) {
@@ -1237,9 +1305,51 @@ HEAD_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
             int dstar = argh_oc[t * S1_V + v];
             if (dstar < 0 || dstar >= S1_D) continue;
             gWHEAD_oc[v * S1_D + dstar] += g;
-            gR[t][dstar] = sat32((acc_t)gR[t][dstar] + (acc_t)g);
+            gRn[t][dstar] = sat32((acc_t)gRn[t][dstar] + (acc_t)g);
         }
     }
+
+#if S1_USE_LNF
+    // ---- LN_F backward: gY = gRn -> gR (residual-stream grad) + g_LNF_gamma + g_LNF_beta. The pre-LN_F
+    //      residual is R_fin = R_all[N_LAYERS] (saved by mode 0). Same math as LN1/LN2 bwd. ----
+    static data_t Rfin_m[S1_L_SEQ][S1_D];
+LNF_LDRFIN: for (int t = 0; t < S1_L_SEQ; t++)
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            Rfin_m[t][d] = (data_t)R_all_oc[S1_N_LAYERS * S1_L_SEQ * S1_D + t * S1_D + d];
+        }
+LNF_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
+        int e_n  = lnfst_oc[2 * t];
+        int nq_n = lnfst_oc[2 * t + 1];
+        acc_t g_c[S1_D];
+        acc_t gsum = 0;
+    LNF_GSTE: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            bool gsn, gnz; exp_t ge;
+            wdecode((int32_t)lnfg_oc[d], gsn, ge, gnz);
+            acc_t gchat = gnz ? ((acc_t)gRn[t][d] << (int)ge) : (acc_t)0;
+            if (gnz && gsn) gchat = -gchat;
+            acc_t gd = s1_apply_invq(gchat, e_n, nq_n);
+            g_c[d] = gd;
+            gsum += gd;
+        }
+        acc_t mean = gsum >> S1_LOG2_D;
+    LNF_GSUB: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            gR[t][d] = sat32((acc_t)gR[t][d] + (g_c[d] - mean));
+            gLNFB_oc[d] = sat32((acc_t)gLNFB_oc[d] + (acc_t)gRn[t][d]);
+        }
+    }
+    // g_LNF_gamma[d] += sum_t gRn[t][d] * q(rf[t][d])  (rf = pre-gamma rescaled c of LN_F). ln_gamma_grad
+    // reads its stats as lnst[l*L_SEQ*2 + ...]; LN_F is a single LN so pass l=0 against the LN_F stats array.
+    ln_gamma_grad(Rfin_m, lnfst_oc, 0, gRn, gLNFG_oc, 0);
+#else
+LNF_BWD_ID: for (int t = 0; t < S1_L_SEQ; t++)
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            gR[t][d] = gRn[t][d];
+        }
+#endif
 
     // ---------------------------------------------------------------------
     // (2) per layer (REVERSE).
@@ -1494,6 +1604,10 @@ EMB_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
     burst_store_i32(gLN1B_oc,  buffer, S1_OFF_G_LN1_B,  S1_W_LN);
     burst_store_i32(gLN2G_oc,  buffer, S1_OFF_G_LN2_G,  S1_W_LN);
     burst_store_i32(gLN2B_oc,  buffer, S1_OFF_G_LN2_B,  S1_W_LN);
+#if S1_USE_LNF
+    burst_store_i32(gLNFG_oc,  buffer, S1_OFF_G_LNF_G,  S1_D);
+    burst_store_i32(gLNFB_oc,  buffer, S1_OFF_G_LNF_B,  S1_D);
+#endif
     burst_store_i32(gWHEAD_oc, buffer, S1_OFF_G_W_HEAD, S1_W_WHEAD);
     burst_store_i32(&gR[0][0],     buffer, S1_OFF_GR,    S1_L_SEQ * S1_D);
     burst_store_i32(&gX1_oc[0][0], buffer, S1_OFF_GX1,   S1_L_SEQ * S1_D);
@@ -1562,6 +1676,47 @@ static inline int32_t s1_encode(data_t wfp) {
     return (int32_t)(int8_t)(unsigned char)c;   // store as a sign-extended byte (== burst_load_codes read)
 }
 
+// re-quantize a FINE FIXED-POINT code master (the TRAIN_ALL fix). wq is the int32 master at scale 2^Q_CODE
+// (weight value = wq / 2^Q_CODE). Round-to-nearest to the integer code value, dyad() it, then optionally
+// CLAMP the per-step exponent change to +/-1 relative to the previous deploy code (S1_CODE_EXP_CLAMP) so no
+// single step can runaway-double a weight. prev_code is the byte code the forward read BEFORE this step
+// (decoded for its sign/nz/exp). The result is BIT-IDENTICAL integer arithmetic in kernel + golden.
+// rwq  = round(wq / 2^Q_CODE) with round-half-away-from-zero (symmetric, sign-stable):
+//        |rwq| = (|wq| + 2^(Q-1)) >> Q ; sign from wq. (Q_CODE>=1 so the half-bias 2^(Q-1) is exact.)
+static inline int32_t s1_encode_fine(acc_t wq, int32_t prev_code, bool allow_clamp) {
+#pragma HLS INLINE
+    acc_t aw = (wq < 0) ? (acc_t)(-wq) : wq;
+    acc_t half = (acc_t)1 << (S1_Q_CODE - 1);
+    acc_t mag = (aw + half) >> S1_Q_CODE;            // rounded integer code magnitude
+    data_t wr = (wq < 0) ? (data_t)(-(acc_t)sat16(mag)) : (data_t)sat16(mag);
+    bool sgn, nz; exp_t e;
+    dyad(wr, sgn, e, nz);                            // dyad() the rounded integer code value
+    int ee = (int)e;
+#if S1_CODE_EXP_CLAMP
+    // damping safety: limit |Δexp| <= 1 per step (and entering-from-zero starts at the floor exp 0).
+    // SKIPPED on init (allow_clamp=false): init must produce the true dyad(round(master)) — there is no
+    // meaningful "previous" deploy code yet (the host only staged the master).
+    if (allow_clamp) {
+        int pe; int pnz;
+        { unsigned pc = (unsigned)(prev_code & 0xFF); pnz = (pc >> 5) & 1; pe = (int)(pc & 0x1F); }
+        if (nz) {
+            if (pnz) {                               // prev nonzero: stay within +/-1 of its exponent
+                if (ee > pe + 1) ee = pe + 1;
+                if (ee < pe - 1) ee = pe - 1;
+                if (ee < 0) ee = 0;
+            } else {                                 // climbing off zero: enter at the smallest dyadic (2^0)
+                ee = 0;
+            }
+        }
+    }
+#endif
+    if (ee > 31) ee = 31;
+    int c = (ee & 0x1F);
+    if (nz)  c |= (1 << 5);
+    if (sgn) c |= (1 << 7);
+    return (int32_t)(int8_t)(unsigned char)c;
+}
+
 // one dyadic-Adam step over ONE region [n params, contiguous]. STREAMING RMW in LANE-wide chunks:
 //   load W_fp/g/m/v tile -> per-lane Adam update -> store W_fp/m/v + the re-quantized code/value + g=0.
 // init_only=1: grad is treated as ZERO (Adam is a no-op: m,v,W_fp unchanged) and ONLY the re-quantize
@@ -1580,24 +1735,43 @@ ADAM_R: for (int base = 0; base < n; base += S1_LANE) {
                 acc_t g = init_only ? (acc_t)0 : (acc_t)(int32_t)buffer[R.g_off  + p];
                 acc_t m = (acc_t)(int32_t)buffer[R.m_off + p];
                 acc_t v = (acc_t)(int32_t)buffer[R.v_off + p];
-                data_t wfp = (data_t)(int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
                 acc_t absg = (g < 0) ? (acc_t)(-g) : g;
                 acc_t mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
                 acc_t vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
                 int se = s1_dyad_exp(vn);
                 acc_t step = mn >> se;                       // m / 2^round(log2 v)  (arith shift, keeps sign)
-                acc_t dw   = step >> S1_LR_SHIFT;            // lr = 2^-LR_SHIFT
-                data_t wn  = init_only ? wfp : sat16((acc_t)wfp - dw);
-                // write back state (unchanged under init_only since g==0 -> mn=m-m>>3, but we KEEP m,v
-                // identical on init by skipping the store; only the re-quantize matters there).
-                if (!init_only) {
-                    buffer[R.m_off + p]   = (int32_t)mn;
-                    buffer[R.v_off + p]   = (int32_t)vn;
-                    buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
-                    buffer[R.g_off + p]   = 0;               // zero the grad after applying
+                if (R.is_code) {
+                    // FINE FIXED-POINT code master (int32 at scale 2^Q_CODE): nudge by a small fraction of a
+                    // code unit, re-quantize the deploy code from the rounded master via dyad() + exp-clamp.
+                    acc_t wq  = (acc_t)(int32_t)buffer[R.wfp_off + p];
+                    acc_t dw  = step >> S1_LR_SHIFT_CODE;    // fine lr = 2^-LR_SHIFT_CODE of a code unit
+#if S1_CODE_WD_SHIFT
+                    acc_t wd  = wq >> S1_CODE_WD_SHIFT;      // multiplier-free weight decay (shift toward 0)
+#else
+                    acc_t wd  = 0;
+#endif
+                    acc_t wn  = init_only ? wq : (acc_t)sat32((acc_t)wq - dw - wd);
+                    if (!init_only) {
+                        buffer[R.m_off + p]   = (int32_t)mn;
+                        buffer[R.v_off + p]   = (int32_t)vn;
+                        buffer[R.wfp_off + p] = (int32_t)wn;     // store the full int32 fixed-point master
+                        buffer[R.g_off + p]   = 0;
+                    }
+                    buffer[R.dst_off + p] = s1_encode_fine(wn, buffer[R.dst_off + p], !init_only);
+                } else {
+                    // VALUE master (EMBED/W_HEAD/LN beta): int16 unit scale, coarse LR_SHIFT (unchanged — it
+                    // SCATTERS, no fan-in blow-up, and already trains stably in FREEZE_CODES).
+                    data_t wfp = (data_t)(int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
+                    acc_t dw   = step >> S1_LR_SHIFT;        // lr = 2^-LR_SHIFT
+                    data_t wn  = init_only ? wfp : sat16((acc_t)wfp - dw);
+                    if (!init_only) {
+                        buffer[R.m_off + p]   = (int32_t)mn;
+                        buffer[R.v_off + p]   = (int32_t)vn;
+                        buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
+                        buffer[R.g_off + p]   = 0;
+                    }
+                    buffer[R.dst_off + p] = (int32_t)(int16_t)wn;
                 }
-                // re-quantize the master into the forward-read region.
-                buffer[R.dst_off + p] = R.is_code ? s1_encode(wn) : (int32_t)(int16_t)wn;
             }
         }
     }
@@ -1607,21 +1781,39 @@ ADAM_R: for (int base = 0; base < n; base += S1_LANE) {
         int32_t g = init_only ? 0 : buffer[R.g_off + p];
         int32_t m = buffer[R.m_off + p];
         int32_t v = buffer[R.v_off + p];
-        int16_t wfp = (int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
         int64_t absg = g < 0 ? -(int64_t)g : g;
         int64_t mn = (int64_t)m - ((int64_t)m >> S1_ADAM_B1) + ((int64_t)g    >> S1_ADAM_B1);
         int64_t vn = (int64_t)v - ((int64_t)v >> S1_ADAM_B2) + (absg          >> S1_ADAM_B2);
         int se = s1_dyad_exp((acc_t)vn);
         int64_t step = mn >> se;
-        int64_t dw   = step >> S1_LR_SHIFT;
-        int16_t wn = init_only ? wfp : (int16_t)sat16((acc_t)((int64_t)wfp - dw));
-        if (!init_only) {
-            buffer[R.m_off + p]   = (int32_t)mn;
-            buffer[R.v_off + p]   = (int32_t)vn;
-            buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
-            buffer[R.g_off + p]   = 0;
+        if (R.is_code) {
+            int32_t wq = buffer[R.wfp_off + p];                  // full int32 fixed-point master (scale 2^Q)
+            int64_t dw = step >> S1_LR_SHIFT_CODE;
+#if S1_CODE_WD_SHIFT
+            int64_t wd = (int64_t)wq >> S1_CODE_WD_SHIFT;        // multiplier-free weight decay (shift toward 0)
+#else
+            int64_t wd = 0;
+#endif
+            int32_t wn = init_only ? wq : (int32_t)sat32((acc_t)((int64_t)wq - dw - wd));
+            if (!init_only) {
+                buffer[R.m_off + p]   = (int32_t)mn;
+                buffer[R.v_off + p]   = (int32_t)vn;
+                buffer[R.wfp_off + p] = wn;
+                buffer[R.g_off + p]   = 0;
+            }
+            buffer[R.dst_off + p] = s1_encode_fine((acc_t)wn, buffer[R.dst_off + p], !init_only);
+        } else {
+            int16_t wfp = (int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
+            int64_t dw  = step >> S1_LR_SHIFT;
+            int16_t wn  = init_only ? wfp : (int16_t)sat16((acc_t)((int64_t)wfp - dw));
+            if (!init_only) {
+                buffer[R.m_off + p]   = (int32_t)mn;
+                buffer[R.v_off + p]   = (int32_t)vn;
+                buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
+                buffer[R.g_off + p]   = 0;
+            }
+            buffer[R.dst_off + p] = (int32_t)(int16_t)wn;
         }
-        buffer[R.dst_off + p] = R.is_code ? s1_encode((data_t)wn) : (int32_t)(int16_t)wn;
     }
 #endif
 }
@@ -1648,12 +1840,13 @@ ZGR: for (int base = 0; base < n; base += S1_LANE) {
 //   a1 = S1_OPT_STEP (full step) | S1_OPT_INIT (re-quantize the codes/values from the staged W_fp ONLY —
 //        the code-init path; Adam is a no-op).
 //   freeze_codes (mode-2 a2; S1_OPT_TRAIN_ALL=0 | S1_OPT_FREEZE_CODES=1): when set, the dense PRE-DYADIC
-//        CODE weights (is_code=1: Wq/Wk/Wv/Wo/W_up/W_down/LN1_g/LN2_g) are NOT updated and NOT re-quantized
-//        — their grad is just dropped (zeroed) — so only the SCATTER/VALUE weights (EMBED, W_HEAD, LN beta)
-//        train. This is the QAT "frozen-quantized-backbone, train embeddings+head" regime; it is the
-//        configuration in which the dyadic-Adam trainer is STABLE and the CE genuinely drops (the
-//        all-trainable dense path drives the residual stream into the int16 sat ceiling — see the
-//        convergence TB). init_only ignores freeze (the init must re-quantize EVERY code from staged W_fp
+//        CODE weights (is_code=1: Wq/Wk/Wv/Wo/W_up/W_down/LN1_g/LN2_g/LN_F_g) are NOT updated and NOT
+//        re-quantized — grad dropped — so only the SCATTER/VALUE weights (EMBED, W_HEAD, LN beta) train.
+//        The conservative always-stable QAT baseline. TRAIN_ALL (full stack) NOW WORKS too: with the final
+//        LayerNorm (S1_USE_LNF) bounding the head input + the code-master weight decay (S1_CODE_WD_SHIFT)
+//        countering the upward ratchet, the dense backbone trains without the old residual-saturation
+//        collapse and BEATS freeze in the TB ablation (see forge_s1_config.hpp S1_Q_CODE / the TRAIN_ALL TB
+//        block). init_only ignores freeze (the init must re-quantize EVERY code from staged W_fp
 //        so the first forward reads valid codes for all regions).
 // =============================================================================
 static int do_opt(int32_t *buffer, int a1, int freeze_codes) {
