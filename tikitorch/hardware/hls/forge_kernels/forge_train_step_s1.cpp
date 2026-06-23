@@ -318,6 +318,29 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 #endif
 
 // =============================================================================
+// OPT TIMING FIX — TILED ON-CHIP STAGING of do_opt (the LAST closure step). Before this fix do_opt was the
+// ONLY mode still hitting gmem in its COMPUTE loop: it streamed the optimizer RMW directly on the m_axi
+// `buffer` (no on-chip staging). Because the buffer port is max_widen_bitwidth=512, EVERY scalar
+// variable-offset access (buffer[R.wfp_off + p], etc.) became a 512-bit AXI read PLUS a VARIABLE 512-bit
+// barrel shift to extract the int32 lane; that wide variable shift chained with the AXI read was the
+// critical-path pole (csynth: gmem read 2.920 ns -> 512-bit lshr 1.443 ns = 4.32 ns > 4.0). fwd/bwd were
+// already fixed by ON-CHIP RESIDENT STAGING; do_opt was left streaming. The fix applies the SAME proven
+// pattern in BOUNDED TILES: per tile, burst-load g/m/v/W_fp (+ prev deploy code for is_code) from gmem into
+// small on-chip int32 arrays via the existing wide/sequential burst helpers (HLS coalesces a contiguous
+// burst to wide AXI with FIXED per-lane shifts — NO per-element variable shift), run the SAME dyadic-Adam
+// element math reading/writing the ON-CHIP tile arrays with FIXED [i] indexing (no gmem, no 512-bit
+// variable shift in the compute loop), then burst-store the updated W_fp / code-or-value / m / v tile back
+// and zero the grad tile. The two-pass split (one priority encoder per stage) is preserved. BIT-EXACT: the
+// optimizer is a per-element map (no contraction, no cross-element carry), so tiling only changes the
+// SCHEDULE — every element touches the identical offsets and arithmetic. Tile arrays add modest BRAM
+// (S1_OPT_TILE*4B*5 ~ 80 KB = ~tens of BRAM18) — well within the BRAM headroom. S1_OPT_TILE must be a
+// multiple of 16 so each full-tile gmem slice stays 512-bit aligned (region bases are S1_AL16-aligned).
+// =============================================================================
+#ifndef S1_OPT_TILE
+#define S1_OPT_TILE 4096
+#endif
+
+// =============================================================================
 // fwd_gemm — the dyadic-MAC GEMM y[t][o] = sum_i q(x[t][i]) MAC q(W[o][i]) + bias(=0 in S1).
 // Reproduces forge_fwd_wide.cpp's inner: x dyad-quantized once, W PRE-DYADIC (wdecode inline), the
 // MAC is sign-xor + exponent-ADD + barrel-SHIFT + signed accumulate (NO multiply, DSP=0).
@@ -1756,75 +1779,112 @@ static void dyadic_adam_region(int32_t *buffer, const s1_opt_region_t &R, bool i
 #pragma HLS INLINE off
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
     int n = R.n;
-    // ---- PASS A: Adam update -> W_fp_new (one priority encoder: s1_dyad_exp) ----
-ADAM_R: for (int base = 0; base < n; base += S1_OPT_LANE) {
+    // TILED ON-CHIP STAGING — process the region in bounded S1_OPT_TILE chunks. Per tile: burst-in g/m/v/
+    // W_fp (+ prev deploy code) into on-chip int32 arrays via the wide burst helpers, run the SAME two-pass
+    // dyadic-Adam element math on the on-chip arrays with FIXED [i] indexing (no gmem, no 512-bit variable
+    // barrel shift in the compute loop), then burst-out the updated W_fp / code-or-value / m / v + the
+    // zeroed grad. BIT-EXACT to the streaming version: every element p (=tbase+i) reads/writes the identical
+    // logical offsets via the burst, and the arithmetic is verbatim. Tile arrays sized S1_OPT_TILE int32.
+    static int32_t g_t[S1_OPT_TILE], m_t[S1_OPT_TILE], v_t[S1_OPT_TILE], wfp_t[S1_OPT_TILE], dst_t[S1_OPT_TILE];
+#pragma HLS BIND_STORAGE variable=g_t   type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=m_t   type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=v_t   type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=wfp_t type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=dst_t type=ram_2p impl=bram
+OPT_TILE: for (int tbase = 0; tbase < n; tbase += S1_OPT_TILE) {
+        int tn = n - tbase; if (tn > S1_OPT_TILE) tn = S1_OPT_TILE;   // this tile's element count
+
+        // ---- BURST-IN: contiguous gmem slices -> on-chip tile arrays (wide AXI, NO per-elem variable shift) ----
+        burst_load_i32(buffer, R.wfp_off + tbase, wfp_t, tn);
+        if (!init_only) {
+            burst_load_i32(buffer, R.g_off + tbase, g_t, tn);
+            burst_load_i32(buffer, R.m_off + tbase, m_t, tn);
+            burst_load_i32(buffer, R.v_off + tbase, v_t, tn);
+        }
+        // prev deploy code (for the exp-clamp in PASS B) / value-init source: staged in dst slot.
+        if (R.is_code || init_only) burst_load_i32(buffer, R.dst_off + tbase, dst_t, tn);
+
+        // ---- PASS A: Adam update -> W_fp_new (one priority encoder: s1_dyad_exp), ON-CHIP fixed indexing ----
+ADAM_R: for (int base = 0; base < tn; base += S1_OPT_LANE) {
 #pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=128 max=589824
-        for (int lane = 0; lane < S1_OPT_LANE; lane++) {
+#pragma HLS LOOP_TRIPCOUNT min=8 max=4096
+            for (int lane = 0; lane < S1_OPT_LANE; lane++) {
 #pragma HLS UNROLL
-            int p = base + lane;
-            if (p < n) {
-                if (init_only) {
-                    // Adam no-op on init: leave W_fp/m/v/g untouched. CODE regions re-quantize the staged
-                    // W_fp in PASS B; VALUE regions have no encoder, so populate the deploy slot here from
-                    // the staged master (== old single-pass init: dst = (int16)wfp, unchanged weights).
-                    if (!R.is_code) {
-                        data_t wfp = (data_t)(int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
-                        buffer[R.dst_off + p] = (int32_t)(int16_t)wfp;
+                int i = base + lane;
+                if (i < tn) {
+                    if (init_only) {
+                        // Adam no-op on init: leave W_fp/m/v/g untouched. CODE regions re-quantize the staged
+                        // W_fp in PASS B; VALUE regions have no encoder, so populate the deploy slot here from
+                        // the staged master (== old single-pass init: dst = (int16)wfp, unchanged weights).
+                        if (!R.is_code) {
+                            data_t wfp = (data_t)(int16_t)(wfp_t[i] & 0xFFFF);
+                            dst_t[i] = (int32_t)(int16_t)wfp;
+                        }
+                        continue;
                     }
-                    continue;
-                }
-                acc_t g = (acc_t)(int32_t)buffer[R.g_off  + p];
-                acc_t m = (acc_t)(int32_t)buffer[R.m_off + p];
-                acc_t v = (acc_t)(int32_t)buffer[R.v_off + p];
-                acc_t absg = (g < 0) ? (acc_t)(-g) : g;
-                acc_t mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
-                acc_t vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
-                int se = s1_dyad_exp(vn);                    // PRIORITY ENCODER #1 (alone in this stage)
-                acc_t step = mn >> se;                       // m / 2^round(log2 v)  (arith shift, keeps sign)
-                if (R.is_code) {
-                    // FINE FIXED-POINT code master (int32 at scale 2^Q_CODE): nudge by a small fraction of a
-                    // code unit; the deploy code is re-quantized from W_fp_new in PASS B (encoder #2).
-                    acc_t wq  = (acc_t)(int32_t)buffer[R.wfp_off + p];
-                    acc_t dw  = step >> S1_LR_SHIFT_CODE;    // fine lr = 2^-LR_SHIFT_CODE of a code unit
+                    acc_t g = (acc_t)(int32_t)g_t[i];
+                    acc_t m = (acc_t)(int32_t)m_t[i];
+                    acc_t v = (acc_t)(int32_t)v_t[i];
+                    acc_t absg = (g < 0) ? (acc_t)(-g) : g;
+                    acc_t mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
+                    acc_t vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
+                    int se = s1_dyad_exp(vn);                    // PRIORITY ENCODER #1 (alone in this stage)
+                    acc_t step = mn >> se;                       // m / 2^round(log2 v)  (arith shift, keeps sign)
+                    if (R.is_code) {
+                        // FINE FIXED-POINT code master (int32 at scale 2^Q_CODE): nudge by a small fraction of a
+                        // code unit; the deploy code is re-quantized from W_fp_new in PASS B (encoder #2).
+                        acc_t wq  = (acc_t)(int32_t)wfp_t[i];
+                        acc_t dw  = step >> S1_LR_SHIFT_CODE;    // fine lr = 2^-LR_SHIFT_CODE of a code unit
 #if S1_CODE_WD_SHIFT
-                    acc_t wd  = wq >> S1_CODE_WD_SHIFT;      // multiplier-free weight decay (shift toward 0)
+                        acc_t wd  = wq >> S1_CODE_WD_SHIFT;      // multiplier-free weight decay (shift toward 0)
 #else
-                    acc_t wd  = 0;
+                        acc_t wd  = 0;
 #endif
-                    acc_t wn  = (acc_t)sat32((acc_t)wq - dw - wd);
-                    buffer[R.m_off + p]   = (int32_t)mn;
-                    buffer[R.v_off + p]   = (int32_t)vn;
-                    buffer[R.wfp_off + p] = (int32_t)wn;     // store the full int32 fixed-point master
-                    buffer[R.g_off + p]   = 0;
-                } else {
-                    // VALUE master (EMBED/W_HEAD/LN beta): int16 unit scale, coarse LR_SHIFT (unchanged — it
-                    // SCATTERS, no fan-in blow-up). No re-quantize: the deploy slot IS W_fp_new, written here.
-                    data_t wfp = (data_t)(int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
-                    acc_t dw   = step >> S1_LR_SHIFT;        // lr = 2^-LR_SHIFT
-                    data_t wn  = sat16((acc_t)wfp - dw);
-                    buffer[R.m_off + p]   = (int32_t)mn;
-                    buffer[R.v_off + p]   = (int32_t)vn;
-                    buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
-                    buffer[R.g_off + p]   = 0;
-                    buffer[R.dst_off + p] = (int32_t)(int16_t)wn;
+                        acc_t wn  = (acc_t)sat32((acc_t)wq - dw - wd);
+                        m_t[i]   = (int32_t)mn;
+                        v_t[i]   = (int32_t)vn;
+                        wfp_t[i] = (int32_t)wn;                  // store the full int32 fixed-point master
+                        g_t[i]   = 0;
+                    } else {
+                        // VALUE master (EMBED/W_HEAD/LN beta): int16 unit scale, coarse LR_SHIFT (unchanged — it
+                        // SCATTERS, no fan-in blow-up). No re-quantize: the deploy slot IS W_fp_new, written here.
+                        data_t wfp = (data_t)(int16_t)(wfp_t[i] & 0xFFFF);
+                        acc_t dw   = step >> S1_LR_SHIFT;        // lr = 2^-LR_SHIFT
+                        data_t wn  = sat16((acc_t)wfp - dw);
+                        m_t[i]   = (int32_t)mn;
+                        v_t[i]   = (int32_t)vn;
+                        wfp_t[i] = (int32_t)(int16_t)wn;
+                        g_t[i]   = 0;
+                        dst_t[i] = (int32_t)(int16_t)wn;
+                    }
                 }
             }
         }
-    }
-    // ---- PASS B: re-quantize CODE regions W_fp_new -> deploy code (one priority encoder: dyad in encode) ----
-    if (R.is_code) {
-ADAM_Q: for (int base = 0; base < n; base += S1_OPT_LANE) {
+        // ---- PASS B: re-quantize CODE regions W_fp_new -> deploy code (one priority encoder: dyad in encode) ----
+        if (R.is_code) {
+ADAM_Q: for (int base = 0; base < tn; base += S1_OPT_LANE) {
 #pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=128 max=589824
-            for (int lane = 0; lane < S1_OPT_LANE; lane++) {
+#pragma HLS LOOP_TRIPCOUNT min=8 max=4096
+                for (int lane = 0; lane < S1_OPT_LANE; lane++) {
 #pragma HLS UNROLL
-                int p = base + lane;
-                if (p < n) {
-                    acc_t wn = (acc_t)(int32_t)buffer[R.wfp_off + p];   // W_fp_new from PASS A (or staged W_fp on init)
-                    buffer[R.dst_off + p] = s1_encode_fine(wn, buffer[R.dst_off + p], !init_only);  // PRIORITY ENCODER #2
+                    int i = base + lane;
+                    if (i < tn) {
+                        acc_t wn = (acc_t)(int32_t)wfp_t[i];     // W_fp_new from PASS A (or staged W_fp on init)
+                        dst_t[i] = s1_encode_fine(wn, dst_t[i], !init_only);  // PRIORITY ENCODER #2
+                    }
                 }
             }
+        }
+
+        // ---- BURST-OUT: on-chip tile arrays -> contiguous gmem slices (wide AXI). On init PASS A only moved
+        //      the VALUE deploy slot (CODE dst is set by PASS B); m/v/g/W_fp are untouched, so skip them. ----
+        if (R.is_code || init_only) burst_store_i32(dst_t, buffer, R.dst_off + tbase, tn);
+        if (!init_only) {
+            burst_store_i32(wfp_t, buffer, R.wfp_off + tbase, tn);
+            burst_store_i32(m_t,   buffer, R.m_off   + tbase, tn);
+            burst_store_i32(v_t,   buffer, R.v_off   + tbase, tn);
+            burst_store_i32(g_t,   buffer, R.g_off   + tbase, tn);   // grads zeroed in PASS A
+            if (!R.is_code) burst_store_i32(dst_t, buffer, R.dst_off + tbase, tn);  // VALUE deploy slot
         }
     }
 #else
@@ -1875,15 +1935,28 @@ ADAM_Q: for (int base = 0; base < n; base += S1_OPT_LANE) {
 static void zero_grad_region(int32_t *buffer, const s1_opt_region_t &R) {
 #pragma HLS INLINE off
     int n = R.n;
-ZGR: for (int base = 0; base < n; base += S1_OPT_LANE) {
+#if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
+    // TILED ON-CHIP ZERO — same anti-512-bit-variable-shift pattern: build a zero TILE on-chip (sequential
+    // II=1 writes, no variable-offset gmem), then burst-store it to the grad region in wide AXI chunks. A
+    // direct buffer[R.g_off + p] = 0 would be a 512-bit RMW + variable barrel shift (the pole we removed).
+    static int32_t zero_t[S1_OPT_TILE];
+#pragma HLS BIND_STORAGE variable=zero_t type=ram_2p impl=bram
+ZGR_INIT: for (int i = 0; i < S1_OPT_TILE; i++) {
 #pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=128 max=589824
+        zero_t[i] = 0;
+    }
+ZGR_TILE: for (int tbase = 0; tbase < n; tbase += S1_OPT_TILE) {
+        int tn = n - tbase; if (tn > S1_OPT_TILE) tn = S1_OPT_TILE;
+        burst_store_i32(zero_t, buffer, R.g_off + tbase, tn);
+    }
+#else
+ZGR: for (int base = 0; base < n; base += S1_OPT_LANE) {
         for (int lane = 0; lane < S1_OPT_LANE; lane++) {
-#pragma HLS UNROLL
             int p = base + lane;
             if (p < n) buffer[R.g_off + p] = 0;
         }
     }
+#endif
 }
 
 // =============================================================================
