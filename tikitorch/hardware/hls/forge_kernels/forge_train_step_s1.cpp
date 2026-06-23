@@ -301,6 +301,23 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 #endif
 
 // =============================================================================
+// OPT AREA FIX — the optimizer (mode 2 do_opt) is a per-element streaming RMW (dyadic-Adam EMA + pow2
+// step + re-quantize + weight decay), NOT a throughput GEMM. The old version inherited the GEMM's wide
+// S1_LANE(=16) UNROLL on the RMW loop, which REPLICATED the whole per-element datapath — and crucially the
+// s1_dyad_exp / dyad / s1_encode_fine PRIORITY ENCODERS (32-/16-deep) — 16x per region. That is why do_opt
+// was 515k LUT (16x the encoder trees). The fix: a SEPARATE, SMALL optimizer lane width S1_OPT_LANE
+// (default 1 = ONE shared dyadic-Adam-element datapath, II=1) so the heavy priority-encoders are
+// instantiated ONCE. Latency grows ~S1_LANE/S1_OPT_LANE x (irrelevant for the S1 correctness/convergence
+// proof — the throughput story is the standalone optimized kernels). BIT-EXACT-PRESERVING: the optimizer
+// is a per-element map (no contraction, no cross-element carry), so any lane width produces the IDENTICAL
+// result — only the SCHEDULE changes. The #else (g++) reference path is a plain scalar loop already, so
+// the int64 golden is untouched. S1_OPT_LANE must divide nothing (the p<n guard handles any tail).
+// =============================================================================
+#ifndef S1_OPT_LANE
+#define S1_OPT_LANE 1
+#endif
+
+// =============================================================================
 // fwd_gemm — the dyadic-MAC GEMM y[t][o] = sum_i q(x[t][i]) MAC q(W[o][i]) + bias(=0 in S1).
 // Reproduces forge_fwd_wide.cpp's inner: x dyad-quantized once, W PRE-DYADIC (wdecode inline), the
 // MAC is sign-xor + exponent-ADD + barrel-SHIFT + signed accumulate (NO multiply, DSP=0).
@@ -1725,10 +1742,10 @@ static void dyadic_adam_region(int32_t *buffer, const s1_opt_region_t &R, bool i
 #pragma HLS INLINE off
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
     int n = R.n;
-ADAM_R: for (int base = 0; base < n; base += S1_LANE) {
+ADAM_R: for (int base = 0; base < n; base += S1_OPT_LANE) {
 #pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT min=128 max=589824
-        for (int lane = 0; lane < S1_LANE; lane++) {
+        for (int lane = 0; lane < S1_OPT_LANE; lane++) {
 #pragma HLS UNROLL
             int p = base + lane;
             if (p < n) {
@@ -1823,10 +1840,10 @@ ADAM_R: for (int base = 0; base < n; base += S1_LANE) {
 static void zero_grad_region(int32_t *buffer, const s1_opt_region_t &R) {
 #pragma HLS INLINE off
     int n = R.n;
-ZGR: for (int base = 0; base < n; base += S1_LANE) {
+ZGR: for (int base = 0; base < n; base += S1_OPT_LANE) {
 #pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT min=128 max=589824
-        for (int lane = 0; lane < S1_LANE; lane++) {
+        for (int lane = 0; lane < S1_OPT_LANE; lane++) {
 #pragma HLS UNROLL
             int p = base + lane;
             if (p < n) buffer[R.g_off + p] = 0;
@@ -1851,6 +1868,12 @@ ZGR: for (int base = 0; base < n; base += S1_LANE) {
 // =============================================================================
 static int do_opt(int32_t *buffer, int a1, int freeze_codes) {
 #pragma HLS INLINE off
+    // AREA FIX — ONE shared dyadic-Adam-element datapath time-multiplexed across all 14 regions (and the
+    // mode-3 do_train_run call shares it too via the top-level ALLOCATION). Without limit=1 HLS would build
+    // a separate per-region RMW engine (14x the priority-encoder trees). The region loop itself is NOT
+    // unrolled, so the 14 regions stream sequentially through the single S1_OPT_LANE-wide element datapath.
+#pragma HLS ALLOCATION function instances=dyadic_adam_region limit=1
+#pragma HLS ALLOCATION function instances=zero_grad_region   limit=1
     bool init_only = (a1 == S1_OPT_INIT);
     bool freeze = (freeze_codes == S1_OPT_FREEZE_CODES) && !init_only;
 OPT_REGIONS: for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
@@ -1922,6 +1945,15 @@ extern "C" int forge_train_step_s1(
 #pragma HLS INTERFACE s_axilite  port=a3      bundle=control
 #pragma HLS INTERFACE s_axilite  port=buffer  bundle=control
 #pragma HLS INTERFACE s_axilite  port=return  bundle=control
+
+    // AREA FIX (mode-3 sharing) — force ONE physical instance of each sub-function, time-multiplexed by the
+    // dispatcher's direct mode-0/1/2 calls AND by mode 3's do_train_run (which calls the SAME three). Without
+    // this, HLS builds the sub-functions once for the dispatch path and AGAIN inside do_train_run — a full
+    // duplicate copy of do_fwd_loss + do_bwd + do_opt (~904k LUT, ~half the kernel). limit=1 collapses the
+    // duplicate to a single shared instance (mode 3 just re-sequences the same engines; bit-exact unchanged).
+#pragma HLS ALLOCATION function instances=do_fwd_loss limit=1
+#pragma HLS ALLOCATION function instances=do_bwd      limit=1
+#pragma HLS ALLOCATION function instances=do_opt      limit=1
 
     (void)a3;
     if (mode == 0) return do_fwd_loss(buffer);
