@@ -1,0 +1,23 @@
+### off-by-one kernel shift, tgt=8 (DEFAULT) -> STUCK at chance (the bug)
+$ PC_KERNEL_SHIFT=1 PC_NOSHUF=1 PC_BATCH=32 PC_EPOCHS=2 python scripts/pc_onfabric_train_ref.py
+  init test acc = 0.0841
+  epoch 1: test acc = 0.0980  |W0|max=1891 |W1|max=1886
+  epoch 2: test acc = 0.0980  |W0|max=3766 |W1|max=3761
+  (Weights grow ~480/epoch; clamp to int16 for long runs -- fine for the few-epoch demo.)
+
+### off-by-one kernel shift + tgt=16 (host-side fix) -> recovers
+$ PC_KERNEL_SHIFT=1 PC_TGT=16 PC_NOSHUF=1 PC_BATCH=32 PC_EPOCHS=2 python scripts/pc_onfabric_train_ref.py
+  init test acc = 0.0841
+  epoch 1: test acc = 0.8846  |W0|max=1891 |W1|max=1886
+  epoch 2: test acc = 0.8961  |W0|max=3766 |W1|max=3760
+  (Weights grow ~480/epoch; clamp to int16 for long runs -- fine for the few-epoch demo.)
+
+### EXACT driver config: off-by-one + tgt=16 + no-shuffle + batch32 + uniform(-4,4) init
+$ PC_KERNEL_SHIFT=1 PC_TGT=16 PC_NOSHUF=1 PC_BATCH=32 PC_UNIFINIT=1 PC_EPOCHS=3 python scripts/pc_onfabric_train_ref.py
+  init test acc = 0.1095
+  epoch 1: test acc = 0.7996  |W0|max=1879 |W1|max=1879
+  epoch 2: test acc = 0.8079  |W0|max=3754 |W1|max=3754
+  epoch 3: test acc = 0.8094  |W0|max=5629 |W1|max=5629
+  (Weights grow ~480/epoch; clamp to int16 for long runs -- fine for the few-epoch demo.)
+
+(generated 2026-06-23T17:41Z; reproduces the ONFABRIC_TRAINING.md recipe claims)
