@@ -1196,11 +1196,16 @@ int main() {
     printf("  -> MODE 2 (dyadic-Adam) %s\n", opt_ok ? "BIT-EXACT" : "MISMATCH");
     free(ob);
 
-#ifndef __VITIS_HLS__   // heavy multi-step convergence runs in native g++ ONLY. Vitis csim does the one-step
-                        // bit-exact checks above (ap_int == int64 for one step) then proceeds to csynth; the
-                        // N-step convergence is proven in g++ and is transitively valid (deterministic, one
-                        // bit-exact step => N bit-exact steps). Running ~1440 train steps in csim_design would
-                        // exceed the build backstop.
+    // The convergence block runs in BOTH regimes now (INTEGRITY MEASUREMENT): under g++ at the full
+    // 120/400-step horizon WITH the convergence gates wired into the return code (the established golden),
+    // and ALSO under Vitis csim at a SHORT 32/32-step horizon that is NON-GATING — csim PRINTS the TRUE
+    // float CE / peak|R| / argmax-acc at start and end for BOTH regimes (greppable [APINT FREEZE] /
+    // [APINT TRAIN_ALL] lines) under the REAL ap_int<48>/int16 hardware types, but the Vitis RETURN CODE
+    // depends ONLY on the one-step bit-exact checks (fwd_ok && bwd_ok && opt_ok) so csim always completes
+    // and csynth proceeds. We OBSERVE the printed numbers; we do not gate on them under csim. 32 steps is
+    // enough to distinguish a genuine CE drop from int16 saturation collapse (peak|R|==32767): the known
+    // g++ FREEZE trajectory is already at ~CE 4.2 by step 20. This settles whether the multi-step ap_int
+    // trajectory genuinely reduces CE or whether the int64-golden dense result was a saturation artifact.
     // ============================================================================
     // =========  MODE 3 (FUSED TRAINER) N-STEP CONVERGENCE check  =================
     // ============================================================================
@@ -1224,7 +1229,11 @@ int main() {
     // faked by saturation (uniform logits => CE == log V == the FLOOR, which FAILS the test). Convergence
     // requires (a) CE drops by a substantial margin, (b) the final distribution is NOT the uniform-collapse
     // floor, and (c) argmax accuracy strictly improves. The loss must move because the WEIGHTS move.
-    const int N_STEPS = 120;
+#ifdef __VITIS_HLS__
+    const int N_STEPS = 32;     // short, NON-GATING csim horizon (enough to see CE drop vs saturation)
+#else
+    const int N_STEPS = 120;    // full g++ golden horizon (gated)
+#endif
     const int FRZ = S1_OPT_FREEZE_CODES;   // a2 for modes 2 & 3 in the convergence run
     printf("  ----- MODE 3 (fused trainer) %d-step convergence (memorization, FREEZE_CODES) -----\n", N_STEPS);
 
@@ -1275,6 +1284,15 @@ int main() {
     forge_train_step_s1(hb, 0, 0, 0, 0);
     double ce_final = true_ce(hb);
     int    acc_final = count_correct(hb);
+    // peak|R| (residual stream at the final layer): the int16 saturation indicator. ==32767 means the
+    // residual is pinned at the int16 ceiling == collapse (the SAME peak|R| metric used for TRAIN_ALL).
+    long frz_peakR = 0;
+    for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) { long a = labs((long)(int32_t)hb[s1_off_R(S1_N_LAYERS) + t*S1_D + d]); if (a > frz_peakR) frz_peakR = a; }
+    // greppable HONEST measurement under the REAL ap_int<48>/int16 hardware types (printed in BOTH g++ and
+    // csim). CE0->CE1 is the TRUE float cross-entropy (non-fakeable: uniform/saturation collapse == log V
+    // floor); peakR==32767 == int16 ceiling == collapse; acc0/acc1 are argmax accuracy start/end.
+    printf("  [APINT FREEZE] CE0=%.4f CE1=%.4f peakR=%ld acc0=%d acc1=%d (N_STEPS=%d floor=%.4f)\n",
+           ce_traj[0], ce_final, frz_peakR, acc_traj[0], acc_final, N_STEPS, CE_FLOOR);
 
     printf("  TRUE cross-entropy trajectory (-mean_t log softmax(logits)[target]; uniform/collapse = %.4f):\n", CE_FLOOR);
     for (int s = 0; s < N_STEPS; s++) {
@@ -1352,7 +1370,13 @@ int main() {
     // The dense-backbone benefit over FREEZE GROWS with the horizon (measured: ~0.04 nats @120 -> ~0.05 @400
     // steps, all-seeds-consistent). Use a longer horizon for the TRAIN_ALL block so the ablation has a clear,
     // un-fakeable margin. (The FREEZE convergence + fused bit-exact checks above keep the shorter N_STEPS.)
+    // Under Vitis csim the horizon is SHORT and NON-GATING — 32 steps is enough to tell a genuine CE drop
+    // from int16 saturation (peak|R|==32767 == collapse), which is the open ap_int integrity question.
+#ifdef __VITIS_HLS__
+    const int TA_STEPS = 32;
+#else
     const int TA_STEPS = 400;
+#endif
 
     // (A) TRAIN_ALL trajectory.
     int32_t *tb = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
@@ -1424,6 +1448,13 @@ int main() {
 
     printf("  TRAIN_ALL:  CE %.4f -> %.4f  (drop %.4f nats; floor %.4f)  acc %d -> %d/%d  peak|R|=%ld\n",
            ta_ce0, ta_ce_final, ta_ce0 - ta_ce_final, CE_FLOOR, ta_acc0, ta_acc_final, S1_L_SEQ, ta_peakR);
+    // greppable HONEST measurement under the REAL ap_int<48>/int16 hardware types (printed in BOTH g++ and
+    // csim). CE0->CE1 is the TRUE float cross-entropy; peakR==32767 == int16 ceiling == saturation/collapse;
+    // beats_freeze=1 iff TRAIN_ALL final CE strictly beats FREEZE(same init) final CE (the dense backbone
+    // genuinely helps). If TRAIN_ALL saturates (peakR==32767) the dense result was an int64-golden artifact.
+    printf("  [APINT TRAIN_ALL] CE0=%.4f CE1=%.4f peakR=%ld acc0=%d acc1=%d beats_freeze=%d (frz_CE1=%.4f TA_STEPS=%d floor=%.4f)\n",
+           ta_ce0, ta_ce_final, ta_peakR, ta_acc0, ta_acc_final,
+           (ta_ce_final < frz_ce_final - 1e-9) ? 1 : 0, frz_ce_final, TA_STEPS, CE_FLOOR);
     printf("  TRAIN_ALL:  dense code bytes changed from init = %d  (0 => codes never moved == FREEZE; >0 => dense backbone genuinely stepped)\n", ta_code_changes);
     printf("  ABLATION :  TRAIN_ALL final CE %.4f  vs  FREEZE(same init) final CE %.4f  (TA - FRZ = %+.4f; <0 => dense codes HELP)\n",
            ta_ce_final, frz_ce_final, ta_ce_final - frz_ce_final);
@@ -1452,20 +1483,23 @@ int main() {
            ta_fused_ok ? "BIT-EXACT" : "MISMATCH");
     free(tb); free(nb);
 
-    int ok = fwd_ok && bwd_ok && opt_ok && conv_ok && fused_ok;
     printf("  ============================================================\n");
+#ifdef __VITIS_HLS__
+    // Vitis csim: the convergence block ABOVE ran (short, NON-GATING) and PRINTED the [APINT FREEZE] /
+    // [APINT TRAIN_ALL] CE/peakR/acc lines under the REAL ap_int<48>/int16 hardware types — we OBSERVE
+    // those. The RETURN CODE depends ONLY on the one-step bit-exact checks so csim always completes and
+    // csynth proceeds; the multi-step convergence is OBSERVED, not gated, under csim.
+    int ok = fwd_ok && bwd_ok && opt_ok;
+    printf("  S1 TRAINER (Vitis csim): FWD %s ; BWD %s ; OPT %s   [convergence OBSERVED above, non-gating]\n",
+           fwd_ok ? "OK" : "FAIL", bwd_ok ? "OK" : "FAIL", opt_ok ? "OK" : "FAIL");
+#else
+    // g++ golden: the FULL 120/400-step convergence gates are wired into the return code (unchanged).
+    int ok = fwd_ok && bwd_ok && opt_ok && conv_ok && fused_ok;
     printf("  S1 TRAINER: FWD %s ; BWD %s ; OPT %s ; CONVERGE(FREEZE) %s ; FUSED %s ; TRAIN_ALL %s\n",
            fwd_ok ? "OK" : "FAIL", bwd_ok ? "OK" : "FAIL", opt_ok ? "OK" : "FAIL",
            conv_ok ? "OK" : "FAIL", fused_ok ? "OK" : "FAIL",
            train_all_genuine ? "GENUINE-TRAIN" : "DOES-NOT-GENUINELY-TRAIN");
-    free(buf);
-    return ok ? 0 : 1;
-#else   // __VITIS_HLS__ : Vitis csim path — one-step bit-exact only (N-step convergence is the g++ path)
-    int ok = fwd_ok && bwd_ok && opt_ok;
-    printf("  ============================================================\n");
-    printf("  S1 TRAINER (Vitis csim, one-step bit-exact): FWD %s ; BWD %s ; OPT %s\n",
-           fwd_ok ? "OK" : "FAIL", bwd_ok ? "OK" : "FAIL", opt_ok ? "OK" : "FAIL");
-    free(buf);
-    return ok ? 0 : 1;
 #endif
+    free(buf);
+    return ok ? 0 : 1;
 }
