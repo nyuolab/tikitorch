@@ -9,7 +9,7 @@ set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"
 REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null || echo us-east-1)}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-f2.12xlarge}"; AMI="${AMI:-ami-092fc5deb8f3c0f7d}"
-AGFI="${AGFI:?set AGFI}"; EPOCHS="${EPOCHS:-5}"; NSLOTS="${NSLOTS:-2}"; MAX_MINUTES="${MAX_MINUTES:-50}"; ROLE="${ROLE:-tiki-sweep-runner}"
+AGFI="${AGFI:?set AGFI}"; EPOCHS="${EPOCHS:-5}"; NSLOTS="${NSLOTS:-2}"; MAX_MINUTES="${MAX_MINUTES:-50}"; ROLE="${ROLE:-tiki-sweep-runner}"; VERIFY="${VERIFY:-}"
 BINS_S3="${BINS_S3:-s3://tiki-sweep-739966866637/pc_mnist_bins}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_pc_shard_state"; mkdir -p "$STATE_DIR"; STATE_FILE="$STATE_DIR/run.env"
@@ -45,7 +45,7 @@ render_user_data(){
 shutdown -h +${MAX_MINUTES} dl || true
 exec > /var/log/tiki-pcshard.log 2>&1
 set -x; export HOME=/root
-S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; AGFI="${AGFI}"; EPOCHS="${EPOCHS}"; NSLOTS="${NSLOTS}"; BINS_S3="${BINS_S3}"
+S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; AGFI="${AGFI}"; EPOCHS="${EPOCHS}"; NSLOTS="${NSLOTS}"; BINS_S3="${BINS_S3}"; VERIFY="${VERIFY}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-pcshard.log "\$S3_RESULTS/pcshard.log" --only-show-errors || true; }
 trap up EXIT
 echo "BOOT \$(date -u)"; hostname
@@ -59,6 +59,13 @@ mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.
 mkdir -p /tmp/pc_mnist; for f in train_x.i8 train_y.u8 test_x.i8 test_y.u8; do aws s3 cp "\$BINS_S3/\$f" /tmp/pc_mnist/\$f --only-show-errors; done
 gcc -O2 -std=gnu11 -I"\$SDK/include" /opt/tiki/tikitorch/fpga/silicon/forge_pc_train_shard.c -lfpga_mgmt -o /tmp/pcshard 2>&1 | tee /tmp/build.txt
 up
+if [ -n "\$VERIFY" ]; then
+  gcc -O2 -std=gnu11 -I"\$SDK/include" /opt/tiki/tikitorch/fpga/silicon/forge_pc_block_verify.c -lfpga_mgmt -o /tmp/pcbverify 2>&1 | tee -a /tmp/build.txt
+  ( sudo /tmp/pcbverify 0 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
+  for f in img build train; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
+  echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
+  up; shutdown -h now
+fi
 # Vccint (core rail) energy: read 'Last measured: N watts' under each slot's Vccint. helper:
 vcc(){ sudo \$FD -S \$1 -M 2>&1 | awk 'BEGIN{IGNORECASE=1} /vccint/{f=1} f&&/last measured/{for(i=1;i<=NF;i++)if(\$i~/^[0-9]+\$/){print \$i;exit}}'; }
 echo "== IDLE Vccint (per slot, pre-run) ==" | tee /tmp/power.txt
