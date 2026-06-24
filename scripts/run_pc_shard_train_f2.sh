@@ -11,6 +11,9 @@ REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null ||
 INSTANCE_TYPE="${INSTANCE_TYPE:-f2.12xlarge}"; AMI="${AMI:-ami-092fc5deb8f3c0f7d}"
 AGFI="${AGFI:?set AGFI}"; EPOCHS="${EPOCHS:-5}"; NSLOTS="${NSLOTS:-2}"; MAX_MINUTES="${MAX_MINUTES:-50}"; ROLE="${ROLE:-tiki-sweep-runner}"; VERIFY="${VERIFY:-}"
 BINS_S3="${BINS_S3:-s3://tiki-sweep-739966866637/pc_mnist_bins}"
+INITPERM_S3="${INITPERM_S3:-s3://tiki-sweep-739966866637/pc_initperm}"
+RESIDUAL="${RESIDUAL:-}"   # non-empty -> host-side residual skips on hidden chips (deep nets, no rebuild)
+SWEEP="${SWEEP:-}"         # e.g. "2 4 8": run the driver at each chip-count on this instance (scaling-law)
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_pc_shard_state"; mkdir -p "$STATE_DIR"; STATE_FILE="$STATE_DIR/run.env"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
@@ -45,7 +48,7 @@ render_user_data(){
 shutdown -h +${MAX_MINUTES} dl || true
 exec > /var/log/tiki-pcshard.log 2>&1
 set -x; export HOME=/root
-S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; AGFI="${AGFI}"; EPOCHS="${EPOCHS}"; NSLOTS="${NSLOTS}"; BINS_S3="${BINS_S3}"; VERIFY="${VERIFY}"
+S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; AGFI="${AGFI}"; EPOCHS="${EPOCHS}"; NSLOTS="${NSLOTS}"; BINS_S3="${BINS_S3}"; INITPERM_S3="${INITPERM_S3}"; RESIDUAL="${RESIDUAL}"; SWEEP="${SWEEP}"; VERIFY="${VERIFY}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-pcshard.log "\$S3_RESULTS/pcshard.log" --only-show-errors || true; }
 trap up EXIT
 echo "BOOT \$(date -u)"; hostname
@@ -57,7 +60,7 @@ SLOTS=""; for s in \$(seq 0 \$((NSLOTS-1))); do SLOTS="\$SLOTS \$s"; sudo \$FC -
 sleep 4; for s in \$SLOTS; do sudo \$FD -S \$s 2>&1 | tee -a /tmp/img.txt; done; up
 mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.tgz && break; sleep 8; done && tar xzf s.tgz
 mkdir -p /tmp/pc_mnist; for f in train_x.i8 train_y.u8 test_x.i8 test_y.u8; do aws s3 cp "\$BINS_S3/\$f" /tmp/pc_mnist/\$f --only-show-errors; done
-mkdir -p /tmp/pc_initperm; aws s3 cp s3://tiki-sweep-739966866637/pc_initperm/ /tmp/pc_initperm/ --recursive --only-show-errors || true
+mkdir -p /tmp/pc_initperm; aws s3 cp "\$INITPERM_S3/" /tmp/pc_initperm/ --recursive --only-show-errors || true
 gcc -O2 -std=gnu11 -I"\$SDK/include" /opt/tiki/tikitorch/fpga/silicon/forge_pc_train_shard.c -lfpga_mgmt -o /tmp/pcshard 2>&1 | tee /tmp/build.txt
 up
 if [ -n "\$VERIFY" ]; then
@@ -73,7 +76,18 @@ echo "== IDLE Vccint (per slot, pre-run) ==" | tee /tmp/power.txt
 for s in \$SLOTS; do echo "idle slot=\$s W=\$(vcc \$s)" | tee -a /tmp/power.txt; done
 # run the instrumented driver in the BACKGROUND; sample per-slot Vccint concurrently every ~2s
 rm -f /tmp/scdone
-( sudo PC_INITPERM=/tmp/pc_initperm /tmp/pcshard "\$EPOCHS" /tmp/pc_mnist \$SLOTS 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt; touch /tmp/scdone ) &
+runseq(){   # run the driver once per chip-count in SWEEP (scaling-law), else once with all NSLOTS
+  local list="\$SWEEP"; [ -z "\$list" ] && list="\$NSLOTS"
+  for nl in \$list; do
+    local sl=""; for s in \$(seq 0 \$((nl-1))); do sl="\$sl \$s"; done
+    echo "===== RUN L=\$nl slots=\$sl =====" | tee -a /tmp/train.txt
+    sudo PC_INITPERM=/tmp/pc_initperm PC_RESIDUAL="\$RESIDUAL" /tmp/pcshard "\$EPOCHS" /tmp/pc_mnist \$sl 2>&1 | tee /tmp/train_L\${nl}.txt | tee -a /tmp/train.txt
+    for w in shardW0 shardW1 shardW2 shardW3 shardW4 shardW5 shardW6 shardW7; do [ -f /tmp/\$w.i32 ] && cp /tmp/\$w.i32 /tmp/\${w}_L\${nl}.i32; done
+    aws s3 cp /tmp/train_L\${nl}.txt "\$S3_RESULTS/train_L\${nl}.txt" --only-show-errors || true
+  done
+  touch /tmp/scdone
+}
+runseq &
 while [ ! -f /tmp/scdone ]; do TS=\$(date +%s.%N); for s in \$SLOTS; do echo "during t=\$TS slot=\$s W=\$(vcc \$s)"; done >> /tmp/power.txt; sleep 2; done
 wait
 # compute energy (J, J/step) from the sampled Vccint + the driver's ENERGY_WINDOW line
@@ -103,7 +117,8 @@ if wall:
     print("NOTE: Vccint is the core rail (not whole-board); a DSP_MULT=0 core's dynamic draw is often at/below the sensor's 1W resolution -> dynamic may read ~0 (honest: structural demo, not a power record).")
 PY
 for f in img build train power energy; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
-for w in s1_perm.i32 shardW0.i32 shardW1.i32 s1_iW0.i32 s1_iW1.i32 s1_x.i32 s1_y.i32 s1_W0.i32 s1_W1.i32; do [ -f /tmp/\$w ] && aws s3 cp /tmp/\$w "\$S3_RESULTS/\$w" --only-show-errors || true; done
+for w in s1_perm.i32 shardW0.i32 shardW1.i32 shardW2.i32 shardW3.i32 shardW4.i32 shardW5.i32 shardW6.i32 shardW7.i32 s1_iW0.i32 s1_iW1.i32 s1_x.i32 s1_y.i32 s1_W0.i32 s1_W1.i32; do [ -f /tmp/\$w ] && aws s3 cp /tmp/\$w "\$S3_RESULTS/\$w" --only-show-errors || true; done
+for f in /tmp/shardW*_L*.i32 /tmp/train_L*.txt; do [ -f "\$f" ] && aws s3 cp "\$f" "\$S3_RESULTS/\$(basename \$f)" --only-show-errors || true; done
 echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 up; shutdown -h now
 UDEOF

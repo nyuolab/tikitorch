@@ -88,6 +88,67 @@ def step(xb, yb, W0, W1, m0, m1):
     return W0, W1, m0, m1, (h, logits, e_out1, gW0, gW1)
 
 
+# ===================== L-LAYER GENERALIZATION (deep nets across L chips) =====================
+# A net of L chips: chips 0..L-2 are HIDDEN (D->D ReLU), chip L-1 is OUTPUT (D->C readout). Exactly the
+# forge_pc_train_shard.c driver's loop (role_of(l) = OUTPUT iff l==L-1). Each chip holds ONLY W[l]+mom[l];
+# only a neighbour activation (down) + neighbour error (up) cross. Bit-exact to the 2-layer step() at L=2.
+
+@torch.no_grad()
+def step_L(xb, yb, Ws, ms, upd=None, res=False):
+    """One distributed step across L chips. Ws/ms are length-L lists; returns (Ws, ms, dbg).
+    upd: optional length-L per-chip update flags (0 = frozen layer, kernel DO_UPDATE=0; still routes).
+    res: HOST-side residual skip on the hidden chips (out_l = relu_block(in_l) + in_l). A deep PLAIN dyadic+relu
+         cascade washes out the input signal at depth>=4 (forward collapse); the residual carries it through
+         (the transformer's depth trick). The kernel is unchanged — the host adds the skip to the neighbour
+         activation (fwd) and routes the skip error (bwd: e_in_l = routed + e_out_l), so it stays bit-exact to
+         a reference that includes the same host arithmetic."""
+    L = len(Ws)
+    tgt = torch.nn.functional.one_hot(yb, C).double() * 8
+    # ---- forward sweep up: acts[l] = input to chip l ; raws[l] = chip l's relu_block output ; acts[L] = logits ----
+    acts = [xb]; raws = []; masks = []
+    for l in range(L):
+        role = "output" if l == L - 1 else "hidden"
+        raw, mask = chip_fwd(acts[-1], Ws[l], role)
+        raws.append(raw); masks.append(mask)
+        out = raw + acts[-1] if (res and role == "hidden") else raw          # host residual skip (hidden only)
+        acts.append(out)
+    # ---- backward sweep down: output chip seeds the error, each hidden chip consumes the neighbour error ----
+    gWs = [None] * L
+    gWs[L - 1], e_out = chip_bwd(acts[L - 1], Ws[L - 1], "output", masks[L - 1], a_out=acts[L], tgt=tgt)
+    for l in range(L - 2, -1, -1):
+        gWs[l], routed = chip_bwd(acts[l], Ws[l], "hidden", masks[l], e_in=e_out)
+        # host skip: grad wrt in_l = routed + e_out_l ; max-shift back to EDN_BITS so the accumulated error
+        # stays int16-bounded at depth (a uniform error rescale is benign for SignSGD — sign(gW) is invariant).
+        e_out = mshift(routed + e_out, EDN_BITS) if res else routed
+    # ---- each chip updates ONLY its own weights (SignSGD-momentum); frozen chips route but don't update ----
+    nWs, nms = [], []
+    for l in range(L):
+        if upd is not None and not upd[l]:
+            nWs.append(Ws[l]); nms.append(ms[l]); continue
+        m = (ms[l] + sign(gWs[l])).clamp(-MCAP, MCAP); W = Ws[l] - sign(m)
+        nWs.append(W); nms.append(m)
+    return nWs, nms, (acts, gWs)
+
+
+@torch.no_grad()
+def accuracy_L(X, Y, Ws, res=False):
+    L = len(Ws); correct = 0
+    for i in range(0, X.shape[0], 4000):
+        a = X[i:i+4000]
+        for l in range(L - 1):
+            raw, _ = chip_fwd(a, Ws[l], "hidden")
+            a = raw + a if res else raw
+        lg, _ = chip_fwd(a, Ws[L - 1], "output")
+        correct += (lg.argmax(1) == Y[i:i+4000]).sum().item()
+    return correct / X.shape[0]
+
+
+def init_Ws(L, seed):
+    """Reproduce the reference init convention round(randn*4), L independent DxD matrices for one seed."""
+    g = torch.Generator().manual_seed(seed)
+    return [(torch.randn(D, D, generator=g) * 4).round().double() for _ in range(L)]
+
+
 if __name__ == "__main__":
     (Xtr, Ytr), (Xte, Yte) = load_mnist_16()
     print(f"distributed (2-chip) PC training, 16x16 MNIST: train {tuple(Xtr.shape)} test {tuple(Xte.shape)}",

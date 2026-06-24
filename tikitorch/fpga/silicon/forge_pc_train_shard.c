@@ -19,6 +19,7 @@
 #define C 10
 #define H1_BITS 7
 #define LG_BITS 4
+#define EDN_BITS 13   // outgoing-error band (matches the kernel); used to rescale the residual-skip error
 #define MAXL 8
 // forge_pc_block DDR layout (must match the kernel)
 #define WL 16
@@ -48,6 +49,11 @@ static double now_s(){ struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); ret
 static int8_t *load(const char*p,long*n){ FILE*f=fopen(p,"rb"); if(!f){fprintf(stderr,"open %s\n",p);exit(2);} fseek(f,0,SEEK_END);*n=ftell(f);fseek(f,0,SEEK_SET); int8_t*b=malloc(*n); if(fread(b,1,*n,f)!=(size_t)*n){fprintf(stderr,"read %s\n",p);exit(2);} fclose(f); return b; }
 
 static int L;
+static int RES = 0;   // PC_RESIDUAL: host-side residual skip on hidden chips (out=relu_block(in)+in). A deep
+                      // plain dyadic+relu cascade washes out the signal at depth>=4; the skip carries it
+                      // through (the transformer's depth trick). Kernel unchanged; host adds the skip to the
+                      // neighbour activation (fwd) and routes the skip error (bwd). Bit-exact to a ref with the
+                      // same host arithmetic (pc_shard_train_ref.step_L(res=True)).
 static pci_bar_handle_t bar0[MAXL], bar4[MAXL], bar4r[MAXL];
 static int32_t *hbuf[MAXL];
 
@@ -65,14 +71,16 @@ static int role_of(int l){ return (l==L-1)?RL_OUTPUT:RL_HIDDEN; }
 
 // host forward through all L layers (eval), == the chips' forward. returns predicted class
 static int predict(const int8_t*x, int32_t**W){
-    static long a[D]; for(int i=0;i<D;i++) a[i]=x[i];
+    static long a[D], prev[D]; for(int i=0;i<D;i++) a[i]=x[i];
     for(int l=0;l<L;l++){
         int od = (l==L-1)?C:D;
+        for(int i=0;i<D;i++) prev[i]=a[i];                 // save block input for the residual skip
         long pre[D]; long mx=0;
         for(int o=0;o<od;o++){ long acc=0; for(int i=0;i<D;i++) acc+=rdyad(W[l][o*D+i])*a[i]; pre[o]=acc;
             long r=(l==L-1)?(acc<0?-acc:acc):(acc>0?acc:0); if(r>mx)mx=r; }
         int sh=rshift(mx,(l==L-1)?LG_BITS:H1_BITS);
-        for(int o=0;o<od;o++){ long v=(l==L-1)?pre[o]:(pre[o]>0?pre[o]:0); a[o]=(int16_t)(v>>sh); }
+        for(int o=0;o<od;o++){ long v=(l==L-1)?pre[o]:(pre[o]>0?pre[o]:0); long raw=v>>sh;
+            a[o]=(int16_t)((RES && l<L-1) ? raw+prev[o] : raw); }   // residual skip on hidden chips
         for(int o=od;o<D;o++) a[o]=0;
     }
     int best=0; long bv=-1L<<62; for(int c=0;c<C;c++){ if(a[c]>bv){bv=a[c];best=c;} } return best;
@@ -83,6 +91,7 @@ int main(int argc,char**argv){
     const char*dir = argc>2?argv[2]:"/tmp/pc_mnist";
     L = argc-3; if(L<2||L>MAXL){ fprintf(stderr,"usage: %s <epochs> <bindir> <slot0> <slot1> [..] (2<=L<=%d)\n",argv[0],MAXL); return 1; }
     int slot[MAXL]; for(int l=0;l<L;l++) slot[l]=atoi(argv[3+l]);
+    RES = (getenv("PC_RESIDUAL") != NULL);   // host-side residual skip on hidden chips (deep nets)
 
     long ntr,nte,nytr,nyte; char p[512];
     snprintf(p,512,"%s/train_x.i8",dir); int8_t*Xtr=load(p,&ntr);
@@ -91,7 +100,7 @@ int main(int argc,char**argv){
     snprintf(p,512,"%s/test_y.u8",dir);  int8_t*Yte=load(p,&nyte);
     int Ntr=nytr, Nte=nyte;
     printf("[shard] %d-layer net MODEL-PARALLEL across %d FPGAs (slots", L, L);
-    for(int l=0;l<L;l++) printf(" %d",slot[l]); printf("); %d train %d test\n", Ntr, Nte);
+    for(int l=0;l<L;l++) printf(" %d",slot[l]); printf("); %d train %d test%s\n", Ntr, Nte, RES?" [RESIDUAL skips]":"");
 
     if(fpga_mgmt_init()){fprintf(stderr,"mgmt init\n");return 2;}
     for(int l=0;l<L;l++){
@@ -134,7 +143,8 @@ int main(int argc,char**argv){
                 if(l==0){ for(int n=0;n<N;n++){ int s=perm[b*N+n]; for(int i=0;i<D;i++) hbuf[0][O_AIN+n*D+i]=Xtr[s*D+i]; } T_STAGE+=stage(l,O_AIN,N*D); }
                 else    { memcpy(hbuf[l]+O_AIN, aout, 4*N*D); xchip_msg += (long)N*D; T_XCHIP+=stage(l,O_AIN,N*D); }   // AOUT(l-1)->AIN(l): cross-chip
                 { double kt=kick(l); kick_fwd_s[l]+=kt; T_FWDK+=kt; }
-                if(l<L-1) T_XCHIP+=readw(l,O_AOUT,aout,N*D);   // read this layer's activation to pass on = comms
+                if(l<L-1){ T_XCHIP+=readw(l,O_AOUT,aout,N*D);   // read this layer's activation to pass on = comms
+                    if(RES) for(int j=0;j<N*D;j++) aout[j]+=hbuf[l][O_AIN+j]; }  // residual: out = raw + in_l (host skip)
             }
             // ---- BACKWARD SWEEP: slot L-1 -> 0, passing each layer's error upstream ----
             for(int l=L-1;l>=0;l--){
@@ -142,7 +152,10 @@ int main(int argc,char**argv){
                 if(l==L-1){ for(int n=0;n<N;n++){ int s=perm[b*N+n]; for(int c=0;c<D;c++) hbuf[l][O_TGT+n*D+c]=0; hbuf[l][O_TGT+n*D+Ytr[s]]=8; } T_STAGE+=stage(l,O_TGT,N*D); }
                 else      { memcpy(hbuf[l]+O_EIN, eout, 4*N*D); xchip_msg += (long)N*D; T_XCHIP+=stage(l,O_EIN,N*D); }  // EOUT(l+1)->EIN(l): cross-chip
                 { double kt=kick(l); kick_bwd_s[l]+=kt; T_BWDK+=kt; }
-                if(l>0) T_XCHIP+=readw(l,O_EOUT,eout,N*D);     // read upstream error to pass on = comms
+                if(l>0){ T_XCHIP+=readw(l,O_EOUT,eout,N*D);     // read upstream error to pass on = comms
+                    if(RES && l<L-1){ for(int j=0;j<N*D;j++) eout[j]+=hbuf[l][O_EIN+j];  // residual: grad wrt in_l = routed + e_out_l
+                        long mx=0; for(int j=0;j<N*D;j++){ long a=eout[j]<0?-eout[j]:eout[j]; if(a>mx)mx=a; }
+                        int sh=rshift(mx,EDN_BITS); for(int j=0;j<N*D;j++) eout[j]>>=sh; } }  // rescale to stay int16-bounded (scale-invariant)
             }
             // weights & gradients are NEVER read-and-crossed -> xchip_weight, xchip_grad stay 0 by construction
             if(ep==0 && b==0){   // ---- one-time 2-chip flow diagnostic ----
@@ -190,9 +203,9 @@ int main(int argc,char**argv){
         printf("[shard] epoch %d: test acc = %.4f  (%d steps, %.1fs)  MODEL-PARALLEL/%d-chip  [W0 chg=%ld/%d W%d chg=%ld/%d vs init]\n",
                ep+1, (double)ok/Nte, nb, now_s()-t0, L, wc[0], D*D, L-1, wc[L-1], D*D); fflush(stdout);
     }
-    // dump trained weights so the host can re-eval with the Python ref (predict-bug vs diverged-weights)
-    { FILE*f=fopen("/tmp/shardW0.i32","wb"); if(f){fwrite(W[0],4,D*D,f);fclose(f);}
-      f=fopen("/tmp/shardW1.i32","wb"); if(f){fwrite(W[L-1],4,D*D,f);fclose(f);} }
+    // dump ALL L trained weights so the host can re-eval / bit-exact-replay with the Python ref (per chip)
+    for(int l=0;l<L;l++){ snprintf(p,512,"/tmp/shardW%d.i32",l); FILE*f=fopen(p,"wb"); if(f){fwrite(W[l],4,D*D,f);fclose(f);} }
+    { FILE*f=fopen("/tmp/shardW1.i32","wb"); if(f){fwrite(W[L-1],4,D*D,f);fclose(f);} }  // back-compat alias = last layer
     double wall = now_s() - t_run0;
     long steps = (long)epochs * nb;          // one model-parallel training step per batch
     long kicks = steps * 2L * L;             // L fwd kicks + L bwd kicks per step
