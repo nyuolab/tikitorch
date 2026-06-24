@@ -46,14 +46,17 @@
 
 #include <cstdint>
 
-// ---- S1 model config ----
-#define S1_D        128     // d_model
-#define S1_LOG2_D   7       // log2(D): LayerNorm mean = sum >> 7 (no divider); D MUST == 1<<LOG2_D
+// ---- S1 model config (S1-small: D=64, halved from D=128 so the AFI fits+closes on F2) ----
+// D=128 monolithic was in an area<->timing bind (ALLOCATION-sharing muxes -> WNS -4.6ns post-route across 5
+// AFI builds). Halving every dim shrinks the design ~4x -> ~18% LUT / ~16% BRAM -> the sharing muxes shrink and
+// it fits+closes with margin (keeps all 4 modes incl the fused trainer). All dims stay 16-divisible (wide bursts).
+#define S1_D        64      // d_model (was 128)
+#define S1_LOG2_D   6       // log2(D)=6: LayerNorm mean = sum >> 6 (no divider); D MUST == 1<<LOG2_D
 #define S1_H        2       // attention heads
-#define S1_DH       64      // head dim (== forge_attn AT_DH); H*DH == D
-#define S1_FFN      512     // FFN inner width (4*D)
-#define S1_L_SEQ    128     // sequence length (== forge_attn AT_L)
-#define S1_V        128     // vocab (tied embed / LM-head)
+#define S1_DH       32      // head dim; H*DH == D (2*32=64)  (was 64)
+#define S1_FFN      256     // FFN inner width (4*D)  (was 512)
+#define S1_L_SEQ    64      // sequence length  (was 128)
+#define S1_V        64      // vocab (tied embed / LM-head)  (was 128; >= 8-symbol memorization task)
 #define S1_N_LAYERS 1       // transformer blocks (offsets are layer-major; bump to 2 once bit-exact)
 #define S1_MBITS    2       // fine-dyadic LN mantissa bits (== forge_layernorm LN_MBITS)
 #define S1_LUT_N    256     // exp2 LUT entries (CE + attn)
