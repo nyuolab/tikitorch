@@ -154,6 +154,17 @@ int main(int argc,char**argv){
                 printf("[diag] step1: W0 changed=%ld W1 changed=%ld | logits[0,:10]=%d %d %d %d %d %d %d %d %d %d\n",
                     c0,c1, lg[0],lg[1],lg[2],lg[3],lg[4],lg[5],lg[6],lg[7],lg[8],lg[9]);
                 free(ain1);free(lg);free(w0);free(w1); fflush(stdout);
+                // dump init W + this batch (x,labels) + post-step1 W for an exact Python per-step compare
+                { FILE*f;
+                  f=fopen("/tmp/s1_iW0.i32","wb"); if(f){fwrite(iW[0],4,D*D,f);fclose(f);}
+                  f=fopen("/tmp/s1_iW1.i32","wb"); if(f){fwrite(iW[L-1],4,D*D,f);fclose(f);}
+                  int32_t *bx=malloc(4*N*D),*by=malloc(4*N); for(int n=0;n<N;n++){ int s=perm[b*N+n]; by[n]=Ytr[s]; for(int i=0;i<D;i++) bx[n*D+i]=Xtr[s*D+i]; }
+                  f=fopen("/tmp/s1_x.i32","wb"); if(f){fwrite(bx,4,N*D,f);fclose(f);}
+                  f=fopen("/tmp/s1_y.i32","wb"); if(f){fwrite(by,4,N,f);fclose(f);}
+                  int32_t *a0=malloc(4*D*D),*a1=malloc(4*D*D); readw(0,O_W,a0,D*D); readw(L-1,O_W,a1,D*D);
+                  f=fopen("/tmp/s1_W0.i32","wb"); if(f){fwrite(a0,4,D*D,f);fclose(f);}
+                  f=fopen("/tmp/s1_W1.i32","wb"); if(f){fwrite(a1,4,D*D,f);fclose(f);}
+                  free(bx);free(by);free(a0);free(a1); }
             }
             if(ep==0 && (b==nb/4 || b==nb/2 || b==3*nb/4)){   // in-epoch accuracy trajectory (diverge vs flat?)
                 for(int l=0;l<L;l++) readw(l,O_W,W[l],D*D);
