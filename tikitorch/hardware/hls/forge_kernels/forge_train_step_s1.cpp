@@ -297,11 +297,17 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 // the chunked loop tile evenly.
 // =============================================================================
 #ifndef S1_LANE
-#define S1_LANE 8     // was 16; halved with the D=64 shrink. LUT is set by the parallel-lane count (NOT the
-                      // model dims), so cutting lanes is what actually shrinks compute LUT + the ALLOCATION-share
-                      // muxes (the D=128 post-route timing killer). LANE=8 divides D=64/DH=32/FFN=256/seq=64/V=64
-                      // and S1_GEMM_TMAX=64 (64%8==0). Bit-exact-preserving (integer reduction order-independent);
-                      // ~2x more cycles (irrelevant for the single-shot S1 proof). Target ~35% LUT -> routes+closes.
+#define S1_LANE 4     // was 16 -> 8 -> 4. LUT is set by the parallel-lane count (NOT the model dims), so cutting
+                      // lanes is what shrinks compute LUT. v10 (LANE=8) post-route MISSED at WNS -0.409: the worst
+                      // path is the shell sh_ddr(SLR1) async-FIFO wready -> XBAR_DDR crossbar -> high-fanout(577)
+                      // net crossing to the DMA-PCIS side in SLR0. That SLR0/SLR1-boundary crossbar<->DMA-PCIS path
+                      // is structural (DMA-PCIS is shell-fixed in SLR0, DDR in SLR1) and CLOSED in the proven
+                      // muzero_ddr build with no help -- S1 misses only because its bigger trainer kernel + clkgen +
+                      // 2 CDCs CROWD the boundary region, degrading that net's placement/replication. LANE=4 halves
+                      // the dominant logic consumer to de-crowd the boundary (restore muzero-like routing). LANE=4
+                      // divides D=64/DH=32/FFN=256/seq=64/V=64 and S1_GEMM_TMAX=64/IMAX=OMAX=256 (all %4==0).
+                      // Bit-exact-preserving (integer reduction is order-independent); ~2x more cycles than LANE=8
+                      // (irrelevant for the single-shot S1 proof). Re-csim-verified bit-exact before the AFI build.
 #endif
 
 // =============================================================================
