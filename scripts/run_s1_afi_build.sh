@@ -40,7 +40,7 @@ KERNEL_TCL="${KERNEL_TCL:-synth_train_step_s1.tcl}"        # HLS the TRAINER ker
 KERNEL_PROJ="${KERNEL_PROJ:-forge_train_step_s1_proj}"
 ROLE="${ROLE:-tiki-sweep-runner}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-STATE_DIR="$PROJECT_DIR/.tiki_s1_afibuild_state"; mkdir -p "$STATE_DIR"
+STATE_DIR="${STATE_DIR:-$PROJECT_DIR/.tiki_s1_afibuild_state}"; mkdir -p "$STATE_DIR"  # overridable for parallel builds (e.g. STATE_DIR=.../_v12)
 STATE_FILE="$STATE_DIR/run.env"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
