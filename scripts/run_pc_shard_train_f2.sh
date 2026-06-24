@@ -64,7 +64,7 @@ if [ -n "\$VERIFY" ]; then
   ( sudo /tmp/pcbverify 0 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
   for f in img build train; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
   echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
-  up; shutdown -h now
+  up; sync; shutdown -h now; exit 0
 fi
 # Vccint (core rail) energy: read 'Last measured: N watts' under each slot's Vccint. helper:
 vcc(){ sudo \$FD -S \$1 -M 2>&1 | awk 'BEGIN{IGNORECASE=1} /vccint/{f=1} f&&/last measured/{for(i=1;i<=NF;i++)if(\$i~/^[0-9]+\$/){print \$i;exit}}'; }

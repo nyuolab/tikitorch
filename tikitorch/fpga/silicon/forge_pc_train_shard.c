@@ -108,6 +108,7 @@ int main(int argc,char**argv){
         stage(l,0,BUFLEN);
     }
 
+    int32_t *iW[MAXL]; for(int l=0;l<L;l++){ iW[l]=malloc(4*D*D); memcpy(iW[l], hbuf[l]+O_W, 4*D*D); }  // init snapshot (diag)
     int32_t *W[MAXL]; for(int l=0;l<L;l++) W[l]=malloc(4*D*D);
     int32_t *aout=malloc(4*N*D), *eout=malloc(4*N*D);
     int *perm=malloc(Ntr*sizeof(int)); for(int i=0;i<Ntr;i++) perm[i]=i;
@@ -135,11 +136,21 @@ int main(int argc,char**argv){
                 if(l>0) T_XCHIP+=readw(l,O_EOUT,eout,N*D);     // read upstream error to pass on = comms
             }
             // weights & gradients are NEVER read-and-crossed -> xchip_weight, xchip_grad stay 0 by construction
+            if(ep==0 && b==0){   // ---- one-time 2-chip flow diagnostic ----
+                int32_t *lg=malloc(4*N*D); readw(L-1,O_AOUT,lg,N*D);   // chip L-1 logits
+                long nzh=0,nzlg=0,nze=0; for(int j=0;j<N*D;j++){ if(aout[j])nzh++; if(j<N*C&&lg[j])nzlg++; if(eout[j])nze++; }
+                int32_t *w0=malloc(4*D*D),*w1=malloc(4*D*D); readw(0,O_W,w0,D*D); readw(L-1,O_W,w1,D*D);
+                long c0=0,c1=0; for(int j=0;j<D*D;j++){ if(w0[j]!=iW[0][j])c0++; if(w1[j]!=iW[L-1][j])c1++; }
+                printf("[diag] step1: h1(aout) nz=%ld/%d, chip%d logits nz=%ld/%d, EOUT1 nz=%ld/%d | W0 changed=%ld W1 changed=%ld | h1[0..3]=%d %d %d %d lg[0..3]=%d %d %d %d eout[0..3]=%d %d %d %d\n",
+                    nzh,N*D, L-1, nzlg,N*C, nze,N*D, c0,c1, aout[0],aout[1],aout[2],aout[3], lg[0],lg[1],lg[2],lg[3], eout[0],eout[1],eout[2],eout[3]);
+                free(lg);free(w0);free(w1); fflush(stdout);
+            }
         }
         for(int l=0;l<L;l++) T_READW+=readw(l,O_W,W[l],D*D);   // read each chip's weights (host eval only)
+        long wc[MAXL]={0}; for(int l=0;l<L;l++) for(int j=0;j<D*D;j++) if(W[l][j]!=iW[l][j]) wc[l]++;
         double te0=now_s(); long ok=0; for(int t=0;t<Nte;t++) if(predict(Xte+t*D,W)==Yte[t]) ok++; T_EVAL+=now_s()-te0;
-        printf("[shard] epoch %d: test acc = %.4f  (%d steps, %.1fs)  MODEL-PARALLEL/%d-chip\n",
-               ep+1, (double)ok/Nte, nb, now_s()-t0, L); fflush(stdout);
+        printf("[shard] epoch %d: test acc = %.4f  (%d steps, %.1fs)  MODEL-PARALLEL/%d-chip  [W0 chg=%ld/%d W%d chg=%ld/%d vs init]\n",
+               ep+1, (double)ok/Nte, nb, now_s()-t0, L, wc[0], D*D, L-1, wc[L-1], D*D); fflush(stdout);
     }
     double wall = now_s() - t_run0;
     long steps = (long)epochs * nb;          // one model-parallel training step per batch
