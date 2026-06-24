@@ -341,6 +341,26 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 #endif
 
 // =============================================================================
+// DDR-STREAMED ACTIVATION-SAVE TILE granularities (the BRAM-relief rearchitecture). The big activation
+// SAVES (relu mask / R snapshots / X1 / X2 / attn probs / head trio) are no longer held RESIDENT for the
+// whole block — they are streamed per-tile to/from their S1_OFF_* DDR regions (fwd burst-store the tile as
+// it is computed; bwd burst-load the tile right before the consuming op), following the do_opt template.
+// Each tile is one op's natural slice; every tile BASE = region_base (S1_AL16-aligned) + k*STRIDE where
+// STRIDE is one of these — all multiples of 16 — so every wide burst stays 512-bit aligned (the
+// OFF_CE_LUT-class corruption guard). The compute LOOP BODY is unchanged: only the destination of the
+// already-computed value changes from a resident array slot to a per-tile burst (bit-exact: a pure write /
+// pure reload, identical offsets + arithmetic; the int64 #else golden sees the same buffer contents because
+// burst_load_i32/burst_store_i32 reduce to a plain scalar copy there).
+#define S1_TILE_RELU   S1_FFN      // relu mask:  per-token row  [FFN]
+#define S1_TILE_RD     S1_D        // R snapshot / X1 / X2: per-token row [D]
+#define S1_TILE_ATTNP  S1_L_SEQ    // attn probs: per-query row  [L_SEQ]
+#define S1_TILE_V      S1_V        // head trio (argmax/grad-logit/logits): per-position row [V]
+static_assert(S1_TILE_RELU  % 16 == 0, "relu tile stride must be 16-word aligned");
+static_assert(S1_TILE_RD    % 16 == 0, "R/X1/X2 tile stride must be 16-word aligned");
+static_assert(S1_TILE_ATTNP % 16 == 0, "attn-p tile stride must be 16-word aligned");
+static_assert(S1_TILE_V     % 16 == 0, "head tile stride must be 16-word aligned");
+
+// =============================================================================
 // fwd_gemm — the dyadic-MAC GEMM y[t][o] = sum_i q(x[t][i]) MAC q(W[o][i]) + bias(=0 in S1).
 // Reproduces forge_fwd_wide.cpp's inner: x dyad-quantized once, W PRE-DYADIC (wdecode inline), the
 // MAC is sign-xor + exponent-ADD + barrel-SHIFT + signed accumulate (NO multiply, DSP=0).
@@ -465,12 +485,17 @@ RESC: for (int d = 0; d < S1_D; d++) {
 // to gmem at the END of do_fwd_loss) -> no gmem write in the attn loops.
 // Q/K/V are [L_SEQ][DH] on-chip; out written to [L_SEQ][DH]; p_save is [L][L], jstar_save is [L].
 // =============================================================================
+// p_off: DDR word-offset of THIS head's attn-prob region (s1_off_attn_p(l,h)); the per-query prob row is
+// burst-stored there (the dead-row reuse — query i's row is final once i+1 starts). p_off < 0 => skip the
+// save entirely (the mode-1 forward RECOMPUTE does not re-save probs). jstar stays resident (1 word/query).
 static void attn_head(const data_t Q[S1_L_SEQ][S1_DH], const data_t K[S1_L_SEQ][S1_DH],
                       const data_t V[S1_L_SEQ][S1_DH], const int32_t *attn_lut,
-                      data_t out[S1_L_SEQ][S1_DH], int32_t *p_save, int32_t *jstar_save) {
+                      data_t out[S1_L_SEQ][S1_DH], int32_t *buffer, int p_off, int32_t *jstar_save) {
 #pragma HLS INLINE off
     static acc_t  s[S1_L_SEQ];
     static prob_t p[S1_L_SEQ];
+    static int32_t p_row[S1_L_SEQ];     // per-query prob row -> DDR (replaces the resident p_save array)
+#pragma HLS BIND_STORAGE variable=p_row type=ram_2p impl=bram
     static acc_t  blend[S1_DH];
 #pragma HLS ARRAY_PARTITION variable=blend cyclic factor=S1_LANE
 
@@ -533,11 +558,14 @@ ROW: for (int i = 0; i < S1_L_SEQ; i++) {
 #pragma HLS PIPELINE II=1
             out[i][d] = sat16(blend[d] >> S1_AT_P_FRAC);
         }
-        // save probs (Q16, post-normalize) + argmax j* for the future backward (ON-CHIP -> stored later).
+        // save probs (Q16, post-normalize) + argmax j* for the backward. The prob row streams PER QUERY to
+        // DDR (p_off>=0); jstar stays resident (1 word/query). p_off<0 (bwd recompute) skips the save.
     SAVEP: for (int j = 0; j < S1_L_SEQ; j++) {
 #pragma HLS PIPELINE II=1
-            p_save[i * S1_L_SEQ + j] = (int32_t)p[j];
+            p_row[j] = (int32_t)p[j];
         }
+        if (p_off >= 0)
+            burst_store_i32(p_row, buffer, p_off + i * S1_TILE_ATTNP, S1_TILE_ATTNP);
         jstar_save[i] = jstar;
     }
 }
@@ -622,22 +650,36 @@ static int do_fwd_loss(int32_t *buffer) {
     burst_load_i32  (buffer, S1_OFF_TARGETS,  tgts,     S1_L_SEQ);
 
     // ---------------------------------------------------------------------
-    // (B) RESIDENT activation-save arrays — written during compute, burst-stored at END.
+    // (B) Activation-save staging.
+    //   RESIDENT (small per-(layer,token) metadata — kept on-chip, burst-stored once at END):
+    //     ln1st_oc / ln2st_oc / lnfst_oc (LN stats) + attnj_oc (argmax j*).
+    //   DDR-STREAMED (the BRAM hogs — NOT resident; each is written per-tile to its S1_OFF_* region as it
+    //     is computed via burst_store_i32, mirrored by a per-tile reload in mode 1):
+    //     R snapshots / X1 / X2 / relu mask / attn probs / argmax-head / grad-logit / logits.
+    //     The small per-tile arrays below replace the whole-block resident arrays.
     // ---------------------------------------------------------------------
-    static int32_t R_all_oc[S1_W_RALL];      // R_0..R_N_LAYERS residual snapshots
-    static int32_t X1_oc[S1_W_ACT];
-    static int32_t X2_oc[S1_W_ACT];
     static int32_t ln1st_oc[S1_W_LNST];
     static int32_t ln2st_oc[S1_W_LNST];
 #if S1_USE_LNF
     static int32_t lnfst_oc[S1_L_SEQ * 2];   // final-LN (e,nq) per token
 #endif
-    static int32_t attnp_oc[S1_W_ATTNP];
     static int32_t attnj_oc[S1_W_ATTNJ];
-    static int32_t relu_oc[S1_W_RELU];
-    static int32_t argh_oc[S1_W_ARGH];
-    static int32_t glog_oc[S1_W_GLOG];
-    static int32_t logit_oc[S1_W_GLOG];
+    // per-tile DDR-stream scratch (ram_2p/BRAM, one op-slice each — the do_opt tile pattern).
+    static int32_t rsnap_t[S1_TILE_RD];      // R snapshot row  [D]  -> S1_OFF_R
+#pragma HLS BIND_STORAGE variable=rsnap_t type=ram_2p impl=bram
+    static int32_t x1_t[S1_TILE_RD];         // LN1 out row     [D]  -> S1_OFF_X1
+#pragma HLS BIND_STORAGE variable=x1_t   type=ram_2p impl=bram
+    static int32_t x2_t[S1_TILE_RD];         // LN2 out row     [D]  -> S1_OFF_X2
+#pragma HLS BIND_STORAGE variable=x2_t   type=ram_2p impl=bram
+    static int32_t relu_t[S1_TILE_RELU];     // relu mask row   [FFN]-> S1_OFF_RELU_MASK
+#pragma HLS BIND_STORAGE variable=relu_t type=ram_2p impl=bram
+    // (attn prob row streams to S1_OFF_ATTN_P from attn_head's own resident p_row[L_SEQ]; no tile here.)
+    static int32_t argh_t[S1_TILE_V];        // head argmax row [V]  -> S1_OFF_ARGMAX_HEAD
+#pragma HLS BIND_STORAGE variable=argh_t type=ram_2p impl=bram
+    static int32_t glog_t[S1_TILE_V];        // grad-logit row  [V]  -> S1_OFF_GRAD_LOGIT
+#pragma HLS BIND_STORAGE variable=glog_t type=ram_2p impl=bram
+    static int32_t logit_t[S1_TILE_V];       // logits row      [V]  -> S1_OFF_LOGITS
+#pragma HLS BIND_STORAGE variable=logit_t type=ram_2p impl=bram
 
     // R[t][d] = EMBED[tok[t]*D + d]  (embed gather, morph LM head idiom). Saved as R layer-0 input.
     static data_t R[S1_L_SEQ][S1_D];
@@ -648,8 +690,10 @@ EMB: for (int t = 0; t < S1_L_SEQ; t++) {
 #pragma HLS PIPELINE II=1
             data_t rv = (data_t)embed_oc[tok * S1_D + d];   // on-chip embed gather (was gmem)
             R[t][d] = rv;
-            R_all_oc[0 * S1_L_SEQ * S1_D + t * S1_D + d] = (int32_t)rv;   // save R_0 (block-0 input)
+            rsnap_t[d] = (int32_t)rv;                        // R_0 snapshot row (DDR-streamed)
         }
+        // stream-save R_0 (block-0 input) row t -> S1_OFF_R (was resident R_all_oc).
+        burst_store_i32(rsnap_t, buffer, s1_off_R(0) + t * S1_TILE_RD, S1_TILE_RD);
     }
 
     // on-chip block scratch
@@ -683,8 +727,10 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
                 X1[t][d] = yrow[d];
-                X1_oc[l * S1_L_SEQ * S1_D + t * S1_D + d] = (int32_t)yrow[d];   // save LN1 out
+                x1_t[d]  = (int32_t)yrow[d];                  // LN1 out row (DDR-streamed)
             }
+            // stream-save LN1 out row t -> S1_OFF_X1 (was resident X1_oc).
+            burst_store_i32(x1_t, buffer, s1_off_act(S1_OFF_X1, l) + t * S1_TILE_RD, S1_TILE_RD);
         }
 
         // ---- Q/K/V projections (each [L][D] -> [L][D]) ----
@@ -702,9 +748,8 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
                     Vh[t][d] = Vm[t][h * S1_DH + d];
                 }
             }
-            int p_base = (l * S1_H + h) * S1_L_SEQ * S1_L_SEQ;
             int j_base = (l * S1_H + h) * S1_L_SEQ;
-            attn_head(Qh, Kh, Vh, at_lut, Ah, &attnp_oc[p_base], &attnj_oc[j_base]);
+            attn_head(Qh, Kh, Vh, at_lut, Ah, buffer, s1_off_attn_p(l, h), &attnj_oc[j_base]);  // p->DDR per query row
             for (int t = 0; t < S1_L_SEQ; t++) {
                 for (int d = 0; d < S1_DH; d++) {
 #pragma HLS PIPELINE II=1
@@ -735,19 +780,24 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
                 X2[t][d] = yrow[d];
-                X2_oc[l * S1_L_SEQ * S1_D + t * S1_D + d] = (int32_t)yrow[d];
+                x2_t[d]  = (int32_t)yrow[d];                  // LN2 out row (DDR-streamed)
             }
+            // stream-save LN2 out row t -> S1_OFF_X2 (was resident X2_oc).
+            burst_store_i32(x2_t, buffer, s1_off_act(S1_OFF_X2, l) + t * S1_TILE_RD, S1_TILE_RD);
         }
 
         // ---- FFN up [L][D]->[L][FFN], ReLU (save mask), down [L][FFN]->[L][D], residual add ----
         fwd_gemm(&X2[0][0], wup_oc, l * S1_FFN * S1_D, &U[0][0], S1_L_SEQ, S1_D, S1_FFN);
-    RELU: for (int t = 0; t < S1_L_SEQ; t++)
+    RELU: for (int t = 0; t < S1_L_SEQ; t++) {
             for (int k = 0; k < S1_FFN; k++) {
 #pragma HLS PIPELINE II=1
                 bool act = (U[t][k] > 0);
                 Hd[t][k] = act ? U[t][k] : (data_t)0;
-                relu_oc[l * S1_L_SEQ * S1_FFN + t * S1_FFN + k] = act ? 1 : 0;
+                relu_t[k] = act ? 1 : 0;                      // relu mask row (DDR-streamed)
             }
+            // stream-save the FFN ReLU mask row t -> S1_OFF_RELU_MASK (was resident relu_oc, the 114-BRAM hog).
+            burst_store_i32(relu_t, buffer, s1_off_relu(l) + t * S1_TILE_RELU, S1_TILE_RELU);
+        }
         fwd_gemm(&Hd[0][0], wdn_oc, l * S1_D * S1_FFN, &Dn[0][0], S1_L_SEQ, S1_FFN, S1_D);
     RES2: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
@@ -755,12 +805,15 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
                 R[t][d] = sat16((acc_t)R[t][d] + (acc_t)Dn[t][d]);
             }
 
-        // save the block-l output residual (block-(l+1) input).
-    SAVER: for (int t = 0; t < S1_L_SEQ; t++)
+        // save the block-l output residual (block-(l+1) input) — per-token snapshot row, DDR-streamed.
+    SAVER: for (int t = 0; t < S1_L_SEQ; t++) {
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-                R_all_oc[(l + 1) * S1_L_SEQ * S1_D + t * S1_D + d] = (int32_t)R[t][d];
+                rsnap_t[d] = (int32_t)R[t][d];
             }
+            // stream-save R_{l+1} snapshot row t -> S1_OFF_R (was resident R_all_oc).
+            burst_store_i32(rsnap_t, buffer, s1_off_R(l + 1) + t * S1_TILE_RD, S1_TILE_RD);
+        }
     }
 
     // ---- FINAL LayerNorm (LN_F) before the LM head (S1_USE_LNF). Normalizes the head INPUT so the
@@ -859,9 +912,12 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
     CE_G: for (int v = 0; v < S1_V; v++) {
 #pragma HLS PIPELINE II=1
             int32_t g = e_row[v] - (v == target ? psum : 0);
-            glog_oc[t * S1_V + v]  = g;
-            logit_oc[t * S1_V + v] = (int32_t)logits[v];
+            glog_t[v]  = g;                              // grad-logit row (DDR-streamed)
+            logit_t[v] = (int32_t)logits[v];            // logits row     (DDR-streamed)
         }
+        // stream-save grad-logit + logits rows for position t (was resident glog_oc/logit_oc).
+        burst_store_i32(glog_t,  buffer, S1_OFF_GRAD_LOGIT + t * S1_TILE_V, S1_TILE_V);
+        burst_store_i32(logit_t, buffer, S1_OFF_LOGITS     + t * S1_TILE_V, S1_TILE_V);
         // CONVERGENCE signal: the target classification margin (logit[pred]-logit[target]) >= 0, summed
         // over positions. Strictly monotone with the model getting the target right; -> 0 at fit. (No log,
         // bit-exact integer, no saturation — the honest CE surrogate. == zneg at v==target.)
@@ -870,30 +926,25 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
         // SATURATES once the distribution peaks (2^16/position), so it is NOT used as the convergence test.
         loss_sum += (acc_t)(psum - e_row[target]);
 
-        // save head argmax route (for the future backward sparse scatter).
+        // save head argmax route (for the backward sparse scatter) — per-position row, DDR-streamed.
     SAVEH: for (int v = 0; v < S1_V; v++) {
 #pragma HLS PIPELINE II=1
-            argh_oc[t * S1_V + v] = ad_head[v];
+            argh_t[v] = ad_head[v];
         }
+        burst_store_i32(argh_t, buffer, S1_OFF_ARGMAX_HEAD + t * S1_TILE_V, S1_TILE_V);
     }
 
     // ---------------------------------------------------------------------
-    // (C) BURST-STORE every buffer-exposed region back to gmem (wide II=1 writes).
+    // (C) BURST-STORE the RESIDENT metadata back to gmem (wide II=1 writes). The big activation SAVES
+    //     (R snapshots / X1 / X2 / attn probs / relu mask / argmax-head / grad-logit / logits) were ALREADY
+    //     streamed per-tile to their S1_OFF_* regions during compute above — they are NOT held resident.
     // ---------------------------------------------------------------------
-    burst_store_i32(R_all_oc, buffer, S1_OFF_R,           S1_W_RALL);
-    burst_store_i32(X1_oc,    buffer, s1_off_act(S1_OFF_X1, 0), S1_W_ACT);
-    burst_store_i32(X2_oc,    buffer, s1_off_act(S1_OFF_X2, 0), S1_W_ACT);
     burst_store_i32(ln1st_oc, buffer, S1_OFF_LN1_STATS,   S1_W_LNST);
     burst_store_i32(ln2st_oc, buffer, S1_OFF_LN2_STATS,   S1_W_LNST);
 #if S1_USE_LNF
     burst_store_i32(lnfst_oc, buffer, S1_OFF_LNF_STATS,   S1_L_SEQ * 2);
 #endif
-    burst_store_i32(attnp_oc, buffer, S1_OFF_ATTN_P,      S1_W_ATTNP);
     burst_store_i32(attnj_oc, buffer, S1_OFF_ATTN_JSTAR,  S1_W_ATTNJ);
-    burst_store_i32(relu_oc,  buffer, S1_OFF_RELU_MASK,   S1_W_RELU);
-    burst_store_i32(argh_oc,  buffer, S1_OFF_ARGMAX_HEAD, S1_W_ARGH);
-    burst_store_i32(glog_oc,  buffer, S1_OFF_GRAD_LOGIT,  S1_W_GLOG);
-    burst_store_i32(logit_oc, buffer, S1_OFF_LOGITS,      S1_W_GLOG);
     buffer[S1_OFF_LOSS + 0] = (int32_t)loss_margin;   // CONVERGENCE signal (target margin; monotone)
     buffer[S1_OFF_LOSS + 1] = (int32_t)loss_sum;      // reference Q16-mass proxy (saturating; not asserted)
 
@@ -1263,31 +1314,37 @@ static int do_bwd(int32_t *buffer) {
     burst_load_i32  (buffer, S1_OFF_TOKENS,   toks,     S1_L_SEQ);
 
     // ---------------------------------------------------------------------
-    // (B) RESIDENT saved activations from mode 0.
+    // (B) Saved activations from mode 0.
+    //   RESIDENT (small per-(layer,token) metadata — burst-loaded once): LN stats.
+    //   DDR-STREAMED (the BRAM hogs — reloaded PER-TILE right before each consuming op, mirroring the fwd
+    //     per-tile saves): R snapshots / X1 / X2 / relu mask / argmax-head / grad-logit. The per-tile reload
+    //     scratch below replaces the whole-block resident arrays. Every reload reads the IDENTICAL S1_OFF_*
+    //     offset the fwd wrote (bit-exact; the int64 #else path makes burst_load_i32 a plain scalar copy).
     // ---------------------------------------------------------------------
-    static int32_t R_all_oc[S1_W_RALL];
-    static int32_t X1_oc[S1_W_ACT];
-    static int32_t X2_oc[S1_W_ACT];
     static int32_t ln1st_oc[S1_W_LNST];
     static int32_t ln2st_oc[S1_W_LNST];
 #if S1_USE_LNF
     static int32_t lnfst_oc[S1_L_SEQ * 2];
 #endif
-    static int32_t relu_oc[S1_W_RELU];
-    static int32_t argh_oc[S1_W_ARGH];
-    static int32_t glog_oc[S1_W_GLOG];
+    // per-tile DDR-reload scratch (ram_2p/BRAM, one op-slice each — the do_opt tile pattern).
+    static int32_t rrow_t[S1_TILE_RD];       // R snapshot row  [D]  <- S1_OFF_R
+#pragma HLS BIND_STORAGE variable=rrow_t   type=ram_2p impl=bram
+    static int32_t x1row_t[S1_TILE_RD];      // LN1 out row     [D]  <- S1_OFF_X1
+#pragma HLS BIND_STORAGE variable=x1row_t  type=ram_2p impl=bram
+    static int32_t x2row_t[S1_TILE_RD];      // LN2 out row     [D]  <- S1_OFF_X2
+#pragma HLS BIND_STORAGE variable=x2row_t  type=ram_2p impl=bram
+    static int32_t relurow_t[S1_TILE_RELU];  // relu mask row   [FFN]<- S1_OFF_RELU_MASK
+#pragma HLS BIND_STORAGE variable=relurow_t type=ram_2p impl=bram
+    static int32_t arghrow_t[S1_TILE_V];     // head argmax row [V]  <- S1_OFF_ARGMAX_HEAD
+#pragma HLS BIND_STORAGE variable=arghrow_t type=ram_2p impl=bram
+    static int32_t glogrow_t[S1_TILE_V];     // grad-logit row  [V]  <- S1_OFF_GRAD_LOGIT
+#pragma HLS BIND_STORAGE variable=glogrow_t type=ram_2p impl=bram
 
-    burst_load_i32(buffer, S1_OFF_R,           R_all_oc, S1_W_RALL);
-    burst_load_i32(buffer, s1_off_act(S1_OFF_X1, 0), X1_oc, S1_W_ACT);
-    burst_load_i32(buffer, s1_off_act(S1_OFF_X2, 0), X2_oc, S1_W_ACT);
     burst_load_i32(buffer, S1_OFF_LN1_STATS,   ln1st_oc, S1_W_LNST);
     burst_load_i32(buffer, S1_OFF_LN2_STATS,   ln2st_oc, S1_W_LNST);
 #if S1_USE_LNF
     burst_load_i32(buffer, S1_OFF_LNF_STATS,   lnfst_oc, S1_L_SEQ * 2);
 #endif
-    burst_load_i32(buffer, S1_OFF_RELU_MASK,   relu_oc,  S1_W_RELU);
-    burst_load_i32(buffer, S1_OFF_ARGMAX_HEAD, argh_oc,  S1_W_ARGH);
-    burst_load_i32(buffer, S1_OFF_GRAD_LOGIT,  glog_oc,  S1_W_GLOG);
 
     // ---------------------------------------------------------------------
     // (C) RESIDENT gradient accumulators (zeroed) + intermediate grad scratch.
@@ -1338,11 +1395,14 @@ GRN_ZERO: for (int t = 0; t < S1_L_SEQ; t++)
             gR[t][d]  = 0;
         }
 HEAD_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
+        // reload position t's grad-logit + argmax-head rows from DDR (was resident glog_oc/argh_oc).
+        burst_load_i32(buffer, S1_OFF_GRAD_LOGIT  + t * S1_TILE_V, glogrow_t, S1_TILE_V);
+        burst_load_i32(buffer, S1_OFF_ARGMAX_HEAD + t * S1_TILE_V, arghrow_t, S1_TILE_V);
         for (int v = 0; v < S1_V; v++) {
 #pragma HLS PIPELINE II=4
-            int32_t g = glog_oc[t * S1_V + v];
+            int32_t g = glogrow_t[v];
             if (g == 0) continue;
-            int dstar = argh_oc[t * S1_V + v];
+            int dstar = arghrow_t[v];
             if (dstar < 0 || dstar >= S1_D) continue;
             gWHEAD_oc[v * S1_D + dstar] += g;
             gRn[t][dstar] = sat32((acc_t)gRn[t][dstar] + (acc_t)g);
@@ -1353,11 +1413,14 @@ HEAD_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
     // ---- LN_F backward: gY = gRn -> gR (residual-stream grad) + g_LNF_gamma + g_LNF_beta. The pre-LN_F
     //      residual is R_fin = R_all[N_LAYERS] (saved by mode 0). Same math as LN1/LN2 bwd. ----
     static data_t Rfin_m[S1_L_SEQ][S1_D];
-LNF_LDRFIN: for (int t = 0; t < S1_L_SEQ; t++)
+LNF_LDRFIN: for (int t = 0; t < S1_L_SEQ; t++) {
+        // reload the final R snapshot row t from DDR (was resident R_all_oc[N_LAYERS]).
+        burst_load_i32(buffer, s1_off_R(S1_N_LAYERS) + t * S1_TILE_RD, rrow_t, S1_TILE_RD);
         for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-            Rfin_m[t][d] = (data_t)R_all_oc[S1_N_LAYERS * S1_L_SEQ * S1_D + t * S1_D + d];
+            Rfin_m[t][d] = (data_t)rrow_t[d];
         }
+    }
 LNF_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
         int e_n  = lnfst_oc[2 * t];
         int nq_n = lnfst_oc[2 * t + 1];
@@ -1427,18 +1490,21 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
         // X1 = LN1(R_l) was saved; X2 = LN2(R_after_attn) was saved. Q/K/V = GEMM(X1); Acat from attn;
         // Hd = relu(GEMM(X2)). We need X1m/X2m (wgrad x-operand), Qm/Km/Vm + Acatm (attn + Wo wgrad),
         // Hdm (W_down wgrad). All BIT-IDENTICAL to the forward.
-    LD_X1: for (int t = 0; t < S1_L_SEQ; t++)
+    LD_X1: for (int t = 0; t < S1_L_SEQ; t++) {
+            // reload LN1/LN2 out rows for token t from DDR (was resident X1_oc/X2_oc).
+            burst_load_i32(buffer, s1_off_act(S1_OFF_X1, l) + t * S1_TILE_RD, x1row_t, S1_TILE_RD);
+            burst_load_i32(buffer, s1_off_act(S1_OFF_X2, l) + t * S1_TILE_RD, x2row_t, S1_TILE_RD);
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-                X1m[t][d] = (data_t)X1_oc[l * S1_L_SEQ * S1_D + t * S1_D + d];
-                X2m[t][d] = (data_t)X2_oc[l * S1_L_SEQ * S1_D + t * S1_D + d];
+                X1m[t][d] = (data_t)x1row_t[d];
+                X2m[t][d] = (data_t)x2row_t[d];
             }
+        }
         fwd_gemm(&X1m[0][0], wq_oc, l * S1_D * S1_D, &Qm[0][0], S1_L_SEQ, S1_D, S1_D);
         fwd_gemm(&X1m[0][0], wk_oc, l * S1_D * S1_D, &Km[0][0], S1_L_SEQ, S1_D, S1_D);
         fwd_gemm(&X1m[0][0], wv_oc, l * S1_D * S1_D, &Vm[0][0], S1_L_SEQ, S1_D, S1_D);
     RC_HEAD: for (int h = 0; h < S1_H; h++) {
             static data_t Ahh[S1_L_SEQ][S1_DH];
-            static int32_t p_dummy[S1_L_SEQ * S1_L_SEQ];
             static int32_t j_dummy[S1_L_SEQ];
             for (int t = 0; t < S1_L_SEQ; t++)
                 for (int d = 0; d < S1_DH; d++) {
@@ -1447,7 +1513,7 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
                     Kh[t][d] = Km[t][h * S1_DH + d];
                     Vh[t][d] = Vm[t][h * S1_DH + d];
                 }
-            attn_head(Qh, Kh, Vh, at_lut, Ahh, p_dummy, j_dummy);
+            attn_head(Qh, Kh, Vh, at_lut, Ahh, buffer, -1, j_dummy);  // recompute only; p_off=-1 skips the prob save
             for (int t = 0; t < S1_L_SEQ; t++)
                 for (int d = 0; d < S1_DH; d++) {
 #pragma HLS PIPELINE II=1
@@ -1457,11 +1523,14 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
         // Hd = relu(GEMM(X2, W_up)) — recompute U then gate by the SAVED relu mask (bit-identical to fwd).
         static data_t Um[S1_L_SEQ][S1_FFN];
         fwd_gemm(&X2m[0][0], wup_oc, l * S1_FFN * S1_D, &Um[0][0], S1_L_SEQ, S1_D, S1_FFN);
-    RC_RELU: for (int t = 0; t < S1_L_SEQ; t++)
+    RC_RELU: for (int t = 0; t < S1_L_SEQ; t++) {
+            // reload the relu mask row for token t from DDR (was resident relu_oc, the 114-BRAM hog).
+            burst_load_i32(buffer, s1_off_relu(l) + t * S1_TILE_RELU, relurow_t, S1_TILE_RELU);
             for (int k = 0; k < S1_FFN; k++) {
 #pragma HLS PIPELINE II=1
-                Hdm[t][k] = (relu_oc[l * S1_L_SEQ * S1_FFN + t * S1_FFN + k] != 0) ? Um[t][k] : (data_t)0;
+                Hdm[t][k] = (relurow_t[k] != 0) ? Um[t][k] : (data_t)0;
             }
+        }
 
         // === residual2 split: gR feeds BOTH the FFN-down output (gDn) AND the skip (gR kept). ===
     RES2_BWD: for (int t = 0; t < S1_L_SEQ; t++)
@@ -1475,11 +1544,14 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
         wgrad_gemm(&gDn[0][0], &Hdm[0][0], gWDN_oc, l * S1_D * S1_FFN, S1_L_SEQ, S1_FFN, S1_D);
 
         // === ReLU bwd: gU = mask ? gHd : 0. ===
-    RELU_BWD: for (int t = 0; t < S1_L_SEQ; t++)
+    RELU_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
+            // reload the relu mask row for token t from DDR (was resident relu_oc).
+            burst_load_i32(buffer, s1_off_relu(l) + t * S1_TILE_RELU, relurow_t, S1_TILE_RELU);
             for (int k = 0; k < S1_FFN; k++) {
 #pragma HLS PIPELINE II=1
-                gU[t][k] = (relu_oc[l * S1_L_SEQ * S1_FFN + t * S1_FFN + k] != 0) ? gHd[t][k] : 0;
+                gU[t][k] = (relurow_t[k] != 0) ? gHd[t][k] : 0;
             }
+        }
 
         // === FFN up-GEMM bwd: gX2 = xgrad(gU, W_up)  ; g_W_up += wgrad(gU, X2). ===
         xgrad_gemm(&gU[0][0], wup_oc, l * S1_FFN * S1_D, &gX2v[0][0], S1_L_SEQ, S1_D, S1_FFN);
@@ -1527,11 +1599,14 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
         static data_t AOm[S1_L_SEQ][S1_D];
         static data_t Rattn[S1_L_SEQ][S1_D];
         fwd_gemm(&Acatm[0][0], wo_oc, l * S1_D * S1_D, &AOm[0][0], S1_L_SEQ, S1_D, S1_D);
-    RC_RATTN: for (int t = 0; t < S1_L_SEQ; t++)
+    RC_RATTN: for (int t = 0; t < S1_L_SEQ; t++) {
+            // reload R_l snapshot row t from DDR (was resident R_all_oc[l]).
+            burst_load_i32(buffer, s1_off_R(l) + t * S1_TILE_RD, rrow_t, S1_TILE_RD);
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-                Rattn[t][d] = sat16((acc_t)R_all_oc[l * S1_L_SEQ * S1_D + t * S1_D + d] + (acc_t)AOm[t][d]);
+                Rattn[t][d] = sat16((acc_t)rrow_t[d] + (acc_t)AOm[t][d]);
             }
+        }
         ln_gamma_grad(Rattn, ln2st_oc, l, gX2v, gLN2G_oc, l * S1_D);
 
         // === residual1 split: gR feeds BOTH the attn-output (Wo) branch AND the skip. ===
@@ -1610,11 +1685,14 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
         }
         // g_LN1_gamma[d] += sum_t gX1[t][d] * q(r1[t][d]); r1 from the pre-LN1 residual = R_all[l] (block input).
         static data_t Rin1[S1_L_SEQ][S1_D];
-    RC_RIN1: for (int t = 0; t < S1_L_SEQ; t++)
+    RC_RIN1: for (int t = 0; t < S1_L_SEQ; t++) {
+            // reload R_l snapshot row t from DDR (was resident R_all_oc[l]).
+            burst_load_i32(buffer, s1_off_R(l) + t * S1_TILE_RD, rrow_t, S1_TILE_RD);
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
-                Rin1[t][d] = (data_t)R_all_oc[l * S1_L_SEQ * S1_D + t * S1_D + d];
+                Rin1[t][d] = (data_t)rrow_t[d];
             }
+        }
         ln_gamma_grad(Rin1, ln1st_oc, l, gX1v, gLN1G_oc, l * S1_D);
     }
 
