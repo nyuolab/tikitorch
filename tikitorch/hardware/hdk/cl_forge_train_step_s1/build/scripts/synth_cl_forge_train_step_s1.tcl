@@ -28,16 +28,9 @@ read_ip [list \
 ]
 
 # ---- CLKGEN+CDC rearchitecture: the kernel runs on clk_extra_a1 (125 MHz, Recipe A1) ----
-# AWS_CLK_GEN common-library sources. aws_clk_gen.sv (instantiated as AWS_CLK_GEN in the CL) lives in the
-# HDK common lib and pulls in aws_clk_regs.sv. The --aws_clk_gen build flag normally adds these automatically,
-# but read them explicitly in the OOC synth driver so the module elaborates deterministically. Guard with
-# file existence so a flow that already added them does not error.
-foreach f [list \
-    ${HDK_DIR}/common/lib/aws_clk_gen.sv \
-    ${HDK_DIR}/common/lib/aws_clk_regs.sv \
-  ] {
-  if {[file exists $f]} { read_verilog -sv $f }
-}
+# aws_clk_gen.sv (instantiated as AWS_CLK_GEN in the CL) + aws_clk_regs.sv are added by the --aws_clk_gen build
+# flag -- do NOT read them here (cl_mem_perf's synth tcl does not either; a manual read double-defines the module,
+# and $HDK_DIR is not a Tcl var in this context -> "can't read HDK_DIR" was the v8 fail). The flag handles them.
 # AWS_CLK_GEN's MMCM (group A) + AXI-Lite clock-xbar + reg-slice IP (pre-built in the HDK cl_ip src tree, the
 # same locations cl_mem_perf's synth reads). Only group A is enabled in the CL, so only clk_mmcm_a is needed;
 # cl_clk_axil_xbar + cl_axi_register_slice_light + cl_axi_clock_converter_light are aws_clk_gen-internal deps.
