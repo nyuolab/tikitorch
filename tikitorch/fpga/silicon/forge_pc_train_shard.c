@@ -137,13 +137,23 @@ int main(int argc,char**argv){
             }
             // weights & gradients are NEVER read-and-crossed -> xchip_weight, xchip_grad stay 0 by construction
             if(ep==0 && b==0){   // ---- one-time 2-chip flow diagnostic ----
-                int32_t *lg=malloc(4*N*D); readw(L-1,O_AOUT,lg,N*D);   // chip L-1 logits
-                long nzh=0,nzlg=0,nze=0; for(int j=0;j<N*D;j++){ if(aout[j])nzh++; if(j<N*C&&lg[j])nzlg++; if(eout[j])nze++; }
-                int32_t *w0=malloc(4*D*D),*w1=malloc(4*D*D); readw(0,O_W,w0,D*D); readw(L-1,O_W,w1,D*D);
+                int32_t *ain1=malloc(4*N*D), *lg=malloc(4*N*D), *w1=malloc(4*D*D);
+                readw(L-1,O_AIN ,ain1,N*D);   // h1 AS RECEIVED by chip L-1 (the cross-chip message)
+                readw(L-1,O_AOUT,lg  ,N*D);   // chip L-1 logits (silicon)
+                readw(L-1,O_W   ,w1  ,D*D);
+                long hmax=0,amax=0; for(int j=0;j<N*D;j++){ long a=labs(aout[j]); if(a>hmax)hmax=a; long b2=labs(ain1[j]); if(b2>amax)amax=b2; }
+                // host-recompute chip(L-1) OUTPUT forward from the RECEIVED ain1 + w1 (maxshift LG_BITS)
+                long mxl=0; static long pre1[N][C];
+                for(int n=0;n<N;n++)for(int c=0;c<C;c++){ long acc=0; for(int i=0;i<D;i++) acc+=rdyad(w1[c*D+i])*(long)ain1[n*D+i]; pre1[n][c]=acc; long al=acc<0?-acc:acc; if(al>mxl)mxl=al; }
+                int shh=rshift(mxl,LG_BITS); long nzhost=0,nzsil=0;
+                for(int n=0;n<N;n++)for(int c=0;c<C;c++){ long hl=pre1[n][c]>>shh; if(hl)nzhost++; if(lg[n*D+c])nzsil++; }
+                printf("[diag] |chip0_AOUT(h1)|max=%ld  |chip1_AIN(recv)|max=%ld (match=%s) | chip1 logits nz: silicon=%ld host-recompute=%ld/%d (host sh=%d, |pre1|max=%ld)\n",
+                    hmax,amax, hmax==amax?"yes":"NO!", nzsil,nzhost,N*C, shh,mxl);
+                int32_t *w0=malloc(4*D*D); readw(0,O_W,w0,D*D);
                 long c0=0,c1=0; for(int j=0;j<D*D;j++){ if(w0[j]!=iW[0][j])c0++; if(w1[j]!=iW[L-1][j])c1++; }
-                printf("[diag] step1: h1(aout) nz=%ld/%d, chip%d logits nz=%ld/%d, EOUT1 nz=%ld/%d | W0 changed=%ld W1 changed=%ld | h1[0..3]=%d %d %d %d lg[0..3]=%d %d %d %d eout[0..3]=%d %d %d %d\n",
-                    nzh,N*D, L-1, nzlg,N*C, nze,N*D, c0,c1, aout[0],aout[1],aout[2],aout[3], lg[0],lg[1],lg[2],lg[3], eout[0],eout[1],eout[2],eout[3]);
-                free(lg);free(w0);free(w1); fflush(stdout);
+                printf("[diag] step1: W0 changed=%ld W1 changed=%ld | logits[0,:10]=%d %d %d %d %d %d %d %d %d %d\n",
+                    c0,c1, lg[0],lg[1],lg[2],lg[3],lg[4],lg[5],lg[6],lg[7],lg[8],lg[9]);
+                free(ain1);free(lg);free(w0);free(w1); fflush(stdout);
             }
         }
         for(int l=0;l<L;l++) T_READW+=readw(l,O_W,W[l],D*D);   // read each chip's weights (host eval only)
