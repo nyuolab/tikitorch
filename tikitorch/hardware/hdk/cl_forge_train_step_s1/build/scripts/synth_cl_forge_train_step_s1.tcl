@@ -27,12 +27,39 @@ read_ip [list \
   ${HDK_IP_SRC_DIR}/cl_axi_clock_converter_light/cl_axi_clock_converter_light.xci \
 ]
 
+# ---- CLKGEN+CDC rearchitecture: the kernel runs on clk_extra_a1 (125 MHz, Recipe A1) ----
+# AWS_CLK_GEN common-library sources. aws_clk_gen.sv (instantiated as AWS_CLK_GEN in the CL) lives in the
+# HDK common lib and pulls in aws_clk_regs.sv. The --aws_clk_gen build flag normally adds these automatically,
+# but read them explicitly in the OOC synth driver so the module elaborates deterministically. Guard with
+# file existence so a flow that already added them does not error.
+foreach f [list \
+    ${HDK_DIR}/common/lib/aws_clk_gen.sv \
+    ${HDK_DIR}/common/lib/aws_clk_regs.sv \
+  ] {
+  if {[file exists $f]} { read_verilog -sv $f }
+}
+# AWS_CLK_GEN's MMCM (group A) + AXI-Lite clock-xbar + reg-slice IP (pre-built in the HDK cl_ip src tree, the
+# same locations cl_mem_perf's synth reads). Only group A is enabled in the CL, so only clk_mmcm_a is needed;
+# cl_clk_axil_xbar + cl_axi_register_slice_light + cl_axi_clock_converter_light are aws_clk_gen-internal deps.
+foreach f [list \
+    $HDK_SHELL_DESIGN_DIR/../../ip/cl_ip/cl_ip.srcs/sources_1/ip/clk_mmcm_a/clk_mmcm_a.xci \
+    $HDK_SHELL_DESIGN_DIR/../../ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_clk_axil_xbar/cl_clk_axil_xbar.xci \
+    ${HDK_IP_SRC_DIR}/cl_axi_register_slice_light/cl_axi_register_slice_light.xci \
+  ] {
+  if {[file exists $f]} { read_ip $f }
+}
+
 # our IP: OCL AXI4-Lite slice (s1_ocl_slice — renamed to avoid the HDK axi_register_slice_light clash)
-# + the 2->1 DDR crossbar. OOC flow needs synth_ip for the CL's own IP.
+# + the 2->1 DDR crossbar + the TWO self-owned CDC clock converters (s1_axil_cdc OCL 250->125,
+# s1_axi_cdc kernel-mem 125->250). OOC flow needs synth_ip for the CL's own IP.
 read_ip [glob $CL_DIR/design/ip/s1_ocl_slice/s1_ocl_slice.xci]
 read_ip [glob $CL_DIR/design/ip/axi_crossbar_ddr/axi_crossbar_ddr.xci]
+read_ip [glob $CL_DIR/design/ip/s1_axil_cdc/s1_axil_cdc.xci]
+read_ip [glob $CL_DIR/design/ip/s1_axi_cdc/s1_axi_cdc.xci]
 synth_ip [get_ips s1_ocl_slice]
 synth_ip [get_ips axi_crossbar_ddr]
+synth_ip [get_ips s1_axil_cdc]
+synth_ip [get_ips s1_axi_cdc]
 
 synth_design -mode out_of_context \
              -top ${CL} \

@@ -4,12 +4,16 @@
 # scripts/run_muzero_afi_build.sh — ONLY the head env vars below change (CL/PKG/KERNEL/state/backstop); the
 # user-data body (launch guard, git-lfs pull, HLS+csim, CL scaffold from HDK template, gen_ip, the
 # aws_build_dcp_from_cl P&R flow, DCP/tarball -> S3, self-terminate) is IDENTICAL to the proven muzero_ddr
-# build (agfi-085dca07f374aa1cd, on silicon). The build runner's CLOCK_RECIPE is the muzero_ddr default:
-# create_clock period 4.0 ns = 250 MHz clk_main_a0 (NOT overridden here). The kernel csynth-closes at 3.197 ns
-# (+0.803 ns margin, 1.08 ns uncertainty folded in) so it meets 250 MHz; the recipe is the SAME knob muzero_ddr
-# used and is the safe default — do NOT invent one. If the first P&R misses timing (S1 is ~5x the muzero
-# kernel's LUT/BRAM -> congestion is the realistic risk, per the plan's R2), rebuild at 200 MHz (5.0 ns) by
-# relaxing create_clock in synth_train_step_s1.tcl + the synth driver — one knob, +1.8 ns slack, no RTL change.
+# build (agfi-085dca07f374aa1cd, on silicon) EXCEPT for the CLKGEN+CDC rearchitecture (S1_CLKGEN_PLAN.md):
+# the S1 kernel runs on the GENERATED clk_extra_a1 (125 MHz, Recipe A1) — NOT the shell-fixed 250 MHz
+# clk_main_a0. The kernel post-route closes ~144 MHz but MISSES 250 MHz (WNS -2.958 ns); clk_main_a0 cannot
+# be slowed by recipe on F2, so the CL now instantiates AWS_CLK_GEN to make a 125 MHz domain (8 ns >> the
+# 6.94 ns the kernel needs) and bridges the kernel's two AXI boundaries with axi_clock_converter CDC IP, while
+# every shell interface (DMA-PCIS, OCL, sh_ddr, crossbar) stays on clk_main_a0=250 MHz. The kernel HLS RTL +
+# 13-bit ABI are UNCHANGED. This requires --aws_clk_gen --clock_recipe_a A1 on EVERY build (see CLOCK_ARGS).
+# The shell-side 250 MHz logic still closes at the fixed 4.0 ns; the 125 MHz kernel constraint comes from the
+# A1 recipe applied by --clock_recipe_a A1 (NOT a hand-edited create_clock). Relief knob if P&R misses at
+# 125 MHz: CLOCK_RECIPE=A0 (clk_extra_a1=62.5 MHz, 16 ns) — one knob, no RTL change.
 #   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
 #   bash scripts/run_s1_afi_build.sh launch      # build src -> S3 -> launch z1d build box
 #   bash scripts/run_s1_afi_build.sh status        # poll S3 (no SSH)
@@ -21,9 +25,15 @@ REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null ||
 INSTANCE_TYPE="${INSTANCE_TYPE:-z1d.2xlarge}"            # AWS-recommended Vivado build instance
 AMI="${AMI:-ami-092fc5deb8f3c0f7d}"                       # FPGA Developer AMI (Vivado+Vitis+aws-fpga); proven by probe
 MAX_MINUTES="${MAX_MINUTES:-360}"                         # S1 is ~5x muzero: HLS+csim ~15m + synth ~25m + P&R ~3h + margin
-CLOCK_RECIPE="${CLOCK_RECIPE:-A1}"                        # A1=250MHz (shell default, no clk_gen); A0=125MHz eases routing/closure on the big S1 design
-# A1 is the shell-native recipe (no flag); any custom recipe (A0 etc.) needs --aws_clk_gen (the clock-gen IP).
-if [ "$CLOCK_RECIPE" = "A1" ]; then CLOCK_ARGS=""; else CLOCK_ARGS="--aws_clk_gen --clock_recipe_a $CLOCK_RECIPE"; fi
+CLOCK_RECIPE="${CLOCK_RECIPE:-A1}"                        # group-A recipe for AWS_CLK_GEN. A1 -> clk_extra_a1=125MHz (the KERNEL clock).
+# CLKGEN+CDC REARCHITECTURE (S1_CLKGEN_PLAN.md): the kernel now runs on the GENERATED clk_extra_a1 (125MHz)
+# instead of the shell-fixed clk_main_a0 (250MHz). AWS_CLK_GEN is instantiated in the CL, so --aws_clk_gen is
+# MANDATORY for EVERY build (it pulls in aws_clk_gen.sv + its MMCM/xbar/converter IP and applies the clkgen
+# clock constraints) and --clock_recipe_a sets MMCM_A's dividers so clk_extra_a1 = 125MHz. The OLD A1->empty
+# gate was correct for the no-clkgen design and is now WRONG: without --aws_clk_gen the AWS_CLK_GEN IP/constraints
+# are absent and the kernel never gets a 125MHz clock. ALWAYS pass both. A0 -> clk_extra_a1=62.5MHz is the safe
+# relief knob (16ns) if P&R ever misses at 125MHz; the kernel ABI is unchanged for any recipe.
+CLOCK_ARGS="--aws_clk_gen --clock_recipe_a ${CLOCK_RECIPE:-A1}"
 CL="${CL:-cl_forge_train_step_s1}"
 PKG_REL="${PKG_REL:-tikitorch/hardware/hdk/cl_forge_train_step_s1}"   # CL package (design/ + build/)
 KERNEL_TCL="${KERNEL_TCL:-synth_train_step_s1.tcl}"        # HLS the TRAINER kernel (top forge_train_step_s1); runs csim (bit-exact gate) + csynth

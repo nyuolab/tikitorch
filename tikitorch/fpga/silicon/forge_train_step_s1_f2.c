@@ -4,10 +4,17 @@
 // N_STEPS of fwd->bwd->opt with all weights/state resident in DDR — no per-step host round-trip.
 //
 // DATA PATH (the proven cl_forge_muzero_ddr DDR topology; PCIM is NOT drivable on EC2 Nitro, R1):
-//   host BAR0 (OCL AXI4-Lite)  -> s1_ocl_slice -> kernel s_axi_control[12:0]   (mode/args/buffer-ptr + kick/poll)
+//   host BAR0 (OCL AXI4-Lite)  -> s1_ocl_slice -> [OCL CDC 250->125] -> kernel s_axi_control[12:0]  (mode/args/buffer-ptr + kick/poll)
 //   host BAR4 (DMA-PCIS, 512b) -\
-//                                >- axi_crossbar_ddr (2->1 SASD) -> sh_ddr -> DDR4   (stage + readback)
-//   kernel m_axi gmem (512b RW)-/    buffer lives at DDR addr 0; kernel BUFFER ptr reg = 0
+//                                >- axi_crossbar_ddr (2->1 SASD, 250MHz) -> sh_ddr -> DDR4   (stage + readback)
+//   kernel m_axi gmem (512b RW)-[GMEM CDC 125->250]-/    buffer lives at DDR addr 0; kernel BUFFER ptr reg = 0
+//   host mgmt AXI-Lite (SDA/PF1-BAR4) -> AWS_CLK_GEN   (MMCM_LOCK poll + SYS_RST deassert = clkgen bring-up)
+//
+// CLKGEN+CDC (S1_CLKGEN_PLAN.md): the kernel runs on AWS_CLK_GEN's GENERATED clk_extra_a1 = 125MHz (the
+// kernel post-route closes ~144MHz but MISSES the shell-fixed 250MHz clk_main_a0); the shell interfaces
+// (DMA-PCIS, OCL, sh_ddr, crossbar) stay at 250MHz and the kernel's two AXI boundaries are bridged by
+// axi_clock_converter CDC IP. The host MUST do the AWS_CLK_GEN bring-up (clkgen_bringup() below) AFTER AFI
+// load and BEFORE any stage/kick — else clk_extra_a1 is static-low / the kernel domain is held in reset.
 //
 // SILICON-PROOF: this reproduces the forge_train_step_s1_tb MODE-3 convergence block on real fabric.
 // The host stages the IDENTICAL init the TB uses (stage_opt_buffer(seed=4242, memorize=true): the
@@ -28,6 +35,10 @@
 //       -I<repo>/tikitorch/hardware/hls/forge_kernels \
 //       -I<repo>/tikitorch/fpga/silicon/cstdint_shim \
 //       forge_train_step_s1_f2.c -lfpga_mgmt -o s1_f2
+//   The CLKGEN+CDC variant additionally needs the SDK clkgen library for the spec-blessed bring-up:
+//   add -lfpga_clkgen (and ensure <fpga_clkgen.h> is on -I$SDK/include). If an SDK lacks the clkgen lib,
+//   build with -DHAVE_FPGA_CLKGEN=0 to use the explicit-register fallback (mgmt-BAR MMCM_LOCK poll +
+//   SYS_RST clear) and drop -lfpga_clkgen.
 //   sudo ./s1_f2 <slot> <n_steps> [freeze|trainall] [seed]
 //
 //   <slot>     FPGA slot (0)
@@ -47,6 +58,22 @@
 // fpga_dma.h (its `char buf[static N]` is invalid C++; not needed — we use fpga_pci_write_burst).
 #include <fpga_pci.h>
 #include <fpga_mgmt.h>
+// CLKGEN+CDC rearchitecture (S1_CLKGEN_PLAN.md): the kernel now runs on AWS_CLK_GEN's generated 125MHz
+// clk_extra_a1. At AFI load AWS_CLK_GEN boots with SYS_RST_REG=0xFFFF_FFFE (cl_rst_a1_n ASSERTED, the
+// kernel domain held in reset) and clk_extra_a1 STATIC-LOW until MMCM_A locks. The host MUST, after AFI
+// load and BEFORE staging/kicking, poll MMCM_LOCK_REG until MMCM_A is locked then clear the CL resets
+// (SYS_RST_REG) so clk_extra_a1 oscillates and the two AXI clock-converter CDC bridges + the kernel come
+// out of reset. The spec-blessed mechanism is aws_clkgen_deassert_resets(slot) in the SDK fpga_clkgen
+// library, which performs exactly this lock-poll + reset-deassert sequence over the mgmt (SDA/PF1-BAR4)
+// path. Include it when available (HAVE_FPGA_CLKGEN); otherwise fall back to the explicit register
+// sequence below over the management AXI-Lite path. Define HAVE_FPGA_CLKGEN=0 at compile time on an SDK
+// that lacks the header.
+#ifndef HAVE_FPGA_CLKGEN
+#define HAVE_FPGA_CLKGEN 1
+#endif
+#if HAVE_FPGA_CLKGEN
+#include <fpga_clkgen.h>
+#endif
 
 // ----------------------------------------------------------------------------
 // C-safe inclusion of the C++ shared config header (S1_BUFLEN + S1_OFF_* + s1_off_* helpers).
@@ -81,6 +108,17 @@ typedef struct S1OPT S1OPT;          // forward the opt-region tag (so the bare-
 #define AP_START    0x01
 #define AP_DONE     0x02
 #define DDR_BUF     0x0ULL          // buffer staged at DDR address 0 (crossbar M00 base = 0)
+
+// ----------------------------------------------------------------------------
+// AWS_CLK_GEN AWS_CLK_REGS (BASE_REG = 0x0005_8000) — for the bring-up sequence (AWS_CLK_GEN_spec.md
+// "Boot and Reset Sequencing"). Reached over the management AXI-Lite (SDA / PF1-BAR4) path. Only used by
+// the explicit-register fallback when the SDK fpga_clkgen library is not available.
+// ----------------------------------------------------------------------------
+#define CLKGEN_BASE_REG   0x00058000UL  // BASE_REG = AWS_CLK_REGS base in the SDA address space
+#define CLKGEN_SYS_RST    0x14U         // SYS_RST_REG  off; boot=0xFFFF_FFFE (cl_rst_a1_n bit1 asserted)
+#define CLKGEN_MMCM_LOCK  0x20U         // MMCM_LOCK_REG off; bit0 = MMCM_BASE_A locked
+#define CLKGEN_MMCM_A_LOCKED  0x00000001U  // group-A-only lock mask (we enable CLK_GRP_A_EN only)
+#define CLKGEN_ALL_LOCKED     0x00000151U  // all four MMCMs locked (A=0,B=4,C=6,HBM=8) per the spec
 
 // kernel mode + a1/a2 selectors (== forge_s1_config.hpp). a1 of mode 3 = n_steps; a2 = which weights move.
 #define MODE_FWD    0
@@ -277,6 +315,67 @@ static int kick(int mode, int a1, int a2, double timeout_s) {
     return -1;
 }
 
+// ----------------------------------------------------------------------------
+// AWS_CLK_GEN bring-up (REQUIRED before any staging/kicking) — S1_CLKGEN_PLAN.md sec 5 +
+// AWS_CLK_GEN_spec.md "Boot and Reset Sequencing".
+//
+// At AFI load AWS_CLK_GEN starts with SYS_RST_REG = 0xFFFF_FFFE (every CL reset asserted except
+// cl_rst_main_n) and the MMCM clock outputs (clk_extra_a1, the 125MHz KERNEL clock) HELD STATIC-LOW
+// until MMCM_A locks. With the kernel + both CDC bridges held in reset and clk_extra_a1 not toggling,
+// the kernel never runs and a mode-3 kick would hang forever. The host MUST therefore:
+//   (1) poll MMCM_LOCK_REG until the enabled MMCM(s) report locked, THEN
+//   (2) clear SYS_RST_REG to deassert the CL resets so clk_extra_a1 oscillates and the CDCs + kernel
+//       exit reset (releasing resets BEFORE lock is the spec's explicit anti-pattern).
+//
+// The spec-blessed, version-robust mechanism is the SDK aws_clkgen_deassert_resets(slot) (fpga_clkgen
+// library), which performs exactly this lock-poll + reset-deassert sequence over the management path —
+// we use it when the header is available (HAVE_FPGA_CLKGEN). When it is not, the explicit-register
+// fallback attaches the management AXI-Lite (the SDA / PF1-BAR4 path the CL wires to AWS_CLK_GEN's
+// s_axil_ctrl_*) and runs the same sequence by hand.
+//
+// Returns 0 on success (clocks locked + resets released), nonzero on failure.
+static int clkgen_bringup(int slot) {
+#if HAVE_FPGA_CLKGEN
+    // Robust SDK path: lock-poll MMCM_LOCK_REG + clear SYS_RST_REG internally, over the mgmt path.
+    int rc = aws_clkgen_deassert_resets(slot);
+    if (rc != 0) {
+        fprintf(stderr, "[s1] aws_clkgen_deassert_resets(slot=%d) FAILED rc=%d "
+                        "(AFI may not be clkgen-enabled — built without --aws_clk_gen?)\n", slot, rc);
+        return rc;
+    }
+    printf("[s1] AWS_CLK_GEN: aws_clkgen_deassert_resets ok — clk_extra_a1 (125MHz) live, CL resets released\n");
+    return 0;
+#else
+    // Explicit-register fallback over the management AXI-Lite (SDA / PF1-BAR4) path.
+    pci_bar_handle_t mbar = PCI_BAR_HANDLE_INIT;
+    if (fpga_pci_attach(slot, FPGA_MGMT_PF, MGMT_PF_BAR4, 0, &mbar) != 0) {
+        fprintf(stderr, "[s1] clkgen: attach mgmt BAR (FPGA_MGMT_PF/MGMT_PF_BAR4) failed\n");
+        return -1;
+    }
+    // (1) poll MMCM_LOCK_REG for MMCM_A lock (bit0). CL enables CLK_GRP_A_EN only, so MMCM_A_LOCKED suffices.
+    uint32_t lock = 0; double t0 = now_s();
+    while (now_s() - t0 < 5.0) {
+        if (fpga_pci_peek(mbar, CLKGEN_BASE_REG + CLKGEN_MMCM_LOCK, &lock) == 0 &&
+            (lock & CLKGEN_MMCM_A_LOCKED)) break;
+    }
+    if (!(lock & CLKGEN_MMCM_A_LOCKED)) {
+        fprintf(stderr, "[s1] clkgen: MMCM_A did NOT lock (MMCM_LOCK_REG=0x%08x) in 5s — clk_extra_a1 dead\n", lock);
+        fpga_pci_detach(mbar); return -2;
+    }
+    // (2) deassert ALL CL resets (cl_rst_a1_n + the rest): write SYS_RST_REG = 0. Per the spec this MUST
+    //     happen only AFTER the lock above, else the downstream CDCs/kernel see no clocked reset assertion.
+    if (fpga_pci_poke(mbar, CLKGEN_BASE_REG + CLKGEN_SYS_RST, 0x00000000U) != 0) {
+        fprintf(stderr, "[s1] clkgen: SYS_RST_REG deassert write failed\n");
+        fpga_pci_detach(mbar); return -3;
+    }
+    uint32_t rstv = 0xdeadbeef; fpga_pci_peek(mbar, CLKGEN_BASE_REG + CLKGEN_SYS_RST, &rstv);
+    printf("[s1] AWS_CLK_GEN: MMCM_LOCK=0x%08x (A locked) -> SYS_RST_REG cleared (readback 0x%08x); "
+           "clk_extra_a1 (125MHz) live, CL resets released\n", lock, rstv);
+    fpga_pci_detach(mbar);
+    return 0;
+#endif
+}
+
 int main(int argc, char **argv) {
     int   slot     = (argc > 1) ? atoi(argv[1]) : 0;
     int   n_steps  = (argc > 2) ? atoi(argv[2]) : 32;
@@ -295,6 +394,15 @@ int main(int argc, char **argv) {
     if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR0, 0, &bar0) != 0)             { fprintf(stderr, "attach BAR0 failed\n"); return 3; }
     if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR4, BURST_CAPABLE, &bar4) != 0) { fprintf(stderr, "attach BAR4(burst) failed\n"); return 4; }
     if (fpga_pci_attach(slot, FPGA_APP_PF, APP_PF_BAR4, 0, &bar4r) != 0)            { fprintf(stderr, "attach BAR4(plain) failed\n"); return 4; }
+
+    // 0. AWS_CLK_GEN BRING-UP (MUST precede any staging/kick): poll MMCM_LOCK_REG until MMCM_A locks,
+    //    then deassert the CL resets (SYS_RST_REG) so the generated 125MHz clk_extra_a1 oscillates and
+    //    the kernel + its two AXI clock-converter CDC bridges leave reset. Without this the kernel domain
+    //    is held in reset / clk_extra_a1 is static-low and every kick below would hang. (S1_CLKGEN_PLAN.md)
+    if (clkgen_bringup(slot) != 0) {
+        fprintf(stderr, "[s1] AWS_CLK_GEN bring-up FAILED — kernel has no 125MHz clock; aborting before stage/kick\n");
+        return 9;
+    }
 
     hbuf = (int32_t *)calloc(S1_BUFLEN, 4);
     if (!hbuf) { fprintf(stderr, "calloc hbuf failed\n"); return 5; }

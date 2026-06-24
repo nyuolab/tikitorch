@@ -21,4 +21,23 @@ set_property -dict [list \
   CONFIG.R_REGISTER {1} \
   CONFIG.M00_A00_BASE_ADDR {0x0000000000000000} CONFIG.M00_A00_ADDR_WIDTH {34} \
 ] [get_ips axi_crossbar_ddr]
+
+# ---- CLKGEN+CDC rearchitecture: the kernel runs on clk_extra_a1 (125 MHz); two axi_clock_converter CDC IPs
+#      bridge the kernel's two AXI boundaries to/from the 250 MHz shell domain. SELF-OWNED module names
+#      (s1_axil_cdc / s1_axi_cdc) so they do NOT collide with the HDK's pre-built cl_axi_clock_converter*
+#      that sh_ddr reads from HDK_IP_SRC_DIR — same renaming trick as s1_ocl_slice.
+# CDC-1: OCL control 250->125 MHz, AXI4-Lite 32b (slave clk_main_a0 -> master clk_extra_a1).
+create_ip -name axi_clock_converter -vendor xilinx.com -library ip -module_name s1_axil_cdc -dir $ipdir
+set_property -dict [list \
+  CONFIG.PROTOCOL {AXI4LITE} CONFIG.DATA_WIDTH {32} CONFIG.ADDR_WIDTH {32} \
+  CONFIG.ID_WIDTH {0} CONFIG.SYNCHRONIZATION_STAGES {3} \
+] [get_ips s1_axil_cdc]
+# CDC-2: kernel m_axi 125->250 MHz, AXI4 512b, 64-bit addr, 1-bit ID (matches the kernel)
+#        (slave clk_extra_a1 -> master clk_main_a0; integer 2:1 ratio).
+create_ip -name axi_clock_converter -vendor xilinx.com -library ip -module_name s1_axi_cdc -dir $ipdir
+set_property -dict [list \
+  CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ADDR_WIDTH {64} \
+  CONFIG.ID_WIDTH {1} CONFIG.SYNCHRONIZATION_STAGES {3} CONFIG.ACLK_RATIO {2:1} \
+] [get_ips s1_axi_cdc]
+
 generate_target all [get_ips]
