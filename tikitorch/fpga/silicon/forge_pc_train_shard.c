@@ -100,25 +100,33 @@ int main(int argc,char**argv){
         if(fpga_pci_attach(slot[l],FPGA_APP_PF,APP_PF_BAR4,0,&bar4r[l])){fprintf(stderr,"bar4r slot %d\n",slot[l]);return 4;}
         hbuf[l]=calloc(BUFLEN,4);
     }
-    // init each chip's weights ~ round(randn*4) (Irwin-Hall), momentum 0; stage once -> persist in its DDR
+    // init each chip's weights, momentum 0; stage once -> persist in its DDR.
+    // PC_INITPERM=<dir>: load a VERIFIED-GOOD init (W<l>_init.i32) + data order (perm.i32) -> the silicon
+    // bit-exactly reproduces a Python-verified run (the MSE+SignSGD recipe collapses for some valid data
+    // orders; a pre-validated order avoids that). Else: round(randn*4) Irwin-Hall + per-epoch C shuffle.
+    const char* ipdir = getenv("PC_INITPERM");
     srand(12345);
     for(int l=0;l<L;l++){
-        for(int i=0;i<D*D;i++){ double g=0; for(int k=0;k<12;k++) g+=rand()/(double)RAND_MAX;
+        if(ipdir){ snprintf(p,512,"%s/W%d_init.i32",ipdir,l); FILE*f=fopen(p,"rb"); if(!f){fprintf(stderr,"open %s\n",p);return 2;}
+                   if(fread(hbuf[l]+O_W,4,D*D,f)!=(size_t)(D*D)){fprintf(stderr,"read %s\n",p);return 2;} fclose(f); for(int i=0;i<D*D;i++) hbuf[l][O_MOM+i]=0; }
+        else for(int i=0;i<D*D;i++){ double g=0; for(int k=0;k<12;k++) g+=rand()/(double)RAND_MAX;
             hbuf[l][O_W+i]=(int)(4.0*(g-6.0)+(g>=6.0?0.5:-0.5)); hbuf[l][O_MOM+i]=0; }
         stage(l,0,BUFLEN);
     }
+    if(ipdir) printf("[shard] loaded verified-good init from %s\n", ipdir);
 
     int32_t *iW[MAXL]; for(int l=0;l<L;l++){ iW[l]=malloc(4*D*D); memcpy(iW[l], hbuf[l]+O_W, 4*D*D); }  // init snapshot (diag)
     int32_t *W[MAXL]; for(int l=0;l<L;l++) W[l]=malloc(4*D*D);
     int32_t *aout=malloc(4*N*D), *eout=malloc(4*N*D);
     int *perm=malloc(Ntr*sizeof(int)); for(int i=0;i<Ntr;i++) perm[i]=i;
+    if(ipdir){ snprintf(p,512,"%s/perm.i32",ipdir); FILE*f=fopen(p,"rb"); if(!f){fprintf(stderr,"open %s\n",p);return 2;}
+               if(fread(perm,4,Ntr,f)!=(size_t)Ntr){fprintf(stderr,"read %s\n",p);return 2;} fclose(f); printf("[shard] loaded verified-good order (reused each epoch)\n"); }
     long xchip_msg=0, xchip_weight=0, xchip_grad=0;     // Gate C: ints that cross chips, by kind
     int nb=Ntr/N;
     double t_run0=now_s();                              // start of the measured training window
     for(int ep=0; ep<epochs; ep++){
         double t0=now_s();
-        for(int i=Ntr-1;i>0;i--){ int j=rand()%(i+1); int t=perm[i];perm[i]=perm[j];perm[j]=t; }
-        if(ep==0){ FILE*f=fopen("/tmp/s1_perm.i32","wb"); if(f){fwrite(perm,4,Ntr,f);fclose(f);} }  // dump the epoch-0 order
+        if(!ipdir) for(int i=Ntr-1;i>0;i--){ int j=rand()%(i+1); int t=perm[i];perm[i]=perm[j];perm[j]=t; }   // C shuffle (unless a verified order was loaded)
         for(int b=0;b<nb;b++){
             // ---- FORWARD SWEEP: slot 0 -> L-1, passing each layer's activation downstream ----
             for(int l=0;l<L;l++){

@@ -57,6 +57,7 @@ SLOTS=""; for s in \$(seq 0 \$((NSLOTS-1))); do SLOTS="\$SLOTS \$s"; sudo \$FC -
 sleep 4; for s in \$SLOTS; do sudo \$FD -S \$s 2>&1 | tee -a /tmp/img.txt; done; up
 mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.tgz && break; sleep 8; done && tar xzf s.tgz
 mkdir -p /tmp/pc_mnist; for f in train_x.i8 train_y.u8 test_x.i8 test_y.u8; do aws s3 cp "\$BINS_S3/\$f" /tmp/pc_mnist/\$f --only-show-errors; done
+mkdir -p /tmp/pc_initperm; aws s3 cp s3://tiki-sweep-739966866637/pc_initperm/ /tmp/pc_initperm/ --recursive --only-show-errors || true
 gcc -O2 -std=gnu11 -I"\$SDK/include" /opt/tiki/tikitorch/fpga/silicon/forge_pc_train_shard.c -lfpga_mgmt -o /tmp/pcshard 2>&1 | tee /tmp/build.txt
 up
 if [ -n "\$VERIFY" ]; then
@@ -72,7 +73,7 @@ echo "== IDLE Vccint (per slot, pre-run) ==" | tee /tmp/power.txt
 for s in \$SLOTS; do echo "idle slot=\$s W=\$(vcc \$s)" | tee -a /tmp/power.txt; done
 # run the instrumented driver in the BACKGROUND; sample per-slot Vccint concurrently every ~2s
 rm -f /tmp/scdone
-( sudo /tmp/pcshard "\$EPOCHS" /tmp/pc_mnist \$SLOTS 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt; touch /tmp/scdone ) &
+( sudo PC_INITPERM=/tmp/pc_initperm /tmp/pcshard "\$EPOCHS" /tmp/pc_mnist \$SLOTS 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt; touch /tmp/scdone ) &
 while [ ! -f /tmp/scdone ]; do TS=\$(date +%s.%N); for s in \$SLOTS; do echo "during t=\$TS slot=\$s W=\$(vcc \$s)"; done >> /tmp/power.txt; sleep 2; done
 wait
 # compute energy (J, J/step) from the sampled Vccint + the driver's ENERGY_WINDOW line
