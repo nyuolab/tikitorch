@@ -92,6 +92,38 @@ int main(int argc,char**argv){
     int32_t cfg[4]; readw(O_CFG,cfg,4);
     printf("[D] CFG readback after BWD: phase=%d role=%d tgt=%d update=%d (expected 1 0 8 1)\n", cfg[0],cfg[1],cfg[2],cfg[3]);
 
+    // (E) OUTPUT-role: does the output chip SUBTRACT the target? re-init fresh, FWD then BWD with a tgt,
+    //     compare W' to ref WITH target (e1=logits-tgt) vs WITHOUT (e1=logits, the class-0-collapse bug).
+    #define RL_OUTPUT 1
+    #define C_ 10
+    #define LG_BITS 4
+    static long Wo[D*D],Mo[D*D],Ho[N][D]; int lab[N];
+    for(int i=0;i<D*D;i++){ Wo[i]=(rand()%9)-4; Mo[i]=0; hbuf[O_W+i]=Wo[i]; hbuf[O_MOM+i]=0; }
+    for(int n=0;n<N;n++){ lab[n]=n%C_; for(int i=0;i<D;i++){ Ho[n][i]=rand()%100; hbuf[O_AIN+n*D+i]=Ho[n][i]; } }
+    stage(0,BUFLEN);
+    setcfg(PH_FWD,RL_OUTPUT,0); stage(O_AIN,N*D); kick();
+    int32_t*LGo=malloc(4*N*D); readw(O_AOUT,LGo,N*D);
+    // int64 ref forward (output): logits = maxshift(q(Wo)*Ho, LG_BITS) over first C
+    static long pr[N][C_]; long mxl=0;
+    for(int n=0;n<N;n++)for(int c=0;c<C_;c++){ long acc=0; for(int i=0;i<D;i++) acc+=rdyad(Wo[c*D+i])*Ho[n][i]; pr[n][c]=acc; long al=acc<0?-acc:acc; if(al>mxl)mxl=al; }
+    int shl=rsh(mxl,LG_BITS); static long LGr[N][C_];
+    for(int n=0;n<N;n++)for(int c=0;c<C_;c++) LGr[n][c]=i16(pr[n][c]>>shl);
+    // stage tgt = onehot*8, BWD update
+    for(int n=0;n<N;n++){ for(int c=0;c<D;c++) hbuf[O_TGT+n*D+c]=0; hbuf[O_TGT+n*D+lab[n]]=8; }
+    setcfg(PH_BWD,RL_OUTPUT,1); stage(O_TGT,N*D); kick();
+    int32_t*Wo2=malloc(4*D*D); readw(O_W,Wo2,D*D);
+    // ref WITH tgt and WITHOUT tgt
+    long dA=0,dB=0;
+    for(int c=0;c<C_;c++)for(int i=0;i<D;i++){ int idx=c*D+i;
+        long gA=0,gB=0; for(int n=0;n<N;n++){ long e_with=LGr[n][c]-(c==lab[n]?8:0); long e_wo=LGr[n][c];
+            gA+=rdyad(e_with)*rdyad(Ho[n][i]); gB+=rdyad(e_wo)*rdyad(Ho[n][i]); }
+        long mA=Mo[idx]+sgn(gA); mA=mA>MCAP?MCAP:(mA<-MCAP?-MCAP:mA); long wA=i16(Wo[idx]-sgn(mA));
+        long mB=Mo[idx]+sgn(gB); mB=mB>MCAP?MCAP:(mB<-MCAP?-MCAP:mB); long wB=i16(Wo[idx]-sgn(mB));
+        long a=labs((long)Wo2[idx]-wA); if(a>dA)dA=a; long b=labs((long)Wo2[idx]-wB); if(b>dB)dB=b; }
+    printf("[E] OUTPUT update: |W'-ref_WITH_tgt|=%ld  |W'-ref_WITHOUT_tgt|=%ld  -> %s\n",
+           dA,dB, dA==0?"TARGET APPLIED (correct)":(dB==0?"TARGET NOT SUBTRACTED (=class-0 collapse BUG)":"neither (other bug)"));
+    free(LGo);free(Wo2);
+
     printf("VERDICT: A=%s B=%s C=%s\n", dwr==0?"ok":"FAIL", dao==0?"ok":"FAIL", (dWu==0&&changed>0)?"ok":"FAIL");
     fpga_pci_detach(bar0); fpga_pci_detach(bar4); fpga_pci_detach(bar4r);
     return 0;
