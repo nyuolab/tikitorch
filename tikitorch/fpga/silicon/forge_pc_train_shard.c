@@ -118,6 +118,7 @@ int main(int argc,char**argv){
     for(int ep=0; ep<epochs; ep++){
         double t0=now_s();
         for(int i=Ntr-1;i>0;i--){ int j=rand()%(i+1); int t=perm[i];perm[i]=perm[j];perm[j]=t; }
+        if(ep==0){ FILE*f=fopen("/tmp/s1_perm.i32","wb"); if(f){fwrite(perm,4,Ntr,f);fclose(f);} }  // dump the epoch-0 order
         for(int b=0;b<nb;b++){
             // ---- FORWARD SWEEP: slot 0 -> L-1, passing each layer's activation downstream ----
             for(int l=0;l<L;l++){
