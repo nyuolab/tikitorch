@@ -368,9 +368,14 @@ static int clkgen_bringup(int slot) {
         fprintf(stderr, "[s1] clkgen: SYS_RST_REG deassert write failed\n");
         fpga_pci_detach(mbar); return -3;
     }
+    // Readback note: SYS_RST_REG[31:10] are Reserved and READ BACK SET (spec default 0x3FFFFF keeps reserved
+    // bits high, AWS_CLK_GEN_spec.md:121); only [9:0] are writable. A successful deassert therefore shows the
+    // writable cl_rst_* bits [9:0] == 0 while the high reserved bits stay set — do NOT misread the non-zero
+    // full readback as a failed deassert. Print both the raw value and the writable [9:0] window for clarity.
     uint32_t rstv = 0xdeadbeef; fpga_pci_peek(mbar, CLKGEN_BASE_REG + CLKGEN_SYS_RST, &rstv);
-    printf("[s1] AWS_CLK_GEN: MMCM_LOCK=0x%08x (A locked) -> SYS_RST_REG cleared (readback 0x%08x); "
-           "clk_extra_a1 (125MHz) live, CL resets released\n", lock, rstv);
+    printf("[s1] AWS_CLK_GEN: MMCM_LOCK=0x%08x (A locked) -> SYS_RST_REG cleared "
+           "(raw readback 0x%08x; writable bits[9:0]=0x%03x, expect 0x000; reserved [31:10] stay set per spec); "
+           "clk_extra_a1 (125MHz) live, CL resets released\n", lock, rstv, rstv & 0x3FFu);
     fpga_pci_detach(mbar);
     return 0;
 #endif

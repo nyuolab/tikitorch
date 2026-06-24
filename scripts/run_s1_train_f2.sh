@@ -62,7 +62,21 @@ mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.
 # build the S1 host driver (compile as C, -std=gnu11; the shared forge_s1_config.hpp is C++ and does
 # `#include <cstdint>`, so we add the cstdint_shim/ dir on the -I path (a one-line cstdint->stdint.h
 # redirect) — see the driver header comment. -I the forge_kernels dir for forge_s1_config.hpp itself).
-gcc -O2 -std=gnu11 -I"\$SDK/include" \
+#
+# CLKGEN BRING-UP PATH: build with -DHAVE_FPGA_CLKGEN=0 so the driver uses the EXPLICIT-REGISTER fallback
+# (mgmt-BAR MMCM_LOCK poll on the group-A bit + SYS_RST clear) instead of the SDK aws_clkgen_deassert_resets().
+# WHY (two confirmed blockers, both resolved by this one flag):
+#   (1) LINK: the default HAVE_FPGA_CLKGEN=1 path #includes <fpga_clkgen.h> and calls aws_clkgen_deassert_resets(),
+#       which lives in the SEPARATE fpga_clkgen lib (AWS_CLK_GEN_spec.md:25; not bundled in -lfpga_mgmt) — linking
+#       only -lfpga_mgmt would fail with 'undefined reference to aws_clkgen_deassert_resets' and no binary is built.
+#   (2) LOCK MASK: this CL enables ONLY clock group A (cl_forge_train_step_s1.sv:100, CLK_GRP_A_EN=1, B/C/HBM=0),
+#       so MMCM_LOCK_REG can only ever read 0x001 (bit0=MMCM_A). The SDK aws_clkgen_deassert_resets() was validated
+#       against the all-4-groups cl_mem_perf reference (cl_mem_perf.sv:190-193) whose lock reaches 0x0151; if it
+#       hard-polls the all-groups mask it would never satisfy on this partial enable -> reset never released ->
+#       every kick hangs. The explicit fallback polls ONLY the MMCM_A bit (forge_train_step_s1_f2.c:120,358-359),
+#       which is provably correct for a group-A-only CL, over the spec-blessed SDA/PF1-BAR4 mgmt path. The fallback
+#       is fully self-contained (needs only fpga_pci.h/fpga_mgmt.h already linked; no -lfpga_clkgen).
+gcc -O2 -std=gnu11 -DHAVE_FPGA_CLKGEN=0 -I"\$SDK/include" \
     -I/opt/tiki/tikitorch/hardware/hls/forge_kernels \
     -I/opt/tiki/tikitorch/fpga/silicon/cstdint_shim \
     /opt/tiki/tikitorch/fpga/silicon/forge_train_step_s1_f2.c -lfpga_mgmt -lm -o /tmp/s1_f2 2>&1 | tee /tmp/build.txt
