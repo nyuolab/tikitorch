@@ -1,0 +1,24 @@
+Stage-2 dyadic recipe de-risk: vocab=65 D=64 heads=2 blocks=8 seq=64 steps=1600
+   [float+shard] step     0  bpb=6.327
+   [float+shard] step   200  bpb=3.289
+   [float+shard] step   400  bpb=2.929
+   [float+shard] step   600  bpb=2.545
+   [float+shard] step   800  bpb=2.441
+   [float+shard] step  1000  bpb=2.367
+   [float+shard] step  1200  bpb=2.330
+   [float+shard] step  1400  bpb=2.166
+   [float+shard] step  1599  bpb=2.248
+   [DYADIC+shard] step     0  bpb=6.432
+   [DYADIC+shard] step   200  bpb=3.364
+   [DYADIC+shard] step   400  bpb=2.985
+   [DYADIC+shard] step   600  bpb=2.638
+   [DYADIC+shard] step   800  bpb=2.519
+   [DYADIC+shard] step  1000  bpb=2.491
+   [DYADIC+shard] step  1200  bpb=2.450
+   [DYADIC+shard] step  1400  bpb=2.278
+   [DYADIC+shard] step  1599  bpb=2.384
+
+  RESULT: 8-block distributed transformer, int16 neighbour boundaries.
+    float-proj  + warm-attn:  2.248 bpb
+    DYADIC-proj + warm-attn:  2.384 bpb  (+0.136)
+  -> mult-free dyadic projections/FFN/head (the fabric forward) PRESERVE training; attention warm-trained (the one multiply). Validates forge_pc_xformer_block's recipe.

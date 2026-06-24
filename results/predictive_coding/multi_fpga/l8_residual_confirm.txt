@@ -1,0 +1,1 @@
+NEW step_L (error-rescaled) RES L=8: traj=[0.5384, 0.6261, 0.5415, 0.646] peak=0.6460
