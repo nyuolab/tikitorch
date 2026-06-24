@@ -297,7 +297,11 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 // the chunked loop tile evenly.
 // =============================================================================
 #ifndef S1_LANE
-#define S1_LANE 16
+#define S1_LANE 8     // was 16; halved with the D=64 shrink. LUT is set by the parallel-lane count (NOT the
+                      // model dims), so cutting lanes is what actually shrinks compute LUT + the ALLOCATION-share
+                      // muxes (the D=128 post-route timing killer). LANE=8 divides D=64/DH=32/FFN=256/seq=64/V=64
+                      // and S1_GEMM_TMAX=64 (64%8==0). Bit-exact-preserving (integer reduction order-independent);
+                      // ~2x more cycles (irrelevant for the single-shot S1 proof). Target ~35% LUT -> routes+closes.
 #endif
 
 // =============================================================================
