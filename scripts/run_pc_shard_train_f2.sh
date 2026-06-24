@@ -102,6 +102,7 @@ if wall:
     print("NOTE: Vccint is the core rail (not whole-board); a DSP_MULT=0 core's dynamic draw is often at/below the sensor's 1W resolution -> dynamic may read ~0 (honest: structural demo, not a power record).")
 PY
 for f in img build train power energy; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
+for w in shardW0.i32 shardW1.i32; do [ -f /tmp/\$w ] && aws s3 cp /tmp/\$w "\$S3_RESULTS/\$w" --only-show-errors || true; done
 echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 up; shutdown -h now
 UDEOF

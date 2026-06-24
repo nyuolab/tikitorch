@@ -155,6 +155,12 @@ int main(int argc,char**argv){
                     c0,c1, lg[0],lg[1],lg[2],lg[3],lg[4],lg[5],lg[6],lg[7],lg[8],lg[9]);
                 free(ain1);free(lg);free(w0);free(w1); fflush(stdout);
             }
+            if(ep==0 && (b==nb/4 || b==nb/2 || b==3*nb/4)){   // in-epoch accuracy trajectory (diverge vs flat?)
+                for(int l=0;l<L;l++) readw(l,O_W,W[l],D*D);
+                long ok=0; for(int t=0;t<Nte;t++) if(predict(Xte+t*D,W)==Yte[t]) ok++;
+                long m0=0,m1=0; for(int j=0;j<D*D;j++){ long a=labs(W[0][j]); if(a>m0)m0=a; long b2=labs(W[L-1][j]); if(b2>m1)m1=b2; }
+                printf("[mideval] epoch1 step %d/%d: acc=%.4f  |W0|max=%ld |W1|max=%ld\n", b,nb,(double)ok/Nte,m0,m1); fflush(stdout);
+            }
         }
         for(int l=0;l<L;l++) T_READW+=readw(l,O_W,W[l],D*D);   // read each chip's weights (host eval only)
         long wc[MAXL]={0}; for(int l=0;l<L;l++) for(int j=0;j<D*D;j++) if(W[l][j]!=iW[l][j]) wc[l]++;
@@ -162,6 +168,9 @@ int main(int argc,char**argv){
         printf("[shard] epoch %d: test acc = %.4f  (%d steps, %.1fs)  MODEL-PARALLEL/%d-chip  [W0 chg=%ld/%d W%d chg=%ld/%d vs init]\n",
                ep+1, (double)ok/Nte, nb, now_s()-t0, L, wc[0], D*D, L-1, wc[L-1], D*D); fflush(stdout);
     }
+    // dump trained weights so the host can re-eval with the Python ref (predict-bug vs diverged-weights)
+    { FILE*f=fopen("/tmp/shardW0.i32","wb"); if(f){fwrite(W[0],4,D*D,f);fclose(f);}
+      f=fopen("/tmp/shardW1.i32","wb"); if(f){fwrite(W[L-1],4,D*D,f);fclose(f);} }
     double wall = now_s() - t_run0;
     long steps = (long)epochs * nb;          // one model-parallel training step per batch
     long kicks = steps * 2L * L;             // L fwd kicks + L bwd kicks per step
