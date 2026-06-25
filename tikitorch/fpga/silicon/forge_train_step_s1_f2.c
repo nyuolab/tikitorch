@@ -429,20 +429,22 @@ int main(int argc, char **argv) {
     //     ordered AFTER the burst writes on the shared DMA-PCIS->crossbar->sh_ddr path, so this both (a) FORCES
     //     the posted writes to flush before the first kick and (b) localizes a staging-path fault (e.g. the new
     //     DMA-PCIS register slice) by comparing DDR readback to the host buffer on NON-ZERO regions.
+    // Probe the regions the HOST actually writes (the W_fp MASTERS + LUTs + tokens), NOT the live code/value
+    // regions (S1_OFF_EMBED etc.) which the host leaves zero for the kernel's do_opt(INIT) to populate.
     {
-        long probes[3]; probes[0] = S1_OFF_EMBED; probes[1] = S1_OFF_W_HEAD; probes[2] = S1_OFF_TOKENS;
-        const char *pn[3]; pn[0] = "EMBED"; pn[1] = "W_HEAD"; pn[2] = "TOKENS";
+        long probes[4]; probes[0] = S1_OFF_WFP_EMBED; probes[1] = S1_OFF_WFP_LN1_G; probes[2] = S1_OFF_CE_LUT; probes[3] = S1_OFF_TOKENS;
+        const char *pn[4]; pn[0] = "WFP_EMBED"; pn[1] = "WFP_LN1_G"; pn[2] = "CE_LUT"; pn[3] = "TOKENS";
         int total_mism = 0;
-        for (int p = 0; p < 3; p++) {
+        for (int p = 0; p < 4; p++) {
             int32_t rb[8];
             readback(probes[p], rb, 8);
             int m = 0; for (int j = 0; j < 8; j++) if (rb[j] != hbuf[probes[p] + j]) m++;
             total_mism += m;
-            printf("[s1] stage-check %-6s @%ld: ddr={%d,%d,%d,%d} host={%d,%d,%d,%d} mism=%d/8\n",
+            printf("[s1] stage-check %-9s @%ld: ddr={%d,%d,%d,%d} host={%d,%d,%d,%d} mism=%d/8\n",
                    pn[p], probes[p], rb[0], rb[1], rb[2], rb[3],
                    hbuf[probes[p]], hbuf[probes[p]+1], hbuf[probes[p]+2], hbuf[probes[p]+3], m);
         }
-        printf("[s1] POST-STAGE READBACK: %s (%d mismatches across 24 probed words)\n",
+        printf("[s1] POST-STAGE READBACK (masters/LUT/tokens): %s (%d mismatches across 32 probed words)\n",
                total_mism == 0 ? "MATCH (staging landed)" : "MISMATCH (staging did NOT land)", total_mism);
     }
 
@@ -450,6 +452,23 @@ int main(int argc, char **argv) {
     //    re-quantizes codes from W_fp at entry, but a standalone mode-0 needs valid codes first, so run a
     //    mode-2 INIT (re-quantize, no weight move) then mode-0. Timeout small (single fwd ~18 ms).
     if (kick(MODE_OPT, S1_OPT_INIT, a2, 10.0)) return 7;   // re-quantize codes/values from staged W_fp
+    // POST-INIT PROBE: did do_opt(INIT) copy the W_fp masters into the LIVE regions the forward reads?
+    // (S1_OFF_EMBED/W_HEAD = int16 values copied from WFP_*; S1_OFF_LN1_G = a dyadic code re-quantized.)
+    // If these are ZERO after the INIT kick, do_opt(INIT) is not populating on silicon = the root cause of
+    // the zero-init (peak|R|=0, CE pinned at log-V floor) despite the masters staging correctly.
+    {
+        long pl[3]; pl[0] = S1_OFF_EMBED; pl[1] = S1_OFF_W_HEAD; pl[2] = S1_OFF_LN1_G;
+        const char *pn[3]; pn[0] = "EMBED(live)"; pn[1] = "W_HEAD(live)"; pn[2] = "LN1_G(live)";
+        int nz = 0;
+        for (int p = 0; p < 3; p++) {
+            int32_t rb[8]; readback(pl[p], rb, 8);
+            for (int j = 0; j < 8; j++) if (rb[j] != 0) nz++;
+            printf("[s1] post-INIT %-12s @%ld: live={%d,%d,%d,%d,%d,%d,%d,%d}\n", pn[p], pl[p],
+                   rb[0],rb[1],rb[2],rb[3],rb[4],rb[5],rb[6],rb[7]);
+        }
+        printf("[s1] POST-INIT do_opt(INIT) copy: %s (%d/24 live words nonzero)\n",
+               nz > 0 ? "POPULATED" : "STILL ZERO (do_opt INIT not copying masters->live on silicon)", nz);
+    }
     if (kick(MODE_FWD, 0, 0, 10.0))            return 7;   // forward + CE -> LOGITS
     readback(S1_OFF_LOGITS,  hbuf + S1_OFF_LOGITS,  (long)S1_L_SEQ * S1_V);
     readback(S1_OFF_TARGETS, hbuf + S1_OFF_TARGETS, (long)S1_L_SEQ);
