@@ -1,0 +1,11 @@
+[xfsim] 4-block transformer, LOCAL multi-chip sim (real ap_int kernel), D=64 seq=64 vocab=64, 800 steps
+  step    0  bpb=39.863  bpb_ema=39.863  acc=0.000
+  step  100  bpb=36.749  bpb_ema=39.707  acc=0.078
+  step  200  bpb=36.764  bpb_ema=39.560  acc=0.062
+  step  300  bpb=37.372  bpb_ema=39.451  acc=0.062
+  step  400  bpb=30.785  bpb_ema=39.018  acc=0.078
+  step  500  bpb=38.026  bpb_ema=38.968  acc=0.047
+  step  600  bpb=38.649  bpb_ema=38.952  acc=0.031
+  step  700  bpb=37.995  bpb_ema=38.904  acc=0.047
+  step  799  bpb=27.303  bpb_ema=38.324  acc=0.062
+  -> PASS: distributed 4-block transformer did not clearly fall (bpb_ema 38.324; lower=learning, log2(64)=6.0 chance)
