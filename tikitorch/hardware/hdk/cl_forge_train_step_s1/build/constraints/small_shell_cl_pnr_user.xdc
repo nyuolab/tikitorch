@@ -96,10 +96,14 @@ resize_pblock pblock_S1_KERNEL -add {CLOCKREGION_X0Y4:CLOCKREGION_X3Y7}
 # NOTE: the X5Y1:X5Y3 / X4*/X6Y1 DDR-column partials are intentionally NOT added.
 resize_pblock pblock_S1_KERNEL -add {CLOCKREGION_X0Y0:CLOCKREGION_X3Y3}
 
-# Nested-pblock hygiene + soft (guide, not wall) -- see SAFETY POSTURE above.
-set_property SNAPPING_MODE ON   [get_pblocks pblock_S1_KERNEL]
-set_property IS_SOFT       TRUE [get_pblocks pblock_S1_KERNEL]
-set_property parent  pblock_CL  [get_pblocks pblock_S1_KERNEL]
+# Nested-pblock hygiene. IS_SOFT FALSE: the F2 Hierarchical-Design (partial-reconfig)
+# flow only supports HARD pblocks ("WARNING [Constraints 18-5661] Only False is
+# supported for IS_SOFT ... due to its Hierarchical Design flow requirement" -- v12
+# forced it FALSE anyway, and the HARD pblock is exactly what took the worst path from
+# -0.409 to -0.062 ns). The region is generous (~64 CRs) so the LANE=4 kernel fits hard.
+set_property SNAPPING_MODE ON    [get_pblocks pblock_S1_KERNEL]
+set_property IS_SOFT       FALSE [get_pblocks pblock_S1_KERNEL]
+set_property parent  pblock_CL   [get_pblocks pblock_S1_KERNEL]
 
 # ---- Cell mapping (exact full hier paths; confirmed against the CL .sv) ----
 # u_kernel  = forge_train_step_s1 (cl_forge_train_step_s1.sv line 192), the big
@@ -118,6 +122,41 @@ add_cells_to_pblock pblock_S1_KERNEL [get_cells [list \
     WRAPPER/CL/u_kernel \
     WRAPPER/CL/GMEM_CDC ]]
 
+###############################################################################
+# Child Pblock: confine the DDR crossbar (XBAR_DDR) to SLR1 so it CANNOT spread
+# into SLR2. v12 (kernel pblock alone) cut the miss to WNS -0.062 ns but the worst
+# path STILL crosses SLR1->SLR2->SLR1: the crossbar's own wready mux drifted up
+# into SLR2's X5 column (the kernel pblock OPENED all of SLR2 but the LANE=4 kernel
+# does not fill it, so the unconstrained crossbar crept in). v11 showed the same
+# crossbar self-crossing (XBAR_DDR/...m_valid_i_reg SLR1<->SLR2, WNS -0.543).
+# Confining XBAR_DDR to SLR1's CL clock regions (X0Y4:X3Y7 compute block + the
+# X5Y4:X5Y7 DDR column where SH_DDR lives) keeps the whole sh_ddr<->crossbar
+# handshake intra-SLR1 -- eliminating the inter-SLR (~0.35 ns each way) + Laguna
+# penalty on the failing path. Only the inherent crossbar->DMA-PCIS SLR1->SLR0
+# crossing remains, which the proven muzero_ddr build already closed. The region
+# is GENEROUS (~20 CRs vs a small 2->1 SASD crossbar) so the forced-HARD pblock
+# cannot overflow; the crossbar gravitates to X5 next to SH_DDR (timing-driven).
+# Every CR is within pblock_CL's SLR1 set (X0Y4:X3Y7 + X5Y4:X5Y7), so no
+# out-of-partition error.
+###############################################################################
+# Confine XBAR_DDR to the SLR1 X4+X5 DDR-side columns (next to SH_DDR), DISJOINT
+# from the kernel pblock's X0-X3 columns -- so the two sibling pblocks never overlap
+# (the proven AWS reference floorplans, results/fpga_silicon/ddr_arch/*small_shell*,
+# keep CL child pblocks strictly disjoint by SLR + nest the crossbar; overlapping
+# siblings are avoided). These are EXACTLY the SLR1 X4/X5 clock regions pblock_CL
+# owns (X4Y4, X4Y6:X4Y7 -- note X4Y5 is NOT in pblock_CL -- and X5Y4:X5Y7); 7 CRs
+# (~130k LUT after SH_DDR's share) vs a ~3k-LUT 2->1 SASD crossbar = generous, so
+# the forced-HARD pblock cannot overflow. No SLR2 region -> the crossbar physically
+# cannot spread to SLR2, killing the SLR1<->SLR2 self-crossing on the -0.062 path.
+create_pblock pblock_S1_XBAR
+resize_pblock pblock_S1_XBAR -add {CLOCKREGION_X5Y4:CLOCKREGION_X5Y7}
+resize_pblock pblock_S1_XBAR -add {CLOCKREGION_X4Y6:CLOCKREGION_X4Y7}
+resize_pblock pblock_S1_XBAR -add {CLOCKREGION_X4Y4:CLOCKREGION_X4Y4}
+set_property SNAPPING_MODE ON    [get_pblocks pblock_S1_XBAR]
+set_property IS_SOFT       FALSE [get_pblocks pblock_S1_XBAR]
+set_property parent  pblock_CL   [get_pblocks pblock_S1_XBAR]
+add_cells_to_pblock pblock_S1_XBAR [get_cells [list WRAPPER/CL/XBAR_DDR]]
+
 # =============================================================================
 # ASYNC CLOCK GROUPS (the kernel clk_extra_a1=125 MHz is async to the shell
 # clk_main_a0=250 MHz; they cross ONLY through the s1_axil_cdc / s1_axi_cdc
@@ -129,17 +168,17 @@ add_cells_to_pblock pblock_S1_KERNEL [get_cells [list \
 # AUTHORED earlier in cl_timing_user.xdc but that file is NEVER read by the F2
 # flow (it reads ONLY ${SHELL_MODE}_cl_pnr_user.xdc = small_shell_cl_pnr_user.xdc,
 # confirmed at aws_build.full.log line 7265-7267) -- so it was a silent no-op the
-# whole time (why v9 == v10 byte-identical). Declaring the groups async here (the
-# file that IS read) stops Vivado timing the crossings, freeing the router to help
-# the marginal -0.409 ns sh_ddr<->crossbar wready path. Guarded: if either clock
-# is absent at P&R the get_clocks return empty and the whole block is skipped, so
-# a name mismatch CANNOT error the ~6 h build.
+# whole time (why v9 == v10 byte-identical). v12 then put it here but wrapped in a
+# Tcl `if {...}` guard -- REJECTED ("CRITICAL WARNING [Designutils 20-1307] Command
+# 'if' is not supported in the xdc constraint file"), so the async group STILL did
+# not apply (Timing 38-164 persisted at v12 line 11565). XDC files allow only a
+# restricted command set, NOT general Tcl control flow. The fix is a BARE
+# set_clock_groups (get_clocks IS allowed in XDC). clk_main_a0 and clk_extra_a1
+# both exist at P&R (the v10/v11/v12 reports time 255 paths between them), so the
+# get_clocks resolve non-empty -- no guard needed. This finally excludes the
+# phantom inter-clock crossings (handled by the CDC IPs), freeing the router for
+# the last 62 ps on the single-clock sh_ddr<->crossbar wready path.
 # =============================================================================
-set _cmain  [get_clocks -quiet -include_generated_clocks clk_main_a0]
-set _cextra [get_clocks -quiet -include_generated_clocks clk_extra_a1]
-if {[llength $_cmain] > 0 && [llength $_cextra] > 0} {
-  set_clock_groups -asynchronous -group $_cmain -group $_cextra
-  puts "INFO: S1 cl_pnr_user -- set_clock_groups async clk_main_a0 <-> clk_extra_a1 applied"
-} else {
-  puts "WARNING: S1 cl_pnr_user -- clk_main_a0 or clk_extra_a1 not found; async group SKIPPED (m=[llength $_cmain] e=[llength $_cextra])"
-}
+set_clock_groups -asynchronous \
+  -group [get_clocks -include_generated_clocks clk_main_a0] \
+  -group [get_clocks -include_generated_clocks clk_extra_a1]
