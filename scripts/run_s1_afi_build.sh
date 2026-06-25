@@ -91,9 +91,19 @@ echo "BOOT \$(date -u)"; hostname; nproc; free -g
 # cloud-init runs as root with HOME unset -> Vivado's realTime.tcl chokes expanding ~/.oasys
 # ("Failed to load feature 'vivado'"). Set HOME before any Vivado/Vitis invocation.
 export HOME=/root; mkdir -p /root/.oasys /root/.Xilinx
-# git-lfs is NOT preinstalled on the AMI; the shell DCP/manifest are LFS objects, so without it
-# 'git lfs pull' is a no-op and P&R links against pointer stubs. Install it first.
-( command -v git-lfs >/dev/null 2>&1 || apt-get update -y && apt-get install -y git-lfs || yum install -y git-lfs ) || true
+# git-lfs is NOT preinstalled on the AMI; the shell DCP/manifest/IP are LFS objects, and aws-fpga
+# hdk_setup.sh's check_git_lfs ABORTS the whole HDK env setup (-> HDK_IP_SRC_DIR unset -> build fails)
+# if git-lfs is missing. apt-get is RACY vs the AMI boot-time unattended-upgrades holding the dpkg lock
+# (v16 failed here twice: "Could not get lock /var/lib/dpkg/lock-frontend ... unattended-upgr"). Install
+# from the STATIC BINARY release (no apt, no dpkg lock) so git-lfs is present BEFORE hdk_setup runs.
+if ! command -v git-lfs >/dev/null 2>&1; then
+  ( curl -fsSL https://github.com/git-lfs/git-lfs/releases/download/v3.5.1/git-lfs-linux-amd64-v3.5.1.tar.gz -o /tmp/glfs.tgz \
+      && tar -xzf /tmp/glfs.tgz -C /tmp \
+      && install -m 0755 /tmp/git-lfs-*/git-lfs /usr/local/bin/git-lfs ) \
+  || ( for _i in \$(seq 1 90); do fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || break; sleep 5; done; \
+       apt-get install -y git-lfs ) || true
+fi
+command -v git-lfs && git-lfs version || echo "WARN: git-lfs STILL missing (hdk_setup will likely abort)"
 # --- locate aws-fpga + tools ---
 AF=""; for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /home/*/aws-fpga /opt/aws-fpga; do [ -d "\$p/hdk" ] && AF="\$p" && break; done
 [ -z "\$AF" ] && { AF=/opt/aws-fpga; git clone https://github.com/aws/aws-fpga.git "\$AF"; }
