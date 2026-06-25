@@ -108,15 +108,18 @@ patterns (copied into new files; originals untouched). The **forward path** (emb
 one multiply] → WO+residual → LN2 → FFN → residual → OUTPUT head+CE | downstream message) is written and the
 forward bugs the audits found are fixed.
 
-**The backward is now BUILT and algorithm-validated (§6).** A plain-int64 golden of the full block
-(fwd + PC-cascade backward + mult-free dyadic-Adam) was built and **validated locally** — it trains a tiny
-char-LM on TinyShakespeare to **5× chance** with bounded logits, proving the integer backward + optimizer are
-sound. That validation caught **three recipe bugs** invisible on paper (dyadic-Adam LR rounded every step to
-zero; weight-decay 32× too strong for int16 masters; LN-gammas must be frozen or they blow up the logits). The
-HLS kernel transcribes this golden; an int64 csim testbench checks fwd+bwd+optimizer bit-exact (max|diff|=0). A
-2nd adversarial workflow caught six more bugs in the HLS transcription (two wouldn't compile; the matmul clipped
-to int16 before rescale; int48 overflowed the attention backward) — all fixed. **Status: csim-ready; the HLS is
-unvalidated until the user runs csim (no local ap_int compiler), but the algorithm is golden-validated.**
+**The backward is BUILT and the kernel is CSIM-BIT-EXACT to the golden — validated LOCALLY (§6).** A plain-int64
+golden of the full block (fwd + PC-cascade backward + mult-free dyadic-Adam) was built and **validated locally**
+— it trains a tiny char-LM on TinyShakespeare to ~**4–5× chance** with bounded logits, proving the integer
+backward + optimizer are sound. The HLS kernel transcribes it, and a minimal `ap_int` shim (`_apshim/ap_int.h`)
+compiles kernel + testbench with plain g++ so the **csim runs locally — and passes at max|diff| = 0** across
+every region (activations, the updated weights with ~30k genuinely moved, the whole input-gradient cascade
+`EOUT`, + zero-grad and all-ones KATs). Getting there caught **nine bugs invisible on paper**: 3 recipe bugs
+(LR rounded steps to zero; decay 32× too strong; LN-gammas must be frozen), a workflow's 6 HLS bugs (two
+wouldn't compile; matmul clipped to int16 before rescale; int48 overflowed the attention backward), and 3 the
+local csim exposed (`norm_shift` scanned only 47 bits so ~2^55 backward grads left `EOUT` un-rescaled; the decay
+drifted negative weights; the OUTPUT-role HIN contract). **Status: csim bit-exact (local, `run_local_csim.sh`);
+the EC2 Vitis run (`synth_pc_xformer_block.tcl`) is the authoritative csim + the free csynth gate — next step.**
 
 ---
 
