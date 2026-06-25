@@ -94,6 +94,7 @@ struct GG {
     i64 WQ[X_D*X_D],WK[X_D*X_D],WV[X_D*X_D],WO[X_D*X_D],WUP[X_FFN*X_D],WDN[X_D*X_FFN],WHEAD[X_VOCAB*X_D];
     i64 LN1G[X_D],LN1B[X_D],LN2G[X_D],LN2B[X_D],LNFG[X_D],LNFB[X_D];
     i64 EMB[X_VOCAB*X_D],POS[X_SEQ*X_D];
+    i64 gR[X_SEQ*X_D];      // final input-gradient (the OUTPUT/HIDDEN role's EOUT-before-rescale) — for the tb
 };
 
 // ---------------- BACKWARD (OUTPUT role) ----------------
@@ -139,6 +140,7 @@ static void g_backward(GW &w, GA &a, GG &g, const int *tok) {
     g_route(gV, w.WV, tmp, X_SEQ, X_D, X_D); for(int i=0;i<X_SEQ*X_D;i++) gX1[i]+=tmp[i]; g_wgrad(gV, a.X1, g.WV, X_SEQ, X_D, X_D);
     // (4) LN1 bwd over input R -> add into gR
     g_ln_bwd(gX1, a.R, w.LN1G, a.ln1s, gR, g.LN1G, g.LN1B, X_SEQ);
+    for (int i=0;i<X_SEQ*X_D;i++) g.gR[i]=gR[i];                  // expose the final input-gradient for the tb
     // (6) INPUT-role grads: scatter gR into embed + pos by token id (OUTPUT role would emit EOUT=rescale(gR))
     for(int t=0;t<X_SEQ;t++){ int v=tok[t]; if(v<0)v=0; if(v>=X_VOCAB)v=X_VOCAB-1; for(int d=0;d<X_D;d++){ g.EMB[v*X_D+d]+=gR[t*X_D+d]; g.POS[t*X_D+d]+=gR[t*X_D+d]; } }
 }
@@ -149,7 +151,8 @@ static void g_adam(i64 *W, const i64 *gW, i64 *m, i64 *v, int n) {
     for(int i=0;i<n;i++){ i64 g=gW[i], ag=g<0?-g:g;
         m[i]=m[i]-(m[i]>>X_ADAM_BSH)+(g>>X_ADAM_BSH); v[i]=v[i]-(v[i]>>X_ADAM_BSH)+(ag>>X_ADAM_BSH);
         int se=g_dyad_exp(v[i]); i64 step=m[i]>>se; i64 dw=step>>X_LR_SHIFT;
-        i64 nw=W[i]-dw - (W[i]>>X_WD_SHIFT);            // + mult-free weight decay
+        i64 dec = (W[i]>=0) ? (W[i]>>X_WD_SHIFT) : -((-W[i])>>X_WD_SHIFT);   // round-toward-0 decay (symmetric)
+        i64 nw=W[i]-dw-dec;
         if(nw>32767)nw=32767; if(nw<-32767)nw=-32767; W[i]=nw;             // int16 master clamp
     }
 }

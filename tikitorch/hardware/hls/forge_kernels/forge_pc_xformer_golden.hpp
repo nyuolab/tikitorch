@@ -31,7 +31,7 @@ static inline void g_dyad(i64 w, int &sgn, int &e, int &nz) {   // sign/exp/nz f
     int m = 0; for (int b = 15; b >= 1; b--) if ((a >> b) & 1) { m = b; break; }
     if (m >= 1 && ((a >> (m - 1)) & 1)) m++; e = m;
 }
-static inline int g_bitlen(i64 v) { i64 a = v < 0 ? -v : v; int h = 0; for (int b = 47; b >= 1; b--) if ((a >> b) & 1) { h = b; break; } return h + 1; }
+static inline int g_bitlen(i64 v) { i64 a = v < 0 ? -v : v; int h = 0; for (int b = 62; b >= 1; b--) if ((a >> b) & 1) { h = b; break; } return h + 1; }
 static inline int g_normshift(i64 mx, int target) { int s = g_bitlen(mx) - target; return s > 0 ? s : 0; }
 static inline i64 g_floorshr(i64 v, int s) { return v >> s; }   // arithmetic >> = floor-div (gcc/x86)
 

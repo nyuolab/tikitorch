@@ -73,6 +73,16 @@ static void stage_persistent(int32_t *buf, const GW &w, const i64 *lut) {
     for (int i = 0; i < X_NW; i++) { buf[XO_MOM + i] = 0; buf[XO_VAR + i] = 0; }
 }
 
+// stage the golden's (warmed) dyadic-Adam m/v into the flat XO_MOM/XO_VAR regions at each matrix's offset
+static void stage_mv(int32_t *buf, const GW &w) {
+    put_i32(buf, XO_MOM+X_OFF_WQ, w.mWQ, X_D*X_D);     put_i32(buf, XO_VAR+X_OFF_WQ, w.vWQ, X_D*X_D);
+    put_i32(buf, XO_MOM+X_OFF_WK, w.mWK, X_D*X_D);     put_i32(buf, XO_VAR+X_OFF_WK, w.vWK, X_D*X_D);
+    put_i32(buf, XO_MOM+X_OFF_WV, w.mWV, X_D*X_D);     put_i32(buf, XO_VAR+X_OFF_WV, w.vWV, X_D*X_D);
+    put_i32(buf, XO_MOM+X_OFF_WO, w.mWO, X_D*X_D);     put_i32(buf, XO_VAR+X_OFF_WO, w.vWO, X_D*X_D);
+    put_i32(buf, XO_MOM+X_OFF_WUP, w.mUP, X_FFN*X_D);  put_i32(buf, XO_VAR+X_OFF_WUP, w.vUP, X_FFN*X_D);
+    put_i32(buf, XO_MOM+X_OFF_WDN, w.mDN, X_D*X_FFN);  put_i32(buf, XO_VAR+X_OFF_WDN, w.vDN, X_D*X_FFN);
+    put_i32(buf, XO_MOM+X_OFF_MHEAD, w.mHD, X_VOCAB*X_D); put_i32(buf, XO_VAR+X_OFF_MHEAD, w.vHD, X_VOCAB*X_D);
+}
 // ---- region compare: kernel int32 lanes (from off) vs a golden i64 array, optionally only causal (j<=i) ----
 static long cmp_region(const int32_t *buf, int off, const i64 *gold, int n, long &nnz) {
     long mx = 0; nnz = 0;
@@ -86,32 +96,38 @@ int main() {
     int32_t *buf = (int32_t*)aligned_alloc(64, sizeof(int32_t) * X_BUFLEN);
     for (int i = 0; i < X_BUFLEN; i++) buf[i] = 0;
 
-    // ---------------- (1) init: golden GW + identical buffer stage ----------------
+    // ---------------- (1) init + WARM the dyadic-Adam state ----------------
+    // The dyadic-Adam first step from m=v=0 is ~a no-op (EMA warmup), which makes a 1-step weight compare
+    // trivial. Warm the golden a few steps so m/v + weights are non-trivial, then stage THAT warmed state
+    // (weights + m/v) into the buffer so the ONE compared step is a real, non-trivial update on both sides.
     static GW w;  golden_init(w);
-    static GW wstep; golden_init(wstep);         // a second copy to drive through g_step (== fused kernel update)
-    static GA a;  memset(&a, 0, sizeof(GA));
-    static GG g;  memset(&g, 0, sizeof(GG));
-
-    // tokens + targets (fixed seed; same ids fed to golden and kernel)
     int tok[X_SEQ], tgt[X_SEQ];
     srand(123); for (int t = 0; t < X_SEQ; t++) { tok[t] = rand() % X_VOCAB; tgt[t] = rand() % X_VOCAB; }
+    for (int k = 0; k < 4; k++) { static GA aw; static GG gw; memset(&aw,0,sizeof(GA)); memset(&gw,0,sizeof(GG));
+        g_forward(w, aw, tok, tgt); g_backward(w, aw, gw, tok); g_step(w, gw); }   // w now warmed
 
-    stage_persistent(buf, w, G_LUT);
+    static GA a;  memset(&a, 0, sizeof(GA));
+    static GG g;  memset(&g, 0, sizeof(GG));
+    stage_persistent(buf, w, G_LUT);             // stage the WARMED weights (m/v zeroed inside)...
+    stage_mv(buf, w);                            // ...then overwrite m/v with the warmed Adam state
     put_int(buf, XO_TOK, tok, X_SEQ);
     put_int(buf, XO_TGT, tgt, X_SEQ);
 
-    // ---------------- (2) golden reference ----------------
+    // ---------------- (2) golden reference: the ONE compared step from the warmed state ----------------
     g_forward(w, a, tok, tgt);
-    g_backward(w, a, g, tok);
-    // fused kernel does bwd+adam, so apply g_step to the SECOND golden copy to get the post-update weights
-    // (re-run fwd/bwd on wstep so its accumulated grads + adam state are consistent with its own weights;
-    //  wstep == w at init, so the grads are identical, but we keep it self-consistent)
-    static GA a2; static GG g2; memset(&a2,0,sizeof(GA)); memset(&g2,0,sizeof(GG));
-    g_forward(wstep, a2, tok, tgt);
-    g_backward(wstep, a2, g2, tok);
-    g_step(wstep, g2);                            // wstep now holds the post-Adam weights to compare against
+    g_backward(w, a, g, tok);                     // g.gR = the final input-gradient (kernel's EOUT, pre-rescale)
+    // golden EOUT = max-shift(g.gR, X_EBITS) — the OUTPUT-role up-message
+    static i64 gEOUT[X_SEQ*X_D]; { i64 mx=0; for (int i=0;i<X_SEQ*X_D;i++){ i64 v=g.gR[i]<0?-g.gR[i]:g.gR[i]; if(v>mx)mx=v; }
+        int sh=g_normshift(mx, X_EBITS); for (int i=0;i<X_SEQ*X_D;i++) gEOUT[i]=g_floorshr(g.gR[i], sh); }
+    static GW wstep; wstep = w; { static GG gs; memset(&gs,0,sizeof(GG)); static GA as; memset(&as,0,sizeof(GA));
+        g_forward(wstep, as, tok, tgt); g_backward(wstep, as, gs, tok); g_step(wstep, gs); }   // wstep = post-Adam
 
     // ---------------- (3) kernel FORWARD ----------------
+    // The kernel's OUTPUT role does NOT embed — it reads the block input R from the neighbour hidden-state
+    // XO_HIN (the distributed-shard contract). The golden block embeds internally; stage its computed R = a.R
+    // into XO_HIN so the kernel's OUTPUT-role block computes from the SAME R (the embed itself is the INPUT
+    // role's job, validated separately). a.R fits int16, so the int16 HIN message is lossless here.
+    put_i32(buf, XO_HIN, a.R, X_SEQ*X_D);
     setcfg(buf, X_PH_FWD, X_RL_OUT, 1);
     forge_pc_xformer_block((ap_uint<512>*)buf);
 
@@ -164,8 +180,18 @@ int main() {
     printf("  WUP   = %ld   (changed %ld/%d)\n", dUP, nUP, X_FFN*X_D);
     printf("  WDN   = %ld   (changed %ld/%d)\n", dDN, nDN, X_D*X_FFN);
     printf("  WHEAD = %ld   (changed %ld/%d)\n", dHD, nHD, X_VOCAB*X_D);
-    long bwd_bad = dWQ|dWK|dWV|dWO|dUP|dDN|dHD;
-    long changed = nWQ + nWK + nWV + nWO + nUP + nDN + nHD;
+    long dEOUT = cmp_region(buf, XO_EOUT, gEOUT, X_SEQ*X_D, nnz);   // the gradient cascade head->...->LN1 (EOUT)
+    printf("  EOUT (XO_EOUT, the input-gradient cascade) = %ld\n", dEOUT);
+    long bwd_bad = dWQ|dWK|dWV|dWO|dUP|dDN|dHD|dEOUT;
+    // non-triviality: count how many weights the GOLDEN's g_step actually moved (w -> wstep), so a PASS means
+    // "bit-exact AND the update was real" (the per-region nnz above is kernel-vs-golden = 0 when bit-exact).
+    long gupd = 0;
+    for (int i=0;i<X_D*X_D;i++){ gupd += (wstep.WQ[i]!=w.WQ[i])+(wstep.WK[i]!=w.WK[i])+(wstep.WV[i]!=w.WV[i])+(wstep.WO[i]!=w.WO[i]); }
+    for (int i=0;i<X_FFN*X_D;i++) gupd += (wstep.WUP[i]!=w.WUP[i]);
+    for (int i=0;i<X_D*X_FFN;i++) gupd += (wstep.WDN[i]!=w.WDN[i]);
+    for (int i=0;i<X_VOCAB*X_D;i++) gupd += (wstep.WHEAD[i]!=w.WHEAD[i]);
+    printf("  [non-triviality] golden g_step moved %ld weights this step\n", gupd);
+    long changed = gupd;
 
     // ---------------- (5a) KAT: zero grad_logit -> zero weight update ----------------
     // Re-stage a clean persistent init (fresh weights + m/v=0), populate the BWD-needed cached activations by
@@ -204,6 +230,7 @@ int main() {
     g_forward(wo, ao, tok1, tgt1); g_backward(wo, ao, go, tok1);
     static GA aos; static GG gos; memset(&aos,0,sizeof(GA)); memset(&gos,0,sizeof(GG));
     g_forward(wos, aos, tok1, tgt1); g_backward(wos, aos, gos, tok1); g_step(wos, gos);
+    put_i32(ob, XO_HIN, ao.R, X_SEQ*X_D);     // OUTPUT role reads R from HIN (stage the golden's embed result)
     setcfg(ob, X_PH_FWD, X_RL_OUT, 1); forge_pc_xformer_block((ap_uint<512>*)ob);
     long o_fwd = 0;
     { long n; o_fwd |= cmp_region(ob, XO_X1,    ao.X1,   X_SEQ*X_D,     n);

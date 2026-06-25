@@ -55,11 +55,11 @@ PRW: for (int b = 30; b >= 1; b--) {
 // max-shift: s = bit_length(mx) - target (forge_pc_block's FIXED convention)
 static inline int norm_shift(acc_t mx, int target) {
 #pragma HLS INLINE
-    ap_uint<48> a = (mx < 0) ? (ap_uint<48>)(-mx) : (ap_uint<48>)mx;
+    acc_t a = (mx < 0) ? (acc_t)(-mx) : mx;     // int64: backward grads (gR) reach ~2^55, must scan past bit 47
     int hb = 0;
-NS: for (int b = 47; b >= 1; b--) {
+NS: for (int b = 62; b >= 1; b--) {
 #pragma HLS UNROLL
-        if (a[b]) { hb = b; break; }
+        if ((a >> b) & 1) { hb = b; break; }
     }
     int s = (hb + 1) - target;
     return s > 0 ? s : 0;
@@ -246,7 +246,7 @@ LN_T: for (int t = 0; t < M; t++) {
             acc_t r = cn >> X_MBITS;
             if (e >= 0) r = r << e; else r = r >> (-e);
             bool gs, gnz; exp_t ge; dyad(gcode[d], gs, ge, gnz);
-            acc_t g = gnz ? (r << (int)ge) : (acc_t)0;
+            acc_t g = gnz ? (acc_t)(r << (int)ge) : (acc_t)0;
             if (gnz && gs) g = -g;
             y[t * X_D + d] = (data_t)(g + (acc_t)beta[d]);
         }
@@ -300,7 +300,7 @@ LB_T: for (int t = 0; t < M; t++) {
     LB_C: for (int d = 0; d < X_D; d++) {
 #pragma HLS PIPELINE II=1
             bool gs, gnz; exp_t ge; dyad(gcode[d], gs, ge, gnz);
-            acc_t gch = gnz ? (gy[t*X_D+d] << (int)ge) : (acc_t)0; if (gnz && gs) gch = -gch;
+            acc_t gch = gnz ? (acc_t)(gy[t*X_D+d] << (int)ge) : (acc_t)0; if (gnz && gs) gch = -gch;
             acc_t cn = gch << X_MBITS; if (nqm>=1) cn+=gch; if (nqm>=2) cn+=gch; if (nqm>=3) cn+=gch;
             acc_t g = cn >> X_MBITS; if (e>=0) g = g << e; else g = g >> (-e);
             gc[d] = g; msum += g; gB[d] += gy[t*X_D+d];
@@ -334,13 +334,15 @@ AD: for (int i = 0; i < n; i++) {
         m[i] = m[i] - (m[i]>>X_ADAM_BSH) + (g>>X_ADAM_BSH);
         v[i] = v[i] - (v[i]>>X_ADAM_BSH) + (ag>>X_ADAM_BSH);
         int se = (int)dyad_exp32(v[i]); acc_t step = m[i] >> se; acc_t dw = step >> X_LR_SHIFT;
-        acc_t nw = (acc_t)W[i] - dw - ((acc_t)W[i] >> X_WD_SHIFT);
+        acc_t Wv = (acc_t)W[i];
+        acc_t dec = (Wv >= 0) ? (acc_t)(Wv >> X_WD_SHIFT) : (acc_t)(-((-Wv) >> X_WD_SHIFT));   // round-toward-0 decay
+        acc_t nw = Wv - dw - dec;
         if (nw>32767) nw=32767; if (nw<-32767) nw=-32767; W[i] = (data_t)nw;
     }
 }
 
 // ===================================================================================================
-void forge_pc_xformer_block(ap_uint<512> *buffer) {
+extern "C" void forge_pc_xformer_block(ap_uint<512> *buffer) {
 #pragma HLS INTERFACE m_axi port=buffer offset=slave bundle=gmem max_widen_bitwidth=512
 #pragma HLS INTERFACE s_axilite port=buffer
 #pragma HLS INTERFACE s_axilite port=return
