@@ -634,18 +634,33 @@ int main(int argc, char **argv) {
              mgl, mge, mgh, (mge>0||mgh>0) ? "do_bwd COMMITS grads (issue is do_opt STEP)"
                                             : "do_bwd grad-writeback DROPPED (next dead-store)"); }
 
-    // 4. THE TRAINING KICK: mode 3 (do_train_run) = ONE kick runs n_steps of fwd->bwd->opt with weights +
-    //    optimizer state RESIDENT in DDR (no per-step host traffic). a2 = freeze/train-all regime.
-    //    mode 3 itself does do_opt(S1_OPT_INIT) at entry, so this is self-contained from the staged W_fp.
-    double timeout = (double)n_steps * 0.2 + 5.0;       // R7: ~90 ms/step + generous margin
-    printf("[s1] KICK mode 3 (fused trainer): n_steps=%d a2=%s timeout=%.1fs ...\n",
-           n_steps, trainall ? "TRAIN_ALL" : "FREEZE_CODES", timeout);
+    // 4. TRAINING — HOST-DRIVEN loop. The mode-3 fused on-fabric trainer (do_train_run) trains FLAT on silicon:
+    //    its per-step do_opt(STEP) writeback is dropped by the RTL scheduler INSIDE the fused loop (the next
+    //    iteration's read is across shared limit=1 instances -> no provable dependence -> dead store; exactly
+    //    0.0000 CE drop over 200 steps). But STANDALONE kicks COMMIT (the host ap_done poll + MMIO between
+    //    kicks forces each kick's DDR writes to land before the next) -- PROVEN here: the forward works
+    //    (acc>chance), do_bwd commits real grads (max|g_W_HEAD|>0), do_opt(INIT) commits (cosim). So drive the
+    //    loop FROM THE HOST: per step kick mode0 (fwd->grad_logit) -> mode1 (bwd->g_*) -> mode2 STEP (dyadic-
+    //    Adam: update W_fp + re-quantize the live value/code the next forward reads). Each kick commits.
     double tk = now_s();
-    if (kick(MODE_TRAIN, n_steps, a2, timeout)) return 8;
+    printf("[s1] HOST-DRIVEN training: %d steps of {mode0 fwd, mode1 bwd, mode2 STEP} a2=%s\n",
+           n_steps, trainall ? "TRAIN_ALL" : "FREEZE_CODES");
+    for (int step = 0; step < n_steps; step++) {
+        if (kick(MODE_FWD, 0, 0, 10.0))             return 8;   // forward + CE -> grad_logit + activation saves
+        if (kick(MODE_BWD, 0, 0, 10.0))             return 8;   // backward -> g_*  (commits, verified above)
+        if (kick(MODE_OPT, S1_OPT_STEP, a2, 10.0))  return 8;   // dyadic-Adam STEP -> update W_fp + live deploy
+        if (step == 0 || (step + 1) % 20 == 0) {
+            readback(S1_OFF_LOGITS,  hbuf + S1_OFF_LOGITS,  (long)S1_L_SEQ * S1_V);
+            readback(S1_OFF_TARGETS, hbuf + S1_OFF_TARGETS, (long)S1_L_SEQ);
+            printf("[s1]   step %4d: CE = %.4f  acc = %d/%d\n", step + 1, true_ce(hbuf), count_correct(hbuf), S1_L_SEQ);
+        }
+    }
+    // one clean forward so the final readback reflects the post-last-update weights
+    if (kick(MODE_FWD, 0, 0, 10.0)) return 8;
     double elapsed = now_s() - tk;
     uint32_t ret = 0; fpga_pci_peek(bar0, R_AP_RETURN, &ret);
-    printf("[s1] mode-3 AP_DONE in %.3f s (%.2f ms/step over %d steps), ret=%u\n",
-           elapsed, elapsed / (n_steps > 0 ? n_steps : 1) * 1e3, n_steps, ret);
+    printf("[s1] host-driven training done in %.3f s (%d steps, %.1f ms/step incl host round-trips), ret=%u\n",
+           elapsed, n_steps, elapsed / (n_steps > 0 ? n_steps : 1) * 1e3, ret);
 
     // 5. read back the FINAL state: LOGITS + TARGETS (for the true CE), the LOSS proxy, GRAD_LOGIT (CE
     //    adjoint, for the bit-exact check), and the trained scatter weights W_HEAD / EMBED.
