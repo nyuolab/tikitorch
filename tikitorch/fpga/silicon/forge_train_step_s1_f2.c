@@ -190,6 +190,124 @@ static void readback(long off, int32_t *dst, long n) {
 }
 
 // ----------------------------------------------------------------------------
+// HOST-SIDE do_opt(S1_OPT_INIT) — populate every LIVE code/value region the forward reads from its W_fp
+// master, BIT-EXACT to the kernel dyadic_adam_region init path. SILICON FINDING: do_opt(S1_OPT_INIT) is a
+// NO-OP on the AFI (CSIM converges with it but on silicon the live code/value regions stay ZERO after the
+// INIT kick), so the HOST must do what the kernel's init should: copy/re-quantize the masters into the live
+// regions before staging, where (because do_opt(INIT) is a no-op) they survive the INIT kick + mode-3 entry.
+//
+// The encode helpers + region table below are COPIED VERBATIM from forge_train_step_s1_tb.cpp (ref_dyad,
+// ref_s1_encode_fine, ref_s1_encode) and forge_s1_config.hpp (the S1_OPT_REGIONS table fields) — the SAME
+// functions/table that verified the kernel bit-exact in csim. Plain C (no HLS / no ap_int types). The init
+// rules (kernel dyadic_adam_region, init_only path, lines ~1980-2016 of forge_train_step_s1.cpp):
+//   is_code : live[dst+i] = s1_encode_fine(wfp_master, prev=live[dst+i] (staged zero), allow_clamp=false)
+//   value   : live[dst+i] = (int16)(wfp_master & 0xFFFF)
+// On init Adam is a no-op (grad 0); m/v/W_fp untouched. PASS A copies value masters; PASS B re-quantizes
+// the code masters via s1_encode_fine with allow_clamp = (not init_only) = false (the exp-clamp is skipped).
+// ----------------------------------------------------------------------------
+
+// sat16: == kernel/TB int16 clamp (used inside the fine-code re-quantize).
+static inline long h_sat16(long v) {
+    if (v >  32767) return  32767;
+    if (v < -32768) return -32768;
+    return v;
+}
+
+// dyad: forge_fwd_wide dyad() (priority MSB + bump on bit below MSB). returns (sgn,e,nz). == TB ref_dyad.
+static void h_dyad(long v, int *sgn, int *e, int *nz) {
+    long a = v < 0 ? -v : v;
+    a &= 0xFFFFL;                 // int16 magnitude (matches kernel dyad()'s ap_uint<16> truncation)
+    *sgn = (v < 0) ? 1 : 0;
+    *nz  = (a != 0) ? 1 : 0;
+    int msb = 0;
+    for (int b = 15; b >= 1; b--) { if ((a >> b) & 1) { msb = b; break; } }
+    if (msb >= 1 && ((a >> (msb - 1)) & 1)) msb++;
+    *e = msb;
+}
+
+// re-quantize an int16 master into the PRE-DYADIC byte code (== kernel s1_encode). == TB ref_s1_encode.
+// (Not used by the init path — VALUE regions copy the int16 master, CODE regions use the FINE encode below —
+//  but copied verbatim per the spec since it is part of the golden helper set.)
+static int32_t h_s1_encode(long wfp) __attribute__((unused));
+static int32_t h_s1_encode(long wfp) {
+    int sgn, e, nz; h_dyad((int16_t)wfp, &sgn, &e, &nz);   // dyad on the int16 master (matches kernel dyad)
+    int ee = e; if (ee > 31) ee = 31;
+    int c = (ee & 0x1F);
+    if (nz)  c |= (1 << 5);
+    if (sgn) c |= (1 << 7);
+    return (int32_t)(int8_t)(unsigned char)c;
+}
+
+// FINE FIXED-POINT code re-quantize (== kernel s1_encode_fine). wq = int32 master at scale 2^Q_CODE;
+// round-half-away-from-zero to the integer code value, dyad() it, +/-1 exponent clamp vs prev_code
+// (SKIPPED when allow_clamp=0, i.e. init). BIT-IDENTICAL integer arithmetic to the kernel. == TB
+// ref_s1_encode_fine.
+static int32_t h_s1_encode_fine(long wq, int32_t prev_code, int allow_clamp) {
+    long aw = (wq < 0) ? -wq : wq;
+    long half = 1L << (S1_Q_CODE - 1);
+    long mag = (aw + half) >> S1_Q_CODE;
+    long wr = (wq < 0) ? -(long)h_sat16(mag) : (long)h_sat16(mag);
+    int sgn, e, nz; h_dyad((int16_t)wr, &sgn, &e, &nz);
+    int ee = e;
+#if S1_CODE_EXP_CLAMP
+    if (allow_clamp) {
+        unsigned pc = (unsigned)(prev_code & 0xFF); int pnz = (pc >> 5) & 1; int pe = (int)(pc & 0x1F);
+        if (nz) {
+            if (pnz) { if (ee > pe + 1) ee = pe + 1; if (ee < pe - 1) ee = pe - 1; if (ee < 0) ee = 0; }
+            else     { ee = 0; }
+        }
+    }
+#endif
+    if (ee > 31) ee = 31;
+    int c = (ee & 0x1F);
+    if (nz)  c |= (1 << 5);
+    if (sgn) c |= (1 << 7);
+    return (int32_t)(int8_t)(unsigned char)c;
+}
+
+// the kernel optimizer region table (forge_s1_config.hpp S1_OPT_REGIONS), mirrored with ONLY the fields the
+// host init needs: { W_fp master off, deploy code/value off, element count, is_code }. SAME offsets/order/
+// sizes/is_code as the header table (the bare-C++-typename gating keeps S1_OPT_REGIONS itself out of this C
+// TU, so it is reproduced verbatim here).
+struct h_opt_region { int wfp_off, dst_off, n, is_code; };
+static const struct h_opt_region H_OPT_REGIONS[S1_NUM_OPT_REGIONS] = {
+    { S1_OFF_WFP_EMBED,   S1_OFF_EMBED,   S1_V * S1_D,                 0 }, // EMBED  value
+    { S1_OFF_WFP_WQ,      S1_OFF_WQ,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wq     code
+    { S1_OFF_WFP_WK,      S1_OFF_WK,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wk     code
+    { S1_OFF_WFP_WV,      S1_OFF_WV,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wv     code
+    { S1_OFF_WFP_WO,      S1_OFF_WO,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wo     code
+    { S1_OFF_WFP_W_UP,    S1_OFF_W_UP,    S1_N_LAYERS * S1_FFN * S1_D, 1 }, // W_up   code
+    { S1_OFF_WFP_W_DOWN,  S1_OFF_W_DOWN,  S1_N_LAYERS * S1_D * S1_FFN, 1 }, // W_down code
+    { S1_OFF_WFP_LN1_G,   S1_OFF_LN1_G,   S1_N_LAYERS * S1_D,          1 }, // LN1 g  code
+    { S1_OFF_WFP_LN1_B,   S1_OFF_LN1_B,   S1_N_LAYERS * S1_D,          0 }, // LN1 b  value
+    { S1_OFF_WFP_LN2_G,   S1_OFF_LN2_G,   S1_N_LAYERS * S1_D,          1 }, // LN2 g  code
+    { S1_OFF_WFP_LN2_B,   S1_OFF_LN2_B,   S1_N_LAYERS * S1_D,          0 }, // LN2 b  value
+    { S1_OFF_WFP_LNF_G,   S1_OFF_LNF_G,   S1_D,                        1 }, // LN_F g code
+    { S1_OFF_WFP_LNF_B,   S1_OFF_LNF_B,   S1_D,                        0 }, // LN_F b value
+    { S1_OFF_WFP_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 0 }, // W_HEAD value
+};
+
+// host_do_opt_init: replicate the kernel do_opt(S1_OPT_INIT) — populate EVERY live code/value region the
+// forward reads from its staged W_fp master. is_code regions: live = s1_encode_fine(master, prev=live (staged
+// zero), allow_clamp=false). value regions: live = (int16)(master & 0xFFFF). Bit-exact to the kernel init.
+// Call AFTER the host init builder (stage_opt_buffer_memorize / stage_train_all_buffer) and BEFORE stage(),
+// so the live regions are staged into DDR too (and, since do_opt(INIT) is a silicon no-op, survive the kick).
+static void host_do_opt_init(int32_t *buf) {
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const struct h_opt_region *R = &H_OPT_REGIONS[r];
+        for (int i = 0; i < R->n; i++) {
+            if (R->is_code) {
+                // prev = the staged live deploy code (zero here); allow_clamp=0 (init: exp-clamp skipped).
+                buf[R->dst_off + i] = h_s1_encode_fine((long)(int32_t)buf[R->wfp_off + i],
+                                                       buf[R->dst_off + i], /*allow_clamp=*/0);
+            } else {
+                buf[R->dst_off + i] = (int32_t)(int16_t)(buf[R->wfp_off + i] & 0xFFFF);
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
 // HOST INIT — byte-identical to forge_train_step_s1_tb.cpp stage_opt_buffer(seed, memorize=true):
 // the residual-passthrough identity block (Wq/Wk/Wv/Wo/W_up/W_down master = 0 -> dyad code 0; LN gamma
 // master = +1<<Q_CODE, beta = 0; LN_F gamma = +1<<Q_CODE, beta = 0) + small embed/head masters
@@ -218,11 +336,10 @@ static void stage_opt_buffer_memorize(int32_t *buf, unsigned seed) {
         buf[S1_OFF_WFP_EMBED  + i] = (rand() % emag) - eoff;
         buf[S1_OFF_WFP_W_HEAD + i] = (rand() % emag) - eoff;
     }
-    // KERNEL-READ DIAGNOSTIC: also populate the LIVE EMBED value region host-side (= the int16 master), the copy
-    // do_opt(INIT) is supposed to make but leaves zero on silicon. With this staged, a forward-only kick (no
-    // do_opt) tests whether the KERNEL can READ DDR at all (peak|R| after fwd). The dense weight live codes stay
-    // zero (= identity residual passthrough), so R should propagate EMBED to the final R if the kernel reads it.
-    for (int i = 0; i < S1_V * S1_D; i++) buf[S1_OFF_EMBED + i] = (int32_t)(int16_t)(buf[S1_OFF_WFP_EMBED + i] & 0xFFFF);
+    // NOTE: the LIVE code/value regions the forward reads (S1_OFF_EMBED/W_HEAD/WQ.../LN*) are populated from
+    // their W_fp masters by host_do_opt_init() (called from main, after this builder, before stage()) — the
+    // host-side replication of do_opt(S1_OPT_INIT), which is a NO-OP on silicon. (Replaces the old temporary
+    // EMBED-only host copy that was the kernel-read diagnostic; host_do_opt_init now covers EMBED + ALL regions.)
     // m, v, grads: ZERO (fresh optimizer state) — already cleared.
     // host-staged exp2 LUTs (CE + attn share the Q16 exp2 ROM).
     for (int i = 0; i < S1_LUT_N; i++) { buf[S1_OFF_CE_LUT + i] = CE_EXP2_Q16[i];
@@ -421,6 +538,13 @@ int main(int argc, char **argv) {
     if (trainall) stage_train_all_buffer(hbuf, seed, /*densepct=*/35, /*embmag=*/20);
     else          stage_opt_buffer_memorize(hbuf, seed);
 
+    // 1b. HOST-SIDE do_opt(S1_OPT_INIT): populate EVERY live code/value region the forward reads from its
+    //     W_fp master, BIT-EXACT to the kernel init (forge_train_step_s1.cpp dyadic_adam_region init_only).
+    //     do_opt(S1_OPT_INIT) is a NO-OP on the AFI (the live regions stay ZERO after the INIT kick on
+    //     silicon, despite CSIM converging), so the host must do it here — BEFORE stage() so the live
+    //     regions land in DDR, and (since the kick's do_opt(INIT) is a no-op) survive the INIT + mode-3 entry.
+    host_do_opt_init(hbuf);
+
     // 2. stage the WHOLE buffer into DDR @0 over BAR4 (one-time; mode 3 keeps state resident after).
     double sdma = now_s();
     if (stage(0, S1_BUFLEN)) return 6;
@@ -434,8 +558,9 @@ int main(int argc, char **argv) {
     //     ordered AFTER the burst writes on the shared DMA-PCIS->crossbar->sh_ddr path, so this both (a) FORCES
     //     the posted writes to flush before the first kick and (b) localizes a staging-path fault (e.g. the new
     //     DMA-PCIS register slice) by comparing DDR readback to the host buffer on NON-ZERO regions.
-    // Probe the regions the HOST actually writes (the W_fp MASTERS + LUTs + tokens), NOT the live code/value
-    // regions (S1_OFF_EMBED etc.) which the host leaves zero for the kernel's do_opt(INIT) to populate.
+    // Probe the W_fp MASTERS + LUTs + tokens (a representative slice of what the host writes). The live
+    // code/value regions (S1_OFF_EMBED etc.) are NOW host-populated too (host_do_opt_init above); they are
+    // re-checked separately by the post-INIT probe below.
     {
         long probes[4]; probes[0] = S1_OFF_WFP_EMBED; probes[1] = S1_OFF_WFP_LN1_G; probes[2] = S1_OFF_CE_LUT; probes[3] = S1_OFF_TOKENS;
         const char *pn[4]; pn[0] = "WFP_EMBED"; pn[1] = "WFP_LN1_G"; pn[2] = "CE_LUT"; pn[3] = "TOKENS";
