@@ -203,9 +203,10 @@ int main(int argc,char**argv){
         printf("[shard] epoch %d: test acc = %.4f  (%d steps, %.1fs)  MODEL-PARALLEL/%d-chip  [W0 chg=%ld/%d W%d chg=%ld/%d vs init]\n",
                ep+1, (double)ok/Nte, nb, now_s()-t0, L, wc[0], D*D, L-1, wc[L-1], D*D); fflush(stdout);
     }
-    // dump ALL L trained weights so the host can re-eval / bit-exact-replay with the Python ref (per chip)
+    // dump ALL L trained weights so the host can re-eval / bit-exact-replay with the Python ref (per chip).
+    // NOTE: do NOT alias shardW1.i32 to W[L-1] — for L>=4 that clobbers the real chip-1 (hidden) dump with the
+    // OUTPUT layer (the bug that made chip 1 spuriously "diverge" in the first sweep; training was bit-exact).
     for(int l=0;l<L;l++){ snprintf(p,512,"/tmp/shardW%d.i32",l); FILE*f=fopen(p,"wb"); if(f){fwrite(W[l],4,D*D,f);fclose(f);} }
-    { FILE*f=fopen("/tmp/shardW1.i32","wb"); if(f){fwrite(W[L-1],4,D*D,f);fclose(f);} }  // back-compat alias = last layer
     double wall = now_s() - t_run0;
     long steps = (long)epochs * nb;          // one model-parallel training step per batch
     long kicks = steps * 2L * L;             // L fwd kicks + L bwd kicks per step

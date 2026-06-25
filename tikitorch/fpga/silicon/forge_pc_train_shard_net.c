@@ -119,7 +119,7 @@ int main(int argc,char**argv){
     // init weights: load the verified per-GLOBAL-layer init (head: W0..; tail: W{L}..W{2L-1}) so the two boxes
     // form ONE net. PC_INITPERM holds W0_init..W{2L-1}_init + perm; this instance loads its slice.
     int goff = HEAD ? 0 : L;                          // global-layer offset of this instance's first layer
-    srand(12345);
+    srand(12345 + goff*1000003);                      // per-box seed so the fallback init does NOT tie head/tail weights
     for(int l=0;l<L;l++){
         if(ipdir){ snprintf(p,512,"%s/W%d_init.i32",ipdir,goff+l); FILE*f=fopen(p,"rb"); if(!f){fprintf(stderr,"open %s\n",p);return 2;}
                    if(fread(hbuf[l]+O_W,4,D*D,f)!=(size_t)(D*D)){fprintf(stderr,"read %s\n",p);return 2;} fclose(f); }
@@ -139,7 +139,6 @@ int main(int argc,char**argv){
         for(int b=0;b<nb;b++){
             // ================= FORWARD =================
             if(HEAD){
-                int32_t curin[N*D];
                 for(int l=0;l<L;l++){
                     setcfg(l,PH_FWD,RL_HIDDEN,0);
                     if(l==0){ for(int n=0;n<N;n++){ int s=perm[b*N+n]; for(int i=0;i<D;i++) hbuf[0][O_AIN+n*D+i]=Xtr[s*D+i]; } }
@@ -172,8 +171,17 @@ int main(int argc,char**argv){
                         if(RES && l<L-1){ for(int j=0;j<N*D;j++) eout[j]+=hbuf[l][O_EIN+j];
                             long mx=0; for(int j=0;j<N*D;j++){ long a=eout[j]<0?-eout[j]:eout[j]; if(a>mx)mx=a; } int sh=rshift(mx,EDN_BITS); for(int j=0;j<N*D;j++) eout[j]>>=sh; } }
                 }
-                // tail's layer-0 EOUT is the boundary error -> head (the ONLY bwd cross-box msg).
-                readw(0,O_EOUT,eout,N*D); net_send(eout,N*D);
+                // tail's layer-0 (= GLOBAL layer L) is a MIDDLE hidden layer of the combined 2L-net, NOT a net
+                // boundary — its outgoing error must include its OWN residual skip + the EDN_BITS rescale, exactly
+                // as step_L(res=True) does for every hidden layer (mshift(routed_L + e_in_L, EDN_BITS)). The l>0
+                // block above skips l==0; here l==0 crosses the box and is consumed, so apply it before sending.
+                readw(0,O_EOUT,eout,N*D);
+                if(RES && role_of(0)==RL_HIDDEN){          // L>=2: boundary layer is hidden -> has a residual skip
+                    for(int j=0;j<N*D;j++) eout[j]+=hbuf[0][O_EIN+j];   // hbuf[0][O_EIN] holds e_in_L (staged above)
+                    long mx=0; for(int j=0;j<N*D;j++){ long a=eout[j]<0?-eout[j]:eout[j]; if(a>mx)mx=a; }
+                    int sh=rshift(mx,EDN_BITS); for(int j=0;j<N*D;j++) eout[j]>>=sh;
+                }
+                net_send(eout,N*D);
             } else {
                 net_recv(bmsg,N*D);                  // boundary error from tail = grad wrt head's last output
                 for(int l=L-1;l>=0;l--){

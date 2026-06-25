@@ -90,6 +90,7 @@ static const int XO_LNFS  = XO_LN2S + X_SEQ*2;              // [SEQ*2] (OUTPUT)
 static const int XO_RMASK = XO_LNFS + X_SEQ*2;              // [SEQ*FFN] relu mask
 static const int XO_LOGIT = XO_RMASK+ X_SEQ*X_FFN;          // [SEQ*VOCAB] (OUTPUT) logits
 static const int XO_LOSS  = XO_LOGIT+ X_SEQ*X_VOCAB;        // [16] (OUTPUT) loss accumulator
-static const int X_BUFLEN = X_AL(XO_LOSS + 16);
+static const int XO_RP    = X_AL(XO_LOSS + 16);             // [SEQ*D] cached final residual stream R' (BWD LNF/EOUT seed)
+static const int X_BUFLEN = X_AL(XO_RP + X_SEQ*X_D);
 
 #endif

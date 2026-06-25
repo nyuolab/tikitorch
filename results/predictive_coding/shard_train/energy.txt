@@ -1,7 +1,13 @@
 === ENERGY (Vccint core rail, per slot) ===
-slot 0: Vccint avg-during 4.00 W (idle 4 W, dynamic +0.00 W; n=126)
-slot 1: Vccint avg-during 4.52 W (idle 5 W, dynamic -0.48 W; n=126)
-board Vccint: during 8.52 W, idle 9.00 W  | wall 296.67s, 7500 steps
-ENERGY: 2528.8 J total (337.17 mJ/step, 10.537 mJ/sample)
-ENERGY(dynamic, during-idle): -141.3 J (-18.84 mJ/step)
+slot 0: Vccint avg-during 3.98 W (idle 4 W, dynamic -0.02 W; n=812)
+slot 1: Vccint avg-during 3.12 W (idle 4 W, dynamic -0.88 W; n=812)
+slot 2: Vccint avg-during 4.00 W (idle 4 W, dynamic -0.00 W; n=812)
+slot 3: Vccint avg-during 4.00 W (idle 4 W, dynamic +0.00 W; n=812)
+slot 4: Vccint avg-during 4.03 W (idle 5 W, dynamic -0.97 W; n=812)
+slot 5: Vccint avg-during 4.08 W (idle 7 W, dynamic -2.92 W; n=812)
+slot 6: Vccint avg-during 4.11 W (idle 7 W, dynamic -2.89 W; n=812)
+slot 7: Vccint avg-during 4.14 W (idle 8 W, dynamic -3.86 W; n=812)
+board Vccint: during 31.45 W, idle 43.00 W  | wall 1876.68s, 7500 steps
+ENERGY: 59022.9 J total (7869.73 mJ/step, 245.929 mJ/sample)
+ENERGY(dynamic, during-idle): -21674.3 J (-2889.90 mJ/step)
 NOTE: Vccint is the core rail (not whole-board); a DSP_MULT=0 core's dynamic draw is often at/below the sensor's 1W resolution -> dynamic may read ~0 (honest: structural demo, not a power record).

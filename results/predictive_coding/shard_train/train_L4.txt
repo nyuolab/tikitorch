@@ -1,0 +1,28 @@
+[shard] 4-layer net MODEL-PARALLEL across 4 FPGAs (slots 0 1 2 3); 60000 train 10000 test [RESIDUAL skips]
+[shard] loaded verified-good init from /tmp/pc_initperm
+[shard] loaded verified-good order (reused each epoch)
+[diag] |chip0_AOUT(h1)|max=189  |chip1_AIN(recv)|max=189 (match=yes) | chip1 logits nz: silicon=256 host-recompute=318/320 (host sh=10, |pre1|max=14837)
+[diag] step1: W0 changed=49267 W1 changed=2560 | logits[0,:10]=-3 0 1 4 -3 1 1 -2 -4 1
+[mideval] epoch1 step 468/1875: acc=0.5596  |W0|max=486 |W1|max=475
+[mideval] epoch1 step 937/1875: acc=0.5611  |W0|max=955 |W1|max=916
+[mideval] epoch1 step 1406/1875: acc=0.6452  |W0|max=1424 |W1|max=1385
+[shard] epoch 1: test acc = 0.5127  (1875 steps, 236.0s)  MODEL-PARALLEL/4-chip  [W0 chg=55031/65536 W3 chg=2549/65536 vs init]
+[shard] epoch 2: test acc = 0.7155  (1875 steps, 197.9s)  MODEL-PARALLEL/4-chip  [W0 chg=55031/65536 W3 chg=2553/65536 vs init]
+[shard] epoch 3: test acc = 0.7299  (1875 steps, 197.4s)  MODEL-PARALLEL/4-chip  [W0 chg=55031/65536 W3 chg=2555/65536 vs init]
+[shard] epoch 4: test acc = 0.7157  (1875 steps, 197.3s)  MODEL-PARALLEL/4-chip  [W0 chg=55031/65536 W3 chg=2552/65536 vs init]
+
+========== SIGNATURE RESULT: 4-chip model-parallel PC training, fully measured ==========
+[throughput] 7500 steps, 240000 samples, 60000 kicks over 828.71s wall
+[throughput] 9.1 steps/s | 290 samples/s | 72.4 kicks/s | 110.494 ms/step | 3.453 ms/sample
+[throughput] avg fabric time/kick: fwd 6.886 ms, bwd 1.328 ms (sum compute 246.41s = 29.7% of wall)
+[throughput]   chip 0 (slot 0): fwd-kick 8.925 ms, bwd-kick 1.329 ms (avg)
+[throughput]   chip 1 (slot 1): fwd-kick 8.924 ms, bwd-kick 1.328 ms (avg)
+[throughput]   chip 2 (slot 2): fwd-kick 8.924 ms, bwd-kick 1.327 ms (avg)
+[throughput]   chip 3 (slot 3): fwd-kick 0.769 ms, bwd-kick 1.328 ms (avg)
+[breakdown] fwd-compute 24.9% | bwd-compute 4.8% | cross-chip-comms 60.3% | input-stage 0.0% | weight-readback 0.2% | host-eval 5.1%
+[comms] cross-chip messages: 368640000 ints = 1474.56 MB total | 196608 bytes/step (49152 ints) | 2.95 MB/s during comms
+[comms] comms = 60.3% of wall; per step 49152 activation+error ints cross between adjacent chips (each msg = N*D = 8192 ints)
+[gateC] WEIGHTS crossed chips=0 bytes | GRADIENTS crossed=0 bytes | only neighbour messages crossed
+[gateC] -> no chip ever held the global model or the global gradient; no all-reduce, no barrier.
+[energy] (board power sampled per slot by the runner during this window; wall=828.71s, steps=7500 -> J/step in the run's energy.txt)
+ENERGY_WINDOW wall_s=828.706 steps=7500 samples=240000

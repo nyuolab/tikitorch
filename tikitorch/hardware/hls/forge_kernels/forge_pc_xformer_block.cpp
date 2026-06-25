@@ -271,6 +271,9 @@ void forge_pc_xformer_block(ap_uint<512> *buffer) {
         bstore32(buffer, XO_LN1S, ln1s, X_SEQ*2);
 
         // ---- attention: Q/K/V = dyadic proj of X1; per head L1-score softmax; soft blend (THE multiply) ----
+        // NOTE: this is the project's mult-free-DEPLOY attention (L1 score -Sum|Q-K| + exp2-LUT softmax). The
+        // CPU recipe de-risk (pc_xformer_dyadic_ref.py) uses float DOT-PRODUCT softmax, so it does NOT validate
+        // THIS attention math — the int64 golden testbench (which mirrors this kernel) is what validates it.
         static data_t Q[X_SEQ*X_D], K[X_SEQ*X_D], V[X_SEQ*X_D];
         dyad_matmul(X1, WQ, Q, X_SEQ, X_D, X_D);
         dyad_matmul(X1, WK, K, X_SEQ, X_D, X_D);
@@ -311,8 +314,11 @@ void forge_pc_xformer_block(ap_uint<512> *buffer) {
 #pragma HLS PIPELINE II=1
                     acc_t blend = 0;
                     for (int j = 0; j <= i; j++) {
-                        blend += ((acc_t)p[j] * (acc_t)V[j*X_D + h*X_DH + d]) >> X_AT_PFRAC;  // *** MULTIPLY ***
+                        blend += (acc_t)p[j] * (acc_t)V[j*X_D + h*X_DH + d];   // *** THE ONE MULTIPLY *** (p Q16, V int16)
                     }
+                    // normalize ONCE by the row's pow2-rounded softmax sum: p_j/rowsum cancels the Q16 scale,
+                    // so >>shn (shn=bit_length(rowsum)) is the only de-scale (do NOT also >>X_AT_PFRAC — that
+                    // over-divides by 2^16 and collapses the output to zero).
                     ATTN[i*X_D + h*X_DH + d] = (data_t)(blend >> shn);
                 }
             }
@@ -352,6 +358,7 @@ void forge_pc_xformer_block(ap_uint<512> *buffer) {
 #pragma HLS PIPELINE II=1
             RP[i] = (data_t)((acc_t)M[i] + (acc_t)FO[i]);
         }
+        bstore(buffer, XO_RP, RP, X_SEQ*X_D);   // cache R' for the backward (LNF seed on OUTPUT; gR/EOUT seed elsewhere)
 
         // ---- OUTPUT role: final LN + LM head + CE grad ; else: downstream hidden-state message ----
         if (ROLE == X_RL_OUT) {
@@ -366,7 +373,7 @@ void forge_pc_xformer_block(ap_uint<512> *buffer) {
             static prob_t LUT2[X_LUT_N]; { static int32_t t32[X_LUT_N]; bload32(buffer, XO_LUT, t32, X_LUT_N);
                 for (int i = 0; i < X_LUT_N; i++) LUT2[i] = (prob_t)t32[i]; }
             static int32_t tgt[X_SEQ]; bload32(buffer, XO_TGT, tgt, X_SEQ);
-            static data_t GLOG[X_SEQ*X_VOCAB];
+            static int32_t GLOG[X_SEQ*X_VOCAB];     // grad_logit is Q16 (up to 2^16) -> MUST be int32, not int16 (wraps)
         CE: for (int t = 0; t < X_SEQ; t++) {
                 acc_t mx = (acc_t)-1 << 40; for (int v = 0; v < X_VOCAB; v++) if ((acc_t)LG[t*X_VOCAB+v] > mx) mx = LG[t*X_VOCAB+v];
                 acc_t sum = 0; prob_t pr[X_VOCAB];
@@ -379,10 +386,10 @@ void forge_pc_xformer_block(ap_uint<512> *buffer) {
                 for (int v = 0; v < X_VOCAB; v++) {
                     acc_t pq = ((acc_t)pr[v] << X_AT_PFRAC) >> shn;        // softmax prob in Q16
                     acc_t oh = (v == tgt[t]) ? ((acc_t)1 << X_AT_PFRAC) : 0;
-                    GLOG[t*X_VOCAB+v] = (data_t)(pq - oh);                 // grad_logit (Q16-scaled)
+                    GLOG[t*X_VOCAB+v] = (int32_t)(pq - oh);                // grad_logit (Q16-scaled, int32)
                 }
             }
-            bstore(buffer, XO_HOUT, GLOG, X_SEQ*X_VOCAB);  // cache grad_logit (VOCAB==D) for BWD seed; OUTPUT sends no down msg
+            bstore32(buffer, XO_HOUT, GLOG, X_SEQ*X_VOCAB);  // cache grad_logit (VOCAB==D) for BWD seed; OUTPUT sends no down msg
         } else {
             static data_t HOUT[X_SEQ*X_D];
             rescale_band2(RP, HOUT, X_SEQ*X_D, X_ABITS);
