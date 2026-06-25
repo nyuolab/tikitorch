@@ -13,7 +13,7 @@ open_solution -reset solution1
 set_top $top
 set_part $part
 create_clock -period $period
-# csim_design        ;# bit-exact vs the int64 golden (enable once the tb golden is complete)
+csim_design          ;# bit-exact fwd+bwd+dyadic-Adam vs the int64 golden (forge_pc_xformer_block_tb.cpp)
 csynth_design
 puts "==== report: $proj/solution1/syn/report/${top}_csynth.rpt ===="
 puts "==== CHECK: DSP usage (attention soft-blend only ~128), timing met (<= ${period}ns), LUT < one SLR ===="

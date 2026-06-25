@@ -70,6 +70,14 @@ static const int XO_WHEAD = XO_LNFB + X_D;                  // [VOCAB*D] (OUTPUT
 static const int XO_LUT   = XO_WHEAD+ X_VOCAB*X_D;          // [LUT_N] exp2 ROM (host-staged), Q16
 // ---- dyadic-Adam state (m,v int32) for every trainable matrix, same order ----
 #define X_NW (X_D*X_D*4 + X_FFN*X_D + X_D*X_FFN + X_VOCAB*X_D)   // all block + head weights (LN params updated too but small)
+// per-matrix offsets into the flat X_NW dyadic-Adam m/v regions (same order: WQ,WK,WV,WO,WUP,WDN,WHEAD)
+#define X_OFF_WQ    0
+#define X_OFF_WK    (X_D*X_D)
+#define X_OFF_WV    (X_D*X_D*2)
+#define X_OFF_WO    (X_D*X_D*3)
+#define X_OFF_WUP   (X_D*X_D*4)
+#define X_OFF_WDN   (X_D*X_D*4 + X_FFN*X_D)
+#define X_OFF_MHEAD (X_D*X_D*4 + X_FFN*X_D + X_D*X_FFN)
 static const int XO_MOM   = X_AL(XO_LUT + X_LUT_N);        // [X_NW] first-moment EMA
 static const int XO_VAR   = XO_MOM  + X_NW;                 // [X_NW] second-moment EMA
 // ---- per-kick staged messages ----
