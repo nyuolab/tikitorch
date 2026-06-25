@@ -124,12 +124,15 @@ static void g_backward(GW &w, GA &a, GG &g, const int *tok) {
         int shn=a.Pshn[h*X_SEQ+i]; i64 pn[X_SEQ];
         for(int j=0;j<=i;j++) pn[j]=g_floorshr(a.P[(h*X_SEQ+i)*X_SEQ+j]<<X_AT_PFRAC, shn);  // Q16 normalized prob
         i64 gp[X_SEQ]; for(int j=0;j<=i;j++){ i64 s=0; for(int d=0;d<X_DH;d++) s+=gATTN[i*X_D+h*X_DH+d]*a.V[j*X_D+h*X_DH+d]; gp[j]=s; }  // MUL
-        i64 ex=0; for(int j=0;j<=i;j++) ex += g_floorshr(pn[j]*gp[j], X_AT_PFRAC);  // MUL
+        // NOTE: real ap_int computes pn*gp at FULL width (128b RType), THEN >>PFRAC, THEN truncates to acc_t<64>
+        // on assignment. Mirror that with __int128 so the golden == the HW kernel (a plain i64 product wraps at
+        // 64 BEFORE the shift -> diverges for products > 2^63, which random data hits).
+        i64 ex=0; for(int j=0;j<=i;j++) ex += (i64)(((__int128)pn[j]*gp[j]) >> X_AT_PFRAC);  // MUL (128b)
         for(int j=0;j<=i;j++){
-            i64 gs=g_floorshr(pn[j]*(gp[j]-ex), X_AT_PFRAC);                         // MUL (softmax bwd)
+            i64 gs=(i64)(((__int128)pn[j]*(gp[j]-ex)) >> X_AT_PFRAC);                // MUL (softmax bwd, 128b)
             for(int d=0;d<X_DH;d++){ i64 df=a.Q[i*X_D+h*X_DH+d]-a.K[j*X_D+h*X_DH+d]; int sg=df>0?1:(df<0?-1:0);
                 gQ[i*X_D+h*X_DH+d]+= -gs*sg; gK[j*X_D+h*X_DH+d]+= gs*sg; }                 // L1 subgradient (mult-free)
-            for(int d=0;d<X_DH;d++) gV[j*X_D+h*X_DH+d]+= g_floorshr(pn[j]*gATTN[i*X_D+h*X_DH+d], X_AT_PFRAC); // MUL
+            for(int d=0;d<X_DH;d++) gV[j*X_D+h*X_DH+d]+= (i64)(((__int128)pn[j]*gATTN[i*X_D+h*X_DH+d]) >> X_AT_PFRAC); // MUL (128b)
         }
     }
     // route Q/K/V grads back to gX1 (+ wgrads); accumulate into gX1
