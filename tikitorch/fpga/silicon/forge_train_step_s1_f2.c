@@ -421,6 +421,31 @@ int main(int argc, char **argv) {
     if (stage(0, S1_BUFLEN)) return 6;
     printf("[s1] staged %.3f MB into DDR via BAR4 in %.3f s\n", bytes / 1048576.0, now_s() - sdma);
 
+    // 2b. POST-STAGE SANITY READBACK (diagnostic + FLUSH). The fpga_pci_write_burst writes over BAR4 are
+    //     POSTED / write-combined; without a read-after-write the mode-3 kick below (issued over BAR0) can race
+    //     ahead of the staged data actually landing in DDR, and the kernel reads ZERO -> the v1 silicon symptom
+    //     was exactly this: peak|R|=0, gradlogit=0, CE pinned at the log-V floor 4.1589 (no drop). bar4 (burst)
+    //     and bar4r (plain) are the SAME physical BAR4 -> a read on bar4r to a just-written DDR address is
+    //     ordered AFTER the burst writes on the shared DMA-PCIS->crossbar->sh_ddr path, so this both (a) FORCES
+    //     the posted writes to flush before the first kick and (b) localizes a staging-path fault (e.g. the new
+    //     DMA-PCIS register slice) by comparing DDR readback to the host buffer on NON-ZERO regions.
+    {
+        long probes[3]; probes[0] = S1_OFF_EMBED; probes[1] = S1_OFF_W_HEAD; probes[2] = S1_OFF_TOKENS;
+        const char *pn[3]; pn[0] = "EMBED"; pn[1] = "W_HEAD"; pn[2] = "TOKENS";
+        int total_mism = 0;
+        for (int p = 0; p < 3; p++) {
+            int32_t rb[8];
+            readback(probes[p], rb, 8);
+            int m = 0; for (int j = 0; j < 8; j++) if (rb[j] != hbuf[probes[p] + j]) m++;
+            total_mism += m;
+            printf("[s1] stage-check %-6s @%ld: ddr={%d,%d,%d,%d} host={%d,%d,%d,%d} mism=%d/8\n",
+                   pn[p], probes[p], rb[0], rb[1], rb[2], rb[3],
+                   hbuf[probes[p]], hbuf[probes[p]+1], hbuf[probes[p]+2], hbuf[probes[p]+3], m);
+        }
+        printf("[s1] POST-STAGE READBACK: %s (%d mismatches across 24 probed words)\n",
+               total_mism == 0 ? "MATCH (staging landed)" : "MISMATCH (staging did NOT land)", total_mism);
+    }
+
     // 3. warm kick: mode 0 (forward only) so we can read an INITIAL loss BEFORE any training. Mode 3
     //    re-quantizes codes from W_fp at entry, but a standalone mode-0 needs valid codes first, so run a
     //    mode-2 INIT (re-quantize, no weight move) then mode-0. Timeout small (single fwd ~18 ms).
