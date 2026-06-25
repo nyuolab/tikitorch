@@ -501,7 +501,7 @@ extern "C" void forge_pc_xformer_block(ap_uint<512> *buffer) {
                 int shn = 0; for (int b = 31; b >= 0; b--) if ((sum >> b)&1){ shn=b; break; } shn += 1;
                 for (int v = 0; v < X_VOCAB; v++) {
                     acc_t pq = ((acc_t)pr[v] << X_AT_PFRAC) >> shn;        // softmax prob in Q16
-                    acc_t oh = (v == tgt[t]) ? ((acc_t)1 << X_AT_PFRAC) : 0;
+                    acc_t oh = (v == tgt[t]) ? (acc_t)((acc_t)1 << X_AT_PFRAC) : (acc_t)0;
                     GLOG[t*X_VOCAB+v] = (int32_t)(pq - oh);                // grad_logit (Q16-scaled, int32)
                 }
             }
