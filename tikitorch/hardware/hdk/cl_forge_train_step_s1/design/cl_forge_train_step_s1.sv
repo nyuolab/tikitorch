@@ -248,9 +248,79 @@ module cl_forge_train_step_s1
   );
 
   // =========================================================================
-  // 2->1 AXI crossbar: SI0 = kernel m_axi via CDC (kmem_*, ID widened 1->16), SI1 = sh_cl_dma_pcis (16-bit ID),
-  // MI = the DDR AXI slave. Both masters address the single DDR region (base 0). axi_crossbar_ddr
-  // (gen_ip.tcl): NUM_SI=2, NUM_MI=1, 512b, 64-bit addr, 16-bit ID. Crossbar stays fully at clk_main_a0/250.
+  // PCIS register slice — breaks the route-bound shell DMA-PCIS <-> crossbar SI1 long net (TIMING-CLOSE fix).
+  //   The post-route worst path is sh_ddr DDR4 wready -> XBAR_DDR wready mux -> high-fanout net to the STATIC
+  //   shell DMA-PCIS endpoint (~89% route, crossing SLRs, WNS violated at clk_main_a0/250). The CL previously
+  //   wired sh_cl_dma_pcis_* / cl_sh_dma_pcis_* DIRECTLY into crossbar SI1 with no register slice. The proven
+  //   AWS reference CLs (cl_mem_perf / cl_dram_hbm_dma) pipeline this exact path with per-SLR PCIS reg slices
+  //   (AXI4_REG_SLC_PCIS_SLR*). s1_pcis_rs (gen_ip.tcl): AXI4, 512b, 64-bit addr, 16-bit ID, fully registered.
+  //   SLAVE port  = shell side (sh_cl_dma_pcis_* / cl_sh_dma_pcis_*, exactly where crossbar SI1 connected).
+  //   MASTER port = new pcis_* nets that REPLACE sh_cl_dma_pcis_* / cl_sh_dma_pcis_* in the crossbar SI1 slot.
+  //   Net flow: shell -> s1_pcis_rs (slave) -> (master) pcis_* -> crossbar SI1. Responses flow the other way:
+  //   crossbar SI1 -> reg-slice master -> reg-slice slave -> shell. PURE clk_main_a0/250 (NOT a CDC), same
+  //   clock+reset as the crossbar. Latency-only; staging stays byte-exact. The kernel SI0 (kmem_*) is unchanged.
+  // =========================================================================
+  logic [15:0]  pcis_awid;   logic [63:0] pcis_awaddr;  logic [7:0] pcis_awlen;  logic [2:0] pcis_awsize;
+  logic  [1:0]  pcis_awburst; logic pcis_awlock; logic [3:0] pcis_awcache; logic [2:0] pcis_awprot;
+  logic  [3:0]  pcis_awqos;  logic [3:0] pcis_awregion; logic pcis_awvalid, pcis_awready;
+  logic [511:0] pcis_wdata;  logic [63:0] pcis_wstrb;  logic pcis_wlast, pcis_wvalid, pcis_wready;
+  logic [15:0]  pcis_bid;    logic [1:0] pcis_bresp;   logic pcis_bvalid, pcis_bready;
+  logic [15:0]  pcis_arid;   logic [63:0] pcis_araddr;  logic [7:0] pcis_arlen;  logic [2:0] pcis_arsize;
+  logic  [1:0]  pcis_arburst; logic pcis_arlock; logic [3:0] pcis_arcache; logic [2:0] pcis_arprot;
+  logic  [3:0]  pcis_arqos;  logic [3:0] pcis_arregion; logic pcis_arvalid, pcis_arready;
+  logic [15:0]  pcis_rid;    logic [511:0] pcis_rdata;  logic [1:0] pcis_rresp; logic pcis_rlast, pcis_rvalid, pcis_rready;
+
+  s1_pcis_rs PCIS_REG_SLC (
+    .aclk          (clk_main_a0),   .aresetn (rst_main_n_sync),
+    // ---- SLAVE = shell DMA-PCIS (host staging). Exactly the ports crossbar SI1 used to connect to. ----
+    .s_axi_awid    (sh_cl_dma_pcis_awid),    .s_axi_awaddr  (sh_cl_dma_pcis_awaddr),
+    .s_axi_awlen   (sh_cl_dma_pcis_awlen),   .s_axi_awsize  (sh_cl_dma_pcis_awsize),
+    .s_axi_awburst (sh_cl_dma_pcis_awburst), .s_axi_awlock  (sh_cl_dma_pcis_awlock),
+    .s_axi_awcache (sh_cl_dma_pcis_awcache), .s_axi_awprot  (sh_cl_dma_pcis_awprot),
+    .s_axi_awregion(4'h0),                   .s_axi_awqos   (4'h0),
+    .s_axi_awvalid (sh_cl_dma_pcis_awvalid), .s_axi_awready (cl_sh_dma_pcis_awready),
+    .s_axi_wdata   (sh_cl_dma_pcis_wdata),   .s_axi_wstrb   (sh_cl_dma_pcis_wstrb),
+    .s_axi_wlast   (sh_cl_dma_pcis_wlast),   .s_axi_wvalid  (sh_cl_dma_pcis_wvalid),
+    .s_axi_wready  (cl_sh_dma_pcis_wready),
+    .s_axi_bid     (cl_sh_dma_pcis_bid),     .s_axi_bresp   (cl_sh_dma_pcis_bresp),
+    .s_axi_bvalid  (cl_sh_dma_pcis_bvalid),  .s_axi_bready  (sh_cl_dma_pcis_bready),
+    .s_axi_arid    (sh_cl_dma_pcis_arid),    .s_axi_araddr  (sh_cl_dma_pcis_araddr),
+    .s_axi_arlen   (sh_cl_dma_pcis_arlen),   .s_axi_arsize  (sh_cl_dma_pcis_arsize),
+    .s_axi_arburst (sh_cl_dma_pcis_arburst), .s_axi_arlock  (sh_cl_dma_pcis_arlock),
+    .s_axi_arcache (sh_cl_dma_pcis_arcache), .s_axi_arprot  (sh_cl_dma_pcis_arprot),
+    .s_axi_arregion(4'h0),                   .s_axi_arqos   (4'h0),
+    .s_axi_arvalid (sh_cl_dma_pcis_arvalid), .s_axi_arready (cl_sh_dma_pcis_arready),
+    .s_axi_rid     (cl_sh_dma_pcis_rid),     .s_axi_rdata   (cl_sh_dma_pcis_rdata),
+    .s_axi_rresp   (cl_sh_dma_pcis_rresp),   .s_axi_rlast   (cl_sh_dma_pcis_rlast),
+    .s_axi_rvalid  (cl_sh_dma_pcis_rvalid),  .s_axi_rready  (sh_cl_dma_pcis_rready),
+    // ---- MASTER = pcis_* (toward crossbar SI1). ----
+    .m_axi_awid    (pcis_awid),    .m_axi_awaddr  (pcis_awaddr),
+    .m_axi_awlen   (pcis_awlen),   .m_axi_awsize  (pcis_awsize),
+    .m_axi_awburst (pcis_awburst), .m_axi_awlock  (pcis_awlock),
+    .m_axi_awcache (pcis_awcache), .m_axi_awprot  (pcis_awprot),
+    .m_axi_awregion(pcis_awregion),.m_axi_awqos   (pcis_awqos),
+    .m_axi_awvalid (pcis_awvalid), .m_axi_awready (pcis_awready),
+    .m_axi_wdata   (pcis_wdata),   .m_axi_wstrb   (pcis_wstrb),
+    .m_axi_wlast   (pcis_wlast),   .m_axi_wvalid  (pcis_wvalid),
+    .m_axi_wready  (pcis_wready),
+    .m_axi_bid     (pcis_bid),     .m_axi_bresp   (pcis_bresp),
+    .m_axi_bvalid  (pcis_bvalid),  .m_axi_bready  (pcis_bready),
+    .m_axi_arid    (pcis_arid),    .m_axi_araddr  (pcis_araddr),
+    .m_axi_arlen   (pcis_arlen),   .m_axi_arsize  (pcis_arsize),
+    .m_axi_arburst (pcis_arburst), .m_axi_arlock  (pcis_arlock),
+    .m_axi_arcache (pcis_arcache), .m_axi_arprot  (pcis_arprot),
+    .m_axi_arregion(pcis_arregion),.m_axi_arqos   (pcis_arqos),
+    .m_axi_arvalid (pcis_arvalid), .m_axi_arready (pcis_arready),
+    .m_axi_rid     (pcis_rid),     .m_axi_rdata   (pcis_rdata),
+    .m_axi_rresp   (pcis_rresp),   .m_axi_rlast   (pcis_rlast),
+    .m_axi_rvalid  (pcis_rvalid),  .m_axi_rready  (pcis_rready)
+  );
+
+  // =========================================================================
+  // 2->1 AXI crossbar: SI0 = kernel m_axi via CDC (kmem_*, ID widened 1->16), SI1 = sh_cl_dma_pcis via the
+  // s1_pcis_rs register slice (pcis_*, 16-bit ID), MI = the DDR AXI slave. Both masters address the single DDR
+  // region (base 0). axi_crossbar_ddr (gen_ip.tcl): NUM_SI=2, NUM_MI=1, 512b, 64-bit addr, 16-bit ID. Crossbar
+  // stays fully at clk_main_a0/250.
   // =========================================================================
   // DDR-side (crossbar master output -> sh_ddr cl_sh_ddr_axi)
   logic [15:0]  ddr_awid;   logic [63:0] ddr_awaddr;  logic [7:0] ddr_awlen;  logic [2:0] ddr_awsize;
@@ -266,44 +336,44 @@ module cl_forge_train_step_s1
 
   axi_crossbar_ddr XBAR_DDR (
     .aclk    (clk_main_a0),  .aresetn (rst_main_n_sync),
-    // ---- SI: kernel m_axi via CDC (ID 1->16) high, sh_cl_dma_pcis (16-bit ID) low ----
-    .s_axi_awid    ({ {15'h0, kmem_awid}, sh_cl_dma_pcis_awid }),
-    .s_axi_awaddr  ({ kmem_awaddr,        sh_cl_dma_pcis_awaddr }),
-    .s_axi_awlen   ({ kmem_awlen,         sh_cl_dma_pcis_awlen }),
-    .s_axi_awsize  ({ kmem_awsize,        sh_cl_dma_pcis_awsize }),
-    .s_axi_awburst ({ kmem_awburst,       sh_cl_dma_pcis_awburst }),
-    .s_axi_awlock  ({ kmem_awlock,        sh_cl_dma_pcis_awlock }),
-    .s_axi_awcache ({ kmem_awcache,       sh_cl_dma_pcis_awcache }),
-    .s_axi_awprot  ({ kmem_awprot,        sh_cl_dma_pcis_awprot }),
-    .s_axi_awqos   ({ kmem_awqos,         4'h0 }),
-    .s_axi_awvalid ({ kmem_awvalid,       sh_cl_dma_pcis_awvalid }),
-    .s_axi_awready ({ kmem_awready,       cl_sh_dma_pcis_awready }),
-    .s_axi_wdata   ({ kmem_wdata,         sh_cl_dma_pcis_wdata }),
-    .s_axi_wstrb   ({ kmem_wstrb,         sh_cl_dma_pcis_wstrb }),
-    .s_axi_wlast   ({ kmem_wlast,         sh_cl_dma_pcis_wlast }),
-    .s_axi_wvalid  ({ kmem_wvalid,        sh_cl_dma_pcis_wvalid }),
-    .s_axi_wready  ({ kmem_wready,        cl_sh_dma_pcis_wready }),
-    .s_axi_bid     ({ kmem_bid_16,        cl_sh_dma_pcis_bid }),
-    .s_axi_bresp   ({ kmem_bresp,         cl_sh_dma_pcis_bresp }),
-    .s_axi_bvalid  ({ kmem_bvalid,        cl_sh_dma_pcis_bvalid }),
-    .s_axi_bready  ({ kmem_bready,        sh_cl_dma_pcis_bready }),
-    .s_axi_arid    ({ {15'h0, kmem_arid}, sh_cl_dma_pcis_arid }),
-    .s_axi_araddr  ({ kmem_araddr,        sh_cl_dma_pcis_araddr }),
-    .s_axi_arlen   ({ kmem_arlen,         sh_cl_dma_pcis_arlen }),
-    .s_axi_arsize  ({ kmem_arsize,        sh_cl_dma_pcis_arsize }),
-    .s_axi_arburst ({ kmem_arburst,       sh_cl_dma_pcis_arburst }),
-    .s_axi_arlock  ({ kmem_arlock,        sh_cl_dma_pcis_arlock }),
-    .s_axi_arcache ({ kmem_arcache,       sh_cl_dma_pcis_arcache }),
-    .s_axi_arprot  ({ kmem_arprot,        sh_cl_dma_pcis_arprot }),
-    .s_axi_arqos   ({ kmem_arqos,         4'h0 }),
-    .s_axi_arvalid ({ kmem_arvalid,       sh_cl_dma_pcis_arvalid }),
-    .s_axi_arready ({ kmem_arready,       cl_sh_dma_pcis_arready }),
-    .s_axi_rid     ({ kmem_rid_16,        cl_sh_dma_pcis_rid }),
-    .s_axi_rdata   ({ kmem_rdata,         cl_sh_dma_pcis_rdata }),
-    .s_axi_rresp   ({ kmem_rresp,         cl_sh_dma_pcis_rresp }),
-    .s_axi_rlast   ({ kmem_rlast,         cl_sh_dma_pcis_rlast }),
-    .s_axi_rvalid  ({ kmem_rvalid,        cl_sh_dma_pcis_rvalid }),
-    .s_axi_rready  ({ kmem_rready,        sh_cl_dma_pcis_rready }),
+    // ---- SI: kernel m_axi via CDC (ID 1->16) high, DMA-PCIS via s1_pcis_rs reg slice (pcis_*, 16-bit ID) low ----
+    .s_axi_awid    ({ {15'h0, kmem_awid}, pcis_awid }),
+    .s_axi_awaddr  ({ kmem_awaddr,        pcis_awaddr }),
+    .s_axi_awlen   ({ kmem_awlen,         pcis_awlen }),
+    .s_axi_awsize  ({ kmem_awsize,        pcis_awsize }),
+    .s_axi_awburst ({ kmem_awburst,       pcis_awburst }),
+    .s_axi_awlock  ({ kmem_awlock,        pcis_awlock }),
+    .s_axi_awcache ({ kmem_awcache,       pcis_awcache }),
+    .s_axi_awprot  ({ kmem_awprot,        pcis_awprot }),
+    .s_axi_awqos   ({ kmem_awqos,         pcis_awqos }),
+    .s_axi_awvalid ({ kmem_awvalid,       pcis_awvalid }),
+    .s_axi_awready ({ kmem_awready,       pcis_awready }),
+    .s_axi_wdata   ({ kmem_wdata,         pcis_wdata }),
+    .s_axi_wstrb   ({ kmem_wstrb,         pcis_wstrb }),
+    .s_axi_wlast   ({ kmem_wlast,         pcis_wlast }),
+    .s_axi_wvalid  ({ kmem_wvalid,        pcis_wvalid }),
+    .s_axi_wready  ({ kmem_wready,        pcis_wready }),
+    .s_axi_bid     ({ kmem_bid_16,        pcis_bid }),
+    .s_axi_bresp   ({ kmem_bresp,         pcis_bresp }),
+    .s_axi_bvalid  ({ kmem_bvalid,        pcis_bvalid }),
+    .s_axi_bready  ({ kmem_bready,        pcis_bready }),
+    .s_axi_arid    ({ {15'h0, kmem_arid}, pcis_arid }),
+    .s_axi_araddr  ({ kmem_araddr,        pcis_araddr }),
+    .s_axi_arlen   ({ kmem_arlen,         pcis_arlen }),
+    .s_axi_arsize  ({ kmem_arsize,        pcis_arsize }),
+    .s_axi_arburst ({ kmem_arburst,       pcis_arburst }),
+    .s_axi_arlock  ({ kmem_arlock,        pcis_arlock }),
+    .s_axi_arcache ({ kmem_arcache,       pcis_arcache }),
+    .s_axi_arprot  ({ kmem_arprot,        pcis_arprot }),
+    .s_axi_arqos   ({ kmem_arqos,         pcis_arqos }),
+    .s_axi_arvalid ({ kmem_arvalid,       pcis_arvalid }),
+    .s_axi_arready ({ kmem_arready,       pcis_arready }),
+    .s_axi_rid     ({ kmem_rid_16,        pcis_rid }),
+    .s_axi_rdata   ({ kmem_rdata,         pcis_rdata }),
+    .s_axi_rresp   ({ kmem_rresp,         pcis_rresp }),
+    .s_axi_rlast   ({ kmem_rlast,         pcis_rlast }),
+    .s_axi_rvalid  ({ kmem_rvalid,        pcis_rvalid }),
+    .s_axi_rready  ({ kmem_rready,        pcis_rready }),
     // ---- M00 = DDR ----
     .m_axi_awid (ddr_awid), .m_axi_awaddr (ddr_awaddr), .m_axi_awlen (ddr_awlen), .m_axi_awsize (ddr_awsize),
     .m_axi_awburst (ddr_awburst), .m_axi_awlock (ddr_awlock), .m_axi_awcache (ddr_awcache), .m_axi_awprot (ddr_awprot),

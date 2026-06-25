@@ -40,4 +40,20 @@ set_property -dict [list \
   CONFIG.ID_WIDTH {1} CONFIG.SYNCHRONIZATION_STAGES {3} CONFIG.ACLK_RATIO {2:1} \
 ] [get_ips s1_axi_cdc]
 
+# ---- AXI4 register slice on the shell DMA-PCIS <-> crossbar SI1 boundary (TIMING-CLOSE fix) ----
+# The route-bound post-route worst path is the shell sh_ddr DDR4 wready -> XBAR_DDR wready mux -> a high-fanout
+# net to the STATIC shell DMA-PCIS endpoint (~89% route, crossing SLRs, WNS violated at clk_main_a0/250). The S1
+# CL wired sh_cl_dma_pcis_* / cl_sh_dma_pcis_* DIRECTLY into crossbar SI1 with NO register slice, so the
+# crossbar<->shell handshake is one long combinational route. The proven AWS reference CLs (cl_mem_perf /
+# cl_dram_hbm_dma) pipeline this exact path with per-SLR PCIS register slices (AXI4_REG_SLC_PCIS_SLR*). Add ONE
+# FULLY-REGISTERED AXI4 register slice on the boundary to break the long net. SELF-OWNED module name s1_pcis_rs
+# (do NOT collide with the HDK axi_register_slice that sh_ddr reads from HDK_IP_SRC_DIR). Matches sh_cl_dma_pcis /
+# crossbar SI1: AXI4, 512b data, 64-bit addr, 16-bit ID, 64-bit wstrb. REG_* = 7 = "Fully Registered" mode on
+# all five channels (max pipelining; the point is to insert pipeline regs, latency-only).
+create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name s1_pcis_rs -dir $ipdir
+set_property -dict [list \
+  CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ADDR_WIDTH {64} CONFIG.ID_WIDTH {16} \
+  CONFIG.REG_AW {7} CONFIG.REG_AR {7} CONFIG.REG_W {7} CONFIG.REG_R {7} CONFIG.REG_B {7} \
+] [get_ips s1_pcis_rs]
+
 generate_target all [get_ips]

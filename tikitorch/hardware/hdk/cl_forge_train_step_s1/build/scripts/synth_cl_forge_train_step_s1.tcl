@@ -49,10 +49,13 @@ read_ip [glob $CL_DIR/design/ip/s1_ocl_slice/s1_ocl_slice.xci]
 read_ip [glob $CL_DIR/design/ip/axi_crossbar_ddr/axi_crossbar_ddr.xci]
 read_ip [glob $CL_DIR/design/ip/s1_axil_cdc/s1_axil_cdc.xci]
 read_ip [glob $CL_DIR/design/ip/s1_axi_cdc/s1_axi_cdc.xci]
+# s1_pcis_rs: fully-registered AXI4 reg slice on the shell DMA-PCIS <-> crossbar SI1 boundary (timing-close fix)
+read_ip [glob $CL_DIR/design/ip/s1_pcis_rs/s1_pcis_rs.xci]
 synth_ip [get_ips s1_ocl_slice]
 synth_ip [get_ips axi_crossbar_ddr]
 synth_ip [get_ips s1_axil_cdc]
 synth_ip [get_ips s1_axi_cdc]
+synth_ip [get_ips s1_pcis_rs]
 
 synth_design -mode out_of_context \
              -top ${CL} \
