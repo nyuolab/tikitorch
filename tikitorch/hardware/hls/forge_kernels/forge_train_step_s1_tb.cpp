@@ -602,6 +602,118 @@ int main() {
     free(cbuf);
     return cosim_ok ? 0 : 1;
 #endif
+#ifdef S1_COSIM_STEP
+    // ========================================================================
+    // MINIMAL MODE-2 STEP COSIM REPRO — the do_opt(STEP) silicon NO-OP catcher (cosim only).
+    // ------------------------------------------------------------------------
+    // The S1_COSIM_MIN harness above only ever exercised mode-2 *INIT* (the value-copy / re-quantize that
+    // writes ONE wide_buf slot per iteration). The SILICON FACT is narrower: do_opt(INIT) COMMITS but
+    // do_opt(STEP) is a NO-OP on the synthesized RTL — a host-driven per-step loop is EXACTLY flat, weights
+    // never move, even though csim CONVERGES. The STEP path's PASS A writes FIVE wide_buf slots per iteration
+    // (wfp/m/v/g/dst) vs the INIT path's ONE; that 5-way write fan-out on the single gmem bundle is what the
+    // RTL scheduler drops. This harness reproduces ONLY a minimal mode-2 STEP in ONE committing kick (no
+    // fwd/bwd/convergence loop -> cosim stays fast) and asserts a LIVE weight actually MOVED.
+    //
+    // Setup that FORCES a STEP to move a weight:
+    //   (1) zero buf; stage_opt_buffer(memorize=true) stages small-nonzero W_fp masters (EMBED/W_HEAD |.|<20,
+    //       LN/code gammas = +2^Q_CODE); kick do_opt(INIT, TRAIN_ALL) to populate the LIVE code/value regions.
+    //   (2) STAGE A KNOWN, LARGE, NON-ZERO GRADIENT into EVERY g_* region (and zero m/v = a fresh optimizer)
+    //       so the dyadic-Adam step is non-trivial: with m=v=0, mn=g>>B1, vn=|g|>>B1, se=dyad_exp(vn),
+    //       step=mn>>se = sign(g)*O(1) -> a VALUE weight moves by ~1 (W_HEAD/EMBED), and a code master's
+    //       int32 fixed-pt W_fp moves too. A large per-lane grad guarantees dw != 0 on the value regions.
+    //   (3) snapshot the LIVE W_HEAD + EMBED deploy regions (the value weights the forward reads) AND the
+    //       code W_fp masters BEFORE the step.
+    //   (4) kick do_opt(STEP, TRAIN_ALL) — TRAIN_ALL so BOTH value (W_HEAD/EMBED) and code regions step
+    //       (FREEZE would freeze the codes; we want the full STEP writeback exercised).
+    //   (5) assert >=1 live W_HEAD/EMBED deploy word CHANGED vs the snapshot. ZERO changed == the silicon
+    //       no-op reproduced (the STEP writeback was dropped in RTL). ALSO bit-check the kernel STEP against a
+    //       tiny CPU golden (ref_dyadic_adam_region) so a PASS is not just "moved" but "moved CORRECTLY".
+    // Returns 1 on FAIL (no weight moved / mismatch), 0 on PASS. Verified to PASS in g++ (the #else path moves
+    // weights), so a cosim FAIL isolates the RTL-only STEP writeback drop.
+    int32_t *sbuf = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    for (int i = 0; i < S1_BUFLEN; i++) sbuf[i] = 0;
+    stage_opt_buffer(sbuf, 4242, /*memorize=*/true);                       // stage W_fp masters
+    forge_train_step_s1(sbuf, 2, S1_OPT_INIT, S1_OPT_TRAIN_ALL, 0);        // populate live code/value regions
+
+    // (2) stage a KNOWN large nonzero grad into every opt region's g_*; leave m/v = 0 (fresh optimizer). A
+    //     per-lane-varying magnitude (>= a few thousand) guarantees step = mn>>se != 0 on the value regions.
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        for (int p = 0; p < R.n; p++) {
+            long g = 4096 + 37 * ((p % 17) + 1);              // large, deterministic, per-lane-varying
+            sbuf[R.g_off + p] = (int32_t)((p & 1) ? -g : g);  // alternate sign so some weights ++ and some --
+            sbuf[R.m_off + p] = 0;
+            sbuf[R.v_off + p] = 0;
+        }
+    }
+
+    // (3) snapshot the LIVE value-deploy regions (W_HEAD, EMBED) + the code W_fp masters BEFORE the step.
+    static long sn_whead[S1_V * S1_D], sn_embed[S1_V * S1_D];
+    for (int i = 0; i < S1_V * S1_D; i++) { sn_whead[i] = (int32_t)sbuf[S1_OFF_W_HEAD + i];
+                                            sn_embed[i] = (int32_t)sbuf[S1_OFF_EMBED  + i]; }
+    // snapshot ALL regions' g/m/v/W_fp/dst for the per-region CPU golden of the SAME step.
+    static long sg[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    static long sm[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    static long sv[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    static long sw[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    static long sd[S1_NUM_OPT_REGIONS][S1_FFN * S1_D];
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        snap(sbuf, R.g_off,   sg[r], R.n);
+        snap(sbuf, R.m_off,   sm[r], R.n);
+        snap(sbuf, R.v_off,   sv[r], R.n);
+        snap(sbuf, R.wfp_off, sw[r], R.n);
+        snap(sbuf, R.dst_off, sd[r], R.n);
+    }
+
+    // (4) the DUT step (TRAIN_ALL: every learnable region — value AND code — steps).
+    forge_train_step_s1(sbuf, 2, S1_OPT_STEP, S1_OPT_TRAIN_ALL, 0);
+
+    // (5a) did a LIVE value weight MOVE? (the silicon no-op leaves these unchanged == ZERO moved.)
+    long whead_moved = 0, embed_moved = 0;
+    for (int i = 0; i < S1_V * S1_D; i++) {
+        if ((int32_t)sbuf[S1_OFF_W_HEAD + i] != sn_whead[i]) whead_moved++;
+        if ((int32_t)sbuf[S1_OFF_EMBED  + i] != sn_embed[i]) embed_moved++;
+    }
+    // (5b) did a CODE master (W_fp) MOVE? (a second, independent STEP-writeback witness.)
+    long wfp_moved = 0;
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        if (!R.is_code) continue;
+        for (int p = 0; p < R.n; p++) if ((int32_t)sbuf[R.wfp_off + p] != sw[r][p]) wfp_moved++;
+    }
+    // (5c) bit-exact vs the CPU golden of the SAME step (per region): W_fp, deploy code/value, m, v, grad=0.
+    static long sm_ref[S1_FFN * S1_D], sv_ref[S1_FFN * S1_D], sw_ref[S1_FFN * S1_D];
+    static long sd_ref[S1_FFN * S1_D], sg_ref[S1_FFN * S1_D];
+    long max_step_wfp = 0, max_step_dst = 0, max_step_m = 0, max_step_v = 0, max_step_gz = 0;
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const OptRegRef &R = OPT_REGS_REF[r];
+        ref_dyadic_adam_region(sg[r], sm[r], sv[r], sw[r], sd[r], R.n, R.is_code, /*init_only=*/false,
+                               sm_ref, sv_ref, sw_ref, sd_ref, sg_ref);
+        long a;
+        a = cmp_buf(sbuf, R.wfp_off, sw_ref, R.n); if (a > max_step_wfp) max_step_wfp = a;
+        a = cmp_buf(sbuf, R.dst_off, sd_ref, R.n); if (a > max_step_dst) max_step_dst = a;
+        a = cmp_buf(sbuf, R.m_off,   sm_ref, R.n); if (a > max_step_m)   max_step_m   = a;
+        a = cmp_buf(sbuf, R.v_off,   sv_ref, R.n); if (a > max_step_v)   max_step_v   = a;
+        a = cmp_buf(sbuf, R.g_off,   sg_ref, R.n); if (a > max_step_gz)  max_step_gz  = a;
+    }
+
+    printf("[COSIM_STEP] W_HEAD moved = %ld / %d ; EMBED moved = %ld / %d ; code W_fp moved = %ld\n",
+           whead_moved, S1_V * S1_D, embed_moved, S1_V * S1_D, wfp_moved);
+    printf("[COSIM_STEP] bit-exact vs golden: max|W_fp|=%ld max|dst|=%ld max|m|=%ld max|v|=%ld max|g(zeroed)|=%ld\n",
+           max_step_wfp, max_step_dst, max_step_m, max_step_v, max_step_gz);
+    bool moved_ok    = (whead_moved > 0) && (embed_moved > 0) && (wfp_moved > 0);
+    bool bitexact_ok = (max_step_wfp == 0 && max_step_dst == 0 && max_step_m == 0 &&
+                        max_step_v == 0 && max_step_gz == 0);
+    bool step_ok = moved_ok && bitexact_ok;
+    printf("[COSIM_STEP] %s (mode-2 STEP %s)\n",
+           step_ok ? "PASS" : "FAIL",
+           step_ok ? "moved the weights AND is bit-exact to the golden"
+                   : (!moved_ok ? "left the live weights UNCHANGED = RTL no-op reproduced"
+                                : "moved but MISMATCHES the golden step"));
+    free(sbuf);
+    return step_ok ? 0 : 1;
+#endif
     int32_t *buf = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
     for (int i = 0; i < S1_BUFLEN; i++) buf[i] = 0;
     srand(1234);

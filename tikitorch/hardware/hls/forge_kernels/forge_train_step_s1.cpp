@@ -1887,7 +1887,19 @@ static void dyadic_adam_region(int32_t *buffer, const s1_opt_region_t &R, bool i
     int dst_wide    = R.dst_off  >> 4;
 
     // ---- PASS A (fused): Adam update -> W_fp_new (one priority encoder: s1_dyad_exp). Reads wfp (+g/m/v on
-    //      a real step, +dst for the VALUE-init copy), writes wfp/m/v/g (deploy VALUE slot too) in this body. ----
+    //      a real step), writes ONLY the optimizer STATE (wfp/m/v/g) in this body. ----
+    // STEP WRITEBACK FIX: the VALUE-region deploy slot (dst) is NO LONGER written here on a STEP. The old
+    // STEP body wrote FIVE wide_buf slots per iteration (wfp/m/v/g/dst); the INIT body that COMMITS on
+    // silicon writes ONLY ONE (dst), and the morph signsgd_region_wide that COMMITS writes TWO (w/grad-zero).
+    // The 5th write (dst) — whose consumer is a FUTURE kick's do_fwd_loss reading the deploy region back
+    // through a DIFFERENT reinterpret_cast (limit=1) — is the one the RTL scheduler could not prove live and
+    // DROPPED under the 5-way per-body write fan-out, so the STEP was a silicon NO-OP (weights never moved)
+    // while csim/csynth/INIT passed. THE FIX: the wfp/m/v/g writes here are in-instance RAW (do_opt itself
+    // reads m/v/wfp back next kick -> the scheduler proves them live, so PASS A's state writes already
+    // commit), and the VALUE deploy slot is moved to PASS A2 below — a SEPARATE fused pass with the EXACT
+    // single-read(wfp)+single-write(dst) shape that the committing INIT path and PASS B use. Bit-exact: PASS
+    // A2 copies the SAME (int16)wn that PASS A wrote into wfp_new (==the deploy value), so the deploy slot is
+    // identical to the old in-body write — only the SCHEDULE/structure changes to the proven-committing form.
 ADAM_RW: for (int wi = 0; wi < n_wide; wi++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT min=1 max=1024
@@ -1899,7 +1911,8 @@ ADAM_RW: for (int wi = 0; wi < n_wide; wi++) {
         wide_t m_new    = m_word;
         wide_t v_new    = v_word;
         wide_t g_new    = g_word;
-        wide_t dst_new  = 0;   // VALUE deploy slot written here (CODE dst is set by PASS B)
+        wide_t dst_new  = 0;   // VALUE deploy slot — written here on INIT; on STEP it is written by PASS A2
+                               // (the single-write committing shape); CODE dst is set by PASS B.
 RWA_LANE: for (int lane = 0; lane < 16; lane++) {
 #pragma HLS UNROLL
             int hi = lane * 32 + 31, lo = lane * 32;
@@ -1938,7 +1951,8 @@ RWA_LANE: for (int lane = 0; lane < 16; lane++) {
                 g_new.range(hi, lo)   = 0;
             } else {
                 // VALUE master (EMBED/W_HEAD/LN beta): int16 unit scale, coarse LR_SHIFT. No re-quantize: the
-                // deploy slot IS W_fp_new, written here.
+                // deploy slot IS W_fp_new — but it is written by PASS A2 (the single-write committing shape),
+                // NOT here (see the STEP WRITEBACK FIX comment above; the in-body dst write was dropped on RTL).
                 data_t wfp = (data_t)(int16_t)(int32_t)(ap_int<32>)wfp_word.range(hi, lo);
                 acc_t dw   = step >> S1_LR_SHIFT;        // lr = 2^-LR_SHIFT
                 data_t wn  = sat16((acc_t)wfp - dw);
@@ -1946,18 +1960,43 @@ RWA_LANE: for (int lane = 0; lane < 16; lane++) {
                 v_new.range(hi, lo)   = (ap_uint<32>)(ap_int<32>)(int32_t)vn;
                 wfp_new.range(hi, lo) = (ap_uint<32>)(ap_int<32>)(int32_t)(int16_t)wn;
                 g_new.range(hi, lo)   = 0;
-                dst_new.range(hi, lo) = (ap_uint<32>)(ap_int<32>)(int32_t)(int16_t)wn;
             }
         }
-        // WRITE-BACK in the SAME body (the morph fused commit). On init only the VALUE deploy slot moved.
+        // WRITE-BACK in the SAME body (the morph fused commit).
         if (init_only) {
+            // INIT: the VALUE deploy slot is the SOLE write here (the proven-committing single-write shape,
+            // same as morph/PASS B). CODE deploy is re-quantized by PASS B. Optimizer state untouched (no-op).
             if (!R.is_code) wide_buf[dst_wide + wi] = dst_new;
         } else {
+            // STEP: write ONLY the optimizer STATE (in-instance RAW: do_opt reads m/v/wfp back next kick, so
+            // the scheduler proves these live and they commit). The VALUE deploy slot is written by PASS A2
+            // (single-write shape) and the CODE deploy by PASS B — NOT here (the STEP WRITEBACK FIX).
             wide_buf[wfp_wide + wi] = wfp_new;
             wide_buf[m_wide   + wi] = m_new;
             wide_buf[v_wide   + wi] = v_new;
             wide_buf[g_wide   + wi] = g_new;             // grads zeroed per lane above
-            if (!R.is_code) wide_buf[dst_wide + wi] = dst_new;   // VALUE deploy slot
+        }
+    }
+    // ---- PASS A2 (fused, STEP + VALUE regions only): write the VALUE deploy slot from W_fp_new in the EXACT
+    //      single-read(wfp)+single-write(dst) shape that the committing INIT path and PASS B use. This is the
+    //      STEP WRITEBACK FIX: the deploy write — whose consumer is a future kick's forward read-back — is now
+    //      structurally identical to the INIT dst write that COMMITS on silicon (one read, one write per body),
+    //      instead of being the 5th write in PASS A's body (which the RTL scheduler dropped). Skipped on init
+    //      (PASS A already wrote the VALUE deploy slot above) and on CODE regions (PASS B handles their dst).
+    //      BIT-EXACT: dst = (int16)W_fp_new == the value PASS A formerly wrote in-body. ----
+    if (!init_only && !R.is_code) {
+ADAM_VW: for (int wi = 0; wi < n_wide; wi++) {
+#pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=1 max=1024
+            wide_t wfp_word = wide_buf[wfp_wide + wi];   // W_fp_new from PASS A (same offset/cast/instance)
+            wide_t dst_new  = 0;
+VWA_LANE: for (int lane = 0; lane < 16; lane++) {
+#pragma HLS UNROLL
+                int hi = lane * 32 + 31, lo = lane * 32;
+                data_t wn = (data_t)(int16_t)(int32_t)(ap_int<32>)wfp_word.range(hi, lo);
+                dst_new.range(hi, lo) = (ap_uint<32>)(ap_int<32>)(int32_t)(int16_t)wn;
+            }
+            wide_buf[dst_wide + wi] = dst_new;           // fused single-write commit (the morph/INIT shape)
         }
     }
     // ---- PASS B (fused): re-quantize CODE regions W_fp_new -> deploy code (one priority encoder: dyad in
