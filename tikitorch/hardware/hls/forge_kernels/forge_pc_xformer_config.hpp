@@ -26,10 +26,13 @@
 #define X_AT_DELTA 2         // attention softmax gap divisor (Delta = 4)
 #define X_AT_PFRAC 16        // Q16 attention probabilities
 
-// dyadic-Adam (multiplier-free): m,v EMA betas = 1 - 2^-3; lr = 2^-LR_SHIFT
+// dyadic-Adam (multiplier-free): m,v EMA betas = 1 - 2^-3. NOTE: the master weights here are int16 (small
+// range), so the per-step update must be O(1) integer — the dyadic-Adam step m>>se is already ~sign(m)*adapt
+// (a few), so LR_SHIFT=0 (>0 rounds it to zero = frozen weights). Weight decay on int16 masters must be very
+// gentle (W>>5 = W/32 per step swamps the ±few update); WD_SHIFT>=14 ~ off.
 #define X_ADAM_BSH 3
-#define X_LR_SHIFT 10
-#define X_WD_SHIFT 5         // multiplier-free weight decay (W -= W>>WD_SHIFT each step)
+#define X_LR_SHIFT 0
+#define X_WD_SHIFT 14
 
 // roles / phases (CFG word lanes)
 #define X_PH_FWD   0
