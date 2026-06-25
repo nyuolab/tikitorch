@@ -569,6 +569,39 @@ static long cmp_buf(const int32_t *buf, int off, const long *ref, int n) {
 // ============================================================================
 
 int main() {
+#ifdef S1_COSIM_MIN
+    // ========================================================================
+    // MINIMAL MODE-2 INIT COSIM REPRO — the CHEAP RTL-no-op catcher (cosim only).
+    // ------------------------------------------------------------------------
+    // Reproduces the do_opt(INIT) silicon no-op class in ONE kernel kick (no fwd/bwd/convergence loop, so
+    // cosim_design stays fast). stage_opt_buffer(memorize=true) stages the W_fp MASTERS but leaves the LIVE
+    // code/value regions ZERO; mode-2 a1=S1_OPT_INIT must POPULATE those live regions (value copy wfp->dst;
+    // code re-quantize). If the optimizer's writeback is dropped in RTL (the bug), the live regions stay zero
+    // -> we DETECT it here. Asserts the EMBED live region (a VALUE region: dst = (int16)W_fp) AND a CODE live
+    // region (LN1_g, dst = re-quantized code) both became nonzero. Returns 1 (FAIL = RTL no-op reproduced) /
+    // 0 (PASS = optimizer committed its writes). The stage uses memorize=true so EMBED masters are small but
+    // NONZERO (|.|<20) -> the copied EMBED values are nonzero, and LN1_g masters are +1*2^Q_CODE -> the
+    // re-quantized LN1_g codes are nonzero. So a correct INIT leaves BOTH live regions nonzero; a dropped
+    // writeback leaves them ZERO.
+    int32_t *cbuf = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
+    for (int i = 0; i < S1_BUFLEN; i++) cbuf[i] = 0;
+    stage_opt_buffer(cbuf, 4242, /*memorize=*/true);   // stage W_fp masters; live code/value regions ZERO
+    forge_train_step_s1(cbuf, 2, S1_OPT_INIT, S1_OPT_FREEZE_CODES, 0);   // DUT: populate live regions from W_fp
+
+    long nz_embed = 0;   // VALUE live region (EMBED): dst = (int16)W_fp, masters |.|<20 nonzero
+    for (int i = 0; i < S1_V * S1_D; i++) if (cbuf[S1_OFF_EMBED + i] != 0) nz_embed++;
+    long nz_ln1g = 0;    // CODE live region (LN1_g): dst = re-quantized code, masters = +2^Q_CODE -> code nonzero
+    for (int i = 0; i < S1_N_LAYERS * S1_D; i++) if (cbuf[S1_OFF_LN1_G + i] != 0) nz_ln1g++;
+
+    printf("[COSIM_MIN] EMBED live nonzero = %ld / %d ; LN1_g live nonzero = %ld / %d\n",
+           nz_embed, S1_V * S1_D, nz_ln1g, S1_N_LAYERS * S1_D);
+    bool cosim_ok = (nz_embed > 0) && (nz_ln1g > 0);
+    printf("[COSIM_MIN] %s (mode-2 INIT %s the live regions)\n",
+           cosim_ok ? "PASS" : "FAIL",
+           cosim_ok ? "populated" : "left ZERO = RTL no-op reproduced");
+    free(cbuf);
+    return cosim_ok ? 0 : 1;
+#endif
     int32_t *buf = (int32_t *)aligned_alloc(64, sizeof(int32_t) * S1_BUFLEN);
     for (int i = 0; i < S1_BUFLEN; i++) buf[i] = 0;
     srand(1234);

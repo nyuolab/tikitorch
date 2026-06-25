@@ -328,23 +328,21 @@ CAND: for (int step = 1; step <= (1 << S1_MBITS); step++) {
 #endif
 
 // =============================================================================
-// OPT TIMING FIX — TILED ON-CHIP STAGING of do_opt (the LAST closure step). Before this fix do_opt was the
-// ONLY mode still hitting gmem in its COMPUTE loop: it streamed the optimizer RMW directly on the m_axi
-// `buffer` (no on-chip staging). Because the buffer port is max_widen_bitwidth=512, EVERY scalar
-// variable-offset access (buffer[R.wfp_off + p], etc.) became a 512-bit AXI read PLUS a VARIABLE 512-bit
-// barrel shift to extract the int32 lane; that wide variable shift chained with the AXI read was the
-// critical-path pole (csynth: gmem read 2.920 ns -> 512-bit lshr 1.443 ns = 4.32 ns > 4.0). fwd/bwd were
-// already fixed by ON-CHIP RESIDENT STAGING; do_opt was left streaming. The fix applies the SAME proven
-// pattern in BOUNDED TILES: per tile, burst-load g/m/v/W_fp (+ prev deploy code for is_code) from gmem into
-// small on-chip int32 arrays via the existing wide/sequential burst helpers (HLS coalesces a contiguous
-// burst to wide AXI with FIXED per-lane shifts — NO per-element variable shift), run the SAME dyadic-Adam
-// element math reading/writing the ON-CHIP tile arrays with FIXED [i] indexing (no gmem, no 512-bit
-// variable shift in the compute loop), then burst-store the updated W_fp / code-or-value / m / v tile back
-// and zero the grad tile. The two-pass split (one priority encoder per stage) is preserved. BIT-EXACT: the
-// optimizer is a per-element map (no contraction, no cross-element carry), so tiling only changes the
-// SCHEDULE — every element touches the identical offsets and arithmetic. Tile arrays add modest BRAM
-// (S1_OPT_TILE*4B*5 ~ 80 KB = ~tens of BRAM18) — well within the BRAM headroom. S1_OPT_TILE must be a
-// multiple of 16 so each full-tile gmem slice stays 512-bit aligned (region bases are S1_AL16-aligned).
+// OPT WRITEBACK FIX — FUSED WIDE READ+WRITE in do_opt (dyadic_adam_region). HISTORY: the optimizer first
+// streamed the RMW directly on the m_axi `buffer` (per-scalar variable-offset access -> a 512-bit AXI read
+// PLUS a VARIABLE 512-bit barrel shift -> the 4.32 ns timing pole). The next version fixed TIMING with
+// BOUNDED-TILE on-chip staging (burst-load g/m/v/W_fp into static tile arrays, compute with fixed indexing,
+// burst-STORE back) — but those load->static->store ROUND-TRIPS on the SAME gmem offsets that do_fwd_loss
+// reads back through a DIFFERENT limit=1 cast were a writeback the Vitis RTL scheduler could NOT prove live:
+// it DROPPED the stores on silicon (csim+csynth pass; do_opt no-ops; the live regions stay ZERO; mode-3
+// training is FLAT). THE FIX (this version): mirror the morph signsgd_region_wide pattern that COMMITS on
+// the identical F2 shell — a SINGLE FUSED wide read+write per 512-bit word (read wide_buf[wi], compute 16
+// lanes with FIXED per-lane .range() shifts, write wide_buf[wi] in the SAME body). NO static staging arrays,
+// NO separate dead store; do_opt OWNS its writes (the nested ALLOCATION limit=1 share is also removed). The
+// timing argument still holds: the per-lane shifts are FIXED (lane*32) constants — no variable barrel shift —
+// and the per-word work is bounded (16 lanes over one wide word, S1_OPT_LANE-class small), so the fused
+// datapath is the morph datapath that closed at 2.920 ns. S1_OPT_TILE survives ONLY for zero_grad_region's
+// frozen-code grad-zero tile (a separate, already-committing store; must be a multiple of 16).
 // =============================================================================
 #ifndef S1_OPT_TILE
 #define S1_OPT_TILE 4096
@@ -1867,112 +1865,160 @@ static void dyadic_adam_region(int32_t *buffer, const s1_opt_region_t &R, bool i
 #pragma HLS INLINE off
 #if defined(__VITIS_HLS__) || defined(__SDSVHLS__) || defined(__SYNTHESIS__)
     int n = R.n;
-    // TILED ON-CHIP STAGING — process the region in bounded S1_OPT_TILE chunks. Per tile: burst-in g/m/v/
-    // W_fp (+ prev deploy code) into on-chip int32 arrays via the wide burst helpers, run the SAME two-pass
-    // dyadic-Adam element math on the on-chip arrays with FIXED [i] indexing (no gmem, no 512-bit variable
-    // barrel shift in the compute loop), then burst-out the updated W_fp / code-or-value / m / v + the
-    // zeroed grad. BIT-EXACT to the streaming version: every element p (=tbase+i) reads/writes the identical
-    // logical offsets via the burst, and the arithmetic is verbatim. Tile arrays sized S1_OPT_TILE int32.
-    static int32_t g_t[S1_OPT_TILE], m_t[S1_OPT_TILE], v_t[S1_OPT_TILE], wfp_t[S1_OPT_TILE], dst_t[S1_OPT_TILE];
-#pragma HLS BIND_STORAGE variable=g_t   type=ram_2p impl=bram
-#pragma HLS BIND_STORAGE variable=m_t   type=ram_2p impl=bram
-#pragma HLS BIND_STORAGE variable=v_t   type=ram_2p impl=bram
-#pragma HLS BIND_STORAGE variable=wfp_t type=ram_2p impl=bram
-#pragma HLS BIND_STORAGE variable=dst_t type=ram_2p impl=bram
-OPT_TILE: for (int tbase = 0; tbase < n; tbase += S1_OPT_TILE) {
-        int tn = n - tbase; if (tn > S1_OPT_TILE) tn = S1_OPT_TILE;   // this tile's element count
+    // FUSED WIDE READ+WRITE (the morph signsgd_region_wide pattern, proven to COMMIT on the F2 shell). The
+    // prior TILED-STATIC version delegated every write to load->static-tile->store ROUND-TRIPS on the same
+    // gmem offsets (the wfp/m/v/dst regions read back by do_fwd_loss through a DIFFERENT limit=1 cast); the
+    // Vitis scheduler could not prove the cross-instance RAW dependence and DROPPED the writeback on silicon
+    // (csim/csynth pass, mode-2 no-ops -> live regions left ZERO). The fix mirrors morph EXACTLY: per 512-bit
+    // wide word, READ the needed wide words via reinterpret_cast<wide_t*>, compute all 16 lanes with FIXED
+    // per-lane .range() shifts (NO variable barrel shift, NO static staging arrays), and WRITE the updated
+    // wide words back IN THE SAME LOOP BODY. The two-pass split is kept ONLY to separate the two priority
+    // encoders (s1_dyad_exp in PASS A, dyad-in-s1_encode_fine in PASS B); EACH pass is itself a fused wide
+    // read+write with no dead separate store. PASS B reads R.wfp_off — the SAME region PASS A just wrote in
+    // its own fused body — so it sees W_fp_new (the in-region RAW the scheduler CAN prove: same offset, same
+    // wide cast, same function instance). BIT-EXACT to the #else per-element golden: the per-lane integer
+    // arithmetic and the FIXED [i] -> lane mapping are verbatim; only the staging is removed.
+    wide_t *wide_buf = reinterpret_cast<wide_t *>(buffer);
+    int n_wide      = n >> 4;
+    int wfp_wide    = R.wfp_off  >> 4;
+    int g_wide      = R.g_off    >> 4;
+    int m_wide      = R.m_off    >> 4;
+    int v_wide      = R.v_off    >> 4;
+    int dst_wide    = R.dst_off  >> 4;
 
-        // ---- BURST-IN: contiguous gmem slices -> on-chip tile arrays (wide AXI, NO per-elem variable shift) ----
-        burst_load_i32(buffer, R.wfp_off + tbase, wfp_t, tn);
-        if (!init_only) {
-            burst_load_i32(buffer, R.g_off + tbase, g_t, tn);
-            burst_load_i32(buffer, R.m_off + tbase, m_t, tn);
-            burst_load_i32(buffer, R.v_off + tbase, v_t, tn);
-        }
-        // prev deploy code (for the exp-clamp in PASS B) / value-init source: staged in dst slot.
-        if (R.is_code || init_only) burst_load_i32(buffer, R.dst_off + tbase, dst_t, tn);
-
-        // ---- PASS A: Adam update -> W_fp_new (one priority encoder: s1_dyad_exp), ON-CHIP fixed indexing ----
-ADAM_R: for (int base = 0; base < tn; base += S1_OPT_LANE) {
+    // ---- PASS A (fused): Adam update -> W_fp_new (one priority encoder: s1_dyad_exp). Reads wfp (+g/m/v on
+    //      a real step, +dst for the VALUE-init copy), writes wfp/m/v/g (deploy VALUE slot too) in this body. ----
+ADAM_RW: for (int wi = 0; wi < n_wide; wi++) {
 #pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=8 max=4096
-            for (int lane = 0; lane < S1_OPT_LANE; lane++) {
+#pragma HLS LOOP_TRIPCOUNT min=1 max=1024
+        wide_t wfp_word = wide_buf[wfp_wide + wi];
+        wide_t g_word   = init_only ? (wide_t)0 : wide_buf[g_wide + wi];
+        wide_t m_word   = init_only ? (wide_t)0 : wide_buf[m_wide + wi];
+        wide_t v_word   = init_only ? (wide_t)0 : wide_buf[v_wide + wi];
+        wide_t wfp_new  = wfp_word;
+        wide_t m_new    = m_word;
+        wide_t v_new    = v_word;
+        wide_t g_new    = g_word;
+        wide_t dst_new  = 0;   // VALUE deploy slot written here (CODE dst is set by PASS B)
+RWA_LANE: for (int lane = 0; lane < 16; lane++) {
 #pragma HLS UNROLL
-                int i = base + lane;
-                if (i < tn) {
-                    if (init_only) {
-                        // Adam no-op on init: leave W_fp/m/v/g untouched. CODE regions re-quantize the staged
-                        // W_fp in PASS B; VALUE regions have no encoder, so populate the deploy slot here from
-                        // the staged master (== old single-pass init: dst = (int16)wfp, unchanged weights).
-                        if (!R.is_code) {
-                            data_t wfp = (data_t)(int16_t)(wfp_t[i] & 0xFFFF);
-                            dst_t[i] = (int32_t)(int16_t)wfp;
-                        }
-                        continue;
-                    }
-                    acc_t g = (acc_t)(int32_t)g_t[i];
-                    acc_t m = (acc_t)(int32_t)m_t[i];
-                    acc_t v = (acc_t)(int32_t)v_t[i];
-                    acc_t absg = (g < 0) ? (acc_t)(-g) : g;
-                    acc_t mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
-                    acc_t vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
-                    int se = s1_dyad_exp(vn);                    // PRIORITY ENCODER #1 (alone in this stage)
-                    acc_t step = mn >> se;                       // m / 2^round(log2 v)  (arith shift, keeps sign)
-                    if (R.is_code) {
-                        // FINE FIXED-POINT code master (int32 at scale 2^Q_CODE): nudge by a small fraction of a
-                        // code unit; the deploy code is re-quantized from W_fp_new in PASS B (encoder #2).
-                        acc_t wq  = (acc_t)(int32_t)wfp_t[i];
-                        acc_t dw  = step >> S1_LR_SHIFT_CODE;    // fine lr = 2^-LR_SHIFT_CODE of a code unit
+            int hi = lane * 32 + 31, lo = lane * 32;
+            if (init_only) {
+                // Adam no-op on init: W_fp/m/v/g untouched (the unread words above stayed = the source word).
+                // CODE regions re-quantize the staged W_fp in PASS B; VALUE regions populate the deploy slot
+                // here from the staged master (== old init: dst = (int16)wfp, unchanged weights).
+                if (!R.is_code) {
+                    data_t wfp = (data_t)(int16_t)(int32_t)(ap_int<32>)wfp_word.range(hi, lo);
+                    dst_new.range(hi, lo) = (ap_uint<32>)(ap_int<32>)(int32_t)(int16_t)wfp;
+                }
+                continue;
+            }
+            acc_t g = (acc_t)(int32_t)(ap_int<32>)g_word.range(hi, lo);
+            acc_t m = (acc_t)(int32_t)(ap_int<32>)m_word.range(hi, lo);
+            acc_t v = (acc_t)(int32_t)(ap_int<32>)v_word.range(hi, lo);
+            acc_t absg = (g < 0) ? (acc_t)(-g) : g;
+            acc_t mn = m - (m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
+            acc_t vn = v - (v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
+            int se = s1_dyad_exp(vn);                    // PRIORITY ENCODER #1 (alone in this stage)
+            acc_t step = mn >> se;                       // m / 2^round(log2 v)  (arith shift, keeps sign)
+            if (R.is_code) {
+                // FINE FIXED-POINT code master (int32 at scale 2^Q_CODE): nudge by a small fraction of a code
+                // unit; the deploy code is re-quantized from W_fp_new in PASS B (encoder #2).
+                acc_t wq  = (acc_t)(int32_t)(ap_int<32>)wfp_word.range(hi, lo);
+                acc_t dw  = step >> S1_LR_SHIFT_CODE;    // fine lr = 2^-LR_SHIFT_CODE of a code unit
 #if S1_CODE_WD_SHIFT
-                        acc_t wd  = wq >> S1_CODE_WD_SHIFT;      // multiplier-free weight decay (shift toward 0)
+                acc_t wd  = wq >> S1_CODE_WD_SHIFT;      // multiplier-free weight decay (shift toward 0)
 #else
-                        acc_t wd  = 0;
+                acc_t wd  = 0;
 #endif
-                        acc_t wn  = (acc_t)sat32((acc_t)wq - dw - wd);
-                        m_t[i]   = (int32_t)mn;
-                        v_t[i]   = (int32_t)vn;
-                        wfp_t[i] = (int32_t)wn;                  // store the full int32 fixed-point master
-                        g_t[i]   = 0;
-                    } else {
-                        // VALUE master (EMBED/W_HEAD/LN beta): int16 unit scale, coarse LR_SHIFT (unchanged — it
-                        // SCATTERS, no fan-in blow-up). No re-quantize: the deploy slot IS W_fp_new, written here.
-                        data_t wfp = (data_t)(int16_t)(wfp_t[i] & 0xFFFF);
-                        acc_t dw   = step >> S1_LR_SHIFT;        // lr = 2^-LR_SHIFT
-                        data_t wn  = sat16((acc_t)wfp - dw);
-                        m_t[i]   = (int32_t)mn;
-                        v_t[i]   = (int32_t)vn;
-                        wfp_t[i] = (int32_t)(int16_t)wn;
-                        g_t[i]   = 0;
-                        dst_t[i] = (int32_t)(int16_t)wn;
-                    }
-                }
+                acc_t wn  = (acc_t)sat32((acc_t)wq - dw - wd);
+                m_new.range(hi, lo)   = (ap_uint<32>)(ap_int<32>)(int32_t)mn;
+                v_new.range(hi, lo)   = (ap_uint<32>)(ap_int<32>)(int32_t)vn;
+                wfp_new.range(hi, lo) = (ap_uint<32>)(ap_int<32>)(int32_t)wn;   // full int32 fixed-point master
+                g_new.range(hi, lo)   = 0;
+            } else {
+                // VALUE master (EMBED/W_HEAD/LN beta): int16 unit scale, coarse LR_SHIFT. No re-quantize: the
+                // deploy slot IS W_fp_new, written here.
+                data_t wfp = (data_t)(int16_t)(int32_t)(ap_int<32>)wfp_word.range(hi, lo);
+                acc_t dw   = step >> S1_LR_SHIFT;        // lr = 2^-LR_SHIFT
+                data_t wn  = sat16((acc_t)wfp - dw);
+                m_new.range(hi, lo)   = (ap_uint<32>)(ap_int<32>)(int32_t)mn;
+                v_new.range(hi, lo)   = (ap_uint<32>)(ap_int<32>)(int32_t)vn;
+                wfp_new.range(hi, lo) = (ap_uint<32>)(ap_int<32>)(int32_t)(int16_t)wn;
+                g_new.range(hi, lo)   = 0;
+                dst_new.range(hi, lo) = (ap_uint<32>)(ap_int<32>)(int32_t)(int16_t)wn;
             }
         }
-        // ---- PASS B: re-quantize CODE regions W_fp_new -> deploy code (one priority encoder: dyad in encode) ----
-        if (R.is_code) {
-ADAM_Q: for (int base = 0; base < tn; base += S1_OPT_LANE) {
+        // WRITE-BACK in the SAME body (the morph fused commit). On init only the VALUE deploy slot moved.
+        if (init_only) {
+            if (!R.is_code) wide_buf[dst_wide + wi] = dst_new;
+        } else {
+            wide_buf[wfp_wide + wi] = wfp_new;
+            wide_buf[m_wide   + wi] = m_new;
+            wide_buf[v_wide   + wi] = v_new;
+            wide_buf[g_wide   + wi] = g_new;             // grads zeroed per lane above
+            if (!R.is_code) wide_buf[dst_wide + wi] = dst_new;   // VALUE deploy slot
+        }
+    }
+    // ---- PASS B (fused): re-quantize CODE regions W_fp_new -> deploy code (one priority encoder: dyad in
+    //      s1_encode_fine). Reads R.wfp_off (the SAME region PASS A wrote -> sees W_fp_new) + the prev deploy
+    //      code (for the exp-clamp), writes the deploy code IN THIS BODY. ----
+    if (R.is_code) {
+ADAM_QW: for (int wi = 0; wi < n_wide; wi++) {
 #pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=8 max=4096
-                for (int lane = 0; lane < S1_OPT_LANE; lane++) {
+#pragma HLS LOOP_TRIPCOUNT min=1 max=1024
+            wide_t wfp_word  = wide_buf[wfp_wide + wi];   // W_fp_new from PASS A (or staged W_fp on init)
+            wide_t prev_word = wide_buf[dst_wide + wi];   // prev deploy code (exp-clamp reference)
+            wide_t dst_new   = 0;
+RWB_LANE: for (int lane = 0; lane < 16; lane++) {
 #pragma HLS UNROLL
-                    int i = base + lane;
-                    if (i < tn) {
-                        acc_t wn = (acc_t)(int32_t)wfp_t[i];     // W_fp_new from PASS A (or staged W_fp on init)
-                        dst_t[i] = s1_encode_fine(wn, dst_t[i], !init_only);  // PRIORITY ENCODER #2
-                    }
-                }
+                int hi = lane * 32 + 31, lo = lane * 32;
+                acc_t wn = (acc_t)(int32_t)(ap_int<32>)wfp_word.range(hi, lo);
+                int32_t prev = (int32_t)(ap_int<32>)prev_word.range(hi, lo);
+                dst_new.range(hi, lo) =
+                    (ap_uint<32>)(ap_int<32>)s1_encode_fine(wn, prev, !init_only);  // PRIORITY ENCODER #2
             }
+            wide_buf[dst_wide + wi] = dst_new;            // fused commit
         }
-
-        // ---- BURST-OUT: on-chip tile arrays -> contiguous gmem slices (wide AXI). On init PASS A only moved
-        //      the VALUE deploy slot (CODE dst is set by PASS B); m/v/g/W_fp are untouched, so skip them. ----
-        if (R.is_code || init_only) burst_store_i32(dst_t, buffer, R.dst_off + tbase, tn);
-        if (!init_only) {
-            burst_store_i32(wfp_t, buffer, R.wfp_off + tbase, tn);
-            burst_store_i32(m_t,   buffer, R.m_off   + tbase, tn);
-            burst_store_i32(v_t,   buffer, R.v_off   + tbase, tn);
-            burst_store_i32(g_t,   buffer, R.g_off   + tbase, tn);   // grads zeroed in PASS A
-            if (!R.is_code) burst_store_i32(dst_t, buffer, R.dst_off + tbase, tn);  // VALUE deploy slot
+    }
+    // scalar tail for any region whose logical extent is not a wide multiple (all S1 regions ARE 16-aligned,
+    // so this is a no-op in the shipped config; kept for safety, BIT-IDENTICAL per-element math to PASS A/B).
+    for (int p = (n_wide << 4); p < n; p++) {
+        int32_t g = init_only ? 0 : buffer[R.g_off + p];
+        int32_t m = buffer[R.m_off + p];
+        int32_t v = buffer[R.v_off + p];
+        acc_t absg = g < 0 ? (acc_t)(-(acc_t)g) : (acc_t)g;
+        acc_t mn = (acc_t)m - ((acc_t)m >> S1_ADAM_B1) + ((acc_t)g    >> S1_ADAM_B1);
+        acc_t vn = (acc_t)v - ((acc_t)v >> S1_ADAM_B2) + (absg        >> S1_ADAM_B2);
+        int se = s1_dyad_exp(vn);
+        acc_t step = mn >> se;
+        if (R.is_code) {
+            int32_t wq = buffer[R.wfp_off + p];
+            acc_t dw = step >> S1_LR_SHIFT_CODE;
+#if S1_CODE_WD_SHIFT
+            acc_t wd = (acc_t)wq >> S1_CODE_WD_SHIFT;
+#else
+            acc_t wd = 0;
+#endif
+            int32_t wn = init_only ? wq : (int32_t)sat32((acc_t)wq - dw - wd);
+            if (!init_only) {
+                buffer[R.m_off + p]   = (int32_t)mn;
+                buffer[R.v_off + p]   = (int32_t)vn;
+                buffer[R.wfp_off + p] = wn;
+                buffer[R.g_off + p]   = 0;
+            }
+            buffer[R.dst_off + p] = s1_encode_fine((acc_t)wn, buffer[R.dst_off + p], !init_only);
+        } else {
+            int16_t wfp = (int16_t)(buffer[R.wfp_off + p] & 0xFFFF);
+            acc_t dw  = step >> S1_LR_SHIFT;
+            int16_t wn = init_only ? wfp : (int16_t)sat16((acc_t)wfp - dw);
+            if (!init_only) {
+                buffer[R.m_off + p]   = (int32_t)mn;
+                buffer[R.v_off + p]   = (int32_t)vn;
+                buffer[R.wfp_off + p] = (int32_t)(int16_t)wn;
+                buffer[R.g_off + p]   = 0;
+            }
+            buffer[R.dst_off + p] = (int32_t)(int16_t)wn;
         }
     }
 #else
@@ -2064,11 +2110,14 @@ ZGR: for (int base = 0; base < n; base += S1_OPT_LANE) {
 // =============================================================================
 static int do_opt(int32_t *buffer, int a1, int freeze_codes) {
 #pragma HLS INLINE off
-    // AREA FIX — ONE shared dyadic-Adam-element datapath time-multiplexed across all 14 regions (and the
-    // mode-3 do_train_run call shares it too via the top-level ALLOCATION). Without limit=1 HLS would build
-    // a separate per-region RMW engine (14x the priority-encoder trees). The region loop itself is NOT
-    // unrolled, so the 14 regions stream sequentially through the single S1_OPT_LANE-wide element datapath.
-#pragma HLS ALLOCATION function instances=dyadic_adam_region limit=1
+    // do_opt OWNS its writes: dyadic_adam_region is now a FUSED wide read+write (it commits in-body, the
+    // morph signsgd_region_wide pattern), so the prior nested `#pragma HLS ALLOCATION instances=
+    // dyadic_adam_region limit=1` is REMOVED. That nested limit=1 forced a single shared sub-instance whose
+    // round-trip stores the RTL scheduler could not prove live (the mode-2 silicon no-op). The region loop
+    // below is NOT unrolled and S1_OPT_LANE is 1 (the fused per-lane datapath is bounded — 16 lanes over a
+    // single 512-bit word, not the GEMM's wide unroll), so HLS still builds ONE bounded datapath time-shared
+    // across the 14 regions WITHOUT the nested share that broke the writeback. zero_grad_region keeps its
+    // limit=1 (frozen-code grad-zero; a separate, already-committing tile store).
 #pragma HLS ALLOCATION function instances=zero_grad_region   limit=1
     bool init_only = (a1 == S1_OPT_INIT);
     bool freeze = (freeze_codes == S1_OPT_FREEZE_CODES) && !init_only;
