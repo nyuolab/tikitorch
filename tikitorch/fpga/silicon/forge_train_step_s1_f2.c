@@ -218,6 +218,11 @@ static void stage_opt_buffer_memorize(int32_t *buf, unsigned seed) {
         buf[S1_OFF_WFP_EMBED  + i] = (rand() % emag) - eoff;
         buf[S1_OFF_WFP_W_HEAD + i] = (rand() % emag) - eoff;
     }
+    // KERNEL-READ DIAGNOSTIC: also populate the LIVE EMBED value region host-side (= the int16 master), the copy
+    // do_opt(INIT) is supposed to make but leaves zero on silicon. With this staged, a forward-only kick (no
+    // do_opt) tests whether the KERNEL can READ DDR at all (peak|R| after fwd). The dense weight live codes stay
+    // zero (= identity residual passthrough), so R should propagate EMBED to the final R if the kernel reads it.
+    for (int i = 0; i < S1_V * S1_D; i++) buf[S1_OFF_EMBED + i] = (int32_t)(int16_t)(buf[S1_OFF_WFP_EMBED + i] & 0xFFFF);
     // m, v, grads: ZERO (fresh optimizer state) — already cleared.
     // host-staged exp2 LUTs (CE + attn share the Q16 exp2 ROM).
     for (int i = 0; i < S1_LUT_N; i++) { buf[S1_OFF_CE_LUT + i] = CE_EXP2_Q16[i];
@@ -451,6 +456,15 @@ int main(int argc, char **argv) {
     // 3. warm kick: mode 0 (forward only) so we can read an INITIAL loss BEFORE any training. Mode 3
     //    re-quantizes codes from W_fp at entry, but a standalone mode-0 needs valid codes first, so run a
     //    mode-2 INIT (re-quantize, no weight move) then mode-0. Timeout small (single fwd ~18 ms).
+    // KERNEL-READ DIAGNOSTIC (before any do_opt): forward-only with the host-populated live EMBED. If the kernel
+    // can read DDR, the embed gather -> R = EMBED propagates (zero dense codes = identity residual) and peak|R|>0;
+    // if peak|R|==0 the kernel m_axi READ path (GMEM_CDC/crossbar SI0) returns zero on silicon (=> CL rebuild).
+    if (kick(MODE_FWD, 0, 0, 10.0)) return 7;
+    readback(s1_off_R(S1_N_LAYERS), hbuf + s1_off_R(S1_N_LAYERS), (long)S1_L_SEQ * S1_D);
+    { long pk = 0; for (long i = 0; i < (long)S1_L_SEQ * S1_D; i++) { long a = hbuf[s1_off_R(S1_N_LAYERS) + i]; if (a < 0) a = -a; if (a > pk) pk = a; }
+      printf("[s1] DIAG kernel-read (host-staged live EMBED, NO do_opt): peak|R|=%ld -> %s\n", pk,
+             pk > 0 ? "KERNEL READS DDR (do_opt INIT is the bug)" : "KERNEL READ PATH ZERO (GMEM_CDC/SI0) -> CL rebuild"); }
+
     if (kick(MODE_OPT, S1_OPT_INIT, a2, 10.0)) return 7;   // re-quantize codes/values from staged W_fp
     // POST-INIT PROBE: did do_opt(INIT) copy the W_fp masters into the LIVE regions the forward reads?
     // (S1_OFF_EMBED/W_HEAD = int16 values copied from WFP_*; S1_OFF_LN1_G = a dyadic code re-quantized.)
