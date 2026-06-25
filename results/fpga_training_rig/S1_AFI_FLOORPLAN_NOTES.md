@@ -56,3 +56,25 @@ if the path is unchanged again, the s1_axi_cdc hypothesis is confirmed and the f
 Recommended order if v11 misses: (4) trivial-mux or (2) pblock-the-CDC-out — both directly target
 the identified cause without touching the proven kernel. Use a workflow to author+adversarially-vet
 whichever, with the geometry above.
+
+## UPDATE — the constraint-file NAMING BUG (verified, load-bearing)
+The F2 HDK P&R flow reads ONLY `${SHELL_MODE}_cl_pnr_user.xdc` = **small_shell_cl_pnr_user.xdc**
+from the CL constraints dir (CONFIRMED aws_build.full.log line 7265-7267). It does NOT read
+`cl_timing_user.xdc` or `cl_synth_user.xdc`. ⇒ the v9/v10 `set_clock_groups` async lived in
+`cl_timing_user.xdc` and was a **silent no-op the entire time** — which is exactly why v9 ≡ v10
+byte-identical (the WARNING [Timing 38-164] inter-clock note was never addressed). ALL CL user
+constraints (pblock + clock groups) now go in small_shell_cl_pnr_user.xdc (committed c4cc5c0).
+
+## UPDATE — v11 (LANE=4, no floorplan) RESULT = the control: floorplan IS the fix
+v11 post-route VIOLATED **WNS -0.543** (slightly WORSE than v10's -0.409 — placement variance).
+Worst path is now the crossbar's OWN wready mux `WRAPPER/CL/XBAR_DDR/...gen_wmux.wmux_aw_fifo/
+m_valid_i_reg` (SLICE_X181Y497, SLR1) **spreading SLR1→SLR2→SLR1** (89% route). ⇒ DECISIVE:
+halving the kernel does NOTHING — the failing path is intrinsically the **crossbar logic crossing
+SLR boundaries** (it spills from the SLR1 X5 strip up into SLR2's X5 column). Pure floorplan.
+
+KEY for v13 if v12 (Candidate A soft, kernel+GMEM_CDC→compute incl SLR2) misses: v12 fills SLR2
+with the kernel which should DISPLACE the crossbar out of SLR2 (indirect). If the SOFT pblock
+under-displaces, v13 = ADD an explicit XBAR_DDR confinement to SLR1 only (CLOCKREGION set within
+pblock_CL SLR1 = X0Y4:X3Y7 + X5Y4:X5Y7) so the crossbar physically cannot spread to SLR2 —
+combined with the kernel pinned to SLR2 + SLR0-compute (NOT SLR1, to avoid re-crowding SLR1 with
+the crossbar). Author+vet via workflow with v12's worst-path in hand.
