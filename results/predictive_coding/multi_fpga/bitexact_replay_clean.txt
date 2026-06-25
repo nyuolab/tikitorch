@@ -1,0 +1,20 @@
+##### L=4 #####
+order: len=60000 unique=60000 valid_permutation=True
+PYTHON 4-epoch (7500 steps), L=4: python acc=0.7103
+  chip 0: W max|diff|=0  OK
+  chip 1: W max|diff|=0  OK
+  chip 2: W max|diff|=0  OK
+  chip 3: W max|diff|=0  OK
+  -> BIT-EXACT: the distributed FPGA training == the reference for every chip over all steps.
+##### L=8 #####
+order: len=60000 unique=60000 valid_permutation=True
+PYTHON 4-epoch (7500 steps), L=8: python acc=0.6631
+  chip 0: W max|diff|=0  OK
+  chip 1: W max|diff|=0  OK
+  chip 2: W max|diff|=0  OK
+  chip 3: W max|diff|=0  OK
+  chip 4: W max|diff|=0  OK
+  chip 5: W max|diff|=0  OK
+  chip 6: W max|diff|=0  OK
+  chip 7: W max|diff|=0  OK
+  -> BIT-EXACT: the distributed FPGA training == the reference for every chip over all steps.

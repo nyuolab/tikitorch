@@ -51,44 +51,65 @@ residual deep-MLP driver. The **same instance sweeps 2 → 4 → 8 chips** for a
 holds one layer's weights+momentum in its own DDR; only a neighbour activation (down) + error (up) cross; the
 host adds the residual skip. Run `pcshard-20260624T230512Z`.
 
-<!-- SILICON: filled from train_L{2,4,8}.txt when the F2 run lands -->
-| chips | peak test acc | steps/s | comms bytes/step | comms % of wall | Gate-C (W, ∇ crossed) |
-|------:|--------------:|--------:|-----------------:|----------------:|:---------------------:|
-| 2     | _pending_     | _pend_  | _pend_           | _pend_          | 0, 0                  |
-| 4     | _pending_     | _pend_  | _pend_           | _pend_          | 0, 0                  |
-| 8     | _pending_     | _pend_  | _pend_           | _pend_          | 0, 0                  |
+| chips | peak test acc | acc trajectory (4 ep) | steps/s | comms bytes/step | comms % wall | per-chip fwd-kick | Gate-C (W, ∇) |
+|------:|--------------:|-----------------------|--------:|-----------------:|-------------:|-------------------|:-------------:|
+| 2     | **0.729**     | .658 .639 .707 .729   | 25.8    | 65,536           | 57.4 %       | hidden 8.92ms / out 0.77ms | 0, 0 |
+| 4     | **0.730**     | .513 .716 .730 .716   | 9.1     | 196,608          | 60.3 %       | 3×hidden 8.92ms / out 0.77ms | 0, 0 |
+| 8     | **0.728**     | .606 .707 .728 .660   | 4.0     | 458,752          | 61.0 %       | 7×hidden 8.92ms / out 0.77ms | 0, 0 |
 
-**MEASURED:** model-parallel training across 8 physical FPGAs; per-chip kick times; comms bytes/step grows
-~linearly with chip count (each added layer = one more neighbour message each way); Gate-C — **no weight and no
-gradient ever crosses a chip** (static guarantee + live `xchip_msg` counter); bit-exactness — the Python
-reference replayed from the silicon's exact init+order reproduces every chip's final weights
-(`pc_shard_perm_replay_L.py`). **Honest:** ~0.65–0.73 accuracy (depth-flat); slower wall-clock than one chip
-(host PCIe relay). The result is the *distributed mechanism at 8-way scale*, measured.
+**MEASURED (run `pcshard-20260624T230512Z`):** model-parallel training across **8 physical FPGAs**. The per-chip
+kick times make the split visible on silicon — every hidden chip does a full 256×256 dyadic matmul (8.92 ms),
+the output chip does the small 256×10 readout (0.77 ms). Comms grows exactly linearly: 2(L−1) neighbour
+messages/step (2→6→14 for L=2→4→8). **Gate-C: no weight and no gradient ever crosses a chip** (static guarantee
++ live `xchip_msg` counter). Energy: per-slot Vccint ~4 W, dynamic at/below the sensor floor (a DSP_MULT=0
+core; honest — shell-dominated, not a power record). **Accuracy is depth-flat (~0.73)** — this task doesn't need
+depth; the structural achievement (8-way model-parallel, no global gradient) is the result, and the *depth
+headroom* the residual unlocked is what the transformer exploits. Throughput honestly drops 25.8→4.0 steps/s
+(host word-at-a-time PCIe relay; a chip-to-chip link or DMA-burst readback would collapse the 61 % comms).
+
+**Bit-exactness (`pc_shard_perm_replay_L.py`).** Replaying the single-process reference from the silicon's exact
+init+order: **L=2 fully bit-exact** (both chips `max|diff|=0` over 7500 steps). For L=4/L=8, **every chip is
+bit-exact except slot-1's *dumped file*** — root-caused (by the adversarial audit) to a **host dump bug**: a
+back-compat alias overwrote `shardW1.i32` with the *output* layer `W[L-1]` for L≥4, so the replay compared
+chip-1's hidden weights against the output layer's. **The training itself is bit-exact** — all other chips match
+AND chip-1's *neighbours* (0 and 2) match exactly, which is only possible if chip-1's forward/backward messages
+(hence its weights, via `dyad(W)`) matched the reference at every step. The alias is fixed; a clean re-run
+(`pcshard-20260625T004340Z`) confirms all chips bit-exact directly.
 
 ---
 
-## 3. Stage 2 — a distributed PC TRANSFORMER, recipe validated, kernel forward csynth-ready
+## 3. Stage 2 — a distributed PC TRANSFORMER: kernel forward csynth-ready, recipe partially de-risked
 
 The flagship: one transformer block per chip, 8 blocks across 8 FPGAs, trained on TinyShakespeare with
-neighbour-only messages. **The recipe is CPU-validated** (`pc_xformer_dyadic_ref.py`, 8 blocks, int16 block
-boundaries):
+neighbour-only messages. A CPU de-risk (`pc_xformer_dyadic_ref.py`, 8 blocks, int16 block boundaries) probes
+**ONE axis** of the fabric recipe — pow2 (dyadic) quantization of the projection/FFN/head **weights**, with a
+straight-through gradient — inside an otherwise fully-float, AdamW, dot-product-attention PyTorch model:
 
-| 8-block distributed transformer (TinyShakespeare) | bpb (MEASURED, CPU) |
+| 8-block distributed transformer (TinyShakespeare) | final-step single-batch **train** bpb (no held-out eval) |
 |---|---|
-| float projections + warm-trained attention | **2.248** |
-| **DYADIC (mult-free) projections/FFN/head** + warm-trained attention | **2.384** (+0.136) |
+| float-weight projections + warm-trained dot-attention | 2.248 |
+| **pow2 (dyadic) projection/FFN/head WEIGHTS** + same float attention | 2.384 (+0.136) |
 
-So making the projection/FFN/head stack **multiplier-free** (the fabric's dyadic shift-add forward) costs only
-+0.136 bpb — it *preserves* training. Attention is **warm-trained** (the soft `Σ p·V` blend is the one allowed
-multiply; deploy is mult-free via L1+argmax-gather, ~2.43–2.53 bpb from earlier work). 2.384 bpb is competitive
-with the established single-card PC-on-transformer (charlm_mixer 2.481).
+**Read this narrowly.** It shows pow2-quantizing the projection/FFN/head *weights* (plus the int16 cross-chip
+boundaries) is survivable at +0.136 bpb. It does **NOT** validate the rest of the fabric recipe — the de-risk
+still uses float `nn.LayerNorm` (not the kernel's fine-dyadic integer LN), float **dot-product** attention (not
+the kernel's L1-score + exp2-LUT softmax — so it tests *nothing* about the kernel's attention math), float
+activations everywhere (not int16 + maxshift bands), a **straight-through identity backward** (not the kernel's
+integer PC-cascade `q(gO)ᵀq(x)`), and **AdamW** (not mult-free dyadic-Adam). The two bpb are single-batch
+final-step *train* losses (noisy — the float twin was 2.166 at step 1400, 2.248 at 1599), not validation bpb,
+and are **not** comparable to the established charlm_mixer 2.481 (a val bpb at d256/seq256 with the real integer
+backward). **The single hardest, least-tested component — the integer PC-cascade backward + dyadic-Adam — is
+exactly what this de-risk does not exercise, and is the primary remaining algorithmic risk** (to be checked
+against the int64 golden tb + ideally a CPU integer-backward reference before the AFI build).
 
 **Kernel:** `forge_pc_xformer_block.cpp` (+ `forge_pc_xformer_config.hpp`, D=64/H=2/FFN=256/seq=64/vocab=64) —
 role/phase/CFG distributed block reusing the proven `forge_pc_block` + S1/attn/LayerNorm/wgrad/dyadic-Adam
 patterns (copied into new files; originals untouched). The **forward path** (embed/HIN → LN1 → attention[the
-multiply] → WO+residual → LN2 → FFN → residual → OUTPUT head+CE | downstream message) is written and
-csynth-ready (`synth_pc_xformer_block.tcl`). **Remaining build (the user's csim→csynth→AFI):** the PC-cascade
-backward + dyadic-Adam update (transcribed from the validated recipe, bit-exact to an int64 golden tb).
+one multiply] → WO+residual → LN2 → FFN → residual → OUTPUT head+CE | downstream message) is written + the
+attention double-descale / int32-grad_logit / cached-`R'` bugs the audit found are fixed; it is csynth-ready
+(`synth_pc_xformer_block.tcl`). **Remaining build (the user's csim→csynth→AFI):** the PC-cascade backward +
+dyadic-Adam update — designed in detail by the audit workflow (see §6) and validated bit-exact against an int64
+golden tb. This backward is UNVALIDATED by the CPU de-risk above; the golden tb is what will validate it.
 
 ---
 
@@ -98,17 +119,22 @@ backward + dyadic-Adam update (transcribed from the validated recipe, bit-exact 
 layers L..2L-1) with exactly **one boundary message each way crossing the VPC network** (TCP); every intra-box
 message stays on PCIe. `run_pc_shard_net_f2.sh` launches head+tail in a self-allowing security group;
 `pc_shard_net_eval.py` scores the combined 2L-layer net and bit-exact-replays it. Runs on the **existing AGFI**
-— a cheap proof at 2×f2.12xlarge (4 FPGAs) or the full 2×f2.48xlarge (16 FPGAs). **Honest:** TCP < PCIe < fabric
-→ this is *slower* than one box; the value is that the no-global-coordination scheme runs across two physically
-separate accelerators with a single network link, Gate-C clean (weights/grads never cross instances).
+— a cheap proof at 2×f2.12xlarge (4 FPGAs) or the full 2×f2.48xlarge (16 FPGAs). The adversarial audit (two
+independent passes) found + fixed a **bit-exactness blocker** here before any run: the tail's boundary error
+crossing to the head omitted the boundary layer's residual skip + max-shift rescale; it now sends exactly
+`mshift(routed_L + e_in_L, EDN_BITS)`, matching `step_L(res=True)`. **Honest:** TCP < PCIe < fabric → this is
+*slower* than one box; the value is that the no-global-coordination scheme runs across two physically separate
+accelerators with a single network link, Gate-C clean (weights/grads never cross instances). Code is ready; the
+2-instance run is the user's to launch (cost-gated like the AFI builds).
 
 ---
 
 ## 5. GPU-competition framing (measured vs projected)
 
-- **MEASURED:** distributed correctness + bit-exactness at 2/4/8 chips; comms-scaling and per-chip throughput;
-  Gate-C (no global model/gradient); the mult-free transformer recipe (2.384 bpb); linear kernel replication
-  from earlier work (morph-LM N=4 = 4.00×, 53k tok/s).
+- **MEASURED:** distributed correctness + bit-exactness at 2/4/8 chips (training bit-exact to the reference);
+  comms-scaling and per-chip throughput; Gate-C (no global model/gradient); a *narrow* transformer-recipe
+  de-risk (pow2 weights + int16 boundaries survive, +0.136 bpb train-loss — NOT the full mult-free stack or the
+  integer backward); linear kernel replication from earlier work (morph-LM N=4 = 4.00×, 53k tok/s).
 - **PROJECTED (clearly not measured):** pipeline-overlap of the host relay (PC has no backward lock — modelled
   2.3–3.9× in `throughput_model`); the ~9000 idle DSP48s re-used as an add-max ALU array (the top throughput
   lever, unbuilt); a multi-F2 farm; 124M-parameter scale. Energy stays the honest caveat — a DSP_MULT=0 core's
@@ -116,7 +142,25 @@ separate accelerators with a single network link, Gate-C clean (weights/grads ne
 - **The claim:** structurally realizable + scales with chips + removes backprop's global sync + trains deep
   (residual) + trains a transformer + *projects* toward GPU-competitive throughput. **Not** "beats GPUs."
 
-## 6. Reproduce
+## 6. Build plan — the transformer kernel backward (designed by the audit workflow)
+
+The forward is csynth-ready; the **backward + dyadic-Adam** is the remaining build, designed in detail (and the
+DDR-cache audited) by the verification workflow. It mirrors the forward in reverse, reusing three validated
+patterns verbatim in arithmetic: `forge_layernorm` (LN-bwd, DSP=0), `forge_attn_bwd` (the only multiplies),
+`forge_wgrad_df3` (mult-free `gW = Σ q(gO)ᵀq(x)`), `forge_dyadic_adam` (the optimizer). Stages: **(0)** seed the
+top error — OUTPUT: head+LNF backward of the cached Q16 grad_logit; HIDDEN/INPUT: `EIN`; **(1)** FFN-bwd (route
++ relu-mask + two mult-free wgrads); **(2)** LN2-bwd; **(3)** attention-bwd — *the multiplies* `gV/gp/gs` per
+head (fed the cached `P`), `gQ/gK` an L1 `sign(Q−K)` subgradient, all WO/QKV routes+wgrads dyadic; **(4)**
+LN1-bwd; **(5)** dyadic-Adam RMW over every weight; **(6)** `EOUT = maxshift(gR, EBITS)` (INPUT scatters
+`gEmbed`). **DDR-cache check:** all activations the backward needs are already cached **except R′** — the one
+mandatory forward change (now added: `XO_RP`); Q/K/V and the LN `c_hat` are recomputed bit-identically from
+cached tensors (no extra DDR). **Optimizer:** dyadic-Adam (not SignSGD) — the project's own measurement shows
+the attention/shift path needs Adam's adaptivity (dyadic-Adam gather 0.929 > AdamW 0.850; plain SGD stalls).
+**Validation:** an int64 golden tb that ports the *integer* arithmetic (not the float de-risk), per-stage
+`max|diff|=0` with the multiply outputs (`gQ/gK/gV`) checked first, plus KAT corners (all-ones, single-token,
+causal `j>i`, zero-seed). This is the bit-exact bar the 2-FPGA and on-fabric runs met.
+
+## 7. Reproduce
 
 ```
 # Stage 1 (8-FPGA Fashion-MNIST scaling-law, existing AGFI):
