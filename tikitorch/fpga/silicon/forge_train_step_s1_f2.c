@@ -617,6 +617,23 @@ int main(int argc, char **argv) {
     long   loss0_proxy = (int32_t)hbuf[S1_OFF_LOSS];
     printf("[s1] INITIAL  CE = %.4f   acc = %d/%d   (loss-proxy[0] = %ld)\n", ce0, acc0, S1_L_SEQ, loss0_proxy);
 
+    // 3b. BACKWARD GRAD DIAGNOSTIC: mode-3 trained FLAT even after the do_opt fix -> the optimizer either gets
+    //     zero grads (do_bwd grad-writeback dropped, the same dead-store class do_opt had: do_bwd computes
+    //     g_* in static on-chip arrays then burst-stores at the end, consumer = do_opt in a different limit=1
+    //     instance) OR do_opt(STEP) no-ops. Kick mode-1 (do_bwd) on the just-run forward and probe the grad
+    //     magnitudes. max|g_*|>0 => do_bwd commits (issue is do_opt STEP); ==0 => do_bwd grad writes dropped.
+    if (kick(MODE_BWD, 0, 0, 10.0)) return 7;
+    readback(S1_OFF_GRAD_LOGIT, hbuf + S1_OFF_GRAD_LOGIT, (long)S1_L_SEQ * S1_V);
+    readback(S1_OFF_G_EMBED,    hbuf + S1_OFF_G_EMBED,    (long)S1_V * S1_D);
+    readback(S1_OFF_G_W_HEAD,   hbuf + S1_OFF_G_W_HEAD,   (long)S1_V * S1_D);
+    { long mgl=0,mge=0,mgh=0;
+      for (long i=0;i<(long)S1_L_SEQ*S1_V;i++){ long a=labs((long)(int32_t)hbuf[S1_OFF_GRAD_LOGIT+i]); if(a>mgl)mgl=a; }
+      for (long i=0;i<(long)S1_V*S1_D;i++){ long a=labs((long)(int32_t)hbuf[S1_OFF_G_EMBED+i]); if(a>mge)mge=a;
+                                            long b=labs((long)(int32_t)hbuf[S1_OFF_G_W_HEAD+i]); if(b>mgh)mgh=b; }
+      printf("[s1] DIAG backward (mode-1): max|grad_logit|=%ld  max|g_EMBED|=%ld  max|g_W_HEAD|=%ld -> %s\n",
+             mgl, mge, mgh, (mge>0||mgh>0) ? "do_bwd COMMITS grads (issue is do_opt STEP)"
+                                            : "do_bwd grad-writeback DROPPED (next dead-store)"); }
+
     // 4. THE TRAINING KICK: mode 3 (do_train_run) = ONE kick runs n_steps of fwd->bwd->opt with weights +
     //    optimizer state RESIDENT in DDR (no per-step host traffic). a2 = freeze/train-all regime.
     //    mode 3 itself does do_opt(S1_OPT_INIT) at entry, so this is self-contained from the staged W_fp.
