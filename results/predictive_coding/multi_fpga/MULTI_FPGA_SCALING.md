@@ -118,8 +118,19 @@ every region (activations, the updated weights with ~30k genuinely moved, the wh
 (LR rounded steps to zero; decay 32× too strong; LN-gammas must be frozen), a workflow's 6 HLS bugs (two
 wouldn't compile; matmul clipped to int16 before rescale; int48 overflowed the attention backward), and 3 the
 local csim exposed (`norm_shift` scanned only 47 bits so ~2^55 backward grads left `EOUT` un-rescaled; the decay
-drifted negative weights; the OUTPUT-role HIN contract). **Status: csim bit-exact (local, `run_local_csim.sh`);
-the EC2 Vitis run (`synth_pc_xformer_block.tcl`) is the authoritative csim + the free csynth gate — next step.**
+drifted negative weights; the OUTPUT-role HIN contract). **Status: csim BIT-EXACT under AUTHENTIC ap_int (local, via Xilinx's open-source headers — `run_local_csim.sh`)
+AND the free csynth GATE PASSES on real Vitis (`forge_pc_xformer_block_csynth.rpt`, xcvu47p):**
+- **timing met** — 3.192 ns estimated vs 4.0 ns target (WNS **+1.08 ns**);
+- **DSP=0 on every dyadic op** (dyad_matmul/route/wgrad, dyadic_adam, layernorm, ln_bwd all 0) — the **185** DSPs
+  are confined to the attention multiplies (soft-blend + `gp/gs/gV` backward + the 128-bit products), the one
+  allowed multiply;
+- **fits ONE SLR** — BRAM 57%, LUT 44%, DSP 6%, URAM 13% of a single SLR.
+
+So the distributed PC transformer-block trainer (fwd + PC-cascade backward + mult-free dyadic-Adam) is
+**AFI-ready** — the next step is the ~5h AFI build (the user's), then the CL package + distributed driver to run
+it 8-blocks-across-8-FPGAs on TinyShakespeare. (One real-ap_int lesson: the int64 golden had to use `__int128`
+for the attention-bwd products to match the hardware's full-width-then-truncate RType semantics — a width bug
+the shim hid and the open-source ap_int headers caught.)
 
 ---
 
