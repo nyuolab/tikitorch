@@ -105,11 +105,18 @@ against the int64 golden tb + ideally a CPU integer-backward reference before th
 **Kernel:** `forge_pc_xformer_block.cpp` (+ `forge_pc_xformer_config.hpp`, D=64/H=2/FFN=256/seq=64/vocab=64) —
 role/phase/CFG distributed block reusing the proven `forge_pc_block` + S1/attn/LayerNorm/wgrad/dyadic-Adam
 patterns (copied into new files; originals untouched). The **forward path** (embed/HIN → LN1 → attention[the
-one multiply] → WO+residual → LN2 → FFN → residual → OUTPUT head+CE | downstream message) is written + the
-attention double-descale / int32-grad_logit / cached-`R'` bugs the audit found are fixed; it is csynth-ready
-(`synth_pc_xformer_block.tcl`). **Remaining build (the user's csim→csynth→AFI):** the PC-cascade backward +
-dyadic-Adam update — designed in detail by the audit workflow (see §6) and validated bit-exact against an int64
-golden tb. This backward is UNVALIDATED by the CPU de-risk above; the golden tb is what will validate it.
+one multiply] → WO+residual → LN2 → FFN → residual → OUTPUT head+CE | downstream message) is written and the
+forward bugs the audits found are fixed.
+
+**The backward is now BUILT and algorithm-validated (§6).** A plain-int64 golden of the full block
+(fwd + PC-cascade backward + mult-free dyadic-Adam) was built and **validated locally** — it trains a tiny
+char-LM on TinyShakespeare to **5× chance** with bounded logits, proving the integer backward + optimizer are
+sound. That validation caught **three recipe bugs** invisible on paper (dyadic-Adam LR rounded every step to
+zero; weight-decay 32× too strong for int16 masters; LN-gammas must be frozen or they blow up the logits). The
+HLS kernel transcribes this golden; an int64 csim testbench checks fwd+bwd+optimizer bit-exact (max|diff|=0). A
+2nd adversarial workflow caught six more bugs in the HLS transcription (two wouldn't compile; the matmul clipped
+to int16 before rescale; int48 overflowed the attention backward) — all fixed. **Status: csim-ready; the HLS is
+unvalidated until the user runs csim (no local ap_int compiler), but the algorithm is golden-validated.**
 
 ---
 
@@ -142,10 +149,11 @@ accelerators with a single network link, Gate-C clean (weights/grads never cross
 - **The claim:** structurally realizable + scales with chips + removes backprop's global sync + trains deep
   (residual) + trains a transformer + *projects* toward GPU-competitive throughput. **Not** "beats GPUs."
 
-## 6. Build plan — the transformer kernel backward (designed by the audit workflow)
+## 6. The transformer kernel backward — designed, golden-validated, transcribed, csim-ready
 
-The forward is csynth-ready; the **backward + dyadic-Adam** is the remaining build, designed in detail (and the
-DDR-cache audited) by the verification workflow. It mirrors the forward in reverse, reusing three validated
+(Design from the audit workflow; **now implemented** — `forge_pc_xformer_golden{,_block}.hpp` is the locally
+validated int64 reference, `forge_pc_xformer_block.cpp`'s BWD phase is its HLS transcription, and
+`forge_pc_xformer_block_tb.cpp` is the bit-exact csim testbench.) It mirrors the forward in reverse, reusing three validated
 patterns verbatim in arithmetic: `forge_layernorm` (LN-bwd, DSP=0), `forge_attn_bwd` (the only multiplies),
 `forge_wgrad_df3` (mult-free `gW = Σ q(gO)ᵀq(x)`), `forge_dyadic_adam` (the optimizer). Stages: **(0)** seed the
 top error — OUTPUT: head+LNF backward of the cached Q16 grad_logit; HIDDEN/INPUT: `EIN`; **(1)** FFN-bwd (route
@@ -168,7 +176,9 @@ AGFI=agfi-0a9578c54e77ba4d9 INSTANCE_TYPE=f2.48xlarge NSLOTS=8 RESIDUAL=1 SWEEP=
   BINS_S3=s3://.../pc_fashion_bins INITPERM_S3=s3://.../pc_initperm_fashion8res \
   bash scripts/run_pc_shard_train_f2.sh launch        # then fetch; python scripts/pc_scaling_law.py <dir>
 # Stage 2 (recipe de-risk, CPU): PYTHONPATH=. XF_BLOCKS=8 python scripts/pc_xformer_dyadic_ref.py
-#         (kernel csynth gate): vitis_hls -f synth_pc_xformer_block.tcl
+#         (backward golden, locally trains): cd tikitorch/hardware/hls/forge_kernels &&
+#            g++ -O2 -I. forge_pc_xformer_golden_test.cpp -o /tmp/gtest && /tmp/gtest
+#         (kernel csim bit-exact + csynth gate): vitis_hls -f synth_pc_xformer_block.tcl
 # Stage 3 (16 FPGAs, 2 boxes): AGFI=... NSLOTS=8 INSTANCE_TYPE=f2.48xlarge INITPERM_S3=s3://.../pc_initperm_net16 \
 #         bash scripts/run_pc_shard_net_f2.sh launch   # then python scripts/pc_shard_net_eval.py
 ```
