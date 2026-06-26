@@ -583,7 +583,8 @@ static int clkgen_bringup(int slot) {
     uint32_t rstv = 0xdeadbeef; fpga_pci_peek(mbar, CLKGEN_BASE_REG + CLKGEN_SYS_RST, &rstv);
     printf("[s1] AWS_CLK_GEN: MMCM_LOCK=0x%08x (A locked) -> SYS_RST_REG cleared "
            "(raw readback 0x%08x; writable bits[9:0]=0x%03x, expect 0x000; reserved [31:10] stay set per spec); "
-           "clk_extra_a1 (125MHz) live, CL resets released\n", lock, rstv, rstv & 0x3FFu);
+           "clk_extra_a1 (kernel clock; freq=AFI build recipe, A0=62.5MHz) live, CL resets released\n",
+           lock, rstv, rstv & 0x3FFu);
     fpga_pci_detach(mbar);
     return 0;
 #endif
@@ -724,7 +725,7 @@ int main(int argc, char **argv) {
     //    THE WALL: do_opt(STEP) commits in C/RTL co-sim (weights move 4096/4096) but its m_axi STEP writes
     //    NEVER reach the board DDR (mode-3 fused AND host-driven mode-2-STEP loops are EXACTLY flat 0.0000 CE
     //    drop in FREEZE and TRAIN_ALL). PROVEN-WORKING on the real board: mode-0 forward (acc>chance, writes
-    //    logits/grad_logit), mode-1 backward (writes real g_*: max|g_W_HEAD|=507904, max|g_EMBED|=271596),
+    //    logits/grad_logit), mode-1 backward (writes real g_*: e.g. max|g_W_HEAD|=516096, max|g_EMBED|=54656),
     //    and BAR4 DMA-PCIS host staging + readback (byte-exact). So run the OPTIMIZER ON THE HOST: per step
     //    kick mode-0 (fwd) + mode-1 (bwd) on F2, read the committed grads back, do the dyadic-Adam VALUE STEP
     //    host-side (host_do_opt_step_freeze: bit-exact to the kernel #else value path / TB ref_dyadic_adam_
@@ -799,8 +800,12 @@ int main(int argc, char **argv) {
     int peak_ok       = (peakR < 32767);   // not pinned at the int16 ceiling
     printf("[s1] [gates] CE-drops>=0.5: %s   below-floor: %s   acc-improves: %s   no-saturation: %s\n",
            ce_drops ? "yes" : "NO", not_collapsed ? "yes" : "NO", acc_improves ? "yes" : "NO", peak_ok ? "yes" : "NO");
-    printf("[s1] -> ON-FABRIC TRAINER %s\n",
-           (ce_drops && not_collapsed && acc_improves && peak_ok) ? "CONVERGES (silicon == CSIM)" : "NO-CONVERGENCE (inspect)");
+    // NOTE: "TRAINER" here = fwd+bwd ON F2 + the dyadic-Adam optimizer step HOST-SIDE (the on-fabric do_opt
+    // mode-2 writes hit a cosim-passes/silicon-fails wall, so the optimizer is host-side). "matches CSIM" =
+    // the convergence trajectory matches the g++/Vitis-csim recipe; it is NOT bit-exact (silicon CE0/step-120
+    // differ from csim by ~0.03 nat). The optimizer VALUE math alone is bit-exact to the kernel #else path.
+    printf("[s1] -> S1 TRAINER (fwd+bwd on F2, host optimizer) %s\n",
+           (ce_drops && not_collapsed && acc_improves && peak_ok) ? "CONVERGES (trajectory matches CSIM)" : "NO-CONVERGENCE (inspect)");
     printf("[s1] ============================================================\n");
     // greppable one-line summary for the runner / CSIM-reproduction diff.
     printf("[S1 RESULT] regime=%s seed=%u n_steps=%d CE0=%.4f CE1=%.4f drop=%.4f floor=%.4f acc0=%d acc1=%d peakR=%ld msPerStep=%.2f ret=%u\n",
