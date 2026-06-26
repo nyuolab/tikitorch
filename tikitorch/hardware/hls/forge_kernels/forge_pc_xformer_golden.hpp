@@ -18,10 +18,12 @@
 typedef int64_t i64;
 
 // ---------- core integer ops (match the kernel's dyad / norm_shift / fdyad exactly) ----------
+static int g_mxbs = -2;   // MX block size (>0 enables per-block pow2 activation scaling; block-scaled acts flow WIDE)
 static inline i64 g_dyadval(i64 w) {           // round-to-nearest signed power of two (== kernel dyad())
     i64 a = w < 0 ? -w : w; if (a == 0) return 0;
-    if (a > 32767) a = 32767;                  // int16 master clamp (kernel data_t = ap_int<16>)
-    int m = 0; for (int b = 15; b >= 1; b--) if ((a >> b) & 1) { m = b; break; }
+    int top = (g_mxbs > 0) ? 46 : 15;           // MX: block-scaled activations are WIDE -> scan high, no int16 clamp
+    if (g_mxbs <= 0 && a > 32767) a = 32767;     // int16 clamp (kernel data_t = ap_int<16>) only in non-MX mode
+    int m = 0; for (int b = top; b >= 1; b--) if ((a >> b) & 1) { m = b; break; }
     if (m >= 1 && ((a >> (m - 1)) & 1)) m++;    // round-to-nearest bump
     i64 p = (i64)1 << m; return w < 0 ? -p : p;
 }
@@ -71,7 +73,24 @@ static inline i64 g_wapply(i64 w, i64 x) {
     return w < 0 ? -r : r;
 }
 // ---------- forward: dyadic matmul y[M*O] = sum_i dyad(W[o*I+i]/2^WFRAC) * x[t*I+i] ----------
+// MX_BS>0: MX-style per-block (block of MX_BS input dims) POWER-OF-2 scaling of a WIDE input — each block gets
+// its own shift to ~X_ABITS bits (so a small block isn't crushed by an outlier block elsewhere), accumulated
+// with the block shift re-applied. Pow2 block scale = a shift -> fully tropical (DSP_MULT=0). This is the
+// single-scale-vs-block-scale lever from modern int LLM training.
+// MX-style per-block (bs dims) pow2 rounding IN PLACE: each block rounded to ~bits-mantissa precision but kept
+// WIDE (magnitude preserved via the block shift). A small block isn't crushed by an outlier block elsewhere, and
+// the SAME stored values feed both the forward matmul and the wgrad -> forward/backward consistent. Pow2 = shift.
+static void g_block_round(i64 *a, int M, int D, int bits, int bs) {
+    if (g_mxbs < -1) { const char* e = getenv("MX_BS"); g_mxbs = e ? atoi(e) : 0; }
+    for (int t = 0; t < M; t++) for (int b0 = 0; b0 < D; b0 += bs) {
+        int b1 = (b0+bs<D)?b0+bs:D; i64 mx = 0;
+        for (int d=b0; d<b1; d++){ i64 v=a[t*D+d]<0?-a[t*D+d]:a[t*D+d]; if(v>mx)mx=v; }
+        int sh = g_normshift(mx, bits);
+        if (sh>0) for (int d=b0; d<b1; d++){ i64 v=a[t*D+d]; i64 r=(v + ((i64)1<<(sh-1))) >> sh; a[t*D+d]=r<<sh; }  // round-to-nearest, keep wide
+    }
+}
 static void g_matmul(const i64 *x, const i64 *W, i64 *y, int M, int I, int O) {
+    if (g_mxbs < -1) { const char* e = getenv("MX_BS"); g_mxbs = e ? atoi(e) : 0; }
     for (int t = 0; t < M; t++) for (int o = 0; o < O; o++) {
         i64 acc = 0; for (int i = 0; i < I; i++) acc += g_wapply(W[o * I + i], x[t * I + i]);
         y[t * O + o] = acc;

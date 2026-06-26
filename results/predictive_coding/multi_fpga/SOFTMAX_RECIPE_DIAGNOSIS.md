@@ -72,8 +72,23 @@ Two residual gaps remain, both understood:
   does not map to attention"; "the multiply does essential work"). Warm-train the attention (the one allowed
   multiply) to cross it.
 
-Ruled out as the cause (no effect on the golden): wgrad precision, activation precision, LN mantissa, weight
-decay, master quantization.
+Ruled out as the cause (no effect or REGRESS on the golden): float-vs-int optimizer (float 0.189 < int 0.205),
+wgrad full-mul-vs-dyadic (full 0.183 < dyadic 0.205), activation precision (ABITS=12 -> 0.142), LN mantissa
+(MBITS=4 -> 0.150), weight decay, master quantization, AND **MX-style per-block pow2 scaling** (the #1 int-LLM
+trick; correctly implemented with consistent fwd/bwd + grad-check d=0, but FFN down-proj 0.205 -> 0.147). The
+8000-step run plateaus/declines (0.194 -> 0.179) = a genuine ceiling, not undertraining.
+
+## Honest verdict (one chip)
+
+EVERY lever tested is ruled out, so the 0.205 ceiling of the fully-mult-free integer recipe is **diffuse
+cumulative integer execution with no single isolable fix found** — NOT the optimizer, backward, precision, or
+scaling granularity (the PC cascade + dyadic-Adam are all confirmed sound). The float-ablation of the SAME
+mult-free algorithm reaches 0.35-0.45; the integer realization caps at 0.205. We have NOT found a tropical lever
+to close that gap. So: the fully-mult-free PC transformer is a strong STRUCTURAL result (trains to 13x chance,
+distributed-ready, bit-exact-able, PC machinery validated) but is **not competitive-quality**, and closing the
+gap while staying multiplier-free is an open problem — the wide crushed activations that block-scaling would fix
+are exactly in the attention's cross-token path where per-token block-scaling is invalid. The MX path remains a
+gated, off-by-default toggle (MX_BS).
 
 ## Path to competitive (all options keep the substrate tropical)
 

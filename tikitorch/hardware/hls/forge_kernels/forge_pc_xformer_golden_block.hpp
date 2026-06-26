@@ -3,6 +3,8 @@
 #ifndef FORGE_PC_XFORMER_GOLDEN_BLOCK_HPP
 #define FORGE_PC_XFORMER_GOLDEN_BLOCK_HPP
 #include "forge_pc_xformer_golden.hpp"
+#include <map>
+#include <cmath>
 
 // All weights (int16 masters) + Adam m,v (int32) for one block + head.
 struct GW {
@@ -66,7 +68,8 @@ static i64 g_forward(GW &w, GA &a, const int *tok, const int *tgt) {
     g_layernorm(a.M, w.LN2G, w.LN2B, a.X2, a.ln2s, X_SEQ);
     g_matmul(a.X2, w.WUP, a.HD, X_SEQ, X_D, X_FFN);
     for (int i = 0; i < X_SEQ*X_FFN; i++) { int pos=a.HD[i]>0; a.RMASK[i]=pos?1:0; if(!pos)a.HD[i]=0; }
-    g_rescale(a.HD, X_SEQ*X_FFN, X_ABITS);
+    if (g_mxbs <= 0) g_rescale(a.HD, X_SEQ*X_FFN, X_ABITS);   // per-tensor crush (baseline)
+    else g_block_round(a.HD, X_SEQ, X_FFN, X_ABITS, g_mxbs);   // MX: per-block round, keep WIDE (fwd matmul + wgrad share it)
     i64 FO[X_SEQ*X_D]; g_matmul(a.HD, w.WDN, FO, X_SEQ, X_FFN, X_D); g_rescale(FO, X_SEQ*X_D, X_ABITS);
     for (int i = 0; i < X_SEQ*X_D; i++) a.RP[i] = a.M[i] + FO[i];
     g_layernorm(a.RP, w.LNFG, w.LNFB, a.XF, a.lnfs, X_SEQ);
@@ -188,8 +191,24 @@ static void g_backward(GW &w, GA &a, GG &g, const int *tok, bool zero=true) {
 // ---------------- mult-free dyadic-Adam (one matrix) ----------------
 static inline int g_dyad_exp(i64 v){ i64 a=v<0?-v:v; int m=0; for(int b=30;b>=1;b--) if((a>>b)&1){m=b;break;} if(m>=1&&((a>>(m-1))&1)&&m<30)m++; return m; }
 static int g_lrboost=-1, g_wdsh=-1, g_sround=-1; static unsigned g_srng=0x12345u;
+// ISOLATION knob: FLOAT_OPT=1 runs a FLOAT dyadic-Adam (float master, continuous step) while everything else
+// stays integer (int softmax, int cascade backward, int activations). If the golden then reaches ~0.30, the
+// INTEGER optimizer step is confirmed as the 0.20->0.30 gap. FLR = float learning rate, FWD = float weight decay.
+struct GFOpt { std::vector<double> Wf, m, v; };
+static std::map<const i64*, GFOpt> g_gfopt; static int g_float_opt=-1; static double g_flr=0.5, g_fwd=0.0156;
 static void g_adam(i64 *W, const i64 *gW, i64 *m, i64 *v, int n) {
-    if(g_lrboost<0){ const char*e=getenv("LR_BOOST"); g_lrboost=e?atoi(e):0; const char*w=getenv("WDSH"); g_wdsh=w?atoi(w):X_WD_SHIFT; const char*s=getenv("SROUND"); g_sround=s?atoi(s):0; }
+    if(g_lrboost<0){ const char*e=getenv("LR_BOOST"); g_lrboost=e?atoi(e):0; const char*w=getenv("WDSH"); g_wdsh=w?atoi(w):X_WD_SHIFT; const char*s=getenv("SROUND"); g_sround=s?atoi(s):0;
+        const char*fo=getenv("FLOAT_OPT"); g_float_opt=fo?atoi(fo):0; const char*fl=getenv("FLR"); if(fl)g_flr=atof(fl); const char*fw=getenv("FWD"); if(fw)g_fwd=atof(fw); }
+    if(g_float_opt){
+        GFOpt &s=g_gfopt[W]; if(s.Wf.empty()){ s.Wf.assign(n,0); s.m.assign(n,0); s.v.assign(n,0); for(int i=0;i<n;i++) s.Wf[i]=(double)W[i]; }
+        for(int i=0;i<n;i++){ double g=(double)gW[i];
+            s.m[i]=0.875*s.m[i]+0.125*g; s.v[i]=0.875*s.v[i]+0.125*fabs(g);
+            double scale=pow(2.0, floor(log2(fabs(s.m[i])/(s.v[i]+1e-9)+1e-12)));   // float dyadic-Adam: sign * pow2(|m|/v)
+            double sgn=s.m[i]>0?1.0:(s.m[i]<0?-1.0:0.0);
+            s.Wf[i]-= g_flr*sgn*scale; s.Wf[i]-= s.Wf[i]*g_fwd;
+            double w=s.Wf[i]; if(w>32767)w=32767; if(w<-32767)w=-32767; W[i]=(i64)llround(w); }
+        return;
+    }
     for(int i=0;i<n;i++){ i64 g=gW[i], ag=g<0?-g:g;
         m[i]=m[i]-(m[i]>>X_ADAM_BSH)+(g>>X_ADAM_BSH); v[i]=v[i]-(v[i]>>X_ADAM_BSH)+(ag>>X_ADAM_BSH);
         int se=g_dyad_exp(v[i])-g_lrboost; if(se<0)se=0; int sh=se+X_LR_SHIFT; i64 dw;
