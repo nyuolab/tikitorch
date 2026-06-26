@@ -630,7 +630,11 @@ static int do_fwd_loss(int32_t *buffer) {
     static code_t  lnfg_oc[S1_D];            // final-LN gamma codes
     static half_t  lnfb_oc[S1_D];            // final-LN beta int16
 #endif
-    static half_t  whead_oc[S1_W_WHEAD];     // [V][D] int16
+#if S1_HEAD_MODE
+    static code_t  whead_oc[S1_W_WHEAD];     // [V][D] dyadic codes (the dyadic-GEMM head, untied from embed)
+#else
+    static half_t  whead_oc[S1_W_WHEAD];     // [V][D] int16 (the legacy max-plus head)
+#endif
     static int32_t ce_lut[S1_LUT_N];         // host-staged exp2 ROMs (BRAM static-init reads zero on AFI)
     static int32_t at_lut[S1_LUT_N];
     static int32_t toks[S1_L_SEQ];
@@ -651,7 +655,11 @@ static int do_fwd_loss(int32_t *buffer) {
     burst_load_codes(buffer, S1_OFF_LNF_G,    lnfg_oc,  S1_D);
     burst_load_half (buffer, S1_OFF_LNF_B,    lnfb_oc,  S1_D);
 #endif
-    burst_load_half (buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);
+#if S1_HEAD_MODE
+    burst_load_codes(buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);   // dyadic-GEMM head: codes
+#else
+    burst_load_half (buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);   // max-plus head: int16 values
+#endif
     burst_load_i32  (buffer, S1_OFF_CE_LUT,   ce_lut,   S1_LUT_N);
     burst_load_i32  (buffer, S1_OFF_ATTN_LUT, at_lut,   S1_LUT_N);
     burst_load_i32  (buffer, S1_OFF_TOKENS,   toks,     S1_L_SEQ);
@@ -863,13 +871,28 @@ LNF_ID: for (int t = 0; t < S1_L_SEQ; t++)
     // loss_proxy (LOSS[1], kept for reference): the normalized prob mass NOT on the target (Q16).
     acc_t loss_margin = 0;
     acc_t loss_sum = 0;
+#if S1_HEAD_MODE
+    // ---- DYADIC-GEMM head (S1_HEAD_MODE=1): logits[t][v] = sum_d wdecode(WHEAD_code[v][d]) * Rn[t][d].
+    //      This is EXACTLY the backbone GEMM (fwd_gemm) with x=Rn (=hf, the LN_F output), W=WHEAD codes,
+    //      output dim V — a dyadic shift-add MAC, DSP=0. Computed for ALL positions at once into Logits_all;
+    //      the per-position loop below reads it (no max, no argmax_head save). ----
+    static data_t Logits_all[S1_L_SEQ][S1_D >= S1_V ? S1_D : S1_V];   // [L_SEQ][V] (oversized to V<=col)
+    fwd_gemm(&Rn[0][0], whead_oc, 0, &Logits_all[0][0], S1_L_SEQ, S1_D, S1_V);
+#endif
 HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
         int target = tgts[t];
         if (target < 0) target = 0; if (target >= S1_V) target = S1_V - 1;
 
-        // logits[v] = max_d (W_HEAD[v][d] + Rn[t][d]); save argmax d*.  (Rn = LN_F(R) when S1_USE_LNF.)
+        // logits[v]: max-plus head (HEAD_MODE=0) saves argmax d*; dyadic-GEMM head (HEAD_MODE=1) reads the
+        // pre-computed Logits_all (no argmax). Rn = LN_F(R) when S1_USE_LNF.
         static data_t  logits[S1_V];
         static int32_t ad_head[S1_V];
+#if S1_HEAD_MODE
+    HEAD_V: for (int v = 0; v < S1_V; v++) {
+#pragma HLS PIPELINE II=1
+            logits[v] = Logits_all[t][v];
+        }
+#else
     HEAD_V: for (int v = 0; v < S1_V; v++) {
             acc_t mx = ML_NEG_INF;
             int   idx_d = 0;
@@ -882,6 +905,7 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
             logits[v] = sat16(mx);
             ad_head[v] = idx_d;
         }
+#endif
         // pred = argmax_v logits[v]
         int pred = 0;
         {
@@ -934,12 +958,17 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
         // SATURATES once the distribution peaks (2^16/position), so it is NOT used as the convergence test.
         loss_sum += (acc_t)(psum - e_row[target]);
 
+#if !S1_HEAD_MODE
         // save head argmax route (for the backward sparse scatter) — per-position row, DDR-streamed.
+        // (HEAD_MODE=1 has no argmax: the head is a GEMM, its bwd is the dyadic input/weight-grad GEMM.)
     SAVEH: for (int v = 0; v < S1_V; v++) {
 #pragma HLS PIPELINE II=1
             argh_t[v] = ad_head[v];
         }
         burst_store_i32(argh_t, buffer, S1_OFF_ARGMAX_HEAD + t * S1_TILE_V, S1_TILE_V);
+#else
+        (void)ad_head; (void)argh_t;
+#endif
     }
 
     // ---------------------------------------------------------------------
@@ -1298,7 +1327,11 @@ static int do_bwd(int32_t *buffer) {
     static code_t  lnfg_oc[S1_D];      // final-LN gamma codes (needed for LN_F bwd)
     static half_t  lnfb_oc[S1_D];   (void)lnfb_oc;   // beta not needed in bwd (its grad is a column sum)
 #endif
-    static half_t  whead_oc[S1_W_WHEAD];
+#if S1_HEAD_MODE
+    static code_t  whead_oc[S1_W_WHEAD];   // dyadic-GEMM head: codes (needed for the head input-grad GEMM)
+#else
+    static half_t  whead_oc[S1_W_WHEAD];   (void)whead_oc;   // max-plus head bwd does not read W_HEAD (sparse scatter routes via argmax)
+#endif
     static int32_t at_lut[S1_LUT_N];
     static int32_t toks[S1_L_SEQ];
 
@@ -1317,7 +1350,11 @@ static int do_bwd(int32_t *buffer) {
     burst_load_codes(buffer, S1_OFF_LNF_G,    lnfg_oc,  S1_D);
     burst_load_half (buffer, S1_OFF_LNF_B,    lnfb_oc,  S1_D);
 #endif
-    burst_load_half (buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);
+#if S1_HEAD_MODE
+    burst_load_codes(buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);   // dyadic-GEMM head: codes
+#else
+    burst_load_half (buffer, S1_OFF_W_HEAD,   whead_oc, S1_W_WHEAD);   // max-plus head: int16 (unused in bwd)
+#endif
     burst_load_i32  (buffer, S1_OFF_ATTN_LUT, at_lut,   S1_LUT_N);
     burst_load_i32  (buffer, S1_OFF_TOKENS,   toks,     S1_L_SEQ);
 
@@ -1390,10 +1427,15 @@ ZG_F: for (int i = 0; i < S1_D; i++) { gLNFG_oc[i]=0; gLNFB_oc[i]=0; }
     static int32_t gX2_oc[S1_L_SEQ][S1_D];
 
     // ---------------------------------------------------------------------
-    // (1) LM-head backward (max-plus adjoint, SPARSE): route grad_logit[t][v] through saved argmax d*.
-    //     The head reads Rn = LN_F(R_fin) (the head INPUT), so the scatter accumulates into gRn[t][d*]:
+    // (1) LM-head backward. The head reads Rn = LN_F(R_fin) (the head INPUT); the head bwd produces gRn (grad
+    //     w.r.t. Rn). Then LN_F backward maps gRn -> gR (+ g_LNF_gamma/beta). When S1_USE_LNF=0, Rn==R_fin.
+    //
+    //   HEAD_MODE=0 (max-plus, SPARSE): route grad_logit[t][v] through the saved argmax d*:
     //       gRn[t][d*] += grad_logit[t][v]  AND  g_W_HEAD[v][d*] += grad_logit[t][v].   (morph head-scatter)
-    //     Then LN_F backward maps gRn -> gR (+ g_LNF_gamma/beta). When S1_USE_LNF=0, Rn==R so gR==gRn.
+    //   HEAD_MODE=1 (dyadic-GEMM): mirror the backbone GEMM backward EXACTLY (gO = grad_logit [L_SEQ][V]):
+    //       gRn[t][d]      = sum_v grad_logit[t][v] * wdecode(WHEAD[v][d])     (= q(W)^T @ gO, the xgrad GEMM)
+    //       g_WHEAD[v][d] += sum_t q(grad_logit[t][v]) * q(hf[t][d])           (operand-quantized wgrad GEMM)
+    //     where hf = Rn = LN_F(R_fin) (the SAME head input the forward used), recomputed here.
     // ---------------------------------------------------------------------
     static int32_t gRn[S1_L_SEQ][S1_D];
 GRN_ZERO: for (int t = 0; t < S1_L_SEQ; t++)
@@ -1402,6 +1444,43 @@ GRN_ZERO: for (int t = 0; t < S1_L_SEQ; t++)
             gRn[t][d] = 0;
             gR[t][d]  = 0;
         }
+#if S1_HEAD_MODE
+    // --- recompute hf = Rn (the head input): load R_fin, apply LN_F when S1_USE_LNF (bit-identical to fwd). ---
+    static data_t hf_m[S1_L_SEQ][S1_D];
+    static int32_t glogit_all[S1_L_SEQ][S1_V];
+HF_RECOMP: for (int t = 0; t < S1_L_SEQ; t++) {
+        burst_load_i32(buffer, s1_off_R(S1_N_LAYERS) + t * S1_TILE_RD, rrow_t, S1_TILE_RD);
+#if S1_USE_LNF
+        data_t row[S1_D], yrow[S1_D];
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            row[d] = (data_t)rrow_t[d];
+        }
+        int e_d, nq_d;
+        layernorm_tok(row, lnfg_oc, 0, lnfb_oc, 0, yrow, e_d, nq_d);   // hf = LN_F(R_fin)
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            hf_m[t][d] = yrow[d];
+        }
+#else
+        for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+            hf_m[t][d] = (data_t)rrow_t[d];        // no LN_F: head input is R_fin directly
+        }
+#endif
+        // load this position's grad-logit row into the resident [L_SEQ][V] gO operand (for the GEMM bwd).
+        burst_load_i32(buffer, S1_OFF_GRAD_LOGIT + t * S1_TILE_V, glogrow_t, S1_TILE_V);
+        for (int v = 0; v < S1_V; v++) {
+#pragma HLS PIPELINE II=1
+            glogit_all[t][v] = glogrow_t[v];
+        }
+    }
+    // gRn[t][d] = sum_v grad_logit[t][v] * q(WHEAD[v][d])  (the dyadic input-grad GEMM; gO=[L_SEQ][V], W=[V][D]).
+    xgrad_gemm(&glogit_all[0][0], whead_oc, 0, &gRn[0][0], S1_L_SEQ, S1_D, S1_V);
+    // g_WHEAD[v][d] += sum_t q(grad_logit[t][v]) * q(hf[t][d])  (the dyadic weight-grad GEMM; gW=[V][D]).
+    wgrad_gemm(&glogit_all[0][0], &hf_m[0][0], gWHEAD_oc, 0, S1_L_SEQ, S1_D, S1_V);
+    (void)arghrow_t;
+#else
 HEAD_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
         // reload position t's grad-logit + argmax-head rows from DDR (was resident glog_oc/argh_oc).
         burst_load_i32(buffer, S1_OFF_GRAD_LOGIT  + t * S1_TILE_V, glogrow_t, S1_TILE_V);
@@ -1416,6 +1495,7 @@ HEAD_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
             gRn[t][dstar] = sat32((acc_t)gRn[t][dstar] + (acc_t)g);
         }
     }
+#endif
 
 #if S1_USE_LNF
     // ---- LN_F backward: gY = gRn -> gR (residual-stream grad) + g_LNF_gamma + g_LNF_beta. The pre-LN_F

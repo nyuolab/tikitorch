@@ -19,7 +19,9 @@
 //             bit7=sign, bit5=nonzero, bits4..0=exponent). The GEMM decodes inline. ROW-MAJOR [O][I].
 //   LN1/LN2 gamma : PRE-DYADIC int8 byte-codes (forge_layernorm wdecode), one per channel.
 //   LN1/LN2 beta  : plain int16 additive, one per channel.
-//   W_HEAD  : plain int16, ROW-MAJOR [V][D]; the max-plus head adds W_HEAD[v][d]+R[d] (morph LM head).
+//   W_HEAD  : S1_HEAD_MODE=0 -> plain int16, ROW-MAJOR [V][D]; the max-plus head adds W_HEAD[v][d]+R[d].
+//             S1_HEAD_MODE=1 -> PRE-DYADIC int8 byte-codes, ROW-MAJOR [V][D]; the dyadic-GEMM head decodes
+//             inline (wdecode) and computes logits[v]=sum_d wdecode(code)*hf[d] (== the backbone GEMM).
 //   CE_LUT  : host-staged exp2 ROM (256 Q16; forge_ce_lut.hpp FT_CE_EXP2_Q16). Read at runtime (the
 //             BRAM static-init-reads-zero F2 AFI bug => MUST be host-staged).
 //   ATTN_LUT: host-staged exp2 ROM for the softmax (256 Q16; forge_attn exp2_lut). Same staging rule.
@@ -84,12 +86,43 @@
 #define S1_USE_LNF  1
 #endif
 
+// ----------------------------------------------------------------------------
+// LM-HEAD MODE (S1_HEAD_MODE) — the max-plus-head COLLAPSE fix.
+// ----------------------------------------------------------------------------
+// THE ROOT CAUSE (proven): the legacy LM head is MAX-PLUS — logits[v]=max_d(W_HEAD[v][d]+R_final[d]), an
+// argmax-over-d MORPHOLOGICAL readout. That op collapses every input row to (essentially) the unigram
+// marginal: NO optimizer (even a perfect FP-master Adam) and NO capacity (D=64/1L .. D=256/4L) beats the
+// unigram entropy (4.43 bpc) — confirmed empirically. A torch probe settled the FIX: a LINEAR (dot-product)
+// head gets 2.59 bpc and a DYADIC (mult-free, weights snapped to ±2^k) head gets 2.63 bpc — both BEAT the
+// bigram baseline (3.47) by ~0.9 bits, while the max-plus head (3.59) does not. So the fix = replace the
+// max-plus head with a MULTIPLIER-FREE DYADIC-GEMM head (the SAME shift-add GEMM the backbone uses).
+//
+//   S1_HEAD_MODE=0 (default, LEGACY) : max-plus head logits[v]=max_d(W_HEAD[v][d]+hf[d]) + argmax d* save.
+//        W_HEAD is an int16 VALUE region (is_code=0). EVERY mode/test/AFI path is BYTE-IDENTICAL to before.
+//   S1_HEAD_MODE=1 (DYADIC-GEMM)     : logits[v]=sum_d wdecode(WHEAD_code[v][d])·hf[d], a dyadic GEMM
+//        [V][D]x[D] (== fwd_gemm, output dim V; DSP=0). hf = the LN_F output (Rn). W_HEAD becomes a DYADIC
+//        CODE region (int8 codes, like Wq), UNTIED from the embedding; S1_OPT_REGIONS sets W_HEAD is_code=1
+//        so the optimizer re-quantizes it as a code automatically. No argmax_head save (the head is a GEMM,
+//        not a max). The backward mirrors the backbone GEMM bwd: grad_hf = q(W)^T@gO (xgrad, into LN_F bwd),
+//        grad_WHEAD = q(gO)^T@q(hf) (wgrad, operand-quantized). The CE is UNCHANGED.
+#ifndef S1_HEAD_MODE
+#define S1_HEAD_MODE  0
+#endif
+
 // attention softmax constants (== forge_attn)
 #define S1_AT_DELTA_SHIFT 2 // (rowmax - s) >> 2  (Delta = 4)
 #define S1_AT_P_FRAC      16 // probabilities in Q16
 
-// CE constants (== morph LM CE path)
+// CE constants (== morph LM CE path).
+// S1_CE_ZSHIFT sets the softmax TEMPERATURE: the LUT index is (logit[pred]-logit[v]) >> zshift, so a
+// LARGER zshift = flatter (hotter) distribution. Default 4 for BOTH head modes (HEAD_MODE=0 is then
+// byte-identical to before). NOTE the dyadic head's logits are SMALLER (O(10-40)) than the max-plus
+// head's (O(100)), so the softmax it sees at zshift=4 is hotter; an empirical sweep at a short horizon
+// found zshift=4 still best (a sharper zshift over-commits early), so 4 is kept. Overridable via
+// -DS1_CE_ZSHIFT for tuning per rig / horizon.
+#ifndef S1_CE_ZSHIFT
 #define S1_CE_ZSHIFT 4      // (logit[pred]-logit[v]) >> zshift  index into ce_lut
+#endif
 
 // 16-word (512-bit) alignment helper: round a count up to a multiple of 16.
 #define S1_AL16(x) ( (((x) + 15) / 16) * 16 )
@@ -112,7 +145,7 @@ static const int S1_OFF_LN2_B   = S1_OFF_LN2_G  + S1_AL16(S1_N_LAYERS * S1_D);
 // a dyadic code (forge_layernorm wdecode), beta is plain int16, exactly like LN1/LN2.
 static const int S1_OFF_LNF_G   = S1_OFF_LN2_B  + S1_AL16(S1_D);                        // [D] gamma codes
 static const int S1_OFF_LNF_B   = S1_OFF_LNF_G  + S1_AL16(S1_D);                        // [D] beta int16
-static const int S1_OFF_W_HEAD  = S1_OFF_LNF_B  + S1_AL16(S1_D);                        // [V][D] int16
+static const int S1_OFF_W_HEAD  = S1_OFF_LNF_B  + S1_AL16(S1_D);                        // [V][D] int16(HEAD_MODE0)/int8 code(HEAD_MODE1)
 static const int S1_OFF_CE_LUT  = S1_OFF_W_HEAD + S1_AL16(S1_V * S1_D);                 // [256] Q16 exp2
 static const int S1_OFF_ATTN_LUT= S1_OFF_CE_LUT + S1_AL16(S1_LUT_N);                    // [256] Q16 exp2
 static const int S1_OFF_TOKENS  = S1_OFF_ATTN_LUT + S1_AL16(S1_LUT_N);                  // [L_SEQ] token ids
@@ -422,7 +455,10 @@ static const s1_opt_region_t S1_OPT_REGIONS[S1_NUM_OPT_REGIONS] = {
     { S1_OFF_G_LN2_B,   S1_OFF_WFP_LN2_B,   S1_OFF_M_LN2_B,   S1_OFF_V_LN2_B,   S1_OFF_LN2_B,   S1_N_LAYERS * S1_D,          0 }, // LN2 b  value
     { S1_OFF_G_LNF_G,   S1_OFF_WFP_LNF_G,   S1_OFF_M_LNF_G,   S1_OFF_V_LNF_G,   S1_OFF_LNF_G,   S1_D,                        1 }, // LN_F g code
     { S1_OFF_G_LNF_B,   S1_OFF_WFP_LNF_B,   S1_OFF_M_LNF_B,   S1_OFF_V_LNF_B,   S1_OFF_LNF_B,   S1_D,                        0 }, // LN_F b value
-    { S1_OFF_G_W_HEAD,  S1_OFF_WFP_W_HEAD,  S1_OFF_M_W_HEAD,  S1_OFF_V_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 0 }, // W_HEAD value
+    // W_HEAD: VALUE (is_code=0) under the legacy max-plus head (S1_HEAD_MODE=0); a DYADIC CODE (is_code=1)
+    // under the dyadic-GEMM head (S1_HEAD_MODE=1) — flipping is_code makes the optimizer re-quantize it as a
+    // code (the master is held at scale 2^Q_CODE, deploy = s1_encode_fine(dyad(W_fp))), exactly like Wq.
+    { S1_OFF_G_W_HEAD,  S1_OFF_WFP_W_HEAD,  S1_OFF_M_W_HEAD,  S1_OFF_V_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 S1_HEAD_MODE }, // W_HEAD value(0)/code(1)
 };
 
 #endif  // FORGE_S1_CONFIG_HPP

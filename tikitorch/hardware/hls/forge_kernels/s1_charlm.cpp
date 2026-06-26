@@ -59,10 +59,41 @@
 
 extern "C" int forge_train_step_s1(int32_t*, int, int, int, int);
 
-// CE_TEMP: the SAME fixed monotone output scale the gate uses on the int logits. The logits are O(1e3-1e4);
-// CE_TEMP is part of the model's output distribution scaling, so the held-out softmax (hence the bits/char)
-// is computed over softmax(CE_TEMP*logit). Reported as-is; noted in the summary.
+// CE_TEMP: a fixed monotone output scale used by the LEGACY held-out softmax (kept for the max-plus head's
+// O(1e3-1e4) logits). NOTE: this is NOT the temperature the model is actually trained under — the kernel's
+// internal CE is an exp2-LUT softmax at temp ln2/2^ZSHIFT. For an HONEST bits/char we instead reconstruct the
+// kernel's OWN distribution (kernel_ce_bpc below); CE_TEMP is only used by the legacy softmax fallback.
 static const double CE_TEMP = 0.01;
+
+// ---------------------------------------------------------------------------------------------------------
+// kernel_ce_bpc — the HELD-OUT bits/char under the model's ACTUAL output distribution: reproduce the kernel's
+// balanced-LUT cross-entropy EXACTLY (forge_train_step_s1 do_fwd_loss CE_E/CE_SH/CE_P), so the reported bpc
+// is the TRUE held-out CE the model is trained against (temperature-free; works for BOTH head modes, whose
+// logits live at very different scales). Returns -log2(p_model[tgt]); sets *am to argmax_v logits[v].
+//   pred  = argmax_v logits[v]
+//   e[v]  = ce_lut[ clamp((logits[pred]-logits[v]) >> S1_CE_ZSHIFT, 0, 255) ]
+//   sh    = smallest shift with (sum e) >> sh <= 65536 ; p[v] = e[v] >> sh ; psum = sum p
+//   p_model[tgt] = p[tgt] / psum   (== the exp2-LUT softmax probability the CE grad is the adjoint of)
+// ---------------------------------------------------------------------------------------------------------
+static double kernel_ce_bpc(const int32_t* logits_row /*[V]*/, int tgt, const int32_t* ce_lut, int* am) {
+    int pred = 0; long mx = -(1L << 60);
+    for (int v = 0; v < S1_V; v++) { long l = logits_row[v]; if (l > mx) { mx = l; pred = v; } }
+    if (am) *am = pred;
+    long e[S1_V]; long S = 0;
+    for (int v = 0; v < S1_V; v++) {
+        long zneg = (long)logits_row[pred] - (long)logits_row[v];   // >= 0
+        long idx = zneg >> S1_CE_ZSHIFT;
+        if (idx > 255) idx = 255; if (idx < 0) idx = 0;
+        e[v] = ce_lut[idx]; S += e[v];
+    }
+    int sh = 0; for (int b = 0; b < 8; b++) { if ((S >> sh) > 65536) sh++; }
+    long psum = 0, ptgt = 0;
+    for (int v = 0; v < S1_V; v++) { long pq = e[v] >> sh; psum += pq; if (v == tgt) ptgt = pq; }
+    if (psum <= 0) return log2((double)S1_V);          // degenerate guard
+    double p = (double)ptgt / (double)psum;
+    if (p < 1e-12) p = 1e-12;                          // the LUT floors at exp2(-16) -> finite bpc, no inf
+    return -log2(p);
+}
 
 // ---------------------------------------------------------------------------------------------------------
 // DATA: tinyshakespeare lowercased -> sorted-unique-char vocab (V_actual<=39, fits V=64), 90/10 train/val.
@@ -157,7 +188,14 @@ static void stage_train_all(int32_t *buf, unsigned seed, int densepct, int embma
     for (int d = 0; d < S1_D; d++) { buf[S1_OFF_WFP_LNF_G + d] = (int32_t)QC; buf[S1_OFF_WFP_LNF_B + d] = 0; }
     for (int i = 0; i < S1_V * S1_D; i++) {
         buf[S1_OFF_WFP_EMBED  + i] = (rand() % (2 * embmag + 1)) - embmag;
-        buf[S1_OFF_WFP_W_HEAD + i] = (rand() % (2 * embmag + 1)) - embmag;
+#if S1_HEAD_MODE
+        // dyadic-GEMM head: W_HEAD is a CODE region (master at scale 2^Q_CODE). Init a sparse dyadic head
+        // (~densepct nonzero, ±2^0 = ±1 weight value = ±QC master), exactly like the backbone code masters.
+        { int nz = (rand() % 100) < densepct; int sg = (rand() & 1) ? -1 : 1;
+          buf[S1_OFF_WFP_W_HEAD + i] = (int32_t)(nz ? (long)sg * QC : 0); }
+#else
+        buf[S1_OFF_WFP_W_HEAD + i] = (rand() % (2 * embmag + 1)) - embmag;   // max-plus head: int16 value
+#endif
     }
     for (int i = 0; i < S1_LUT_N; i++) { buf[S1_OFF_CE_LUT + i] = FT_CE_EXP2_Q16[i];
                                          buf[S1_OFF_ATTN_LUT + i] = FT_CE_EXP2_Q16[i]; }
@@ -173,7 +211,15 @@ static void stage_freeze(int32_t *buf, unsigned seed, int embmag) {
     for (int d = 0; d < S1_D; d++) buf[S1_OFF_WFP_LNF_G + d] = (int32_t)QC;
     for (int i = 0; i < S1_V * S1_D; i++) {
         buf[S1_OFF_WFP_EMBED  + i] = (rand() % (2 * embmag + 1)) - embmag;
+#if S1_HEAD_MODE
+        // NOTE: under HEAD_MODE=1 W_HEAD is a CODE region, so FREEZE regime FREEZES the head (it will NOT
+        // train). Use TRAIN_ALL (regime 0) to actually train the dyadic head. We still stage a valid sparse
+        // dyadic head master (scale 2^Q_CODE) so the frozen init is a real, non-degenerate head.
+        { int nz = (rand() % 100) < 30; int sg = (rand() & 1) ? -1 : 1;
+          buf[S1_OFF_WFP_W_HEAD + i] = (int32_t)(nz ? (long)sg * QC : 0); }
+#else
         buf[S1_OFF_WFP_W_HEAD + i] = (rand() % (2 * embmag + 1)) - embmag;
+#endif
     }
     for (int i = 0; i < S1_LUT_N; i++) { buf[S1_OFF_CE_LUT + i] = FT_CE_EXP2_Q16[i];
                                          buf[S1_OFF_ATTN_LUT + i] = FT_CE_EXP2_Q16[i]; }
@@ -223,19 +269,12 @@ static double eval_val_bpc(int32_t *buf, int n_windows, double& out_acc) {
         if (s > max_start) s = max_start;
         stage_window(buf, ids, s);
         forge_train_step_s1(buf, 0, 0, 0, 0);   // forward only
+        const int32_t* ce_lut = buf + S1_OFF_CE_LUT;
         for (int t = 0; t < S1_L_SEQ; t++) {
             int tgt = buf[S1_OFF_TARGETS + t]; if (tgt < 0) tgt = 0; if (tgt >= S1_V) tgt = S1_V - 1;
-            double mx = -1e300; int am = 0;
-            for (int v = 0; v < S1_V; v++) {
-                double lv = (int32_t)buf[S1_OFF_LOGITS + t * S1_V + v];
-                if (lv > mx) { mx = lv; am = v; }
-            }
-            double Z = 0.0;
-            for (int v = 0; v < S1_V; v++)
-                Z += exp(((double)(int32_t)buf[S1_OFF_LOGITS + t * S1_V + v] - mx) * CE_TEMP);
-            double lt = ((double)(int32_t)buf[S1_OFF_LOGITS + t * S1_V + tgt] - mx) * CE_TEMP;
-            double logp_nats = lt - log(Z);            // ln p[tgt]
-            double bpc_t = -logp_nats / log(2.0);      // -log2 p[tgt]
+            // TRUE held-out CE under the model's OWN exp2-LUT distribution (the loss it is trained against).
+            int am = 0;
+            double bpc_t = kernel_ce_bpc(buf + S1_OFF_LOGITS + t * S1_V, tgt, ce_lut, &am);
             bits_sum += bpc_t; pos++;
             if (am == tgt) correct++;
         }
@@ -315,8 +354,20 @@ static void build_host_regions() {
     }
     HR_N = S1_NUM_OPT_REGIONS;
 }
-// is this region FROZEN under the given regime? (FREEZE_CODES freezes the is_code dense backbone.)
+// host-only m2 regime: train embed + LM-head (+ LN beta), FREEZE the dense backbone codes — even when the
+// LM head is itself a code (S1_HEAD_MODE=1). This isolates the HEAD's contribution (the torch-probe regime:
+// a bigram-class backbone + a trainable dyadic head), avoiding the dense-backbone TRAIN_ALL instability.
+#define CHARLM_FREEZE_BACKBONE 2
+// regime 3: TRAIN everything (head+embed+backbone) but START from the IDENTITY backbone (stage_freeze) so the
+// model begins at the bigram-class optimum and the attention/FFN LEARN to ADD context on top — instead of
+// starting from a destructive RANDOM dense backbone (TRAIN_ALL regime 0, which buries the embed signal).
+#define CHARLM_TRAIN_FROM_IDENTITY 3
+
+// is this region FROZEN under the given regime? (FREEZE_CODES freezes ALL is_code; FREEZE_BACKBONE freezes
+// is_code EXCEPT the LM head W_HEAD, which always trains.)
 static inline bool region_frozen(const host_region_t& R, int regime) {
+    bool is_head = (R.dst_off == S1_OFF_W_HEAD);
+    if (regime == CHARLM_FREEZE_BACKBONE) return (R.is_code != 0) && !is_head;
     return (regime == S1_OPT_FREEZE_CODES) && (R.is_code != 0);
 }
 
@@ -353,6 +404,7 @@ int main(int argc, char** argv) {
     // never moves (verified: lr=2e-3 is FLAT, lr~1-2 trains). Tune via --lr. (For OPT_KERNEL_PM1/m1 lr is
     // unused — the kernel's dyadic-Adam pow2 step is governed by S1_LR_SHIFT in the config, not this flag.)
     double lr      = 1.0;
+    double wd      = 0.0;     // AdamW decoupled weight decay on the m2 masters (TRAIN_ALL stabilizer; --wd)
     int eval_every = 500;
     unsigned seed  = 4242u;
     // legacy positional: <N> <regime> <eval_every> <seed>  (only if argv[1] is not a --flag)
@@ -376,6 +428,7 @@ int main(int argc, char** argv) {
             else if (a == "--N")          N          = atoi(nx("2000"));
             else if (a == "--K")          K          = atoi(nx("16"));
             else if (a == "--lr")         lr         = atof(nx("0.002"));
+            else if (a == "--wd")         wd         = atof(nx("0.0"));
             else if (a == "--eval_every") eval_every = atoi(nx("500"));
             else if (a == "--seed")       seed       = (unsigned)atoi(nx("4242"));
             else { fprintf(stderr, "[charlm] unknown flag %s\n", a.c_str()); return 1; }
@@ -389,7 +442,10 @@ int main(int argc, char** argv) {
 
     const int N_VAL_WINDOWS = 64;
     const int dense = 30, embmag = 16;                              // TRAIN_ALL densepct/embmag (gate defaults)
-    const char* rn = (regime == S1_OPT_TRAIN_ALL) ? "TRAIN_ALL" : "FREEZE";
+    const char* rn = (regime == S1_OPT_TRAIN_ALL)          ? "TRAIN_ALL(random backbone)"
+                   : (regime == CHARLM_FREEZE_BACKBONE)     ? "FREEZE_BACKBONE(head+embed train)"
+                   : (regime == CHARLM_TRAIN_FROM_IDENTITY) ? "TRAIN_FROM_IDENTITY(all train, identity init)"
+                                                            : "FREEZE";
 
     load_data("/Users/ekoermann/Documents/tikitorch/data/tinyshakespeare.txt");
 
@@ -398,15 +454,22 @@ int main(int argc, char** argv) {
     printf("[charlm] BASELINES (train split): unigram=%.4f bits/char  bigram(cond)=%.4f bits/char\n",
            uni_bpc, bi_bpc);
     printf("[charlm]   -> beat unigram = learned something; beat bigram = uses context.\n");
-    printf("[charlm] note: held-out bpc uses softmax(CE_TEMP*logit), CE_TEMP=%.3f (the model's output scale).\n",
-           CE_TEMP);
+    printf("[charlm] note: held-out bpc = TRUE held-out CE under the model's OWN exp2-LUT distribution (the\n");
+    printf("[charlm]       kernel CE the model is trained against; ZSHIFT=%d), reconstructed in kernel_ce_bpc.\n",
+           S1_CE_ZSHIFT);
 
     build_host_regions();
 
     int32_t *buf = (int32_t*)calloc(S1_BUFLEN, sizeof(int32_t));
+    // FREEZE_BACKBONE (host-only m2 regime 2) freezes the backbone and trains the head+embed. Use the
+    // IDENTITY backbone (stage_freeze: projection codes = 0, LN gamma = 1) so the head reads a CLEAN
+    // hf ~ LN_F(embed) signal (a trained-embed + trained-dyadic-head = bigram-class model) — the cleanest
+    // isolation of the HEAD fix, free of dense-backbone noise. TRAIN_ALL (0) stages a dense trainable backbone.
     if (regime == S1_OPT_TRAIN_ALL) stage_train_all(buf, seed, dense, embmag);
-    else                            stage_freeze(buf, seed, embmag);
-    forge_train_step_s1(buf, 2, S1_OPT_INIT, regime, 0);   // populate live codes/values from staged masters (ONCE)
+    else                            stage_freeze(buf, seed, embmag);   // regimes 1/2/3 -> identity backbone init
+    // init re-quantizes EVERY code/value from the staged master (kernel ignores freeze on init); pass a valid
+    // kernel a2 (TRAIN_ALL) so the host-only regime 2 never reaches the kernel.
+    forge_train_step_s1(buf, 2, S1_OPT_INIT, S1_OPT_TRAIN_ALL, 0);   // populate live codes/values (ONCE)
 
     printf("[charlm] D=%d L_SEQ=%d V=%d H=%d DH=%d FFN=%d  regime=%s  opt=%s K=%d lr=%.2e  N=%d eval_every=%d seed=%u\n",
            S1_D, S1_L_SEQ, S1_V, S1_H, S1_DH, S1_FFN, rn, optn, K, lr, N, eval_every, seed);
@@ -521,6 +584,7 @@ int main(int argc, char** argv) {
                     double mh = Mm[r][i] / bc1;
                     double vh = Mv[r][i] / bc2;
                     M[r][i] -= lr * mh / (sqrt(vh) + EPS);
+                    if (wd > 0.0) M[r][i] -= lr * wd * M[r][i];   // AdamW decoupled weight decay (TRAIN_ALL stabilizer)
                 }
             }
             if (total_windows / eval_every != (total_windows - K) / eval_every || step == n_steps) {

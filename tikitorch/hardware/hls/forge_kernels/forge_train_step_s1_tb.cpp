@@ -569,6 +569,17 @@ static long cmp_buf(const int32_t *buf, int off, const long *ref, int n) {
 // ============================================================================
 
 int main() {
+#if S1_HEAD_MODE
+    // This testbench's golden + staging are written for the LEGACY MAX-PLUS LM head (S1_HEAD_MODE=0): it
+    // stages W_HEAD as int16 VALUES and compares against a max-plus + argmax-scatter golden. Under
+    // S1_HEAD_MODE=1 the kernel uses the DYADIC-GEMM head (W_HEAD is a dyadic CODE region), which is a
+    // DIFFERENT, correct computation — so a max-plus golden would (correctly) "mismatch". The HEAD_MODE=1
+    // validators are SEPARATE: s1_head_gradcheck.cpp (finite-difference head bwd gate) + s1_charlm.cpp (the
+    // real held-out bpc). Do NOT run this max-plus golden against the dyadic-GEMM kernel.
+    printf("[s1_tb] S1_HEAD_MODE=1 (dyadic-GEMM head): this max-plus-head golden is HEAD_MODE=0-only.\n");
+    printf("[s1_tb] Use s1_head_gradcheck (head bwd gate) + s1_charlm (bpc) to validate HEAD_MODE=1. SKIP.\n");
+    return 0;
+#endif
 #ifdef S1_COSIM_MIN
     // ========================================================================
     // MINIMAL MODE-2 INIT COSIM REPRO — the CHEAP RTL-no-op catcher (cosim only).
