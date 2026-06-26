@@ -616,6 +616,9 @@ static int do_fwd_loss(int32_t *buffer) {
     //     Byte-codes in int8, int16 tables in int16, LUTs/tokens in int32.
     // ---------------------------------------------------------------------
     static half_t  embed_oc[S1_W_EMBED];     // [V*D] int16 embed table
+#if S1_POS_EMBED
+    static half_t  pos_oc[S1_POS_N];         // [L_SEQ*D] int16 positional embed (added at the gather)
+#endif
     static code_t  wq_oc[S1_W_PROJ];         // [N_L][D][D] dyadic codes
     static code_t  wk_oc[S1_W_PROJ];
     static code_t  wv_oc[S1_W_PROJ];
@@ -641,6 +644,9 @@ static int do_fwd_loss(int32_t *buffer) {
     static int32_t tgts[S1_L_SEQ];
 
     burst_load_half (buffer, S1_OFF_EMBED,    embed_oc, S1_W_EMBED);
+#if S1_POS_EMBED
+    burst_load_half (buffer, S1_OFF_POS,      pos_oc,   S1_POS_N);
+#endif
     burst_load_codes(buffer, S1_OFF_WQ,       wq_oc,    S1_W_PROJ);
     burst_load_codes(buffer, S1_OFF_WK,       wk_oc,    S1_W_PROJ);
     burst_load_codes(buffer, S1_OFF_WV,       wv_oc,    S1_W_PROJ);
@@ -697,7 +703,9 @@ static int do_fwd_loss(int32_t *buffer) {
     static int32_t logit_t[S1_TILE_V];       // logits row      [V]  -> S1_OFF_LOGITS
 #pragma HLS BIND_STORAGE variable=logit_t type=ram_2p impl=bram
 
-    // R[t][d] = EMBED[tok[t]*D + d]  (embed gather, morph LM head idiom). Saved as R layer-0 input.
+    // R[t][d] = EMBED[tok[t]*D + d] (+ POS[t*D+d] when S1_POS_EMBED). Embed gather, morph LM head idiom.
+    // Saved as R layer-0 input. The POS add is a PURE INT ADD (multiplier-free) that localizes the content
+    // routing the L1 attention does (the no-pos kernel is bigram-class; pos lets it USE CONTEXT).
     static data_t R[S1_L_SEQ][S1_D];
 EMB: for (int t = 0; t < S1_L_SEQ; t++) {
         int tok = toks[t];
@@ -705,6 +713,9 @@ EMB: for (int t = 0; t < S1_L_SEQ; t++) {
         for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
             data_t rv = (data_t)embed_oc[tok * S1_D + d];   // on-chip embed gather (was gmem)
+#if S1_POS_EMBED
+            rv = (data_t)(rv + (data_t)pos_oc[t * S1_D + d]);   // + positional embed (int add; multiplier-free)
+#endif
             R[t][d] = rv;
             rsnap_t[d] = (int32_t)rv;                        // R_0 snapshot row (DDR-streamed)
         }
@@ -1410,6 +1421,9 @@ static int do_bwd(int32_t *buffer) {
     static int32_t gLNFB_oc[S1_D];
 #endif
     static int32_t gWHEAD_oc[S1_W_WHEAD];
+#if S1_POS_EMBED
+    static int32_t gPOS_oc[S1_POS_N];        // [L_SEQ*D] positional-embed grad (= residual-input grad, per row t)
+#endif
 
 ZG_E: for (int i = 0; i < S1_W_EMBED; i++) { gEMBED_oc[i] = 0; gWHEAD_oc[i] = 0; }
 ZG_P: for (int i = 0; i < S1_W_PROJ; i++) { gWQ_oc[i]=0; gWK_oc[i]=0; gWV_oc[i]=0; gWO_oc[i]=0; }
@@ -1418,6 +1432,9 @@ ZG_D: for (int i = 0; i < S1_W_WDOWN; i++)  gWDN_oc[i] = 0;
 ZG_L: for (int i = 0; i < S1_W_LN; i++) { gLN1G_oc[i]=0; gLN1B_oc[i]=0; gLN2G_oc[i]=0; gLN2B_oc[i]=0; }
 #if S1_USE_LNF
 ZG_F: for (int i = 0; i < S1_D; i++) { gLNFG_oc[i]=0; gLNFB_oc[i]=0; }
+#endif
+#if S1_POS_EMBED
+ZG_POS: for (int i = 0; i < S1_POS_N; i++) gPOS_oc[i] = 0;
 #endif
 
     // gR — the running backward residual stream (output-grad of the block; built by the head bwd).
@@ -1786,6 +1803,9 @@ BWD_LAYER: for (int lr = 0; lr < S1_N_LAYERS; lr++) {
 
     // ---------------------------------------------------------------------
     // (3) embed backward (SPARSE): g_EMBED[tok[t]*D + d] += gR[t][d].
+    //     POS backward (S1_POS_EMBED): g_POS[t*D + d] = gR[t][d] — the SAME residual-input grad. Unlike EMBED
+    //     (which scatters into the shared token rows, so it accumulates), each (t,d) maps to a UNIQUE POS row,
+    //     so it is a direct write (no accumulation across positions). Operand-free (a copy of the residual grad).
     // ---------------------------------------------------------------------
 EMB_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
         int tok = toks[t];
@@ -1793,6 +1813,9 @@ EMB_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
         for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
             if (gR[t][d] != 0) gEMBED_oc[tok * S1_D + d] = sat32((acc_t)gEMBED_oc[tok * S1_D + d] + (acc_t)gR[t][d]);
+#if S1_POS_EMBED
+            gPOS_oc[t * S1_D + d] = gR[t][d];
+#endif
         }
     }
 
@@ -1815,6 +1838,9 @@ EMB_BWD: for (int t = 0; t < S1_L_SEQ; t++) {
     burst_store_i32(gLNFB_oc,  buffer, S1_OFF_G_LNF_B,  S1_D);
 #endif
     burst_store_i32(gWHEAD_oc, buffer, S1_OFF_G_W_HEAD, S1_W_WHEAD);
+#if S1_POS_EMBED
+    burst_store_i32(gPOS_oc,   buffer, S1_OFF_G_POS,    S1_POS_N);
+#endif
     burst_store_i32(&gR[0][0],     buffer, S1_OFF_GR,    S1_L_SEQ * S1_D);
     burst_store_i32(&gX1_oc[0][0], buffer, S1_OFF_GX1,   S1_L_SEQ * S1_D);
     burst_store_i32(&gX2_oc[0][0], buffer, S1_OFF_GX2,   S1_L_SEQ * S1_D);

@@ -200,6 +200,41 @@ static void stage_train_all(int32_t *buf, unsigned seed, int densepct, int embma
     for (int i = 0; i < S1_LUT_N; i++) { buf[S1_OFF_CE_LUT + i] = FT_CE_EXP2_Q16[i];
                                          buf[S1_OFF_ATTN_LUT + i] = FT_CE_EXP2_Q16[i]; }
 }
+// SMALL-DENSE-RANDOM init (regime 4): backbone code masters at small magnitude (1..MAGB, 100% dense, random
+// sign) ~= torch's 0.04-std init (master 1-4 at scale 2^Q_CODE -> weight ~0.015-0.06); LN gammas = +QC
+// (identity-ish); small embed/head/pos. This is the init that lets the dyadic attention learn routing.
+static void stage_small_random(int32_t *buf, unsigned seed, int embmag) {
+    for (int i = 0; i < S1_BUFLEN; i++) buf[i] = 0;
+    srand(seed);
+    const long QC = (1L << S1_Q_CODE);
+    const int  MAGB = 4;   // backbone master magnitude 1..4 (dense) ~ torch 0.04-std weights
+    auto fc = [&](int base, int O, int I) {
+        for (int l = 0; l < S1_N_LAYERS; l++)
+            for (int k = 0; k < O * I; k++) {
+                int sg = (rand() & 1) ? -1 : 1; int mag = 1 + (rand() % MAGB);  // 1..MAGB, never 0 -> dense
+                buf[base + l * (O * I) + k] = (int32_t)((long)sg * mag);
+            }
+    };
+    fc(S1_OFF_WFP_WQ, S1_D, S1_D); fc(S1_OFF_WFP_WK, S1_D, S1_D); fc(S1_OFF_WFP_WV, S1_D, S1_D);
+    fc(S1_OFF_WFP_WO, S1_D, S1_D); fc(S1_OFF_WFP_W_UP, S1_FFN, S1_D); fc(S1_OFF_WFP_W_DOWN, S1_D, S1_FFN);
+    for (int l = 0; l < S1_N_LAYERS; l++)
+        for (int d = 0; d < S1_D; d++) {
+            buf[S1_OFF_WFP_LN1_G + l * S1_D + d] = (int32_t)QC; buf[S1_OFF_WFP_LN2_G + l * S1_D + d] = (int32_t)QC;
+        }
+    for (int d = 0; d < S1_D; d++) buf[S1_OFF_WFP_LNF_G + d] = (int32_t)QC;
+    for (int i = 0; i < S1_V * S1_D; i++) {
+        buf[S1_OFF_WFP_EMBED  + i] = (rand() % (2 * embmag + 1)) - embmag;
+#if S1_HEAD_MODE
+        { int sg = (rand() & 1) ? -1 : 1; int mag = 1 + (rand() % MAGB);
+          buf[S1_OFF_WFP_W_HEAD + i] = (int32_t)((long)sg * mag); }   // small dense dyadic head
+#else
+        buf[S1_OFF_WFP_W_HEAD + i] = (rand() % (2 * embmag + 1)) - embmag;
+#endif
+    }
+    // POS region (S1_POS_EMBED=1) stays 0 (learned from zero) — already zeroed by the buffer clear.
+    for (int i = 0; i < S1_LUT_N; i++) { buf[S1_OFF_CE_LUT + i] = FT_CE_EXP2_Q16[i];
+                                         buf[S1_OFF_ATTN_LUT + i] = FT_CE_EXP2_Q16[i]; }
+}
 static void stage_freeze(int32_t *buf, unsigned seed, int embmag) {
     for (int i = 0; i < S1_BUFLEN; i++) buf[i] = 0;
     srand(seed);
@@ -347,7 +382,11 @@ static host_region_t HR[S1_NUM_OPT_REGIONS];
 static int HR_N = 0;
 static void build_host_regions() {
     static const char* names[S1_NUM_OPT_REGIONS] = {
-        "EMBED","WQ","WK","WV","WO","W_UP","W_DOWN","LN1_G","LN1_B","LN2_G","LN2_B","LNF_G","LNF_B","W_HEAD" };
+        "EMBED","WQ","WK","WV","WO","W_UP","W_DOWN","LN1_G","LN1_B","LN2_G","LN2_B","LNF_G","LNF_B","W_HEAD"
+#if S1_POS_EMBED
+        , "POS"
+#endif
+    };
     for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
         const s1_opt_region_t& S = S1_OPT_REGIONS[r];
         HR[r] = host_region_t{ S.dst_off, S.wfp_off, S.g_off, S.n, S.is_code, names[r] };
@@ -362,6 +401,12 @@ static void build_host_regions() {
 // model begins at the bigram-class optimum and the attention/FFN LEARN to ADD context on top — instead of
 // starting from a destructive RANDOM dense backbone (TRAIN_ALL regime 0, which buries the embed signal).
 #define CHARLM_TRAIN_FROM_IDENTITY 3
+// regime 4: TRAIN everything from a SMALL-DENSE-RANDOM backbone (NOT identity, NOT the destructive ±QC sparse
+// TRAIN_ALL). The decisive csim/torch finding: identity-init stays stuck at bigram-class (zero Q/K can't
+// bootstrap routing), and ±QC-sparse buries the signal; only a SMALL DENSE random backbone (~torch 0.04 std
+// = master magnitude ~1-4 at scale 2^Q_CODE, 100% dense) lets the dyadic attention learn content routing.
+// With dyadic head + positional embeddings + ~64k windows this reaches ~2.9 bpc (beats bigram, USES CONTEXT).
+#define CHARLM_TRAIN_SMALL_RANDOM 4
 
 // is this region FROZEN under the given regime? (FREEZE_CODES freezes ALL is_code; FREEZE_BACKBONE freezes
 // is_code EXCEPT the LM head W_HEAD, which always trains.)
@@ -465,8 +510,9 @@ int main(int argc, char** argv) {
     // IDENTITY backbone (stage_freeze: projection codes = 0, LN gamma = 1) so the head reads a CLEAN
     // hf ~ LN_F(embed) signal (a trained-embed + trained-dyadic-head = bigram-class model) — the cleanest
     // isolation of the HEAD fix, free of dense-backbone noise. TRAIN_ALL (0) stages a dense trainable backbone.
-    if (regime == S1_OPT_TRAIN_ALL) stage_train_all(buf, seed, dense, embmag);
-    else                            stage_freeze(buf, seed, embmag);   // regimes 1/2/3 -> identity backbone init
+    if (regime == S1_OPT_TRAIN_ALL)               stage_train_all(buf, seed, dense, embmag);
+    else if (regime == CHARLM_TRAIN_SMALL_RANDOM) stage_small_random(buf, seed, embmag);  // regime 4: the context recipe
+    else                                          stage_freeze(buf, seed, embmag);   // regimes 1/2/3 -> identity backbone init
     // init re-quantizes EVERY code/value from the staged master (kernel ignores freeze on init); pass a valid
     // kernel a2 (TRAIN_ALL) so the host-only regime 2 never reaches the kernel.
     forge_train_step_s1(buf, 2, S1_OPT_INIT, S1_OPT_TRAIN_ALL, 0);   // populate live codes/values (ONCE)
@@ -610,6 +656,16 @@ int main(int argc, char** argv) {
         }
     }
 
+#if S1_POS_EMBED
+    // DIAGNOSTIC: did the positional table train off zero? Report the magnitude stats of the live POS region.
+    {
+        long pmax = 0; double pabs = 0; int pnz = 0;
+        for (int i = 0; i < S1_POS_N; i++) { long v = (long)(int32_t)buf[S1_OFF_POS + i];
+            long a = v < 0 ? -v : v; if (a > pmax) pmax = a; pabs += (double)a; if (v != 0) pnz++; }
+        printf("[charlm] POS-DIAG: peak|POS|=%ld  mean|POS|=%.2f  nonzero=%d/%d\n",
+               pmax, pabs / S1_POS_N, pnz, (int)S1_POS_N);
+    }
+#endif
     // final held-out bpc
     double accF = 0; double bpcF = eval_val_bpc(buf, N_VAL_WINDOWS, accF);
     printf("[charlm] ============================================================\n");

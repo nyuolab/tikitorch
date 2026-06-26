@@ -408,9 +408,16 @@ static const OptRegRef OPT_REGS_REF[S1_NUM_OPT_REGIONS] = {
     { S1_OFF_G_LNF_G,   S1_OFF_WFP_LNF_G,   S1_OFF_M_LNF_G,   S1_OFF_V_LNF_G,   S1_OFF_LNF_G,   S1_D,                        1 },
     { S1_OFF_G_LNF_B,   S1_OFF_WFP_LNF_B,   S1_OFF_M_LNF_B,   S1_OFF_V_LNF_B,   S1_OFF_LNF_B,   S1_D,                        0 },
     { S1_OFF_G_W_HEAD,  S1_OFF_WFP_W_HEAD,  S1_OFF_M_W_HEAD,  S1_OFF_V_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 0 },
+#if S1_POS_EMBED
+    { S1_OFF_G_POS,     S1_OFF_WFP_POS,     S1_OFF_M_POS,     S1_OFF_V_POS,     S1_OFF_POS,     S1_POS_N,                    0 },
+#endif
 };
 static const char *OPT_REG_NAMES[S1_NUM_OPT_REGIONS] = {
-    "EMBED","Wq","Wk","Wv","Wo","W_up","W_down","LN1_g","LN1_b","LN2_g","LN2_b","LN_F_g","LN_F_b","W_HEAD" };
+    "EMBED","Wq","Wk","Wv","Wo","W_up","W_down","LN1_g","LN1_b","LN2_g","LN2_b","LN_F_g","LN_F_b","W_HEAD"
+#if S1_POS_EMBED
+    , "POS"
+#endif
+};
 
 // Stage a CONSISTENT optimizer buffer: small int16 W_fp masters, zeroed m/v/grads, tokens/targets/LUTs.
 // The forward-read code/value regions are LEFT to mode-2 init (a1=S1_OPT_INIT) so the codes are produced

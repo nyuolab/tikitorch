@@ -109,6 +109,28 @@
 #define S1_HEAD_MODE  0
 #endif
 
+// ----------------------------------------------------------------------------
+// POSITIONAL EMBEDDING (S1_POS_EMBED) — the context-localization fix.
+// ----------------------------------------------------------------------------
+// THE ROOT CAUSE (diagnosed by a torch probe of the EXACT s1 architecture): the kernel has NO positional
+// embedding — the layer-0 residual input is a PURE token embed R[t][d]=EMBED[tok[t]*D+d]. The L1-score
+// attention routes CONTENT fine but cannot LOCALIZE (it has no notion of position), so the model is
+// bigram-class (matches the kernel ~3.40 bpc). The torch probe of this exact arch proves pos embeddings are
+// the missing piece: WITH pos = 2.77 bpc (beats bigram 3.47 by 0.63, USES CONTEXT); WITHOUT = 3.40
+// (bigram-class). Adding pos is a SMALL, MULTIPLIER-FREE change.
+//
+//   S1_POS_EMBED=0 (default, LEGACY): no positional embedding. EVERY mode/test/AFI path is BYTE-IDENTICAL
+//        to before. The layer-0 residual is the pure token embed gather.
+//   S1_POS_EMBED=1 (POSITIONAL):  a learnable [L_SEQ][D] int16 VALUE region POS (like EMBED) is ADDED at the
+//        embed gather: R[t][d] = EMBED[tok[t]*D+d] + POS[t*D+d]. A pure int ADD (multiplier-free). POS is a
+//        VALUE region (is_code=0) in S1_OPT_REGIONS with its own WFP/M/V/G slots; the optimizer learns it
+//        like EMBED. It inits to ZERO (no positional signal until trained). The backward grad_POS[t][d] is
+//        the SAME residual-input gradient gR[t][d] the embed bwd scatters into the token rows — for POS it is
+//        simply written to POS row t (accumulated). Operand-free (a copy of the existing residual grad).
+#ifndef S1_POS_EMBED
+#define S1_POS_EMBED  0
+#endif
+
 // attention softmax constants (== forge_attn)
 #define S1_AT_DELTA_SHIFT 2 // (rowmax - s) >> 2  (Delta = 4)
 #define S1_AT_P_FRAC      16 // probabilities in Q16
@@ -300,6 +322,22 @@ static const int S1_OFF_V_LNF_G    = S1_OFF_V_LN2_B   + S1_AL16(S1_N_LAYERS * S1
 static const int S1_OFF_V_LNF_B    = S1_OFF_V_LNF_G   + S1_AL16(S1_D);
 static const int S1_OFF_V_W_HEAD   = S1_OFF_V_LNF_B   + S1_AL16(S1_D);
 
+// ----------------------------------------------------------------------------
+// POSITIONAL EMBEDDING regions (S1_POS_EMBED=1). APPENDED at the VERY END of the buffer so EVERY offset
+// above is BYTE-IDENTICAL whether or not the flag is set (when the flag is off these are unused and
+// S1_BUFLEN does not include them). POS mirrors the EMBED region exactly: a [L_SEQ][D] int16 VALUE forward
+// region + its grad (int32) + the dyadic-Adam master/m/v triple. All 16-aligned.
+//   POS     : [L_SEQ*D] int16 positional value table (the forward ADDS POS[t*D+d] to the embed gather)
+//   G_POS   : [L_SEQ*D] int32 grad (= the residual-input grad gR[t][d], copied to row t)
+//   WFP_POS : [L_SEQ*D] int16 master ; M_POS / V_POS : [L_SEQ*D] int32 dyadic-Adam EMA state
+// (POS_N is the logical element count the optimizer iterates.)
+#define S1_POS_N (S1_L_SEQ * S1_D)
+static const int S1_OFF_POS        = S1_OFF_V_W_HEAD  + S1_AL16(S1_V * S1_D);   // [L_SEQ*D] int16 value
+static const int S1_OFF_G_POS      = S1_OFF_POS       + S1_AL16(S1_POS_N);      // [L_SEQ*D] int32 grad
+static const int S1_OFF_WFP_POS    = S1_OFF_G_POS     + S1_AL16(S1_POS_N);      // [L_SEQ*D] int16 master
+static const int S1_OFF_M_POS      = S1_OFF_WFP_POS   + S1_AL16(S1_POS_N);      // [L_SEQ*D] int32 M
+static const int S1_OFF_V_POS      = S1_OFF_M_POS     + S1_AL16(S1_POS_N);      // [L_SEQ*D] int32 V
+
 // dyadic-Adam constants (== forge_dyadic_adam.cpp; == charlm dyadic-Adam betas 0.875 = 1 - 2^-3).
 #define S1_ADAM_B1     3      // first-moment EMA shift: m += (g - m) >> B1   (beta1 = 1 - 2^-3)
 #define S1_ADAM_B2     3      // second-moment EMA shift: v += (|g| - v) >> B2 (beta2 = 1 - 2^-3)
@@ -413,7 +451,11 @@ static const int S1_OFF_V_W_HEAD   = S1_OFF_V_LNF_B   + S1_AL16(S1_D);
 #define S1_OPT_TRAIN_ALL    0
 #define S1_OPT_FREEZE_CODES 1
 
+#if S1_POS_EMBED
+static const int S1_BUFLEN         = S1_OFF_V_POS    + S1_AL16(S1_POS_N);      // total int32 words; multiple of 16
+#else
 static const int S1_BUFLEN         = S1_OFF_V_W_HEAD + S1_AL16(S1_V * S1_D);   // total int32 words; multiple of 16
+#endif
 
 // ---- per-region addressing helpers (layer-major; collapse to single-layer at l=0) ----
 // weight rows are ROW-MAJOR [O][I]; a layer's slab is l*(O*I).
@@ -437,7 +479,11 @@ static inline int s1_off_gln(int base, int l)              { return base + l * S
 // reads the int16 VALUE which is just W_fp copied through (EMBED / W_HEAD / LN beta). The element count is
 // the LOGICAL extent (the kernel iterates this many params; the S1_AL16 padding between regions is unread).
 // ----------------------------------------------------------------------------
+#if S1_POS_EMBED
+#define S1_NUM_OPT_REGIONS 15
+#else
 #define S1_NUM_OPT_REGIONS 14
+#endif
 struct s1_opt_region_t { int g_off, wfp_off, m_off, v_off, dst_off, n, is_code; };
 // dst_off = the CODE region (is_code=1) or VALUE region (is_code=0) the forward reads.
 static const s1_opt_region_t S1_OPT_REGIONS[S1_NUM_OPT_REGIONS] = {
@@ -459,6 +505,12 @@ static const s1_opt_region_t S1_OPT_REGIONS[S1_NUM_OPT_REGIONS] = {
     // under the dyadic-GEMM head (S1_HEAD_MODE=1) — flipping is_code makes the optimizer re-quantize it as a
     // code (the master is held at scale 2^Q_CODE, deploy = s1_encode_fine(dyad(W_fp))), exactly like Wq.
     { S1_OFF_G_W_HEAD,  S1_OFF_WFP_W_HEAD,  S1_OFF_M_W_HEAD,  S1_OFF_V_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 S1_HEAD_MODE }, // W_HEAD value(0)/code(1)
+#if S1_POS_EMBED
+    // POS: positional embedding VALUE region (is_code=0), learned exactly like EMBED. Inits to zero (the host
+    // stages WFP_POS=0 -> master 0 -> no positional signal until trained). The optimizer treats it as a value
+    // (the int16 master IS the value; mode 2 copies WFP_POS straight into POS, no re-encode).
+    { S1_OFF_G_POS,     S1_OFF_WFP_POS,     S1_OFF_M_POS,     S1_OFF_V_POS,     S1_OFF_POS,     S1_POS_N,                    0 }, // POS    value
+#endif
 };
 
 #endif  // FORGE_S1_CONFIG_HPP
