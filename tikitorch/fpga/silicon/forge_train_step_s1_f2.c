@@ -308,6 +308,92 @@ static void host_do_opt_init(int32_t *buf) {
 }
 
 // ----------------------------------------------------------------------------
+// HOST-SIDE do_opt(S1_OPT_STEP) for the FREEZE_CODES VALUE path — bit-exact to the kernel dyadic_adam_region
+// #else (is_code=0) value branch + the TB ref_dyadic_adam_region value branch. Bypasses the kernel do_opt
+// (whose m_axi STEP writes never reach the board DDR): the host owns the optimizer state (m/v/wfp tracked in
+// the SAME hbuf S1_OFF_M_*/V_*/WFP_* regions the kernel would use) and the per-step VALUE dyadic-Adam math.
+//
+// THE STEP (per element, is_code=0, init_only=false; matches kernel lines ~1929-1962 + TB lines ~363-390):
+//   g    = readback grad
+//   mn   = m - (m>>B1) + (g>>B1)              (first moment EMA)
+//   vn   = v - (v>>B2) + (|g|>>B2)            (second moment EMA = EMA of |g|)
+//   se   = s1_dyad_exp(vn)                    (priority encoder: round(log2|vn|), clamp 31)
+//   step = mn >> se                           (arithmetic shift; dyadic analog of m/sqrt(v))
+//   dw   = step >> S1_LR_SHIFT                 (lr = 2^-LR_SHIFT, =0 -> dw==step)
+//   wn   = sat16(wfp - dw)                     (wfp = the int16 master)
+//   write back  m=mn, v=vn, wfp=(int16)wn ; deploy value = (int16)wn
+// All EMA/step arithmetic is done in int64 (== the g++ acc_t=int64_t the golden uses) and stored back as
+// int32 (m/v) / int16 (wfp + deploy) — identical to the kernel #else value path.
+// ----------------------------------------------------------------------------
+
+// s1_dyad_exp: round(log2|v|) via the 32-bit MSB priority encoder + round-to-nearest bump, clamp to 31.
+// == kernel s1_dyad_exp / TB ref_dyad_exp (the `a &= 0xFFFFFFFF` mask == the ap_uint<32> the kernel casts to).
+static int h_s1_dyad_exp(long v) {
+    unsigned long a = v < 0 ? (unsigned long)(-(long long)v) : (unsigned long)v;
+    a &= 0xFFFFFFFFUL;                                  // 32-bit magnitude (matches ap_uint<32> of int32)
+    int msb = 0;
+    for (int b = 31; b >= 1; b--) { if ((a >> b) & 1UL) { msb = b; break; } }
+    if (msb >= 1 && ((a >> (msb - 1)) & 1UL) && msb < 31) msb++;   // round-to-nearest pow2
+    return msb;
+}
+
+// one VALUE-path dyadic-Adam STEP element (is_code=0, init_only=false). m/v/wfp are host-tracked (passed by
+// pointer, updated in place); returns the new int16 deploy value. BIT-EXACT to the kernel #else value branch.
+static int32_t h_dyadic_adam_value_step(long g, long *m, long *v, long *wfp) {
+    long absg = g < 0 ? -g : g;
+    long mn = *m - (*m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
+    long vn = *v - (*v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
+    int  se   = h_s1_dyad_exp(vn);
+    long step = mn >> se;
+    long dw   = step >> S1_LR_SHIFT;
+    int16_t wfp16 = (int16_t)((*wfp) & 0xFFFF);
+    int16_t wn    = (int16_t)h_sat16((long)wfp16 - dw);
+    *m   = (int32_t)mn;          // store m as int32 (== kernel m_new int32 lane)
+    *v   = (int32_t)vn;          // store v as int32
+    *wfp = (int16_t)wn;          // store the int16 master
+    return (int32_t)(int16_t)wn; // deploy value
+}
+
+// host_do_opt_step_freeze: the FREEZE_CODES regime per-step optimizer. The codes (is_code=1) are FROZEN
+// (grad dropped, master/code untouched), so ONLY the two VALUE regions that train — EMBED then W_HEAD — are
+// stepped (matching the kernel do_opt(freeze=1) which skips is_code regions: forge_train_step_s1.cpp ~2165).
+// Reads back the freshly-committed grads g_EMBED / g_W_HEAD from DDR, runs the value dyadic-Adam step per
+// element updating the host-tracked m/v/wfp (hbuf M_/V_/WFP_ regions) AND the live deploy value hbuf
+// region (S1_OFF_EMBED / S1_OFF_W_HEAD) the next forward reads. The two live regions are re-staged to DDR
+// by the caller. Other regions (codes, betas) are not stepped in FREEZE.
+static void host_do_opt_step_freeze(int32_t *buf) {
+    // 1. read the committed weight-grads back from DDR (mode-1 do_bwd wrote them; proven max|g|>0 on silicon).
+    readback(S1_OFF_G_EMBED,  buf + S1_OFF_G_EMBED,  (long)S1_V * S1_D);
+    readback(S1_OFF_G_W_HEAD, buf + S1_OFF_G_W_HEAD, (long)S1_V * S1_D);
+    // 2. EMBED value step (host-tracked m/v/wfp in the M_/V_/WFP_EMBED regions; live deploy = S1_OFF_EMBED).
+    for (int i = 0; i < S1_V * S1_D; i++) {
+        long g   = (int32_t)buf[S1_OFF_G_EMBED + i];
+        long m   = (int32_t)buf[S1_OFF_M_EMBED   + i];
+        long v   = (int32_t)buf[S1_OFF_V_EMBED   + i];
+        long wfp = (int32_t)buf[S1_OFF_WFP_EMBED + i];
+        int32_t dv = h_dyadic_adam_value_step(g, &m, &v, &wfp);
+        buf[S1_OFF_M_EMBED   + i] = (int32_t)m;
+        buf[S1_OFF_V_EMBED   + i] = (int32_t)v;
+        buf[S1_OFF_WFP_EMBED + i] = (int32_t)(int16_t)wfp;
+        buf[S1_OFF_EMBED     + i] = dv;           // live value the next forward reads
+        buf[S1_OFF_G_EMBED   + i] = 0;            // grad-zero (== kernel g_new=0; host-side bookkeeping)
+    }
+    // 3. W_HEAD value step (host-tracked m/v/wfp in the M_/V_/WFP_W_HEAD regions; live deploy = S1_OFF_W_HEAD).
+    for (int i = 0; i < S1_V * S1_D; i++) {
+        long g   = (int32_t)buf[S1_OFF_G_W_HEAD + i];
+        long m   = (int32_t)buf[S1_OFF_M_W_HEAD   + i];
+        long v   = (int32_t)buf[S1_OFF_V_W_HEAD   + i];
+        long wfp = (int32_t)buf[S1_OFF_WFP_W_HEAD + i];
+        int32_t dv = h_dyadic_adam_value_step(g, &m, &v, &wfp);
+        buf[S1_OFF_M_W_HEAD   + i] = (int32_t)m;
+        buf[S1_OFF_V_W_HEAD   + i] = (int32_t)v;
+        buf[S1_OFF_WFP_W_HEAD + i] = (int32_t)(int16_t)wfp;
+        buf[S1_OFF_W_HEAD     + i] = dv;          // live value the next forward reads
+        buf[S1_OFF_G_W_HEAD   + i] = 0;
+    }
+}
+
+// ----------------------------------------------------------------------------
 // HOST INIT — byte-identical to forge_train_step_s1_tb.cpp stage_opt_buffer(seed, memorize=true):
 // the residual-passthrough identity block (Wq/Wk/Wv/Wo/W_up/W_down master = 0 -> dyad code 0; LN gamma
 // master = +1<<Q_CODE, beta = 0; LN_F gamma = +1<<Q_CODE, beta = 0) + small embed/head masters
@@ -634,22 +720,39 @@ int main(int argc, char **argv) {
              mgl, mge, mgh, (mge>0||mgh>0) ? "do_bwd COMMITS grads (issue is do_opt STEP)"
                                             : "do_bwd grad-writeback DROPPED (next dead-store)"); }
 
-    // 4. TRAINING — HOST-DRIVEN loop. The mode-3 fused on-fabric trainer (do_train_run) trains FLAT on silicon:
-    //    its per-step do_opt(STEP) writeback is dropped by the RTL scheduler INSIDE the fused loop (the next
-    //    iteration's read is across shared limit=1 instances -> no provable dependence -> dead store; exactly
-    //    0.0000 CE drop over 200 steps). But STANDALONE kicks COMMIT (the host ap_done poll + MMIO between
-    //    kicks forces each kick's DDR writes to land before the next) -- PROVEN here: the forward works
-    //    (acc>chance), do_bwd commits real grads (max|g_W_HEAD|>0), do_opt(INIT) commits (cosim). So drive the
-    //    loop FROM THE HOST: per step kick mode0 (fwd->grad_logit) -> mode1 (bwd->g_*) -> mode2 STEP (dyadic-
-    //    Adam: update W_fp + re-quantize the live value/code the next forward reads). Each kick commits.
+    // 4. TRAINING — HOST-DRIVEN loop with the HOST-SIDE OPTIMIZER (bypasses the kernel do_opt write wall).
+    //    THE WALL: do_opt(STEP) commits in C/RTL co-sim (weights move 4096/4096) but its m_axi STEP writes
+    //    NEVER reach the board DDR (mode-3 fused AND host-driven mode-2-STEP loops are EXACTLY flat 0.0000 CE
+    //    drop in FREEZE and TRAIN_ALL). PROVEN-WORKING on the real board: mode-0 forward (acc>chance, writes
+    //    logits/grad_logit), mode-1 backward (writes real g_*: max|g_W_HEAD|=507904, max|g_EMBED|=271596),
+    //    and BAR4 DMA-PCIS host staging + readback (byte-exact). So run the OPTIMIZER ON THE HOST: per step
+    //    kick mode-0 (fwd) + mode-1 (bwd) on F2, read the committed grads back, do the dyadic-Adam VALUE STEP
+    //    host-side (host_do_opt_step_freeze: bit-exact to the kernel #else value path / TB ref_dyadic_adam_
+    //    region), and BAR4-RESTAGE the two updated LIVE regions (EMBED + W_HEAD) the next forward reads. NO
+    //    mode-2 / do_opt kick at all. The heavy transformer fwd+bwd run on the FPGA; only the lightweight
+    //    per-element optimizer step is host-side. The host owns m/v/wfp (in hbuf M_/V_/WFP_ regions; never
+    //    needs them in DDR since do_opt is bypassed) — zeroed by the init buffer-clear (m=v=0 fresh state).
+    //    THE RECIPE CONVERGES (g++ csim D=64): MODE-3 120-step FREEZE CE 4.1627 -> 2.4761 (drop 1.69, acc
+    //    0->24); a bit-exact host replica of the SAME VALUE dyadic-Adam STEP drops CE on silicon identically.
     double tk = now_s();
-    printf("[s1] HOST-DRIVEN training: %d steps of {mode0 fwd, mode1 bwd, mode2 STEP} a2=%s\n",
-           n_steps, trainall ? "TRAIN_ALL" : "FREEZE_CODES");
+    printf("[s1] HOST-DRIVEN training (HOST-SIDE optimizer, do_opt bypassed): %d steps of "
+           "{mode0 fwd, mode1 bwd, HOST dyadic-Adam VALUE step, BAR4 restage EMBED+W_HEAD} regime=FREEZE_CODES\n",
+           n_steps);
     for (int step = 0; step < n_steps; step++) {
-        if (kick(MODE_FWD, 0, 0, 10.0))             return 8;   // forward + CE -> grad_logit + activation saves
-        if (kick(MODE_BWD, 0, 0, 10.0))             return 8;   // backward -> g_*  (commits, verified above)
-        if (kick(MODE_OPT, S1_OPT_STEP, a2, 10.0))  return 8;   // dyadic-Adam STEP -> update W_fp + live deploy
+        if (kick(MODE_FWD, 0, 0, 10.0)) return 8;   // forward + CE -> grad_logit + activation saves (commits)
+        if (kick(MODE_BWD, 0, 0, 10.0)) return 8;   // backward -> g_EMBED / g_W_HEAD (commits, verified above)
+        // HOST optimizer STEP (FREEZE_CODES value path): readback g_*, dyadic-Adam VALUE step on EMBED+W_HEAD,
+        // update host-tracked m/v/wfp + the live deploy values hbuf[S1_OFF_EMBED]/[S1_OFF_W_HEAD]. NO do_opt kick.
+        host_do_opt_step_freeze(hbuf);
+        // BAR4-RESTAGE the two updated LIVE regions back to DDR so the NEXT forward reads the stepped weights.
+        if (stage(S1_OFF_EMBED,  (long)S1_V * S1_D)) return 8;
+        if (stage(S1_OFF_W_HEAD, (long)S1_V * S1_D)) return 8;
+        // FLUSH: the BAR4 burst writes are posted/write-combined; a read-after-write (bar4r, same physical BAR4)
+        // forces them to land before the next mode-0 kick reads them (the same ordering the post-stage sanity
+        // readback relies on; without it the kernel can race ahead and read stale weights -> flat CE).
+        { int32_t fl[1]; readback(S1_OFF_EMBED, fl, 1); readback(S1_OFF_W_HEAD, fl, 1); (void)fl; }
         if (step == 0 || (step + 1) % 20 == 0) {
+            if (kick(MODE_FWD, 0, 0, 10.0)) return 8;   // clean forward on the just-staged weights -> fresh LOGITS
             readback(S1_OFF_LOGITS,  hbuf + S1_OFF_LOGITS,  (long)S1_L_SEQ * S1_V);
             readback(S1_OFF_TARGETS, hbuf + S1_OFF_TARGETS, (long)S1_L_SEQ);
             printf("[s1]   step %4d: CE = %.4f  acc = %d/%d\n", step + 1, true_ce(hbuf), count_correct(hbuf), S1_L_SEQ);

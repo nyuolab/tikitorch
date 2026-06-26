@@ -14,6 +14,7 @@ PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"
 REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null || echo us-east-1)}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-f2.6xlarge}"; AMI="${AMI:-ami-092fc5deb8f3c0f7d}"
 AGFI="${AGFI:?set AGFI}"; N_STEPS="${N_STEPS:-200}"; MAX_MINUTES="${MAX_MINUTES:-40}"; ROLE="${ROLE:-tiki-sweep-runner}"
+REGIME="${REGIME:-}"   # "" -> driver default (freeze) ; "trainall" -> a2=TRAIN_ALL + dense-backbone init
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_s1_train_f2_state"; mkdir -p "$STATE_DIR"; STATE_FILE="$STATE_DIR/run.env"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
@@ -48,7 +49,7 @@ render_user_data(){
 shutdown -h +${MAX_MINUTES} dl || true
 exec > /var/log/tiki-s1train.log 2>&1
 set -x; export HOME=/root
-S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; AGFI="${AGFI}"; N_STEPS="${N_STEPS}"
+S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; AGFI="${AGFI}"; N_STEPS="${N_STEPS}"; REGIME="${REGIME}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-s1train.log "\$S3_RESULTS/s1train.log" --only-show-errors || true; }
 trap up EXIT
 echo "BOOT \$(date -u)"; hostname
@@ -82,7 +83,7 @@ gcc -O2 -std=gnu11 -DHAVE_FPGA_CLKGEN=0 -I"\$SDK/include" \
     /opt/tiki/tikitorch/fpga/silicon/forge_train_step_s1_f2.c -lfpga_mgmt -lm -o /tmp/s1_f2 2>&1 | tee /tmp/build.txt
 up
 # ONE mode-3 kick = N_STEPS fwd->bwd->dyadic-Adam resident in DDR (stages buffer + exp2 LUTs + W_fp first)
-( sudo /tmp/s1_f2 0 "\$N_STEPS" 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
+( sudo /tmp/s1_f2 0 "\$N_STEPS" \$REGIME 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
 for f in img build train; do aws s3 cp /tmp/\$f.txt "\$S3_RESULTS/\$f.txt" --only-show-errors || true; done
 echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 up; shutdown -h now
