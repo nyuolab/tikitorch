@@ -213,6 +213,14 @@ static inline long h_sat16(long v) {
     return v;
 }
 
+// sat32: == kernel sat32 / TB sat32g_fwd (int32 clamp; used on the FINE FIXED-POINT code master, which is a
+// full int32 value at scale 2^Q_CODE — NOT int16). Bit-exact to forge_train_step_s1.cpp sat32().
+static inline long h_sat32(long v) {
+    if (v >  2147483647L)  return  2147483647L;
+    if (v < -2147483648L)  return -2147483648L;
+    return v;
+}
+
 // dyad: forge_fwd_wide dyad() (priority MSB + bump on bit below MSB). returns (sgn,e,nz). == TB ref_dyad.
 static void h_dyad(long v, int *sgn, int *e, int *nz) {
     long a = v < 0 ? -v : v;
@@ -265,26 +273,28 @@ static int32_t h_s1_encode_fine(long wq, int32_t prev_code, int allow_clamp) {
     return (int32_t)(int8_t)(unsigned char)c;
 }
 
-// the kernel optimizer region table (forge_s1_config.hpp S1_OPT_REGIONS), mirrored with ONLY the fields the
-// host init needs: { W_fp master off, deploy code/value off, element count, is_code }. SAME offsets/order/
-// sizes/is_code as the header table (the bare-C++-typename gating keeps S1_OPT_REGIONS itself out of this C
-// TU, so it is reproduced verbatim here).
-struct h_opt_region { int wfp_off, dst_off, n, is_code; };
+// the kernel optimizer region table (forge_s1_config.hpp S1_OPT_REGIONS), mirrored with ALL fields the host
+// optimizer needs: { grad off, W_fp master off, M off, V off, deploy code/value off, element count, is_code }.
+// SAME offsets/order/sizes/is_code as the header S1_OPT_REGIONS table (the bare-C++-typename gating keeps the
+// header table itself out of this C TU, so it is reproduced verbatim here — VERIFY against forge_s1_config.hpp
+// S1_OPT_REGIONS). host_do_opt_init uses {wfp,dst,n,is_code}; host_do_opt_step_trainall iterates ALL rows and
+// also reads {g,m,v} for the per-element step.
+struct h_opt_region { int g_off, wfp_off, m_off, v_off, dst_off, n, is_code; };
 static const struct h_opt_region H_OPT_REGIONS[S1_NUM_OPT_REGIONS] = {
-    { S1_OFF_WFP_EMBED,   S1_OFF_EMBED,   S1_V * S1_D,                 0 }, // EMBED  value
-    { S1_OFF_WFP_WQ,      S1_OFF_WQ,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wq     code
-    { S1_OFF_WFP_WK,      S1_OFF_WK,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wk     code
-    { S1_OFF_WFP_WV,      S1_OFF_WV,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wv     code
-    { S1_OFF_WFP_WO,      S1_OFF_WO,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wo     code
-    { S1_OFF_WFP_W_UP,    S1_OFF_W_UP,    S1_N_LAYERS * S1_FFN * S1_D, 1 }, // W_up   code
-    { S1_OFF_WFP_W_DOWN,  S1_OFF_W_DOWN,  S1_N_LAYERS * S1_D * S1_FFN, 1 }, // W_down code
-    { S1_OFF_WFP_LN1_G,   S1_OFF_LN1_G,   S1_N_LAYERS * S1_D,          1 }, // LN1 g  code
-    { S1_OFF_WFP_LN1_B,   S1_OFF_LN1_B,   S1_N_LAYERS * S1_D,          0 }, // LN1 b  value
-    { S1_OFF_WFP_LN2_G,   S1_OFF_LN2_G,   S1_N_LAYERS * S1_D,          1 }, // LN2 g  code
-    { S1_OFF_WFP_LN2_B,   S1_OFF_LN2_B,   S1_N_LAYERS * S1_D,          0 }, // LN2 b  value
-    { S1_OFF_WFP_LNF_G,   S1_OFF_LNF_G,   S1_D,                        1 }, // LN_F g code
-    { S1_OFF_WFP_LNF_B,   S1_OFF_LNF_B,   S1_D,                        0 }, // LN_F b value
-    { S1_OFF_WFP_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 0 }, // W_HEAD value
+    { S1_OFF_G_EMBED,   S1_OFF_WFP_EMBED,   S1_OFF_M_EMBED,   S1_OFF_V_EMBED,   S1_OFF_EMBED,   S1_V * S1_D,                 0 }, // EMBED  value
+    { S1_OFF_G_WQ,      S1_OFF_WFP_WQ,      S1_OFF_M_WQ,      S1_OFF_V_WQ,      S1_OFF_WQ,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wq     code
+    { S1_OFF_G_WK,      S1_OFF_WFP_WK,      S1_OFF_M_WK,      S1_OFF_V_WK,      S1_OFF_WK,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wk     code
+    { S1_OFF_G_WV,      S1_OFF_WFP_WV,      S1_OFF_M_WV,      S1_OFF_V_WV,      S1_OFF_WV,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wv     code
+    { S1_OFF_G_WO,      S1_OFF_WFP_WO,      S1_OFF_M_WO,      S1_OFF_V_WO,      S1_OFF_WO,      S1_N_LAYERS * S1_D * S1_D,   1 }, // Wo     code
+    { S1_OFF_G_W_UP,    S1_OFF_WFP_W_UP,    S1_OFF_M_W_UP,    S1_OFF_V_W_UP,    S1_OFF_W_UP,    S1_N_LAYERS * S1_FFN * S1_D, 1 }, // W_up   code
+    { S1_OFF_G_W_DOWN,  S1_OFF_WFP_W_DOWN,  S1_OFF_M_W_DOWN,  S1_OFF_V_W_DOWN,  S1_OFF_W_DOWN,  S1_N_LAYERS * S1_D * S1_FFN, 1 }, // W_down code
+    { S1_OFF_G_LN1_G,   S1_OFF_WFP_LN1_G,   S1_OFF_M_LN1_G,   S1_OFF_V_LN1_G,   S1_OFF_LN1_G,   S1_N_LAYERS * S1_D,          1 }, // LN1 g  code
+    { S1_OFF_G_LN1_B,   S1_OFF_WFP_LN1_B,   S1_OFF_M_LN1_B,   S1_OFF_V_LN1_B,   S1_OFF_LN1_B,   S1_N_LAYERS * S1_D,          0 }, // LN1 b  value
+    { S1_OFF_G_LN2_G,   S1_OFF_WFP_LN2_G,   S1_OFF_M_LN2_G,   S1_OFF_V_LN2_G,   S1_OFF_LN2_G,   S1_N_LAYERS * S1_D,          1 }, // LN2 g  code
+    { S1_OFF_G_LN2_B,   S1_OFF_WFP_LN2_B,   S1_OFF_M_LN2_B,   S1_OFF_V_LN2_B,   S1_OFF_LN2_B,   S1_N_LAYERS * S1_D,          0 }, // LN2 b  value
+    { S1_OFF_G_LNF_G,   S1_OFF_WFP_LNF_G,   S1_OFF_M_LNF_G,   S1_OFF_V_LNF_G,   S1_OFF_LNF_G,   S1_D,                        1 }, // LN_F g code
+    { S1_OFF_G_LNF_B,   S1_OFF_WFP_LNF_B,   S1_OFF_M_LNF_B,   S1_OFF_V_LNF_B,   S1_OFF_LNF_B,   S1_D,                        0 }, // LN_F b value
+    { S1_OFF_G_W_HEAD,  S1_OFF_WFP_W_HEAD,  S1_OFF_M_W_HEAD,  S1_OFF_V_W_HEAD,  S1_OFF_W_HEAD,  S1_V * S1_D,                 0 }, // W_HEAD value
 };
 
 // host_do_opt_init: replicate the kernel do_opt(S1_OPT_INIT) — populate EVERY live code/value region the
@@ -354,6 +364,44 @@ static int32_t h_dyadic_adam_value_step(long g, long *m, long *v, long *wfp) {
     return (int32_t)(int16_t)wn; // deploy value
 }
 
+// ----------------------------------------------------------------------------
+// one CODE-path dyadic-Adam STEP element (is_code=1, init_only=false). BIT-EXACT to the kernel
+// dyadic_adam_region #else is_code=1 branch (forge_train_step_s1.cpp lines ~2074-2089) AND the TB
+// ref_dyadic_adam_region code branch (forge_train_step_s1_tb.cpp lines ~372-383). The math is the SAME
+// EMA m/v + step as the value path, EXCEPT:
+//   (1) the master wq is a FULL int32 FIXED-POINT value at scale 2^Q_CODE (NOT int16-masked): the kernel
+//       reads `(int32_t)wfp_word.range(...)`, the TB reads `(int32_t)wfp_in[p]`. So wfp is passed/stored as
+//       the full int32 master (do NOT (int16) it).
+//   (2) dw = step >> S1_LR_SHIFT_CODE  (the FINE code learning-rate shift, default 0).
+//   (3) CODE WEIGHT-DECAY: wd = wq >> S1_CODE_WD_SHIFT (multiplier-free shift toward 0 on the master; the
+//       memory-noted load-bearing decay for dense training). Guarded by #if S1_CODE_WD_SHIFT exactly like
+//       the kernel/TB (S1_CODE_WD_SHIFT==0 -> wd=0).
+//   (4) wn = sat32(wq - dw - wd) — the NEW int32 master (sat32, not sat16).
+//   (5) the LIVE deploy value = s1_encode_fine(wn, prev_deploy_code, allow_clamp=1) (the dyadic CODE), NOT
+//       (int16)wn. allow_clamp = !init_only = 1 on a real STEP (the +/-1 per-step exponent clamp is active).
+// m/v are stored int32; wq/wn are the full int32 master (passed by pointer, updated in place). prev_code is
+// the deploy code byte the forward read BEFORE this step (for the exp-clamp). Returns the new deploy code.
+// All EMA/step arithmetic is done in `long` (== the g++ int64 acc_t the golden uses).
+static int32_t h_dyadic_adam_code_step(long g, long *m, long *v, long *wfp, int32_t prev_code) {
+    long absg = g < 0 ? -g : g;
+    long mn = *m - (*m >> S1_ADAM_B1) + (g    >> S1_ADAM_B1);
+    long vn = *v - (*v >> S1_ADAM_B2) + (absg >> S1_ADAM_B2);
+    int  se   = h_s1_dyad_exp(vn);
+    long step = mn >> se;
+    long wq   = (int32_t)(*wfp);                    // full int32 fixed-point master (scale 2^Q_CODE)
+    long dw   = step >> S1_LR_SHIFT_CODE;           // fine code lr = 2^-LR_SHIFT_CODE of a code unit
+#if S1_CODE_WD_SHIFT
+    long wd   = wq >> S1_CODE_WD_SHIFT;             // multiplier-free weight decay (shift toward 0)
+#else
+    long wd   = 0;
+#endif
+    long wn   = h_sat32(wq - dw - wd);
+    *m   = (int32_t)mn;                             // store m as int32 (== kernel m_new int32 lane)
+    *v   = (int32_t)vn;                             // store v as int32
+    *wfp = (int32_t)wn;                             // store the FULL int32 fixed-point master
+    return h_s1_encode_fine((long)wn, prev_code, /*allow_clamp=*/1);   // deploy CODE (exp-clamp active on a step)
+}
+
 // host_do_opt_step_freeze: the FREEZE_CODES regime per-step optimizer. The codes (is_code=1) are FROZEN
 // (grad dropped, master/code untouched), so ONLY the two VALUE regions that train — EMBED then W_HEAD — are
 // stepped (matching the kernel do_opt(freeze=1) which skips is_code regions: forge_train_step_s1.cpp ~2165).
@@ -390,6 +438,49 @@ static void host_do_opt_step_freeze(int32_t *buf) {
         buf[S1_OFF_WFP_W_HEAD + i] = (int32_t)(int16_t)wfp;
         buf[S1_OFF_W_HEAD     + i] = dv;          // live value the next forward reads
         buf[S1_OFF_G_W_HEAD   + i] = 0;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// host_do_opt_step_trainall: the TRAIN_ALL regime per-step optimizer — mirrors the kernel do_opt(freeze=0)
+// which steps EVERY learnable region in the S1_OPT_REGIONS table (NOT just EMBED + W_HEAD). It iterates the
+// H_OPT_REGIONS table GENERICALLY (loop over rows, branch on is_code) so it stays correct if the table
+// changes — no hand-coded 14 regions. For each region:
+//   - read back the freshly-committed grad g_* from DDR (mode-1 do_bwd wrote it),
+//   - per element run the dyadic-Adam step (VALUE path via h_dyadic_adam_value_step for is_code=0, CODE path
+//     via h_dyadic_adam_code_step for is_code=1; both bit-exact to the kernel #else / TB ref branches),
+//   - update the host-tracked m/v/wfp (hbuf M_/V_/WFP_ regions) AND the live deploy region (S1_OFF_*),
+//   - zero the host grad copy (== kernel g_new=0).
+// The caller RESTAGES every live deploy region the forward reads (codes + values) to DDR after this returns.
+// VALUE regions store the int16 master + deploy (int16)wn; CODE regions store the FULL int32 fixed-point
+// master + deploy s1_encode_fine(wn). The exp-clamp on the code path uses the PREVIOUS deploy code
+// (hbuf[dst+i] before this step's write) as the reference, exactly like the kernel PASS B.
+static void host_do_opt_step_trainall(int32_t *buf) {
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) {
+        const struct h_opt_region *R = &H_OPT_REGIONS[r];
+        // read back this region's committed grad from DDR (do_bwd wrote it this kick).
+        readback(R->g_off, buf + R->g_off, (long)R->n);
+        for (int i = 0; i < R->n; i++) {
+            long g   = (int32_t)buf[R->g_off   + i];
+            long m   = (int32_t)buf[R->m_off   + i];
+            long v   = (int32_t)buf[R->v_off   + i];
+            long wfp = (int32_t)buf[R->wfp_off + i];   // value: int16-in-int32; code: full int32 fixed-pt master
+            if (R->is_code) {
+                int32_t prev = (int32_t)buf[R->dst_off + i];           // prev deploy code (exp-clamp reference)
+                int32_t dv = h_dyadic_adam_code_step(g, &m, &v, &wfp, prev);
+                buf[R->m_off   + i] = (int32_t)m;
+                buf[R->v_off   + i] = (int32_t)v;
+                buf[R->wfp_off + i] = (int32_t)wfp;    // full int32 fixed-point master (NOT (int16))
+                buf[R->dst_off + i] = dv;              // live dyadic CODE the next forward reads
+            } else {
+                int32_t dv = h_dyadic_adam_value_step(g, &m, &v, &wfp);
+                buf[R->m_off   + i] = (int32_t)m;
+                buf[R->v_off   + i] = (int32_t)v;
+                buf[R->wfp_off + i] = (int32_t)(int16_t)wfp;   // int16 master
+                buf[R->dst_off + i] = dv;              // live int16 VALUE the next forward reads
+            }
+            buf[R->g_off + i] = 0;                     // grad-zero (== kernel g_new=0; host-side bookkeeping)
+        }
     }
 }
 
@@ -521,6 +612,110 @@ static int kick(int mode, int a1, int a2, double timeout_s) {
     while (now_s() - t0 < timeout_s) { fpga_pci_peek(bar0, R_AP_CTRL, &ctrl); if (ctrl & AP_DONE) return 0; }
     fprintf(stderr, "[s1] KICK HUNG (mode=%d a1=%d, no AP_DONE in %.1fs)\n", mode, a1, timeout_s);
     return -1;
+}
+
+// ----------------------------------------------------------------------------
+// diag_do_opt_writes — do_opt STEP WRITE-WALL DIAGNOSTIC (host-only, runs ONCE before the training loop).
+//
+// WHY: the flat-CE result only proved the LIVE deploy region (the forward-read dst) does not change on
+// silicon under do_opt(STEP) — it NEVER probed whether do_opt's OTHER m_axi writes (the wfp/m/v MASTER
+// slots) land. This characterizes PRECISELY which of {wfp_master, m, v, dst_live} the kernel's do_opt(STEP)
+// commits to board DDR. That tells us whether do_opt drops ALL its m_axi writes or ONLY the cross-cast dst
+// (the deploy slot the forward reads back through a DIFFERENT limit=1 cast) — the exact info the m_axi
+// HW-debug / kernel-rebuild decision needs.
+//
+// METHOD (probe region = EMBED, is_code=0 -> stepped in BOTH freeze and trainall, clean value path):
+//   1. Stage KNOWN sentinels into EMBED's g (a nonzero dyadic grad +256 / elt), wfp (100), m (0), v (0).
+//   2. Compute the HOST-PREDICTED post-step wfp/m/v/dst with the bit-exact h_dyadic_adam_value_step.
+//   3. kick(MODE_OPT, S1_OPT_STEP, regime) — the SAME do_opt(STEP) the on-fabric trainer would use.
+//   4. Read the wfp/m/v/dst slots back from DDR; for EACH of the 4 report: did it CHANGE from the staged
+//      value? does it MATCH the host prediction? Print a clear table.
+//
+// NON-CORRUPTING: the probe writes the REAL EMBED region's optimizer slots, so AFTER reporting it RESTORES
+// the canonical state by RE-STAGING the real EMBED deploy + its g/wfp/m/v masters from hbuf (the host owns
+// the canonical buffer; hbuf still holds the post-host_do_opt_init values, untouched by this probe). The
+// training loop therefore begins from the exact staged init, as if the probe never ran. Self-contained.
+//
+// regime = the a2 (S1_OPT_FREEZE_CODES | S1_OPT_TRAIN_ALL) the run uses, so the probed do_opt(STEP) matches.
+static int diag_do_opt_writes(int32_t *buf, int regime) {
+    const long n   = (long)S1_V * S1_D;        // EMBED element count
+    const long G   = S1_OFF_G_EMBED;
+    const long WFP = S1_OFF_WFP_EMBED;
+    const long M   = S1_OFF_M_EMBED;
+    const long V   = S1_OFF_V_EMBED;
+    const long DST = S1_OFF_EMBED;             // the LIVE deploy region the forward reads
+    const int32_t SENT_G   = 256;              // nonzero dyadic grad sentinel (+256 / element)
+    const int32_t SENT_WFP = 100;              // master sentinel
+    const int32_t SENT_M   = 0;
+    const int32_t SENT_V   = 0;
+    const int32_t SENT_DST = 12345;            // a distinctive live-slot sentinel (so "UNCHANGED" is provable)
+
+    printf("[s1] ============================================================\n");
+    printf("[s1] DIAG do_opt WRITE-WALL probe (region=EMBED, regime=%s): sentinel-stage -> kick STEP -> readback\n",
+           regime == S1_OPT_TRAIN_ALL ? "TRAIN_ALL" : "FREEZE_CODES");
+
+    // 1. stage sentinels into EMBED's g/wfp/m/v + the live dst. stage() bursts from hbuf[off..], so the sentinels
+    //    must transit hbuf — but hbuf holds the CANONICAL post-init state, so SAVE the five EMBED windows (b*),
+    //    overwrite hbuf with the sentinels, stage, kick, then RESTORE the saved windows + re-stage (step 5) so
+    //    training begins from the exact staged init.
+    static int32_t bg[S1_V * S1_D], bw[S1_V * S1_D], bm[S1_V * S1_D], bv[S1_V * S1_D], bd[S1_V * S1_D];
+    for (long i = 0; i < n; i++) { bg[i] = buf[G+i]; bw[i] = buf[WFP+i]; bm[i] = buf[M+i]; bv[i] = buf[V+i]; bd[i] = buf[DST+i]; }
+    for (long i = 0; i < n; i++) { buf[G+i] = SENT_G; buf[WFP+i] = SENT_WFP; buf[M+i] = SENT_M; buf[V+i] = SENT_V; buf[DST+i] = SENT_DST; }
+    int rc = 0;
+    rc |= stage(G, n); rc |= stage(WFP, n); rc |= stage(M, n); rc |= stage(V, n); rc |= stage(DST, n);
+    { int32_t fl[1]; readback(G, fl, 1); }   // flush posted writes before the kick
+    if (rc) { fprintf(stderr, "[s1] DIAG do_opt: sentinel stage failed rc=%d\n", rc); }
+
+    // 2. host-predicted post-STEP wfp/m/v/dst for the EMBED value path (bit-exact to the kernel #else branch).
+    long pm = SENT_M, pv = SENT_V, pwfp = SENT_WFP;
+    int32_t pdst = h_dyadic_adam_value_step((long)SENT_G, &pm, &pv, &pwfp);   // updates pm/pv/pwfp in place
+    int32_t pred_wfp = (int32_t)(int16_t)pwfp, pred_m = (int32_t)pm, pred_v = (int32_t)pv, pred_dst = pdst;
+
+    // 3. kick the SAME do_opt(STEP) the on-fabric trainer would issue (mode 2, a1=STEP, a2=regime).
+    if (kick(MODE_OPT, S1_OPT_STEP, regime, 10.0)) {
+        fprintf(stderr, "[s1] DIAG do_opt: STEP kick hung\n");
+        // still attempt the restore below so training state is clean.
+    }
+
+    // 4. read the four slots back from DDR and classify each.
+    int32_t r_wfp = 0, r_m = 0, r_v = 0, r_dst = 0;
+    readback(WFP, &r_wfp, 1); readback(M, &r_m, 1); readback(V, &r_v, 1); readback(DST, &r_dst, 1);
+    // (element 0 is representative — every element got the identical sentinel + grad, so the per-element
+    //  prediction is the same for all; reading lane 0 suffices to classify the write behavior.)
+    struct { const char *name; int32_t staged, got, pred; } slot[4] = {
+        { "wfp_master", SENT_WFP, r_wfp, pred_wfp },
+        { "m",          SENT_M,   r_m,   pred_m   },
+        { "v",          SENT_V,   r_v,   pred_v   },
+        { "dst_live",   SENT_DST, r_dst, pred_dst },
+    };
+    printf("[s1] DIAG do_opt STEP write table (EMBED lane0; staged sentinel -> DDR readback vs host prediction):\n");
+    for (int k = 0; k < 4; k++) {
+        int changed = (slot[k].got != slot[k].staged);
+        int matches = (slot[k].got == slot[k].pred);
+        printf("[s1]   %-10s : staged=%-7d got=%-7d pred=%-7d -> %s%s\n",
+               slot[k].name, slot[k].staged, slot[k].got, slot[k].pred,
+               changed ? "CHANGED" : "UNCHANGED",
+               changed ? (matches ? "+matches" : "+MISMATCH") : (matches ? "" : " (the dropped write)"));
+    }
+    int any_changed = (r_wfp != SENT_WFP) || (r_m != SENT_M) || (r_v != SENT_V) || (r_dst != SENT_DST);
+    int dst_changed = (r_dst != SENT_DST);
+    if (!any_changed)
+        printf("[s1] DIAG VERDICT: do_opt STEP drops ALL m_axi writes (wfp/m/v/dst all UNCHANGED) -> kernel m_axi STEP path dead on silicon\n");
+    else if (any_changed && !dst_changed)
+        printf("[s1] DIAG VERDICT: do_opt STEP commits the MASTER/STATE writes (wfp/m/v) but DROPS the cross-cast dst_live (deploy) write\n");
+    else
+        printf("[s1] DIAG VERDICT: do_opt STEP commits including dst_live -> the on-fabric optimizer DOES write the deploy region (re-examine the flat-CE cause)\n");
+
+    // 5. RESTORE the canonical EMBED state: rewrite hbuf's real values (saved in b*) back, re-stage to DDR so
+    //    training begins from the exact staged init (the probe is side-effect-free on the training trajectory).
+    for (long i = 0; i < n; i++) { buf[G+i] = bg[i]; buf[WFP+i] = bw[i]; buf[M+i] = bm[i]; buf[V+i] = bv[i]; buf[DST+i] = bd[i]; }
+    rc = 0;
+    rc |= stage(G, n); rc |= stage(WFP, n); rc |= stage(M, n); rc |= stage(V, n); rc |= stage(DST, n);
+    { int32_t fl[1]; readback(DST, fl, 1); }   // flush the restore before training reads it
+    if (rc) fprintf(stderr, "[s1] DIAG do_opt: canonical EMBED restore stage failed rc=%d\n", rc);
+    printf("[s1] DIAG do_opt: canonical EMBED (g/wfp/m/v/dst) restored from hbuf -> training state clean\n");
+    printf("[s1] ============================================================\n");
+    return 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -735,23 +930,53 @@ int main(int argc, char **argv) {
     //    needs them in DDR since do_opt is bypassed) — zeroed by the init buffer-clear (m=v=0 fresh state).
     //    THE RECIPE CONVERGES (g++ csim D=64): MODE-3 120-step FREEZE CE 4.1627 -> 2.4761 (drop 1.69, acc
     //    0->24); a bit-exact host replica of the SAME VALUE dyadic-Adam STEP drops CE on silicon identically.
+
+    // 3c. do_opt WRITE-WALL DIAGNOSTIC (host-only, once, before training): characterize PRECISELY which of
+    //     {wfp_master, m, v, dst_live} the kernel do_opt(STEP) commits to DDR (the flat-CE only proved dst_live
+    //     does not move). Runs on the real EMBED region with sentinels, then RESTORES the canonical EMBED state
+    //     from hbuf so training begins from the exact staged init. Tells the m_axi HW-debug whether do_opt drops
+    //     ALL its writes or ONLY the cross-cast dst.
+    diag_do_opt_writes(hbuf, a2);
+
+    // CODE-MOVEMENT DISCRIMINATOR (the honest "did the dense backbone TRAIN" check, == TB count_code_changes):
+    // snapshot the live code-region bytes BEFORE training; count how many moved AFTER. FREEZE keeps codes frozen
+    // (expect 0); TRAIN_ALL trains them (expect >0 = the backbone genuinely updated from FPGA-computed grads).
+    long n_code = 0;
+    for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) if (H_OPT_REGIONS[r].is_code) n_code += H_OPT_REGIONS[r].n;
+    int8_t *code_snap = (int8_t *)malloc(n_code > 0 ? (size_t)n_code : 1);
+    { long o = 0; for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) if (H_OPT_REGIONS[r].is_code)
+        for (long p = 0; p < H_OPT_REGIONS[r].n; p++) code_snap[o++] = (int8_t)(hbuf[H_OPT_REGIONS[r].dst_off + p] & 0xFF); }
+
     double tk = now_s();
     printf("[s1] HOST-DRIVEN training (HOST-SIDE optimizer, do_opt bypassed): %d steps of "
-           "{mode0 fwd, mode1 bwd, HOST dyadic-Adam VALUE step, BAR4 restage EMBED+W_HEAD} regime=FREEZE_CODES\n",
-           n_steps);
+           "{mode0 fwd, mode1 bwd, HOST dyadic-Adam %s step, BAR4 restage %s} regime=%s\n",
+           n_steps, trainall ? "ALL-REGION (value+code)" : "VALUE",
+           trainall ? "ALL live regions (codes+values)" : "EMBED+W_HEAD",
+           trainall ? "TRAIN_ALL" : "FREEZE_CODES");
     for (int step = 0; step < n_steps; step++) {
         if (kick(MODE_FWD, 0, 0, 10.0)) return 8;   // forward + CE -> grad_logit + activation saves (commits)
-        if (kick(MODE_BWD, 0, 0, 10.0)) return 8;   // backward -> g_EMBED / g_W_HEAD (commits, verified above)
-        // HOST optimizer STEP (FREEZE_CODES value path): readback g_*, dyadic-Adam VALUE step on EMBED+W_HEAD,
-        // update host-tracked m/v/wfp + the live deploy values hbuf[S1_OFF_EMBED]/[S1_OFF_W_HEAD]. NO do_opt kick.
-        host_do_opt_step_freeze(hbuf);
-        // BAR4-RESTAGE the two updated LIVE regions back to DDR so the NEXT forward reads the stepped weights.
-        if (stage(S1_OFF_EMBED,  (long)S1_V * S1_D)) return 8;
-        if (stage(S1_OFF_W_HEAD, (long)S1_V * S1_D)) return 8;
+        if (kick(MODE_BWD, 0, 0, 10.0)) return 8;   // backward -> g_* (commits, verified above)
+        // HOST optimizer STEP: readback g_*, dyadic-Adam step, update host-tracked m/v/wfp + the live deploy
+        // regions the next forward reads. NO do_opt kick. Dispatch on regime:
+        //   trainall -> host_do_opt_step_trainall (steps EVERY region: codes via the code path, values via the
+        //               value path; restage ALL live deploy regions below).
+        //   freeze   -> host_do_opt_step_freeze (steps only EMBED+W_HEAD; the silicon-proven path, UNCHANGED).
+        if (trainall) host_do_opt_step_trainall(hbuf);
+        else          host_do_opt_step_freeze(hbuf);
+        // BAR4-RESTAGE the updated LIVE region(s) back to DDR so the NEXT forward reads the stepped weights.
+        if (trainall) {
+            // restage EVERY live deploy region (codes + values) the forward reads — iterate the table generically.
+            for (int r = 0; r < S1_NUM_OPT_REGIONS; r++)
+                if (stage(H_OPT_REGIONS[r].dst_off, (long)H_OPT_REGIONS[r].n)) return 8;
+        } else {
+            if (stage(S1_OFF_EMBED,  (long)S1_V * S1_D)) return 8;
+            if (stage(S1_OFF_W_HEAD, (long)S1_V * S1_D)) return 8;
+        }
         // FLUSH: the BAR4 burst writes are posted/write-combined; a read-after-write (bar4r, same physical BAR4)
         // forces them to land before the next mode-0 kick reads them (the same ordering the post-stage sanity
         // readback relies on; without it the kernel can race ahead and read stale weights -> flat CE).
-        { int32_t fl[1]; readback(S1_OFF_EMBED, fl, 1); readback(S1_OFF_W_HEAD, fl, 1); (void)fl; }
+        { int32_t fl[1]; readback(S1_OFF_EMBED, fl, 1); readback(S1_OFF_W_HEAD, fl, 1);
+          if (trainall) readback(S1_OFF_WQ, fl, 1); (void)fl; }
         if (step == 0 || (step + 1) % 20 == 0) {
             if (kick(MODE_FWD, 0, 0, 10.0)) return 8;   // clean forward on the just-staged weights -> fresh LOGITS
             readback(S1_OFF_LOGITS,  hbuf + S1_OFF_LOGITS,  (long)S1_L_SEQ * S1_V);
@@ -787,9 +1012,18 @@ int main(int argc, char **argv) {
     long max_rowsum = 0;
     for (int t = 0; t < S1_L_SEQ; t++) { long rs = 0; for (int v = 0; v < S1_V; v++) rs += (int32_t)hbuf[S1_OFF_GRAD_LOGIT + t * S1_V + v]; if (labs(rs) > max_rowsum) max_rowsum = labs(rs); }
 
+    // count how many live CODE bytes moved vs the pre-training snapshot (the dense-backbone-trained discriminator).
+    long codes_moved = 0;
+    { long o = 0; for (int r = 0; r < S1_NUM_OPT_REGIONS; r++) if (H_OPT_REGIONS[r].is_code)
+        for (long p = 0; p < H_OPT_REGIONS[r].n; p++) { if ((int8_t)(hbuf[H_OPT_REGIONS[r].dst_off + p] & 0xFF) != code_snap[o]) codes_moved++; o++; } }
+    free(code_snap);
+
     double floor_ce = log((double)S1_V);
     printf("[s1] FINAL    CE = %.4f   acc = %d/%d   (loss-proxy[0] = %ld)   peak|R| = %ld   max|gradlogit rowsum| = %ld\n",
            ce1, acc1, S1_L_SEQ, loss1_proxy, peakR, max_rowsum);
+    printf("[s1] CODE backbone: %ld / %ld code bytes moved (%s) — the honest 'did the dense backbone TRAIN' check\n",
+           codes_moved, n_code, trainall ? "TRAIN_ALL: expect >0 = backbone trained on FPGA grads"
+                                          : "FREEZE: expect 0 = codes frozen");
     printf("[s1] ============================================================\n");
     printf("[s1] CE %.4f -> %.4f  (drop %.4f nats; uniform/collapse floor = %.4f)   acc %d -> %d/%d\n",
            ce0, ce1, ce0 - ce1, floor_ce, acc0, acc1, S1_L_SEQ);
@@ -808,9 +1042,9 @@ int main(int argc, char **argv) {
            (ce_drops && not_collapsed && acc_improves && peak_ok) ? "CONVERGES (trajectory matches CSIM)" : "NO-CONVERGENCE (inspect)");
     printf("[s1] ============================================================\n");
     // greppable one-line summary for the runner / CSIM-reproduction diff.
-    printf("[S1 RESULT] regime=%s seed=%u n_steps=%d CE0=%.4f CE1=%.4f drop=%.4f floor=%.4f acc0=%d acc1=%d peakR=%ld msPerStep=%.2f ret=%u\n",
+    printf("[S1 RESULT] regime=%s seed=%u n_steps=%d CE0=%.4f CE1=%.4f drop=%.4f floor=%.4f acc0=%d acc1=%d peakR=%ld codes_moved=%ld/%ld msPerStep=%.2f ret=%u\n",
            trainall ? "TRAIN_ALL" : "FREEZE_CODES", seed, n_steps, ce0, ce1, ce0 - ce1, floor_ce,
-           acc0, acc1, peakR, elapsed / (n_steps > 0 ? n_steps : 1) * 1e3, ret);
+           acc0, acc1, peakR, codes_moved, n_code, elapsed / (n_steps > 0 ? n_steps : 1) * 1e3, ret);
 
     free(hbuf);
     fpga_pci_detach(bar0); fpga_pci_detach(bar4); fpga_pci_detach(bar4r);
