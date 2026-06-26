@@ -17,22 +17,45 @@
 #define X_FFN      256       // FFN inner width (4*D)
 #define X_SEQ      64        // sequence length (the per-kick "batch" = one sequence of tokens)
 #define X_VOCAB    64        // vocab size
+#ifndef X_MBITS
 #define X_MBITS    2         // fine-dyadic LayerNorm mantissa bits (1.0..1.75 in 0.25 steps)
+#endif
 #define X_LUT_N    256       // exp2 LUT entries (host-staged ROM)
 
 // activation max-shift targets (keep activations in a fixed int band, like forge_pc_block)
+#ifndef X_ABITS
 #define X_ABITS    9         // hidden-state message band (the cross-chip down message; fits int16)
+#endif
 #define X_EBITS    12        // error message band (the cross-chip up message; fits int16)
-#define X_AT_DELTA 2         // attention softmax gap divisor (Delta = 4)
+#define X_AT_DELTA 2         // (legacy fixed gap divisor — superseded by the adaptive per-row shift below)
 #define X_AT_PFRAC 16        // Q16 attention probabilities
+// ADAPTIVE softmax temperature: the exp2-LUT spans only ~LUT_N gaps, but the L1 scores (~2^14) and the CE
+// logits (~2^19) are far larger -> a fixed >>DELTA saturates the softmax to one-hot (degenerate: hard argmax,
+// no calibration gradient). Instead, per row/token shift the score SPREAD (max-min) down to ~X_SMBITS bits so
+// the gaps land in the LUT's useful range. X_SMBITS ~ 6 => spread maps to ~64 gaps => probs span 1 .. 2^-8.
+#ifndef X_SMBITS
+#define X_SMBITS 6
+#endif
+// PRECISE softmax exp: mantissa LUT 2^(-f/2^X_EXPFRAC), Q16. exp(-d)=G_EXP[frac(d*log2e)]>>int(d*log2e). The
+// raw-gap temperature + fine mantissa recovers the float-softmax attention (the coarse 2^(-g/8) LUT did not).
+#ifndef X_EXPFRAC
+#define X_EXPFRAC 8          // 256-entry mantissa ROM (one octave, fine)
+#endif
+#ifndef X_EXPTEMP
+#define X_EXPTEMP 6          // softmax temperature = 2^X_EXPTEMP: d>>EXPTEMP before exp (L1 score spread ~2^15)
+#endif
 
 // dyadic-Adam (multiplier-free): m,v EMA betas = 1 - 2^-3. NOTE: the master weights here are int16 (small
 // range), so the per-step update must be O(1) integer — the dyadic-Adam step m>>se is already ~sign(m)*adapt
 // (a few), so LR_SHIFT=0 (>0 rounds it to zero = frozen weights). Weight decay on int16 masters must be very
 // gentle (W>>5 = W/32 per step swamps the ±few update); WD_SHIFT>=14 ~ off.
 #define X_ADAM_BSH 3
+#ifndef X_LR_SHIFT
 #define X_LR_SHIFT 0
+#endif
+#ifndef X_WD_SHIFT
 #define X_WD_SHIFT 14
+#endif
 
 // roles / phases (CFG word lanes)
 #define X_PH_FWD   0

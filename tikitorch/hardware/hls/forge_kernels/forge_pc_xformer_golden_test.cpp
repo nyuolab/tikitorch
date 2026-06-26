@@ -9,10 +9,11 @@
 
 static int RV(double s){ double u=0; for(int k=0;k<6;k++) u+=rand()/(double)RAND_MAX; double g=(u-3.0)*s; int v=(int)lround(g); if(v>32767)v=32767; if(v<-32767)v=-32767; return v; }
 static void init(GW &w){ srand(7);
-    for(int i=0;i<X_D*X_D;i++){ w.WQ[i]=RV(8);w.WK[i]=RV(8);w.WV[i]=RV(8);w.WO[i]=RV(8);}
-    for(int i=0;i<X_FFN*X_D;i++) w.WUP[i]=RV(8);
-    for(int i=0;i<X_D*X_FFN;i++) w.WDN[i]=RV(8);
-    for(int i=0;i<X_VOCAB*X_D;i++) w.WHEAD[i]=RV(8);
+    int wf = getenv("WFRAC")?atoi(getenv("WFRAC")):0; int ws = 1<<wf;   // matmul weights stored at x2^WFRAC (fractional master)
+    for(int i=0;i<X_D*X_D;i++){ w.WQ[i]=RV(8)*ws;w.WK[i]=RV(8)*ws;w.WV[i]=RV(8)*ws;w.WO[i]=RV(8)*ws;}
+    for(int i=0;i<X_FFN*X_D;i++) w.WUP[i]=RV(8)*ws;
+    for(int i=0;i<X_D*X_FFN;i++) w.WDN[i]=RV(8)*ws;
+    for(int i=0;i<X_VOCAB*X_D;i++) w.WHEAD[i]=RV(8)*ws;
     for(int i=0;i<X_VOCAB*X_D;i++) w.EMB[i]=RV(16);
     for(int i=0;i<X_SEQ*X_D;i++) w.POS[i]=RV(8);
     for(int d=0;d<X_D;d++){ w.LN1G[d]=64;w.LN2G[d]=64;w.LNFG[d]=64; w.LN1B[d]=0;w.LN2B[d]=0;w.LNFB[d]=0; }
@@ -24,7 +25,7 @@ static void init(GW &w){ srand(7);
 }
 
 int main(){
-    g_lut_init();
+    g_lut_init(); g_exp_init();
     // load tinyshakespeare, build vocab (<=64)
     const char* path = getenv("SHAKESPEARE"); char def[256]; if(!path){ snprintf(def,256,"%s/.cache/tiur/tinyshakespeare.txt",getenv("HOME")); path=def; }
     FILE* f=fopen(path,"rb"); if(!f){ printf("no data at %s\n",path); return 1; }
@@ -37,11 +38,15 @@ int main(){
     static GW w; static GA a; static GG g; init(w);
     int tok[X_SEQ], tgt[X_SEQ];
     srand(123); double accema=-1, probema=-1;
-    for(int step=0; step<2000; step++){
-        long off = rand() % (ndata - X_SEQ - 2);
-        for(int t=0;t<X_SEQ;t++){ tok[t]=data[off+t]; tgt[t]=data[off+t+1]; }
-        g_forward(w,a,tok,tgt);
-        g_backward(w,a,g,tok);
+    const char* ae=getenv("ACCUM"); int ACCUM = ae?atoi(ae):1;   // gradient accumulation = effective batch (batch-of-1 was a 2nd gap)
+    const char* se=getenv("STEPS"); int NSTEP = se?atoi(se):2000;
+    for(int step=0; step<NSTEP; step++){
+        for(int k=0;k<ACCUM;k++){
+            long off = rand() % (ndata - X_SEQ - 2);
+            for(int t=0;t<X_SEQ;t++){ tok[t]=data[off+t]; tgt[t]=data[off+t+1]; }
+            g_forward(w,a,tok,tgt);
+            g_backward(w,a,g,tok, k==0);          // zero on the first sub-step, accumulate the rest
+        }
         g_step(w,g);
         { int c=0; double tp=0; for(int t=0;t<X_SEQ;t++){ i64 mx=-(((i64)1)<<40); int am=0; for(int v=0;v<X_VOCAB;v++){ i64 lv=a.LG[t*X_VOCAB+v]; if(lv>mx){mx=lv;am=v;} } if(am==tgt[t])c++; i64 sm=a.GLOG[t*X_VOCAB+tgt[t]]+((i64)1<<X_AT_PFRAC); tp+=(double)sm/(1<<X_AT_PFRAC);}
           double ac=(double)c/X_SEQ, pr=tp/X_SEQ; accema=accema<0?ac:0.99*accema+0.01*ac; probema=probema<0?pr:0.99*probema+0.01*pr; }

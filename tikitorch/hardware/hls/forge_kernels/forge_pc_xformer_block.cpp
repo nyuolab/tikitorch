@@ -405,7 +405,7 @@ extern "C" void forge_pc_xformer_block(ap_uint<512> *buffer) {
         static int32_t Pcache[X_H*X_SEQ*X_SEQ];
     HEAD: for (int h = 0; h < X_H; h++) {
         AQ: for (int i = 0; i < X_SEQ; i++) {
-                acc_t s[X_SEQ]; acc_t rowmax = (acc_t)-1 << 40;
+                acc_t s[X_SEQ]; acc_t rowmax = (acc_t)-1 << 40; acc_t rowmin = (acc_t)1 << 40;
             SC: for (int j = 0; j < X_SEQ; j++) {
 #pragma HLS PIPELINE II=1
                     if (j > i) { s[j] = (acc_t)-1 << 40; continue; }
@@ -415,13 +415,14 @@ extern "C" void forge_pc_xformer_block(ap_uint<512> *buffer) {
                         data_t diff = Q[i*X_D + h*X_DH + d] - K[j*X_D + h*X_DH + d];
                         l1 += (diff < 0) ? (acc_t)(-diff) : (acc_t)diff;
                     }
-                    s[j] = -l1; if (s[j] > rowmax) rowmax = s[j];
+                    s[j] = -l1; if (s[j] > rowmax) rowmax = s[j]; if (s[j] < rowmin) rowmin = s[j];
                 }
+                int smsh = norm_shift(rowmax - rowmin, X_SMBITS);    // ADAPTIVE softmax temperature (else one-hot)
                 acc_t rowsum = 0; prob_t p[X_SEQ];
             EX: for (int j = 0; j < X_SEQ; j++) {
 #pragma HLS PIPELINE II=1
                     if (j > i) { p[j] = 0; continue; }
-                    int gap = (int)((rowmax - s[j]) >> X_AT_DELTA);
+                    int gap = (int)((rowmax - s[j]) >> smsh);
                     if (gap < 0) gap = 0; if (gap >= X_LUT_N) gap = X_LUT_N - 1;
                     p[j] = LUT[gap]; rowsum += (acc_t)p[j];
                     Pcache[(h*X_SEQ + i)*X_SEQ + j] = (int32_t)p[j];
@@ -491,10 +492,12 @@ extern "C" void forge_pc_xformer_block(ap_uint<512> *buffer) {
             static int32_t tgt[X_SEQ]; bload32(buffer, XO_TGT, tgt, X_SEQ);
             static int32_t GLOG[X_SEQ*X_VOCAB];     // grad_logit is Q16 (up to 2^16) -> MUST be int32, not int16 (wraps)
         CE: for (int t = 0; t < X_SEQ; t++) {
-                acc_t mx = (acc_t)-1 << 40; for (int v = 0; v < X_VOCAB; v++) if ((acc_t)LG[t*X_VOCAB+v] > mx) mx = LG[t*X_VOCAB+v];
+                acc_t mx = (acc_t)-1 << 40; acc_t mn = (acc_t)1 << 40;
+                for (int v = 0; v < X_VOCAB; v++) { acc_t lv = (acc_t)LG[t*X_VOCAB+v]; if (lv > mx) mx = lv; if (lv < mn) mn = lv; }
+                int smsh = norm_shift(mx - mn, X_SMBITS);     // ADAPTIVE CE softmax temperature
                 acc_t sum = 0; prob_t pr[X_VOCAB];
                 for (int v = 0; v < X_VOCAB; v++) {
-                    int gap = (int)((mx - (acc_t)LG[t*X_VOCAB+v]) >> X_AT_DELTA);
+                    int gap = (int)((mx - (acc_t)LG[t*X_VOCAB+v]) >> smsh);
                     if (gap < 0) gap = 0; if (gap >= X_LUT_N) gap = X_LUT_N-1;
                     pr[v] = LUT2[gap]; sum += (acc_t)pr[v];
                 }

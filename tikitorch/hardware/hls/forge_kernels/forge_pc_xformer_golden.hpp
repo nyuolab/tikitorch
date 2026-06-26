@@ -57,10 +57,23 @@ static inline i64 g_applyinvq(i64 cv, int e, int nq) {
     return r;
 }
 
-// ---------- forward: dyadic matmul y[M*O] = sum_i dyadval(W[o*I+i]) * x[t*I+i] ----------
+// FRACTIONAL MASTER: weights stored at x2^WFRAC. The forward applies dyad(w/2^WFRAC) as a SIGNED SHIFT of x
+// (mult-free). The low WFRAC bits of the int16 master act as an error-feedback accumulator -> the integer
+// optimizer's sub-unit steps accumulate + release smoothly (the floored-to-zero / coarse-bounce ceiling fix).
+// WFRAC=0 is bit-identical to the old g_dyadval(w)*x.
+static int g_wfrac = -1;
+static inline i64 g_wapply(i64 w, i64 x) {
+    if (g_wfrac < 0) { const char* e = getenv("WFRAC"); g_wfrac = e ? atoi(e) : 0; }
+    i64 a = w < 0 ? -w : w; if (a == 0) return 0; if (a > 32767) a = 32767;
+    int m = 0; for (int b = 15; b >= 1; b--) if ((a >> b) & 1) { m = b; break; }
+    if (m >= 1 && ((a >> (m - 1)) & 1)) m++;
+    int e = m - g_wfrac; i64 r = (e >= 0) ? (x << e) : (x >> (-e));
+    return w < 0 ? -r : r;
+}
+// ---------- forward: dyadic matmul y[M*O] = sum_i dyad(W[o*I+i]/2^WFRAC) * x[t*I+i] ----------
 static void g_matmul(const i64 *x, const i64 *W, i64 *y, int M, int I, int O) {
     for (int t = 0; t < M; t++) for (int o = 0; o < O; o++) {
-        i64 acc = 0; for (int i = 0; i < I; i++) acc += g_dyadval(W[o * I + i]) * x[t * I + i];
+        i64 acc = 0; for (int i = 0; i < I; i++) acc += g_wapply(W[o * I + i], x[t * I + i]);
         y[t * O + o] = acc;
     }
 }
