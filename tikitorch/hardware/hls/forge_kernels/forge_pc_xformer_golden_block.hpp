@@ -42,6 +42,7 @@ static inline i64 g_exp_q16(i64 d, int smsh) {
     return G_EXP[(int)(u & ((1<<X_EXPFRAC)-1))] >> intp;
 }
 
+static int g_attn_dot=-1;   // 1 = warm DOT-product attention (#3); 0 = L1 (mult-free, capped). Set in g_forward, read in g_backward.
 // ---------------- FORWARD (OUTPUT role): tokens -> logits + grad_logit, caches everything ----------------
 static i64 g_forward(GW &w, GA &a, const int *tok, const int *tgt) {
     for (int t = 0; t < X_SEQ; t++) for (int d = 0; d < X_D; d++) {
@@ -53,9 +54,13 @@ static i64 g_forward(GW &w, GA &a, const int *tok, const int *tgt) {
     g_matmul(a.X1, w.WQ, a.Q, X_SEQ, X_D, X_D); g_rescale(a.Q, X_SEQ*X_D, g_akb);   // Q/K scale sets the attention score spread
     g_matmul(a.X1, w.WK, a.K, X_SEQ, X_D, X_D); g_rescale(a.K, X_SEQ*X_D, g_akb);
     g_matmul(a.X1, w.WV, a.V, X_SEQ, X_D, X_D); g_rescale(a.V, X_SEQ*X_D, X_ABITS);
+    if(g_attn_dot<0){const char*e=getenv("ATTN_DOT");g_attn_dot=e?atoi(e):0;}  // 1 = warm DOT-product attn (#3, the one multiply); 0 = L1 (mult-free, capped)
     for (int h = 0; h < X_H; h++) for (int i = 0; i < X_SEQ; i++) {
         i64 s[X_SEQ]; i64 rowmax = -(((i64)1)<<40); i64 rowmin = (((i64)1)<<40);
-        for (int j = 0; j <= i; j++) { i64 l1 = 0; for (int d = 0; d < X_DH; d++) { i64 df = a.Q[i*X_D+h*X_DH+d]-a.K[j*X_D+h*X_DH+d]; l1 += df<0?-df:df; } s[j] = -l1; if (s[j]>rowmax) rowmax=s[j]; if (s[j]<rowmin) rowmin=s[j]; }
+        for (int j = 0; j <= i; j++) { i64 sc;
+            if (g_attn_dot) { i64 dot=0; for (int d=0;d<X_DH;d++) dot += a.Q[i*X_D+h*X_DH+d]*a.K[j*X_D+h*X_DH+d]; sc = dot>>X_ABITS; }  // DOT score (the allowed multiply), scaled
+            else { i64 l1 = 0; for (int d = 0; d < X_DH; d++) { i64 df = a.Q[i*X_D+h*X_DH+d]-a.K[j*X_D+h*X_DH+d]; l1 += df<0?-df:df; } sc = -l1; }
+            s[j] = sc; if (s[j]>rowmax) rowmax=s[j]; if (s[j]<rowmin) rowmin=s[j]; }
         static int g_asm=-1,g_afix=-2; if(g_asm<0){const char*e=getenv("A_SMBITS");g_asm=e?atoi(e):X_SMBITS;const char*f=getenv("A_FIXTEMP");g_afix=f?atoi(f):-1;}
         int smsh = (g_afix>=0) ? g_afix : g_normshift(rowmax-rowmin, g_asm);  // FIXED temp (preserves close-key structure) or adaptive
         i64 rowsum = 0;
@@ -170,7 +175,8 @@ static void g_backward(GW &w, GA &a, GG &g, const int *tok, bool zero=true) {
         i64 ex=0; for(int j=0;j<=i;j++) ex += (i64)(((__int128)pn[j]*gp[j]) >> X_AT_PFRAC);  // MUL (128b)
         for(int j=0;j<=i;j++){
             i64 gs=(i64)(((__int128)pn[j]*(gp[j]-ex)) >> X_AT_PFRAC);                // MUL (softmax bwd, 128b)
-            for(int d=0;d<X_DH;d++){ i64 df=a.Q[i*X_D+h*X_DH+d]-a.K[j*X_D+h*X_DH+d]; int sg=df>0?1:(df<0?-1:0);
+            if (g_attn_dot) { for(int d=0;d<X_DH;d++){ gQ[i*X_D+h*X_DH+d]+= (gs*a.K[j*X_D+h*X_DH+d])>>X_ABITS; gK[j*X_D+h*X_DH+d]+= (gs*a.Q[i*X_D+h*X_DH+d])>>X_ABITS; } }  // DOT grad (s=Q.K>>ABITS -> dQ=gs.K>>ABITS)
+            else for(int d=0;d<X_DH;d++){ i64 df=a.Q[i*X_D+h*X_DH+d]-a.K[j*X_D+h*X_DH+d]; int sg=df>0?1:(df<0?-1:0);
                 gQ[i*X_D+h*X_DH+d]+= -gs*sg; gK[j*X_D+h*X_DH+d]+= gs*sg; }                 // L1 subgradient (mult-free)
             for(int d=0;d<X_DH;d++) gV[j*X_D+h*X_DH+d]+= (i64)(((__int128)pn[j]*gATTN[i*X_D+h*X_DH+d]) >> X_AT_PFRAC); // MUL (128b)
         }
