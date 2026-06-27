@@ -16,7 +16,9 @@
 #ifndef X_LOG2_D
 #define X_LOG2_D   6
 #endif
+#ifndef X_H
 #define X_H        2         // attention heads
+#endif
 #ifndef X_DH
 #define X_DH       32        // head dim (H*DH == D)
 #endif
