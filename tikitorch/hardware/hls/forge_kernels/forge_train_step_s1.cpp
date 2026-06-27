@@ -527,6 +527,14 @@ ROW: for (int i = 0; i < S1_L_SEQ; i++) {
             if (sc > bestS) { bestS = sc; jstar = j; }
         }
 
+#if S1_ATTN_HARD
+        // MULT-FREE deploy: argmax-GATHER out=V[jstar] (skip softmax + p*V blend -> DSP=0). jstar from SCORE.
+    WOUTH: for (int dh = 0; dh < S1_DH; dh++) {
+#pragma HLS PIPELINE II=1
+            out[i][dh] = sat16((acc_t)V[jstar][dh]);
+        }
+        jstar_save[i] = jstar;
+#else
         acc_t rowsum = 0;
     EXP: for (int j = 0; j < S1_L_SEQ; j++) {
 #pragma HLS PIPELINE II=1
@@ -575,6 +583,7 @@ ROW: for (int i = 0; i < S1_L_SEQ; i++) {
         if (p_off >= 0)
             burst_store_i32(p_row, buffer, p_off + i * S1_TILE_ATTNP, S1_TILE_ATTNP);
         jstar_save[i] = jstar;
+#endif
     }
 }
 

@@ -108,6 +108,12 @@
 #ifndef S1_HEAD_MODE
 #define S1_HEAD_MODE  0
 #endif
+// ATTENTION DEPLOY MODE — 0 = soft exp2-LUT-softmax p*V blend (training; the 1 attention DSP); 1 = the
+// validated MULT-FREE deploy: argmax-GATHER out=V[jstar] (skip softmax+blend -> DSP=0). jstar is computed
+// either way. The tropical LLM (scripts/tropical_llm.py, hard 2.42 bpc) deploys with S1_ATTN_HARD=1.
+#ifndef S1_ATTN_HARD
+#define S1_ATTN_HARD  0
+#endif
 
 // ----------------------------------------------------------------------------
 // POSITIONAL EMBEDDING (S1_POS_EMBED) — the context-localization fix.
