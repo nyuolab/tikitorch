@@ -1008,6 +1008,7 @@ HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
     return 0;
 }
 
+#if !S1_FWD_ONLY   // ---- training-only (do_bwd / do_opt / do_train_run); forward-only deploy gates these out ----
 // =============================================================================
 // ======================  MODE 1 (BACKWARD) — do_bwd  =========================
 // =============================================================================
@@ -2323,6 +2324,8 @@ S1_STEP_LOOP: for (int s = 0; s < n_steps; s++) {
     return 0;
 }
 
+#endif  // !S1_FWD_ONLY
+
 // =============================================================================
 // Top-level dispatcher — mirror forge_train_step_morph_lm.cpp ABI/pragmas.
 // =============================================================================
@@ -2351,15 +2354,21 @@ extern "C" int forge_train_step_s1(
     // duplicate copy of do_fwd_loss + do_bwd + do_opt (~904k LUT, ~half the kernel). limit=1 collapses the
     // duplicate to a single shared instance (mode 3 just re-sequences the same engines; bit-exact unchanged).
 #pragma HLS ALLOCATION function instances=do_fwd_loss limit=1
+#if !S1_FWD_ONLY
 #pragma HLS ALLOCATION function instances=do_bwd      limit=1
 #pragma HLS ALLOCATION function instances=do_opt      limit=1
+#endif
 
     (void)a3;
     if (mode == 0) return do_fwd_loss(buffer);
+#if !S1_FWD_ONLY
     if (mode == 1) return do_bwd(buffer);
     // mode 2: dyadic-Adam. a1 = S1_OPT_STEP | S1_OPT_INIT ; a2 = S1_OPT_TRAIN_ALL | S1_OPT_FREEZE_CODES.
     if (mode == 2) return do_opt(buffer, a1, a2);
     // mode 3: fused trainer. a1 = n_steps (ONE host kick) ; a2 = S1_OPT_TRAIN_ALL | S1_OPT_FREEZE_CODES.
     if (mode == 3) return do_train_run(buffer, a1, a2);
+#else
+    (void)a1; (void)a2;
+#endif
     return 99;
 }

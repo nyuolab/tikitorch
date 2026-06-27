@@ -8,7 +8,7 @@ set target_part "xcvu47p-fsvh2892-2L-e"
 set target_period_ns 4.0
 
 open_project -reset $proj_dir
-add_files forge_train_step_s1.cpp -cflags "-DS1_ATTN_HARD=1 -DS1_HEAD_MODE=1 -DS1_POS_EMBED=1 -DS1_N_LAYERS=2"
+add_files forge_train_step_s1.cpp -cflags "-DS1_FWD_ONLY=1 -DS1_ATTN_HARD=1 -DS1_HEAD_MODE=1 -DS1_POS_EMBED=1 -DS1_N_LAYERS=2"
 
 open_solution -reset solution1
 set_top $top

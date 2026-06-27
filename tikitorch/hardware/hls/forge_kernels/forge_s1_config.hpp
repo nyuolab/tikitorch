@@ -116,6 +116,12 @@
 #ifndef S1_ATTN_HARD
 #define S1_ATTN_HARD  0
 #endif
+// FORWARD-ONLY DEPLOY build: gate out the training functions (do_bwd / do_opt / do_train_run) so the AFI is a
+// lean inference kernel (mode-0 only). The full trainer is huge (bwd ~14 GEMM PEs, fused-opt 13ns path); the
+// deploy needs only do_fwd_loss. Use -DS1_FWD_ONLY=1 (with S1_ATTN_HARD=1) for the tropical-LLM inference AFI.
+#ifndef S1_FWD_ONLY
+#define S1_FWD_ONLY   0
+#endif
 
 // ----------------------------------------------------------------------------
 // POSITIONAL EMBEDDING (S1_POS_EMBED) — the context-localization fix.
