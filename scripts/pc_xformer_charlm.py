@@ -124,16 +124,44 @@ def main():
         ix = torch.randint(0, len(data)-BLOCK-1, (BATCH,))
         x = torch.stack([data[i:i+BLOCK] for i in ix]); y = torch.stack([data[i+1:i+1+BLOCK] for i in ix])
         return x.to(DEV), y.to(DEV)
+    # STALE_DELAY simulates the no-global-sync bubble-free pipeline: each layer's gradient is applied D steps
+    # late (the pipeline round-trip), so every update uses a D-step-stale gradient. Backprop forbids this (one
+    # global backward); PC tolerates it (local credit assignment). STALE_PERLAYER makes the delay grow with
+    # block depth (block l lags ~ l+1 steps), the faithful pipeline schedule. 0 = synchronous baseline.
+    STALE = int(os.environ.get("STALE_DELAY", 0))
+    PERLAYER = int(os.environ.get("STALE_PERLAYER", 0))
+    params = list(model.parameters())
+    # per-param delay: uniform STALE, or (block-index+1)-scaled if per-layer
+    def pdelay(p):
+        if not PERLAYER: return STALE
+        nm = pnames.get(id(p), "")
+        import re as _re; m = _re.search(r"blocks\.(\d+)\.", nm)
+        return (int(m.group(1))+1) * STALE if m else STALE
+    pnames = {id(p): n for n, p in model.named_parameters()}
+    gqueues = {id(p): [] for p in params}            # per-param FIFO of stale grad snapshots
     t0 = time.time()
     for step in range(STEPS):
         lr = LR * min(1.0, (step+1)/max(1,WARMUP))       # linear warmup
         x, y = get_batch()
         loss = F.cross_entropy(model(x).reshape(-1, vocab), y.reshape(-1))
         model.zero_grad(set_to_none=True); loss.backward()
-        if opt:
+        if STALE > 0:                                     # delay each grad by its pipeline depth
+            ready = True
+            for p in params:
+                if p.grad is None: continue
+                q = gqueues[id(p)]; q.append(p.grad.detach().clone())
+                d = pdelay(p)
+                if len(q) > d: p.grad = q.pop(0)          # apply the d-step-stale grad
+                else: p.grad = None; ready = False        # still filling the pipe
+            if ready or step >= STALE:
+                if opt:
+                    for g in opt.param_groups: g['lr']=lr
+                    opt.step()
+                else: dyadic_adam(params, lr)
+        elif opt:
             for g in opt.param_groups: g['lr']=lr
             opt.step()
-        else: dyadic_adam(list(model.parameters()), lr)
+        else: dyadic_adam(params, lr)
         if step % 250 == 0 or step == STEPS-1:
             print(f"  step {step:5d}  bpb={loss.item()/math.log(2):.3f}  lr={lr:.1e}  {(time.time()-t0):.0f}s", flush=True)
     # sample

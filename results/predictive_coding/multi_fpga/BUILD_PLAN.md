@@ -7,21 +7,51 @@ TinyShakespeare. Honest claim = *the parallel model works and projects favorably
 
 **PRECISION DECISION (locked 2026-06-27):** the FULLY-multiplier-free integer recipe CAPS at ~0.20 acc (gibberish)
 and does NOT scale away (measured int golden D=64 0.19, D=128 peaks 0.20 then declines; the diffuse integer
-realization is a hard, scale-invariant wall — optimizer/backward/precision/block-scaling/attention all ruled out).
-So we ADMIT low-precision multiplication: train the bulk in **BF16 (de-risk, robust, FPGA-native) → MXFP8 for
-throughput** (4-bit-mantissa multiplies, ~4× cheaper than BF16, with a per-block POWER-OF-2 scale that stays
-mult-free — the tropical-adjacent flavor we keep). The NOVEL thesis is now SOLELY the **PC-distributed-no-global-
-sync architecture + bubble-free pipeline** — all precision-INDEPENDENT, fully intact under BF16/FP8. Total
-multiplier elimination is the documented RESEARCH DIRECTION (the diffuse-int-gap problem). Novel angle to measure:
-PC's *local* errors may tolerate lower precision (FP8/FP6) than backprop needs (no whole-depth dynamic range).
+realization is a hard, scale-invariant wall). So we ADMIT low-precision multiplication: train in **BF16 (de-risk,
+robust, FPGA-native) → MXFP8 for throughput** (4-bit-mantissa multiplies, ~4× cheaper than BF16, with a per-block
+POWER-OF-2 scale that stays mult-free — the tropical-adjacent flavor we keep). The NOVEL thesis is now SOLELY the
+**PC-distributed-no-global-sync architecture + bubble-free pipeline** — all precision-INDEPENDENT, fully intact
+under BF16/FP8. Total multiplier elimination is the documented RESEARCH DIRECTION.
+
+**WHERE the wall actually is (triangulated 2026-06-27, torch char-LM D=256, TinyShakespeare):** the cap is NOT the
+multiplier-free *forward* — it's the fully-*integer backward + optimizer*. Measured, same recipe, same scale:
+- mult-free **forward** (dyadic weights + int16 acts + dot attn) + **float** backward/optimizer → **2.016 bpb,
+  COHERENT** (recognizable Shakespeare: *"One word and death... Lest honour him; all harm-on faired come"*).
+- **full BF16** (forward + backward + optimizer) → **1.732 bpb, MORE coherent** (character names, dialogue).
+- **fully-integer** golden (int cascade backward + int16-master dyadic-Adam) → **caps 0.20, gibberish**.
+So the diffuse-int wall lives in the **int backward + int16-master optimizer**, not the forward. **Refined recipe:
+keep the forward multiplier-free (validated coherent + the throughput-critical bulk → DSP-adder array survives) and
+spend BF16 only on the backward + optimizer** (where the int realization actually fails). Build BF16-everywhere
+first (most robust, 1.73 bpb), then reclaim the mult-free forward as a throughput lever (≈+0.28 bpb cost, keeps the
+thesis). Novel angle still open: PC's *local* errors may tolerate lower precision (FP8/FP6) than backprop's
+whole-depth dynamic range — measure on the backward/optimizer where the int wall sits.
 
 ## Why PC-on-FPGA can do this (the parallelism — measured-grounded projection in scripts/pc_pipeline_throughput.py)
 
-1. **Bubble-free pipeline parallelism** — PC has NO global backward, so no pipeline-flush bubble (the thing that
-   bleeds GPU model-parallel). Projected **8–17× over the serial driver**; ~2× the utilization of GPipe at M~L.
-2. **All layers train simultaneously** (local credit assignment) — the whole depth is live, continuous microbatch
-   stream. 3. **Async / staleness-tolerant** (no global sync; measured ~0.6pp at 50% stale). 4. **Weight-stationary
-   dataflow + the DSP-as-adder array** (mult-free bulk → ~9000 idle DSP48 become a parallel shift-add fabric).
+1. **Pipeline parallelism, all chips busy** — the whole depth is live on a continuous microbatch stream (local
+   credit assignment: each chip updates from its OWN error, no global all-reduce / no global gradient).
+   Projected **8–17× over the serial driver** (the serial driver runs one chip at a time; pipelining fills all L).
+2. **No global gradient / no all-reduce** — the genuine structural win: weight updates are per-chip-local. This is
+   precision-independent and intact under BF16/FP8.
+3. **Weight-stationary dataflow + the DSP-as-adder array** (mult-free bulk → ~9000 idle DSP48 become a parallel
+   shift-add fabric). 4. **Replication × token-parallel** (measured 4.00× linear).
+
+**⚠ STALENESS — corrected (measured 2026-06-27, torch char-LM D=128 L=4, TinyShakespeare).** There are TWO distinct
+"staleness" claims and they do NOT both hold; the BUILD must respect this:
+- **Error-relaxation staleness (TYPE 1, TOLERATED):** using *stale neighbour activation/error messages* in the
+  local error computation — the iterative-PC relaxation is stable under this (the old MLP "~0.6pp at 50% stale"
+  result). This is the real async win: the backward error sweep need NOT drain in strict lockstep.
+- **Weight staleness (TYPE 2, NOT tolerated):** applying a gradient computed `k` weight-updates ago (the naive
+  per-microbatch async update across a deep pipeline → staleness = pipeline depth). MEASURED bpb vs sync 2.457:
+  stale-1 **2.639 (+0.18, OK)**, stale-2 3.209, stale-4 3.747, stale-8 4.478. **Only ~1 step is tolerable**, and
+  **LR-scaling does NOT recover it** (matched LR=1.2e-3: stale-0 2.482 vs stale-8 3.747). Self-consistent grads
+  (weight-stashed, PipeDream-2BW best case) still degrade — it's the *magnitude*, not consistency.
+- **⇒ BUILD RULE:** the pipeline MUST bound weight-staleness to ~1 via **per-chip gradient accumulation** (freeze
+  weights over an aligned window W, accumulate the local error, apply once → effective staleness ~1, the
+  pipeline stays full, cost = a W× larger effective batch — standard). This is *pipelined gradient accumulation
+  with a local backward*, NOT "drop a round, train fully async." The earlier "async/staleness-tolerant" framing
+  conflated TYPE 1 with TYPE 2 and is REFUTED for weight updates. The throughput projection (8–17× over serial)
+  SURVIVES — it comes from filling all chips, which accumulation does not impede.
    5. **Replication × token-parallel** (measured 4.00× linear). **Projection: 124M → coherent-overfit
    TinyShakespeare in SINGLE-DIGIT HOURS on one f2.48xlarge-class fabric** (PROJECTED, contingent on the build).
 
