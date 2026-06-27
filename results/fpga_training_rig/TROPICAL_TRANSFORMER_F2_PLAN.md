@@ -12,7 +12,7 @@ gap *shrinks* to +0.043 at D=256). The whole deploy datapath is DSP=0.
 |---|---|---|---|
 | token embed + **positional embed** | int gather + int add | s1 `S1_POS_EMBED` (added, grad-checked, byte-id-off) | 0 |
 | Q/K/V/O projections | dyadic GEMM (±2^k shift-add) | `forge_fwd_gemm` / s1 dyadic GEMM (csynth-closed) | 0 |
-| **attention** | L1 score + argmax-GATHER | **`forge_attn_maxplus`** (this commit; csynth in flight) | **0** |
+| **attention** | L1 score + argmax-GATHER | **`forge_attn_maxplus`** (csynth MEASURED: DSP=0, 2.920ns≤4.0, ~5% LUT/SLR) | **0** |
 | FFN (up/ReLU/down) | dyadic GEMM + ReLU | `forge_fwd_gemm` + `forge_relu` (csynth-closed) | 0 |
 | LayerNorm | fine-dyadic (shift mean) | `forge_layernorm` (csynth-closed, bit-exact) | 0 |
 | **LM head** | dyadic GEMM | s1 `S1_HEAD_MODE=1` (added, FD-grad-checked) | 0 |
@@ -47,7 +47,9 @@ backward audit), OR accept warm-train (Route A). The forward/optimizer are prove
 one piece to harden.
 
 ## De-risk order (no AFI until each csynth/CPU gate passes — the s1 discipline)
-1. **[in flight]** csynth `forge_attn_maxplus` → confirm DSP=0 + timing (the mult-free attention hardware claim).
+1. **✅ DONE** csynth `forge_attn_maxplus` → **DSP=0, 2.920 ns ≤ 4.0 (closes), ~5% LUT/SLR, FF/BRAM negligible,
+   URAM=0** (vs `forge_attn` soft-blend DSP=128). The mult-free attention hardware claim is MEASURED on Vitis.
+   Report: `forge_attn_maxplus_csynth.rpt`.
 2. CPU/csim: assemble the full tropical-transformer forward from the existing kernels at the validated config,
    bit-exact vs the torch reference; confirm the assembled forward reproduces the 2.276 bpc deploy number.
 3. Route A AFI: forward-only (inference) tropical transformer → run on F2, measure on-silicon bpc + tok/s.
