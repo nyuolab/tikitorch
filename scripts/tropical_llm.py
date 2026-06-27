@@ -22,6 +22,10 @@ def load_corpus():
 
 def dyad(w):  # ±2^k via STE — the mult-free weight
     s=torch.sign(w); a=w.abs().clamp_min(1e-9); k=torch.round(torch.log2(a)); return w+(s*torch.pow(2.,k)-w).detach()
+AQ = 0.0  # activation fake-quant scale for the int-deploy gate (0 = off); set before forward
+def fq(x):
+    if AQ <= 0: return x
+    return torch.clamp(torch.round(x*AQ), -32768, 32767)/AQ   # int16 fixed-point activations
 class DLin(nn.Module):
     def __init__(s,i,o): super().__init__(); s.w=nn.Parameter(torch.randn(o,i)*(1/math.sqrt(i)))
     def forward(s,x): return x@dyad(s.w).t()
@@ -34,7 +38,8 @@ class Block(nn.Module):
         s.register_buffer("cmask", torch.triu(torch.ones(T,T),1).bool())
     def attn(s,x,tau,hard):
         B,T,D=x.shape; H,DH=s.H,s.DH
-        q=s.q(s.ln1(x)).view(B,T,H,DH).transpose(1,2); k=s.k(s.ln1(x)).view(B,T,H,DH).transpose(1,2); v=s.v(s.ln1(x)).view(B,T,H,DH).transpose(1,2)
+        z=fq(s.ln1(x))
+        q=fq(s.q(z)).view(B,T,H,DH).transpose(1,2); k=fq(s.k(z)).view(B,T,H,DH).transpose(1,2); v=fq(s.v(z)).view(B,T,H,DH).transpose(1,2)
         sc=[ -(q[:,h].unsqueeze(2)-k[:,h].unsqueeze(1)).abs().sum(-1) for h in range(H) ]  # -L1, mult-free
         score=torch.stack(sc,1).masked_fill(s.cmask[:T,:T], float("-inf"))
         if hard:  # mult-free deploy: argmax-GATHER
@@ -43,7 +48,7 @@ class Block(nn.Module):
             y=(score/tau).softmax(-1)@v
         return s.o(y.transpose(1,2).reshape(B,T,D))
     def forward(s,x,tau,hard):
-        x=x+s.attn(x,tau,hard); return x+s.dn(F.relu(s.up(s.ln2(x))))
+        x=fq(x+s.attn(x,tau,hard)); return fq(x+s.dn(F.relu(fq(s.up(fq(s.ln2(x)))))))
 
 class TropicalLLM(nn.Module):
     def __init__(s,V,D=192,H=6,L=4,T=128):
