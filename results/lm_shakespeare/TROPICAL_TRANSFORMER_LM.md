@@ -35,3 +35,15 @@ a real char-LM, with an FPGA-friendlier attention op.
 
 ## Reproduce
 `python scripts/tropical_transformer_lm.py --steps 6000 --L 3 --T 64 --bs 64`
+
+## Stress tests (2026-06-27)
+- **Scale (D=256, 2× width, 8k steps):** dense 2.366 / tropical hard 2.408 → **gap +0.043** (vs +0.056 at
+  D=128 — the mult-free gap SHRINKS at scale). NB: D=256 absolute bpc is worse than D=128 = overfitting on
+  tiny tinyshakespeare (~1M chars); the GAP is the signal. A cleaner scale check would use text8_20m.
+- **Top-k deploy is the WRONG op:** top-k=2 hard 3.140, top-k=4 hard 3.941 (both far worse than k=1's 2.276).
+  Cause: training τ-anneals the attention to PEAKY (top-1); uniformly averaging the top-k at deploy fights the
+  trained distribution. **argmax-gather (k=1) is the correct, and simplest-for-hardware, deploy op.**
+
+## Locked recipe
+max-plus **argmax-gather** (k=1) attention + dyadic everything + τ-annealed warm-train → hard deploy.
+~+0.05 bpc behind dense, stable across D=128→256. DSP=0 deploy, FPGA-friendlier attention than softmax.
