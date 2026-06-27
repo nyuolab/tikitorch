@@ -3,8 +3,17 @@
 **NORTH-STAR (locked):** a **~124M** (GPT-2-small) distributed PC transformer trained on the **multi-F2 fabric in
 HOURS**, via a **no-global-sync bubble-free pipeline** that demonstrates the *scalable* architecture → coherent
 TinyShakespeare. Honest claim = *the parallel model works and projects favorably*, NOT "beats an A100 on this toy"
-(a single F2 < a GPU; an A100 does this in minutes). Multiplier-free where it pays (the bulk), warm-trained where
-the multiply is essential (attention).
+(a single F2 < a GPU; an A100 does this in minutes).
+
+**PRECISION DECISION (locked 2026-06-27):** the FULLY-multiplier-free integer recipe CAPS at ~0.20 acc (gibberish)
+and does NOT scale away (measured int golden D=64 0.19, D=128 peaks 0.20 then declines; the diffuse integer
+realization is a hard, scale-invariant wall — optimizer/backward/precision/block-scaling/attention all ruled out).
+So we ADMIT low-precision multiplication: train the bulk in **BF16 (de-risk, robust, FPGA-native) → MXFP8 for
+throughput** (4-bit-mantissa multiplies, ~4× cheaper than BF16, with a per-block POWER-OF-2 scale that stays
+mult-free — the tropical-adjacent flavor we keep). The NOVEL thesis is now SOLELY the **PC-distributed-no-global-
+sync architecture + bubble-free pipeline** — all precision-INDEPENDENT, fully intact under BF16/FP8. Total
+multiplier elimination is the documented RESEARCH DIRECTION (the diffuse-int-gap problem). Novel angle to measure:
+PC's *local* errors may tolerate lower precision (FP8/FP6) than backprop needs (no whole-depth dynamic range).
 
 ## Why PC-on-FPGA can do this (the parallelism — measured-grounded projection in scripts/pc_pipeline_throughput.py)
 
@@ -64,13 +73,17 @@ Done: recipe #3 decided + validated (torch D=128 → 0.492/2.428bpb); Phase A1 c
 throughput projection (single-digit hours). Infra: SSO live, no F2 running; distributed-PC-transformer AFI NOT
 built; forge_pc_block 8-FPGA AGFI exists.
 
-NEXT, in dependency order:
-1. **Kernel → dot-product attention** (#3): forge_pc_xformer currently uses L1 attn (the capped deviation). Swap
-   the L1 score for the warm dot-product QK (the one allowed multiply); re-csim bit-exact vs golden; free csynth.
-2. **D=64 #3 AFI build** (~5h, ~$20) → train across 8 FPGAs = the PC-transformer-on-fabric pipeline on silicon.
-3. **Bubble-free pipeline-parallel driver + burst the host-relay** (NO rebuild) — the first MEASURED speedup;
-   this is where the no-global-sync edge becomes a number. Quantify serial-vs-pipe.
-4. **On-fabric chip-to-chip interconnect** — removes the 54% host-relay; the real throughput-scaling enabler.
-5. **Scale the kernel D=64 → D=768** (the 124M layer): bigger matmul tiles, DDR weight staging, multi-SLR.
-6. **DSP-adder array + replication** (the compute-density + data-parallel multipliers) → **train 124M → coherent
-   Shakespeare**, fully instrumented (tok/s, comms, energy), with the honest MEASURED-vs-PROJECTED scaling figure.
+NEXT, in dependency order (BF16-first):
+1. **BF16 reference + recipe lock:** validate end-to-end that the **BF16 PC** path (cascade backward, not autograd)
+   samples coherent TinyShakespeare at a real scale (PC-cascade ≈ backprop is established; this confirms it holds
+   in BF16). scripts/pc_xformer_charlm.py already supports the float/BF16 recipe (MULTFREE=0).
+2. **BF16 transformer kernel:** matmuls + PC cascade backward + dyadic/BF16-Adam in BF16 (DSP multiplies). The LLM
+   instance's s1-trainer lineage already does warm-precision attention on silicon → reuse patterns. csim → csynth.
+3. **D=64 BF16 AFI build** (~5h) → train across 8 FPGAs = the PC-transformer-on-fabric pipeline on silicon.
+4. **Bubble-free pipeline-parallel driver + burst the host-relay** (NO rebuild) — the first MEASURED no-sync
+   speedup; quantify serial-vs-pipe (8–17× projected).
+5. **On-fabric chip-to-chip interconnect** — removes the 54% host-relay; the real throughput-scaling enabler.
+6. **Scale the kernel D=64 → D=768** (the 124M layer): bigger matmul tiles, DDR weight staging, multi-SLR +
+   replication → **train 124M → coherent Shakespeare**, instrumented (tok/s, comms, energy).
+7. **Then MXFP8 for throughput** (4-bit-mantissa multiplies + pow2 block scale) + measure the FP8/FP6 floor PC
+   tolerates (the novel precision angle) — the efficiency/scaling pass once quality is in hand.
