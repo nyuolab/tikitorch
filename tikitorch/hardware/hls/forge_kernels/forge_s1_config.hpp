@@ -59,7 +59,9 @@
 #define S1_FFN      256     // FFN inner width (4*D)  (was 512)
 #define S1_L_SEQ    64      // sequence length  (was 128)
 #define S1_V        64      // vocab (tied embed / LM-head)  (was 128; >= 8-symbol memorization task)
-#define S1_N_LAYERS 1       // transformer blocks (offsets are layer-major; bump to 2 once bit-exact)
+#ifndef S1_N_LAYERS
+#define S1_N_LAYERS 1       // transformer blocks (offsets are layer-major); overridable via -DS1_N_LAYERS for deploy
+#endif
 #define S1_MBITS    2       // fine-dyadic LN mantissa bits (== forge_layernorm LN_MBITS)
 #define S1_LUT_N    256     // exp2 LUT entries (CE + attn)
 
