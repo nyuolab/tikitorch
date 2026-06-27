@@ -10,11 +10,19 @@
 #ifndef FORGE_PC_XFORMER_CONFIG_HPP
 #define FORGE_PC_XFORMER_CONFIG_HPP
 
+#ifndef X_D
 #define X_D        64        // d_model (log2=6 -> LayerNorm mean = sum >> 6)
+#endif
+#ifndef X_LOG2_D
 #define X_LOG2_D   6
+#endif
 #define X_H        2         // attention heads
+#ifndef X_DH
 #define X_DH       32        // head dim (H*DH == D)
+#endif
+#ifndef X_FFN
 #define X_FFN      256       // FFN inner width (4*D)
+#endif
 #define X_SEQ      64        // sequence length (the per-kick "batch" = one sequence of tokens)
 #define X_VOCAB    64        // vocab size
 #ifndef X_MBITS
