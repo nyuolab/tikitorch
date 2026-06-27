@@ -14,10 +14,16 @@ POWER-OF-2 scale that stays mult-free — the tropical-adjacent flavor we keep).
 under BF16/FP8. Total multiplier elimination is the documented RESEARCH DIRECTION.
 
 **WHERE the wall actually is (triangulated 2026-06-27, torch char-LM D=256, TinyShakespeare):** the cap is NOT the
-multiplier-free *forward* — it's the fully-*integer backward + optimizer*. Measured, same recipe, same scale:
+multiplier-free *forward* — it's the fully-*integer backward + optimizer*. **★ HONESTY: the 2.016 / 1.732 numbers
+below are AUTOGRAD witnesses (torch autograd), NOT the PC-cascade datapath the kernel transcribes** — they witness
+that the *precision recipe* is sound; the cascade-fix16 confirmation is PENDING Gate G2 (the golden-cascade training
+experiment running now). Do not present them as proving the kernel's cascade datapath. Measured, same recipe, same
+scale:
 - mult-free **forward** (dyadic weights + int16 acts + dot attn) + **float** backward/optimizer → **2.016 bpb,
-  COHERENT** (recognizable Shakespeare: *"One word and death... Lest honour him; all harm-on faired come"*).
-- **full BF16** (forward + backward + optimizer) → **1.732 bpb, MORE coherent** (character names, dialogue).
+  COHERENT** (autograd witness; recognizable Shakespeare: *"One word and death... Lest honour him; all harm-on
+  faired come"*).
+- **full BF16** (forward + backward + optimizer) → **1.732 bpb, MORE coherent** (autograd witness; character names,
+  dialogue).
 - **fully-integer** golden (int cascade backward + int16-master dyadic-Adam) → **caps 0.20, gibberish**.
 So the diffuse-int wall lives in the **int backward + int16-master optimizer**, not the forward. **Refined recipe:
 keep the forward multiplier-free (validated coherent + the throughput-critical bulk → DSP-adder array survives) and
@@ -47,11 +53,19 @@ whole-depth dynamic range — measure on the backward/optimizer where the int wa
   **LR-scaling does NOT recover it** (matched LR=1.2e-3: stale-0 2.482 vs stale-8 3.747). Self-consistent grads
   (weight-stashed, PipeDream-2BW best case) still degrade — it's the *magnitude*, not consistency.
 - **⇒ BUILD RULE:** the pipeline MUST bound weight-staleness to ~1 via **per-chip gradient accumulation** (freeze
-  weights over an aligned window W, accumulate the local error, apply once → effective staleness ~1, the
-  pipeline stays full, cost = a W× larger effective batch — standard). This is *pipelined gradient accumulation
-  with a local backward*, NOT "drop a round, train fully async." The earlier "async/staleness-tolerant" framing
-  conflated TYPE 1 with TYPE 2 and is REFUTED for weight updates. The throughput projection (8–17× over serial)
-  SURVIVES — it comes from filling all chips, which accumulation does not impede.
+  weights over an aligned window W, accumulate the local error, apply once, the pipeline stays full, cost = a W×
+  larger effective batch — standard). This is *pipelined gradient accumulation with a local backward*, NOT "drop a
+  round, train fully async." The earlier "async/staleness-tolerant" framing conflated TYPE 1 with TYPE 2 and is
+  REFUTED for weight updates. The throughput projection (8–17× over serial) SURVIVES — it comes from filling all
+  chips, which accumulation does not impede.
+  **⚠ STALENESS DEPENDS ON W vs L — it is NOT "~1 independent of L".** Effective staleness is `ceil(2(L−1)/W)`;
+  `staleness ≤ 1` requires **`W ≥ 2(L−1) ≈ 2L`** (a microbatch's forward and backward are ~`2(L−1)` slots apart in
+  a depth-`L` pipeline). So **`W=4` is valid ONLY for `L ≤ 3`; the L=8 gate needs `W ≥ 16`, L=12 needs `W ≥ 24`**.
+  The driver MUST **assert `W ≥ 2*L` host-side**. Cost at depth: **L=12 → `W ≥ 24` → ~1536-token effective batch**
+  (may need an LR re-tune). And: the **serial de-risk driver (1 microbatch in flight) does NOT exercise staleness** —
+  a **1F1B host-sim test is required before AFI**. Finally, the OUTPUT-chip LM-head update (`gWHEAD`,
+  `block.cpp:559-565`) is a SECOND apply site and MUST fold into the same windowed accumulation or the head desyncs
+  from the body. (See KERNEL_DESIGN_SPEC §4.3/§4.5 for the full treatment.)
    5. **Replication × token-parallel** (measured 4.00× linear). **Projection: 124M → coherent-overfit
    TinyShakespeare in SINGLE-DIGIT HOURS on one f2.48xlarge-class fabric** (PROJECTED, contingent on the build).
 
@@ -62,10 +76,18 @@ across D=64→256** (measured scale-trend; the gap does NOT shrink with scale) �
 quality by scaling. The **integer attention is the wall** (the multiply does essential work there). The recipe
 that DOES reach competitive AND scales:
 
-> **Warm-train DOT-PRODUCT attention (the one allowed multiply, ~185 DSP, attention-only)
+> **Warm-train DOT-PRODUCT attention (the allowed multiplies — see DSP note below)
 >  + multiplier-free PC-trained BULK** (FFN, projections, embedding, LM-head, LayerNorm — the *dominant* compute,
 >  DSP-free: dyadic ±2^k weights, fine-dyadic LN, int16 activations, dyadic-Adam optimizer)
 >  + per-width LR tuning + warmup (the dyadic optimizer is less stable with width — measured).
+
+**DSP attribution note (corrected vs the csynth report + source — the "185 DSP attention-only" framing was wrong).**
+The int `forge_pc_xformer_block` uses **185 DSP**, but this is **NOT the forward `p·V` blend** (that blend is **only
+2 DSP**, `block.cpp:436`). The other **183 DSP are the attention-BACKWARD int64 multiplies** (`block.cpp:590-601`;
+csynth loops `LOOP_590`=128, `LOOP_591`=11, `LOOP_592`=44). The forward stays effectively mult-free (2 DSP); the
+DSP cost is in the **attention backward**, which the mp kernel **keeps unchanged**. ⇒ the mp **DSP delta** vs the 185
+baseline is **only the new fix-wgrad multiplies**, not "adding a backward" (the backward already exists at DSP=0 for
+every dyadic op).
 
 Measured (torch twin): D=128 → **0.492 acc / 2.428 bpb**, matching the original de-risk's 2.384 bpb and tracking
 the float baseline (0.544) up in scale (D=64 0.377 → D=128 0.492). This is the validated, scaling, working-LM path.
@@ -82,8 +104,9 @@ direction (might narrow with much more compute, unproven) — NOT the deliverabl
   GPU/EC2 for the ~350M run.
 - **A2** Per-width LR/warmup schedule for the dyadic-Adam at scale (measured instability with width).
 - **A3** Get the on-fabric kernel onto **dot-product attention** (the forge_pc_xformer kernel currently uses L1 —
-  the deviation; the LLM instance's kernel already does warm attention + mult-free bulk + 185-DSP-attention-only,
-  likely reusable). csim bit-exact vs the int64 golden → free csynth gate → AFI.
+  the deviation; the LLM instance's kernel already does warm attention + mult-free bulk, with the DSP spent on the
+  attention forward+backward — 2 DSP fwd `p·V` blend + 183 DSP attn-bwd int64 muls, NOT a "185-DSP attention-only
+  forward"; likely reusable). csim bit-exact vs the int64 golden → free csynth gate → AFI.
 - **A4** Distributed driver + multi-chip run on the #3 recipe; sample text from the on-fabric-trained model.
 
 ## Phase B — throughput (after quality; no rebuild)
@@ -103,12 +126,22 @@ Done: recipe #3 decided + validated (torch D=128 → 0.492/2.428bpb); Phase A1 c
 throughput projection (single-digit hours). Infra: SSO live, no F2 running; distributed-PC-transformer AFI NOT
 built; forge_pc_block 8-FPGA AGFI exists.
 
+**REFRAME (the int kernel is ALREADY a full train kernel — the mp change is a NARROW precision swap, NOT "adding a
+backward").** `forge_pc_xformer_block` already synthesizes the **complete** forward + backward cascade + dyadic-Adam
+optimizer, with **DSP_MULT=0 on every dyadic op** (route, wgrad, adam, LN-bwd) and the attention backward as int64
+muls. So the mixed-precision sibling is NOT building a backward from scratch; it is a **narrow precision swap on two
+operations**: (a) the wgrad outer product `pow2×pow2 → fixed-point-mul wgrad`, and (b) the optimizer master/state
+`int16-master → fix16-master`. Everything else (forward, error routes, attn-bwd, LN-bwd, window accumulation) is
+structurally carried over. The steps below should be read as that precision swap, not a from-scratch backward.
+
 NEXT, in dependency order (BF16-first):
 1. **BF16 reference + recipe lock:** validate end-to-end that the **BF16 PC** path (cascade backward, not autograd)
    samples coherent TinyShakespeare at a real scale (PC-cascade ≈ backprop is established; this confirms it holds
    in BF16). scripts/pc_xformer_charlm.py already supports the float/BF16 recipe (MULTFREE=0).
-2. **BF16 transformer kernel:** matmuls + PC cascade backward + dyadic/BF16-Adam in BF16 (DSP multiplies). The LLM
-   instance's s1-trainer lineage already does warm-precision attention on silicon → reuse patterns. csim → csynth.
+2. **mp transformer kernel (narrow precision swap, NOT a new backward):** swap the existing int kernel's wgrad
+   (`pow2×pow2 → fixed-point-mul`) and optimizer master (`int16 → fix16`); the cascade backward + dyadic-Adam +
+   attn-bwd int64 muls already exist. The LLM instance's s1-trainer lineage already does warm-precision attention on
+   silicon → reuse patterns. csim → csynth.
 3. **D=64 BF16 AFI build** (~5h) → train across 8 FPGAs = the PC-transformer-on-fabric pipeline on silicon.
 4. **Bubble-free pipeline-parallel driver + burst the host-relay** (NO rebuild) — the first MEASURED no-sync
    speedup; quantify serial-vs-pipe (8–17× projected).
