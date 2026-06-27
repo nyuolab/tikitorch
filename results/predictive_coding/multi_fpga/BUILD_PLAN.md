@@ -1,8 +1,20 @@
 # Build plan — PC-fabric transformer LM (LOCKED 2026-06-26)
 
-**Goal:** a transformer trained on the PC fabric that produces **sampling-coherent TinyShakespeare text** at
-**~350M params** (GPT-2-Medium / NanoGPT-Med scale), trains quickly, distributed model-parallel with no global
-gradient sync. Multiplier-free where it pays (the bulk), warm-trained where the multiply is essential (attention).
+**NORTH-STAR (locked):** a **~124M** (GPT-2-small) distributed PC transformer trained on the **multi-F2 fabric in
+HOURS**, via a **no-global-sync bubble-free pipeline** that demonstrates the *scalable* architecture → coherent
+TinyShakespeare. Honest claim = *the parallel model works and projects favorably*, NOT "beats an A100 on this toy"
+(a single F2 < a GPU; an A100 does this in minutes). Multiplier-free where it pays (the bulk), warm-trained where
+the multiply is essential (attention).
+
+## Why PC-on-FPGA can do this (the parallelism — measured-grounded projection in scripts/pc_pipeline_throughput.py)
+
+1. **Bubble-free pipeline parallelism** — PC has NO global backward, so no pipeline-flush bubble (the thing that
+   bleeds GPU model-parallel). Projected **8–17× over the serial driver**; ~2× the utilization of GPipe at M~L.
+2. **All layers train simultaneously** (local credit assignment) — the whole depth is live, continuous microbatch
+   stream. 3. **Async / staleness-tolerant** (no global sync; measured ~0.6pp at 50% stale). 4. **Weight-stationary
+   dataflow + the DSP-as-adder array** (mult-free bulk → ~9000 idle DSP48 become a parallel shift-add fabric).
+   5. **Replication × token-parallel** (measured 4.00× linear). **Projection: 124M → coherent-overfit
+   TinyShakespeare in SINGLE-DIGIT HOURS on one f2.48xlarge-class fabric** (PROJECTED, contingent on the build).
 
 ## The recipe (decided on evidence — "#3")
 
@@ -46,6 +58,19 @@ On-fabric chip-to-chip interconnect (replaces host-relay — the real throughput
 TCP (structural cap, not faster). Comms is local/linear; with pipelining + on-fabric links throughput is
 flat-to-scaling, NOT the regression the un-pipelined host-relay baseline showed.
 
-## Status
+## Status & immediate build order (toward the 124M north-star)
 
-Diagnosis + decision committed (72f5b2a, c34cfe0). Recipe validated in torch. Next: A1 reference + run.
+Done: recipe #3 decided + validated (torch D=128 → 0.492/2.428bpb); Phase A1 char-LM reference (train+sample);
+throughput projection (single-digit hours). Infra: SSO live, no F2 running; distributed-PC-transformer AFI NOT
+built; forge_pc_block 8-FPGA AGFI exists.
+
+NEXT, in dependency order:
+1. **Kernel → dot-product attention** (#3): forge_pc_xformer currently uses L1 attn (the capped deviation). Swap
+   the L1 score for the warm dot-product QK (the one allowed multiply); re-csim bit-exact vs golden; free csynth.
+2. **D=64 #3 AFI build** (~5h, ~$20) → train across 8 FPGAs = the PC-transformer-on-fabric pipeline on silicon.
+3. **Bubble-free pipeline-parallel driver + burst the host-relay** (NO rebuild) — the first MEASURED speedup;
+   this is where the no-global-sync edge becomes a number. Quantify serial-vs-pipe.
+4. **On-fabric chip-to-chip interconnect** — removes the 54% host-relay; the real throughput-scaling enabler.
+5. **Scale the kernel D=64 → D=768** (the 124M layer): bigger matmul tiles, DDR weight staging, multi-SLR.
+6. **DSP-adder array + replication** (the compute-density + data-parallel multipliers) → **train 124M → coherent
+   Shakespeare**, fully instrumented (tok/s, comms, energy), with the honest MEASURED-vs-PROJECTED scaling figure.
