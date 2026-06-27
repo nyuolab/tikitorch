@@ -13,8 +13,9 @@ config (D=64; only N_LAYERS bumped 1→2).
 ## The kernel (ready)
 The s1 forward, built fully multiplier-free via compile flags:
 `-DS1_ATTN_HARD=1` (argmax-gather attention, no soft-blend) `-DS1_HEAD_MODE=1` (dyadic-GEMM head)
-`-DS1_POS_EMBED=1` (positional embeddings) `-DS1_N_LAYERS=2`. Every op DSP=0. Confirmed by csynth
-(`synth_train_step_s1_deploy.tcl` → DSP=0 + fit/timing; see below).
+`-DS1_POS_EMBED=1` (positional embeddings) `-DS1_N_LAYERS=2`. Every op DSP=0. **csynth-CONFIRMED (forward-only, S1_FWD_ONLY=1): DSP=0, timing 2.920 ns <= 4.0 (closes at 250 MHz), ~15% LUT /
+~21% BRAM of one SLR, URAM=0 -- fits one SLR, fast. The full-kernel csynth's 13.1ns/384-DSP/155%-SLR was the
+TRAINING path (bwd/opt), gated out by S1_FWD_ONLY.** (`synth_train_step_s1_deploy.tcl`; report committed.)
 
 ## Remaining steps to "trained LLM generating on F2"
 1. **csim deploy gate (no F2):** export the trained weights to the s1 fixed-point buffer format and run the s1
@@ -36,6 +37,6 @@ The s1 forward, built fully multiplier-free via compile flags:
 
 ## Status
 - Model trained + validated (2.548 hard, clean, beats bigram). ✅
-- Mult-free forward kernel ready + csynth-confirmed (DSP=0 + fit). ✅ (see below)
+- Mult-free forward-only deploy kernel csynth-CONFIRMED: DSP=0, 2.920ns, fits one SLR. ✅
 - Weight-export + inference loop: the one integration to build (csim gate) before the AFI.
 - AFI + on-silicon run: the gated build (user runs F2).
