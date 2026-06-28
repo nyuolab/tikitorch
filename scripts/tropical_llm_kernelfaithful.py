@@ -15,9 +15,10 @@ AQ=0.0
 def fq(x):
     if AQ<=0: return x
     return x+(torch.clamp(torch.round(x*AQ),-32768,32767)/AQ - x).detach()
+QX_POW2=False
 class DLin(nn.Module):
     def __init__(s,i,o): super().__init__(); s.w=nn.Parameter(torch.randn(o,i)*(1/math.sqrt(i)))
-    def forward(s,x): return x@dyad(s.w).t()
+    def forward(s,x): return (dyad(x) if QX_POW2 else x)@dyad(s.w).t()   # QX_POW2 -> q(x)*q(W) (the kernel dyadic-MAC)
 class MADLN(nn.Module):   # kernel-faithful: normalize by mean-ABS-deviation; gamma snapped to pow2 (STE)
     def __init__(s,D): super().__init__(); s.g=nn.Parameter(torch.ones(D)); s.b=nn.Parameter(torch.zeros(D))
     def forward(s,x):
@@ -51,8 +52,8 @@ def main():
     ap.add_argument("--L",type=int,default=2); ap.add_argument("--T",type=int,default=64); ap.add_argument("--steps",type=int,default=7000)
     ap.add_argument("--bs",type=int,default=64); ap.add_argument("--taufloor",type=float,default=0.04)
     ap.add_argument("--madln",type=int,default=1); ap.add_argument("--aq",type=float,default=256.0)
-    ap.add_argument("--out",type=str,default=""); a=ap.parse_args()
-    global AQ; torch.manual_seed(0); tr,va,V=load()
+    ap.add_argument("--out",type=str,default=""); ap.add_argument("--qx",type=int,default=0); a=ap.parse_args()
+    global AQ,QX_POW2; QX_POW2=bool(a.qx); torch.manual_seed(0); tr,va,V=load()
     from collections import Counter
     cN=len(va); bg=Counter(zip(va[:-1],va[1:])); c0=Counter(va[:-1]); bgH=-sum((c/(cN-1))*math.log2(c/c0[x]) for (x,y),c in bg.items())
     print(f"V={V} D={a.D} L={a.L} T={a.T} madln={a.madln} aq={a.aq} | bigram={bgH:.3f}")
