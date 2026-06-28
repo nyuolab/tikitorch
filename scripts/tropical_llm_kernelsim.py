@@ -40,6 +40,7 @@ ACT_Q = 1.0            # activation quant grid (1.0=integer=kernel; >1 = finer)
 ACT_NOCLIP = False     # ablation: disable sat16 clip
 DYAD_K = 1             # weight = sum of K signed powers of 2 (1=current single-pow2; >1 = CSD, still shift-add)
 GEMM_RESCALE = 0       # if >0: right-shift GEMM output by this (pow2 rescale; lets SW be large w/o overflow)
+RS_GUARD = 0           # keep this many fractional/guard bits when auto-rescaling (less floor loss)
 LN_MBITS = 2           # LN reciprocal mantissa bits (kernel=2; 4 = finer)
 
 # ----------------------------- straight-through helpers -----------------------------
@@ -121,7 +122,8 @@ def kernel_gemm(x_int, w, scale):
     out = x_int @ wv.t()
     rs = 0
     if GEMM_RESCALE < 0:                                  # AUTO: rescale by this matrix's own (pow2) weight scale
-        rs = int(round(math.log2(scale))) if scale > 1 else 0
+        rs = (int(round(math.log2(scale))) - RS_GUARD) if scale > 1 else 0
+        if rs < 0: rs = 0
     elif GEMM_RESCALE > 0:
         rs = GEMM_RESCALE
     if rs > 0:
@@ -264,6 +266,7 @@ def main():
     ap.add_argument('--H', type=int, default=2, help='attention heads')
     ap.add_argument('--ffn', type=int, default=256, help='FFN inner dim')
     ap.add_argument('--gemm_rescale', type=int, default=0, help='pow2 right-shift of GEMM output (rescale)')
+    ap.add_argument('--rs_guard', type=int, default=0, help='guard bits kept during auto-rescale')
     ap.add_argument('--seed', type=int, default=0)
     a = ap.parse_args()
     global ABL_LN_EXACT, ABL_W_EXACT, ACT_Q, ACT_NOCLIP, D, H, DH, FFN, LOG2_D
@@ -273,6 +276,7 @@ def main():
     global DYAD_K, LN_MBITS
     global GEMM_RESCALE
     DYAD_K = a.dyad_k; LN_MBITS = a.mbits; GEMM_RESCALE = a.gemm_rescale
+    global RS_GUARD; RS_GUARD = a.rs_guard
     torch.manual_seed(a.seed); np.random.seed(a.seed)
     dev = "mps" if torch.backends.mps.is_available() else "cpu"
     SW = {kv.split(':')[0]: float(kv.split(':')[1]) for kv in a.SW.split(',')}
