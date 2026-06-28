@@ -157,7 +157,9 @@ static void mp_backward(GW &w, GA &a, GG &g, const int *tok, bool zero=true) {
         i64 ex=0; for(int j=0;j<=i;j++) ex += (i64)(((__int128)pn[j]*gp[j]) >> X_AT_PFRAC);
         for(int j=0;j<=i;j++){
             i64 gs=(i64)(((__int128)pn[j]*(gp[j]-ex)) >> X_AT_PFRAC);
-            if (g_attn_dot) { for(int d=0;d<X_DH;d++){ gQ[i*X_D+h*X_DH+d]+= (gs*a.K[j*X_D+h*X_DH+d])>>X_ABITS; gK[j*X_D+h*X_DH+d]+= (gs*a.Q[i*X_D+h*X_DH+d])>>X_ABITS; } }
+            // FIX#1 (int64-overflow at depth): __int128 the DOT gs*K / gs*Q before >>X_ABITS (see g_backward). Bit-
+            // identical to the old i64 product when it fits 63 bits; only matters in the multi-block DOT regime.
+            if (g_attn_dot) { for(int d=0;d<X_DH;d++){ gQ[i*X_D+h*X_DH+d]+= (i64)(((__int128)gs*a.K[j*X_D+h*X_DH+d])>>X_ABITS); gK[j*X_D+h*X_DH+d]+= (i64)(((__int128)gs*a.Q[i*X_D+h*X_DH+d])>>X_ABITS); } }
             else for(int d=0;d<X_DH;d++){ i64 df=a.Q[i*X_D+h*X_DH+d]-a.K[j*X_D+h*X_DH+d]; int sg=df>0?1:(df<0?-1:0);
                 gQ[i*X_D+h*X_DH+d]+= -gs*sg; gK[j*X_D+h*X_DH+d]+= gs*sg; }
             for(int d=0;d<X_DH;d++) gV[j*X_D+h*X_DH+d]+= (i64)(((__int128)pn[j]*gATTN[i*X_D+h*X_DH+d]) >> X_AT_PFRAC);

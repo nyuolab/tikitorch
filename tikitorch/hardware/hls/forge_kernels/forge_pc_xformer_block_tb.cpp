@@ -91,6 +91,15 @@ static long cmp_region(const int32_t *buf, int off, const i64 *gold, int n, long
 }
 
 int main() {
+    // This single-card testbench compares the golden against the PRODUCTION kernel forge_pc_xformer_block.cpp,
+    // which (a) emits the head logits LG UNBOUNDED (no head max-shift) and (b) is one block (no cross-block
+    // message). FIX#3 (head-logit bound) defaults ON and FIX#2 (inter-block grad rescale) defaults ON in the
+    // golden; both are guarded knobs. To keep this TB bit-exact (max|diff|=0) to the unbounded-head single-block
+    // kernel, force the golden into the kernel-matching configuration here. (The bounded-head + inter-block
+    // rescale recipe is exercised by the MULTI-BLOCK confirmation gate forge_pc_xformer_mb_golden_test.cpp,
+    // and the multi-block grad-check forge_pc_xformer_mb_gradcheck2.cpp — not this single-card kernel TB.)
+    setenv("HEAD_RESCALE", "-1", 1);             // golden head LG unbounded == kernel (preserves dLG max|diff|=0)
+    setenv("GRAD_RESCALE", "-1", 1);             // single block: no inter-block message to rescale
     g_lut_init();                                // fill G_LUT (the exp2 ROM the kernel also uses, staged below)
 
     int32_t *buf = (int32_t*)aligned_alloc(64, sizeof(int32_t) * X_BUFLEN);

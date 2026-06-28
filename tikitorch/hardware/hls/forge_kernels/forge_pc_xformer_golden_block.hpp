@@ -79,6 +79,13 @@ static i64 g_forward(GW &w, GA &a, const int *tok, const int *tgt) {
     for (int i = 0; i < X_SEQ*X_D; i++) a.RP[i] = a.M[i] + FO[i];
     g_layernorm(a.RP, w.LNFG, w.LNFB, a.XF, a.lnfs, X_SEQ);
     g_matmul(a.XF, w.WHEAD, a.LG, X_SEQ, X_D, X_VOCAB);
+    // FIX#3 (head-logit bound, default ON ~ C_SMBITS=6): the head logits are the ONE matmul output the golden does
+    // NOT max-shift. With dyadic head weights + an unbounded residual stream the logit SPREAD diverges (~2^21 @
+    // d3/h4), saturating the CE softmax -> GLOG goes near-one-hot, the calibration gradient dies. A single mult-free
+    // max-shift to ~HEAD_RESCALE bits (g_rescale = a per-tensor arithmetic right-shift, the SAME op used on every
+    // other matmul output, DSP=0, kernel-implementable) bounds the spread so the precise-exp CE keeps a graded
+    // signal. Default 6 (= C_SMBITS, matches the adaptive CE shift target). -1 disables = the old canonical forward.
+    { static int hr=-2; if(hr<-1){const char*e=getenv("HEAD_RESCALE"); hr=e?atoi(e):6;} if(hr>=0) g_rescale(a.LG, X_SEQ*X_VOCAB, hr); }
     // CE: softmax via LUT -> grad_logit = softmax - onehot (Q16); also accumulate an integer surrogate loss
     i64 loss = 0;
     for (int t = 0; t < X_SEQ; t++) {
@@ -175,7 +182,14 @@ static void g_backward(GW &w, GA &a, GG &g, const int *tok, bool zero=true) {
         i64 ex=0; for(int j=0;j<=i;j++) ex += (i64)(((__int128)pn[j]*gp[j]) >> X_AT_PFRAC);  // MUL (128b)
         for(int j=0;j<=i;j++){
             i64 gs=(i64)(((__int128)pn[j]*(gp[j]-ex)) >> X_AT_PFRAC);                // MUL (softmax bwd, 128b)
-            if (g_attn_dot) { for(int d=0;d<X_DH;d++){ gQ[i*X_D+h*X_DH+d]+= (gs*a.K[j*X_D+h*X_DH+d])>>X_ABITS; gK[j*X_D+h*X_DH+d]+= (gs*a.Q[i*X_D+h*X_DH+d])>>X_ABITS; } }  // DOT grad (s=Q.K>>ABITS -> dQ=gs.K>>ABITS)
+            // FIX#1 (int64-overflow at depth): the DOT-attention gs*K / gs*Q products wrap at 2^63 in HIDDEN blocks
+            // (multi-block, no inter-block grad rescale): max|gs|~3.97e18, max|gs*K|~6.47e20 >> 2^63=9.22e18 ->
+            // i64-wrap sign-corrupts gQ/gK (signagree 0.55/0.71 vs the correct gradient). Promote to __int128 BEFORE
+            // the >>X_ABITS truncation, EXACTLY like the pn*gp / pn*(gp-ex) / pn*gATTN lines already do above. This is
+            // BIT-IDENTICAL to the old plain-i64 product whenever it fits 63 bits (the single-block / L1 production
+            // regime never trips it), so single-block bit-exactness is preserved. Mult-free unaffected: the L1 path
+            // (else-branch, the production kernel) has no gs*K multiply at all.
+            if (g_attn_dot) { for(int d=0;d<X_DH;d++){ gQ[i*X_D+h*X_DH+d]+= (i64)(((__int128)gs*a.K[j*X_D+h*X_DH+d])>>X_ABITS); gK[j*X_D+h*X_DH+d]+= (i64)(((__int128)gs*a.Q[i*X_D+h*X_DH+d])>>X_ABITS); } }  // DOT grad (s=Q.K>>ABITS -> dQ=gs.K>>ABITS)
             else for(int d=0;d<X_DH;d++){ i64 df=a.Q[i*X_D+h*X_DH+d]-a.K[j*X_D+h*X_DH+d]; int sg=df>0?1:(df<0?-1:0);
                 gQ[i*X_D+h*X_DH+d]+= -gs*sg; gK[j*X_D+h*X_DH+d]+= gs*sg; }                 // L1 subgradient (mult-free)
             for(int d=0;d<X_DH;d++) gV[j*X_D+h*X_DH+d]+= (i64)(((__int128)pn[j]*gATTN[i*X_D+h*X_DH+d]) >> X_AT_PFRAC); // MUL (128b)
