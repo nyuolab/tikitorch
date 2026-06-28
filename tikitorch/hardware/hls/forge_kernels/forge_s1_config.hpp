@@ -179,7 +179,12 @@ static const int S1_OFF_LN2_G   = S1_OFF_LN1_B  + S1_AL16(S1_N_LAYERS * S1_D);
 static const int S1_OFF_LN2_B   = S1_OFF_LN2_G  + S1_AL16(S1_N_LAYERS * S1_D);
 // FINAL LayerNorm (LN_F) weights — ONE per channel (not layer-major; there is a single final LN). gamma is
 // a dyadic code (forge_layernorm wdecode), beta is plain int16, exactly like LN1/LN2.
-static const int S1_OFF_LNF_G   = S1_OFF_LN2_B  + S1_AL16(S1_D);                        // [D] gamma codes
+static const int S1_OFF_LNF_G   = S1_OFF_LN2_B  + S1_AL16(S1_N_LAYERS * S1_D);          // [D] gamma codes
+                                                                                        // (FIX: LN2_B is a [N_L][D] layer-major beta region (S1_W_LN=N_L*D words), so the next
+                                                                                        //  region MUST clear the FULL N_L*D extent. The prior S1_AL16(S1_D) under-reserved LN2_B to
+                                                                                        //  ONE layer (64 words) so at N_LAYERS>=2 LNF_G overlapped LN2_B's layer-1 betas — the
+                                                                                        //  forward read LNF_G codes as LN2_B[L>=1] (broke 2-layer deploy). The G/WFP/M/V siblings
+                                                                                        //  (S1_OFF_G_LNF_G / WFP / M / V) already use S1_AL16(S1_N_LAYERS*S1_D); this matches them.)
 static const int S1_OFF_LNF_B   = S1_OFF_LNF_G  + S1_AL16(S1_D);                        // [D] beta int16
 static const int S1_OFF_W_HEAD  = S1_OFF_LNF_B  + S1_AL16(S1_D);                        // [V][D] int16(HEAD_MODE0)/int8 code(HEAD_MODE1)
 static const int S1_OFF_CE_LUT  = S1_OFF_W_HEAD + S1_AL16(S1_V * S1_D);                 // [256] Q16 exp2
