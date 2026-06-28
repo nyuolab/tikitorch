@@ -40,3 +40,21 @@ TRAINING path (bwd/opt), gated out by S1_FWD_ONLY.** (`synth_train_step_s1_deplo
 - Mult-free forward-only deploy kernel csynth-CONFIRMED: DSP=0, 2.920ns, fits one SLR. ✅
 - Weight-export + inference loop: the one integration to build (csim gate) before the AFI.
 - AFI + on-silicon run: the gated build (user runs F2).
+
+
+## ★ UPDATE (kernel-faithful deploy is VIABLE)
+The first deploy gate caught a train/deploy numeric MISMATCH: the std-LN-trained model deploys at **4.05 bpc**
+(beats unigram, not bigram) through the s1 kernel, because the kernel uses mean-abs-deviation LayerNorm + pow2
+gamma + operand-quant (not std-LN + float). NOT a tuning miss (~700 configs). **FIX CONFIRMED:** training
+kernel-faithful (MAD-LN + pow2-gamma + dyadic + int16, `scripts/tropical_llm_kernelfaithful.py`) →
+**HARD 2.650 bpc, beats bigram by 0.82** (only 0.09 behind std-LN). The on-chip kernel CAN host a useful LM.
+Deployable model: `results/lm_shakespeare/tropical_llm_d64_faithful.pt` (D=64/H2/DH32/FFN256/T64/L2, MAD-LN).
+Also: the gate found+fixed a kernel bug (S1_OFF_LNF_G offset at N_LAYERS>=2).
+
+### Remaining (precise)
+1. **LN bit-match + re-gate:** make the torch MAD-LN bit-identical to the kernel's 2-bit-mantissa fine-dyadic LN,
+   retrain, re-export (`tropical_llm_export_s1.py`, extend to MADLN keys), re-run `s1_deploy_eval.cpp` → confirm
+   the real s1 forward reproduces ~2.65. (The export+harness are bit-exact-verified; this closes the last csim gap.)
+2. **AFI (USER runs F2):** `forge_train_step_s1 -DS1_FWD_ONLY=1 -DS1_ATTN_HARD=1 -DS1_HEAD_MODE=1 -DS1_POS_EMBED=1
+   -DS1_N_LAYERS=2` via `run_s1_afi_build.sh` (csynth-confirmed: DSP=0, 2.92ns, fits one SLR).
+3. **Inference driver:** stage exported weights + mode-0 forward + logits → bpc/generate (driver has staging+mode-0).
