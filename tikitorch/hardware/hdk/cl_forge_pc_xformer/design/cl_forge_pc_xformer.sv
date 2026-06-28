@@ -98,7 +98,7 @@ module cl_forge_pc_xformer
   logic  [1:0]  krn_bresp,   krn_rresp;
   logic         krn_bvalid,  krn_bready,  krn_rlast, krn_rvalid, krn_rready, krn_irq;
 
-  forge_pc_xformer_block u_kernel (
+  forge_pc_xformer_mp_block u_kernel (   // BF16 mixed-precision kernel (mult-free fwd + BF16 backprop-STE bwd)
     .ap_clk     (clk_main_a0),  .ap_rst_n (rst_n_local),  .interrupt (krn_irq),
     .s_axi_control_AWADDR  (ocl_aw_addr_pre[4:0]), .s_axi_control_AWVALID (ocl_aw_valid_pre), .s_axi_control_AWREADY (ocl_aw_ready_pre),
     .s_axi_control_WDATA   (ocl_w_data_pre),  .s_axi_control_WSTRB (ocl_w_strb_pre), .s_axi_control_WVALID (ocl_w_valid_pre), .s_axi_control_WREADY (ocl_w_ready_pre),
