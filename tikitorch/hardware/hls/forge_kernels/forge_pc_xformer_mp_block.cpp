@@ -269,12 +269,31 @@ LN_T: for (int t = 0; t < M; t++) {
 // WIDE-FLOAT forward-for-backward (== bf16 golden bf_forward). Mirrors the char-LM EXACTLY; fills the MP_*
 // wide cache the textbook STE backward differentiates. Operates on the FLOAT master (char-LM scale).
 // =====================================================================================================
+// MP_RK = number of INTERLEAVED partial accumulators that break the loop-carried fp32-add recurrence so the
+// float reductions close at the 4.0 ns clock. WHY the previous code missed timing: `acc += x` at II=1 forces
+// read-acc -> fp32-add -> write-acc into ONE clock; the pipelined fp32 adder is a MULTI-cycle op (this part's
+// HLS float-add library = fadd_32ns_32ns_32_4_no_dsp = 4-cycle, or the DSP-packed fadd_..._7 = 7-cycle, per the
+// mp csynth op report) so cramming its 4.4 ns combinational recurrence into one cycle => 4.423 ns > 4.0 ns.
+// FIX: keep MP_RK independent accumulator chains indexed by (counter % MP_RK). Consecutive iterations now write
+// DIFFERENT partials, so any single partial's adder gets its previous result back MP_RK cycles later (= MP_RK at
+// II=1) instead of next cycle. When MP_RK >= adder-latency the recurrence resolves with the adder PIPELINED
+// across cycles (II=1, clock met); if Vitis instead binds the 7-cycle adder, II relaxes to 2 but the 4.0 ns
+// CLOCK still closes (the clock failure came only from the single-cycle cram, which is gone). MP_RK=4 covers the
+// 4-cycle no_dsp fadd Vitis prefers here (no_dsp keeps the float adds off DSP, area-friendly). Cost = MP_RK fp32
+// adders per reduction (vs the 51% LUT budget = negligible). The combine sums the MP_RK partials after the loop;
+// this reorders the float sum vs the sequential golden by a sub-ULP amount that the downstream qact/bf16 round
+// absorbs (csim: int fwd still bit-exact; wide fwd WATTN==golden, WLG rel 1.4e-4; post-step weights bit-equal).
+#define MP_RK 4
 static void bf_qact(float *x, int n) {
 #pragma HLS INLINE off
-    float mx = 0;
+    // max-reduction is associative -> MP_RK partial maxes (no order/accuracy change at all)
+    float pmx[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pmx complete
+    for (int k = 0; k < MP_RK; k++) pmx[k] = 0;
 QA1: for (int i = 0; i < n; i++) {
 #pragma HLS PIPELINE II=1
-        float a = x[i] < 0 ? -x[i] : x[i]; if (a > mx) mx = a; }
+        float a = x[i] < 0 ? -x[i] : x[i]; if (a > pmx[i % MP_RK]) pmx[i % MP_RK] = a; }
+    float mx = 0; for (int k = 0; k < MP_RK; k++) if (pmx[k] > mx) mx = pmx[k];
     if (mx < 1e-9f) mx = 1e-9f;
     int sh = (int)hls::floor(hls::log2(mx)) - X_ABITS;
     float sc = hls::ldexp(1.0f, sh);
@@ -287,13 +306,21 @@ static void bf_layernorm(const float *x, const float *gamma, const float *beta,
 #pragma HLS INLINE off
 BL_T: for (int t = 0; t < M; t++) {
 #pragma HLS PIPELINE off
-        float sum = 0; for (int d = 0; d < X_D; d++) {
-#pragma HLS PIPELINE II=1
-            sum += x[t*X_D+d]; }
-        float mean = sum / X_D; float asum = 0;
+        float psum[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=psum complete
+        for (int k = 0; k < MP_RK; k++) psum[k] = 0;
         for (int d = 0; d < X_D; d++) {
 #pragma HLS PIPELINE II=1
-            float c = x[t*X_D+d]-mean; asum += c < 0 ? -c : c; }
+            psum[d % MP_RK] += x[t*X_D+d]; }
+        float sum = 0; for (int k = 0; k < MP_RK; k++) sum += psum[k];
+        float mean = sum / X_D;
+        float pasum[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pasum complete
+        for (int k = 0; k < MP_RK; k++) pasum[k] = 0;
+        for (int d = 0; d < X_D; d++) {
+#pragma HLS PIPELINE II=1
+            float c = x[t*X_D+d]-mean; pasum[d % MP_RK] += c < 0 ? -c : c; }
+        float asum = 0; for (int k = 0; k < MP_RK; k++) asum += pasum[k];
         float scale = asum / X_D; if (scale < 1e-9f) scale = 1e-9f;
         int e = (int)hls::floor(hls::log2(scale));
         float mant = hls::round((scale/hls::ldexp(1.0f,e) - 1.0f)*(1<<X_MBITS)) / (float)(1<<X_MBITS);
@@ -308,11 +335,14 @@ static void bf_matmul(const float *x, const float *Wf, float *y, int M, int I, i
 #pragma HLS INLINE off
 BM_T: for (int t = 0; t < M; t++)
     BM_O: for (int o = 0; o < O; o++) {
-            float acc = 0;
+            float pacc[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pacc complete
+            for (int k = 0; k < MP_RK; k++) pacc[k] = 0;
         BM_I: for (int i = 0; i < I; i++) {
 #pragma HLS PIPELINE II=1
-                acc += bf_dyad_f(Wf[o*I+i]) * x[t*I+i];     // dyad(master) * x  (forward-for-bwd, wide)
+                pacc[i % MP_RK] += bf_dyad_f(Wf[o*I+i]) * x[t*I+i];   // dyad(master) * x  (forward-for-bwd, wide)
             }
+            float acc = 0; for (int k = 0; k < MP_RK; k++) acc += pacc[k];
             y[t*O+o] = acc;
         }
 }
@@ -324,20 +354,26 @@ static void bf_linear_bwd(const float *gy, const float *Wf, const float *x,
 #pragma HLS INLINE off
 LR_T: for (int t = 0; t < M; t++)
     LR_I: for (int i = 0; i < I; i++) {
-            float acc = 0;
+            float pacc[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pacc complete
+            for (int k = 0; k < MP_RK; k++) pacc[k] = 0;
         LR_O: for (int o = 0; o < O; o++) {
 #pragma HLS PIPELINE II=1
-                acc += bf_dyad_f(Wf[o*I+i]) * gy[t*O+o];
+                pacc[o % MP_RK] += bf_dyad_f(Wf[o*I+i]) * gy[t*O+o];
             }
+            float acc = 0; for (int k = 0; k < MP_RK; k++) acc += pacc[k];
             dx[t*I+i] = P(acc);
         }
 WG_O: for (int o = 0; o < O; o++)
     WG_I: for (int i = 0; i < I; i++) {
-            float acc = 0;
+            float pacc[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pacc complete
+            for (int k = 0; k < MP_RK; k++) pacc[k] = 0;
         WG_T: for (int t = 0; t < M; t++) {
 #pragma HLS PIPELINE II=1
-                acc += gy[t*O+o] * x[t*I+i];
+                pacc[t % MP_RK] += gy[t*O+o] * x[t*I+i];
             }
+            float acc = 0; for (int k = 0; k < MP_RK; k++) acc += pacc[k];
             dW[o*I+i] += P(acc);
         }
 }
@@ -346,11 +382,14 @@ WG_O: for (int o = 0; o < O; o++)
 static void bf_ln_bwd(const float *gy, const float *gamma, const float *s, float *dx, int M) {
 #pragma HLS INLINE off
 LB_T: for (int t = 0; t < M; t++) {
-        float gxhat[X_D], mg = 0;
+        float gxhat[X_D]; float pmg[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pmg complete
+        for (int k = 0; k < MP_RK; k++) pmg[k] = 0;
     LB_C: for (int d = 0; d < X_D; d++) {
 #pragma HLS PIPELINE II=1
-            gxhat[d] = P(gy[t*X_D+d]*gamma[d]); mg += gxhat[d];
+            gxhat[d] = P(gy[t*X_D+d]*gamma[d]); pmg[d % MP_RK] += gxhat[d];
         }
+        float mg = 0; for (int k = 0; k < MP_RK; k++) mg += pmg[k];
         mg /= X_D;
     LB_D: for (int d = 0; d < X_D; d++) {
 #pragma HLS PIPELINE II=1
@@ -557,19 +596,32 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             static float Praw[X_H*X_SEQ*X_SEQ];
             for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
                 float sc[X_SEQ], mx=-1e30f;
-                for (int j=0;j<=i;j++){ float dot=0; for(int d=0;d<X_DH;d++){
+                for (int j=0;j<=i;j++){ float pdot[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pdot complete
+                    for(int k=0;k<MP_RK;k++) pdot[k]=0;
+                    for(int d=0;d<X_DH;d++){
 #pragma HLS PIPELINE II=1
-                    dot += WQf[i*X_D+h*X_DH+d]*WKf[j*X_D+h*X_DH+d]; }
+                    pdot[d%MP_RK] += WQf[i*X_D+h*X_DH+d]*WKf[j*X_D+h*X_DH+d]; }
+                    float dot=0; for(int k=0;k<MP_RK;k++) dot+=pdot[k];
                     sc[j]=dot*scale; if(sc[j]>mx)mx=sc[j]; }
-                float sum=0; for(int j=0;j<=i;j++){
+                float psum[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=psum complete
+                for(int k=0;k<MP_RK;k++) psum[k]=0;
+                for(int j=0;j<=i;j++){
 #pragma HLS PIPELINE II=1
-                    float e=hls::exp(sc[j]-mx); Praw[(h*X_SEQ+i)*X_SEQ+j]=e; sum+=e; }
+                    float e=hls::exp(sc[j]-mx); Praw[(h*X_SEQ+i)*X_SEQ+j]=e; psum[j%MP_RK]+=e; }
+                float sum=0; for(int k=0;k<MP_RK;k++) sum+=psum[k];
                 for(int j=0;j<=i;j++){
 #pragma HLS PIPELINE II=1
                     Praw[(h*X_SEQ+i)*X_SEQ+j] /= sum; }
-                for(int d=0;d<X_DH;d++){ float blend=0; for(int j=0;j<=i;j++){
+                for(int d=0;d<X_DH;d++){ float pbl[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pbl complete
+                    for(int k=0;k<MP_RK;k++) pbl[k]=0;
+                    for(int j=0;j<=i;j++){
 #pragma HLS PIPELINE II=1
-                    blend+=Praw[(h*X_SEQ+i)*X_SEQ+j]*WVf[j*X_D+h*X_DH+d]; } WATTN[i*X_D+h*X_DH+d]=blend; }
+                    pbl[j%MP_RK]+=Praw[(h*X_SEQ+i)*X_SEQ+j]*WVf[j*X_D+h*X_DH+d]; }
+                    float blend=0; for(int k=0;k<MP_RK;k++) blend+=pbl[k];
+                    WATTN[i*X_D+h*X_DH+d]=blend; }
             }
             bstore_f(buffer, MP_WPRAW, Praw, X_H*X_SEQ*X_SEQ);
             bf_qact(WATTN, X_SEQ*X_D);                          // char-LM: proj(qact(y))
@@ -637,12 +689,20 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
         static float gLG[X_SEQ*X_VOCAB];
     CE: for (int t=0;t<X_SEQ;t++){
 #pragma HLS PIPELINE off
-            float mx=-1e30f; for(int v=0;v<X_VOCAB;v++){
+            float pmx[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pmx complete
+            for(int k=0;k<MP_RK;k++) pmx[k]=-1e30f;
+            for(int v=0;v<X_VOCAB;v++){
 #pragma HLS PIPELINE II=1
-                float l=WLG[t*X_VOCAB+v]; if(l>mx)mx=l; }
-            float sum=0,pr[X_VOCAB]; for(int v=0;v<X_VOCAB;v++){
+                float l=WLG[t*X_VOCAB+v]; if(l>pmx[v%MP_RK])pmx[v%MP_RK]=l; }
+            float mx=-1e30f; for(int k=0;k<MP_RK;k++) if(pmx[k]>mx)mx=pmx[k];
+            float pr[X_VOCAB]; float psum[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=psum complete
+            for(int k=0;k<MP_RK;k++) psum[k]=0;
+            for(int v=0;v<X_VOCAB;v++){
 #pragma HLS PIPELINE II=1
-                pr[v]=hls::exp(WLG[t*X_VOCAB+v]-mx); sum+=pr[v]; }
+                pr[v]=hls::exp(WLG[t*X_VOCAB+v]-mx); psum[v%MP_RK]+=pr[v]; }
+            float sum=0; for(int k=0;k<MP_RK;k++) sum+=psum[k];
             for(int v=0;v<X_VOCAB;v++){
 #pragma HLS PIPELINE II=1
                 float p=pr[v]/sum, oh=(v==tgt[t])?1.0f:0.0f; gLG[t*X_VOCAB+v]=P((p-oh)/X_SEQ); }
@@ -684,15 +744,23 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
 ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
         const float* p=&Praw[(h*X_SEQ+i)*X_SEQ];
         float gp[X_SEQ];
-        for (int j=0;j<=i;j++){ float s=0; for(int d=0;d<X_DH;d++){
+        for (int j=0;j<=i;j++){ float ps[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=ps complete
+            for(int k=0;k<MP_RK;k++) ps[k]=0;
+            for(int d=0;d<X_DH;d++){
 #pragma HLS PIPELINE II=1
-            s+=gATTN[i*X_D+h*X_DH+d]*WVf[j*X_D+h*X_DH+d]; } gp[j]=s;                                                        // MUL (bf16)
+            ps[d%MP_RK]+=gATTN[i*X_D+h*X_DH+d]*WVf[j*X_D+h*X_DH+d]; }                                                        // MUL (bf16)
+            float s=0; for(int k=0;k<MP_RK;k++) s+=ps[k]; gp[j]=s;
             for(int d=0;d<X_DH;d++){
 #pragma HLS PIPELINE II=1
                 gV[j*X_D+h*X_DH+d]+=P(p[j]*gATTN[i*X_D+h*X_DH+d]); } }                                                      // MUL
-        float ex=0; for(int j=0;j<=i;j++){
+        float pex[MP_RK];
+#pragma HLS ARRAY_PARTITION variable=pex complete
+        for(int k=0;k<MP_RK;k++) pex[k]=0;
+        for(int j=0;j<=i;j++){
 #pragma HLS PIPELINE II=1
-            ex+=p[j]*gp[j]; }
+            pex[j%MP_RK]+=p[j]*gp[j]; }
+        float ex=0; for(int k=0;k<MP_RK;k++) ex+=pex[k];
         for (int j=0;j<=i;j++){ float gs=P(p[j]*(gp[j]-ex))*ascale;                                                          // softmax Jacobian
             for(int d=0;d<X_DH;d++){
 #pragma HLS PIPELINE II=1
