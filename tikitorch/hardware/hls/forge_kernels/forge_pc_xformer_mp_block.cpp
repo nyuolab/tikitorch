@@ -272,25 +272,36 @@ LN_T: for (int t = 0; t < M; t++) {
 static void bf_qact(float *x, int n) {
 #pragma HLS INLINE off
     float mx = 0;
-QA1: for (int i = 0; i < n; i++) { float a = x[i] < 0 ? -x[i] : x[i]; if (a > mx) mx = a; }
+QA1: for (int i = 0; i < n; i++) {
+#pragma HLS PIPELINE II=1
+        float a = x[i] < 0 ? -x[i] : x[i]; if (a > mx) mx = a; }
     if (mx < 1e-9f) mx = 1e-9f;
     int sh = (int)hls::floor(hls::log2(mx)) - X_ABITS;
     float sc = hls::ldexp(1.0f, sh);
-QA2: for (int i = 0; i < n; i++) x[i] = hls::round(x[i] / sc) * sc;
+QA2: for (int i = 0; i < n; i++) {
+#pragma HLS PIPELINE II=1
+        x[i] = hls::round(x[i] / sc) * sc; }
 }
 static void bf_layernorm(const float *x, const float *gamma, const float *beta,
                          float *y, float *mean_out, float *s_out, int M) {
 #pragma HLS INLINE off
 BL_T: for (int t = 0; t < M; t++) {
-        float sum = 0; for (int d = 0; d < X_D; d++) sum += x[t*X_D+d];
+#pragma HLS PIPELINE off
+        float sum = 0; for (int d = 0; d < X_D; d++) {
+#pragma HLS PIPELINE II=1
+            sum += x[t*X_D+d]; }
         float mean = sum / X_D; float asum = 0;
-        for (int d = 0; d < X_D; d++) { float c = x[t*X_D+d]-mean; asum += c < 0 ? -c : c; }
+        for (int d = 0; d < X_D; d++) {
+#pragma HLS PIPELINE II=1
+            float c = x[t*X_D+d]-mean; asum += c < 0 ? -c : c; }
         float scale = asum / X_D; if (scale < 1e-9f) scale = 1e-9f;
         int e = (int)hls::floor(hls::log2(scale));
         float mant = hls::round((scale/hls::ldexp(1.0f,e) - 1.0f)*(1<<X_MBITS)) / (float)(1<<X_MBITS);
         float s = (1.0f + mant) * hls::ldexp(1.0f,e);
         mean_out[t] = mean; s_out[t] = s;
-        for (int d = 0; d < X_D; d++) y[t*X_D+d] = gamma[d]*((x[t*X_D+d]-mean)/s) + beta[d];
+        for (int d = 0; d < X_D; d++) {
+#pragma HLS PIPELINE II=1
+            y[t*X_D+d] = gamma[d]*((x[t*X_D+d]-mean)/s) + beta[d]; }
     }
 }
 static void bf_matmul(const float *x, const float *Wf, float *y, int M, int I, int O) {
@@ -546,11 +557,19 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             static float Praw[X_H*X_SEQ*X_SEQ];
             for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
                 float sc[X_SEQ], mx=-1e30f;
-                for (int j=0;j<=i;j++){ float dot=0; for(int d=0;d<X_DH;d++) dot += WQf[i*X_D+h*X_DH+d]*WKf[j*X_D+h*X_DH+d];
+                for (int j=0;j<=i;j++){ float dot=0; for(int d=0;d<X_DH;d++){
+#pragma HLS PIPELINE II=1
+                    dot += WQf[i*X_D+h*X_DH+d]*WKf[j*X_D+h*X_DH+d]; }
                     sc[j]=dot*scale; if(sc[j]>mx)mx=sc[j]; }
-                float sum=0; for(int j=0;j<=i;j++){ float e=hls::exp(sc[j]-mx); Praw[(h*X_SEQ+i)*X_SEQ+j]=e; sum+=e; }
-                for(int j=0;j<=i;j++) Praw[(h*X_SEQ+i)*X_SEQ+j] /= sum;
-                for(int d=0;d<X_DH;d++){ float blend=0; for(int j=0;j<=i;j++) blend+=Praw[(h*X_SEQ+i)*X_SEQ+j]*WVf[j*X_D+h*X_DH+d]; WATTN[i*X_D+h*X_DH+d]=blend; }
+                float sum=0; for(int j=0;j<=i;j++){
+#pragma HLS PIPELINE II=1
+                    float e=hls::exp(sc[j]-mx); Praw[(h*X_SEQ+i)*X_SEQ+j]=e; sum+=e; }
+                for(int j=0;j<=i;j++){
+#pragma HLS PIPELINE II=1
+                    Praw[(h*X_SEQ+i)*X_SEQ+j] /= sum; }
+                for(int d=0;d<X_DH;d++){ float blend=0; for(int j=0;j<=i;j++){
+#pragma HLS PIPELINE II=1
+                    blend+=Praw[(h*X_SEQ+i)*X_SEQ+j]*WVf[j*X_D+h*X_DH+d]; } WATTN[i*X_D+h*X_DH+d]=blend; }
             }
             bstore_f(buffer, MP_WPRAW, Praw, X_H*X_SEQ*X_SEQ);
             bf_qact(WATTN, X_SEQ*X_D);                          // char-LM: proj(qact(y))
@@ -617,9 +636,16 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
         static float FWHEAD[X_VOCAB*X_D], FLNFG[X_D]; bload_f(buffer, MP_FWHEAD, FWHEAD, X_VOCAB*X_D); bload_f(buffer, MP_FLNFG, FLNFG, X_D);
         static float gLG[X_SEQ*X_VOCAB];
     CE: for (int t=0;t<X_SEQ;t++){
-            float mx=-1e30f; for(int v=0;v<X_VOCAB;v++){ float l=WLG[t*X_VOCAB+v]; if(l>mx)mx=l; }
-            float sum=0,pr[X_VOCAB]; for(int v=0;v<X_VOCAB;v++){ pr[v]=hls::exp(WLG[t*X_VOCAB+v]-mx); sum+=pr[v]; }
-            for(int v=0;v<X_VOCAB;v++){ float p=pr[v]/sum, oh=(v==tgt[t])?1.0f:0.0f; gLG[t*X_VOCAB+v]=P((p-oh)/X_SEQ); }
+#pragma HLS PIPELINE off
+            float mx=-1e30f; for(int v=0;v<X_VOCAB;v++){
+#pragma HLS PIPELINE II=1
+                float l=WLG[t*X_VOCAB+v]; if(l>mx)mx=l; }
+            float sum=0,pr[X_VOCAB]; for(int v=0;v<X_VOCAB;v++){
+#pragma HLS PIPELINE II=1
+                pr[v]=hls::exp(WLG[t*X_VOCAB+v]-mx); sum+=pr[v]; }
+            for(int v=0;v<X_VOCAB;v++){
+#pragma HLS PIPELINE II=1
+                float p=pr[v]/sum, oh=(v==tgt[t])?1.0f:0.0f; gLG[t*X_VOCAB+v]=P((p-oh)/X_SEQ); }
         }
         static float gWHEAD[X_VOCAB*X_D]; for (int i=0;i<X_VOCAB*X_D;i++) gWHEAD[i]=0;
         static float gXF[X_SEQ*X_D]; bf_linear_bwd(gLG, FWHEAD, WXF, gXF, gWHEAD, X_SEQ, X_D, X_VOCAB);
@@ -658,11 +684,19 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
 ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
         const float* p=&Praw[(h*X_SEQ+i)*X_SEQ];
         float gp[X_SEQ];
-        for (int j=0;j<=i;j++){ float s=0; for(int d=0;d<X_DH;d++) s+=gATTN[i*X_D+h*X_DH+d]*WVf[j*X_D+h*X_DH+d]; gp[j]=s;   // MUL (bf16)
-            for(int d=0;d<X_DH;d++) gV[j*X_D+h*X_DH+d]+=P(p[j]*gATTN[i*X_D+h*X_DH+d]); }                                    // MUL
-        float ex=0; for(int j=0;j<=i;j++) ex+=p[j]*gp[j];
+        for (int j=0;j<=i;j++){ float s=0; for(int d=0;d<X_DH;d++){
+#pragma HLS PIPELINE II=1
+            s+=gATTN[i*X_D+h*X_DH+d]*WVf[j*X_D+h*X_DH+d]; } gp[j]=s;                                                        // MUL (bf16)
+            for(int d=0;d<X_DH;d++){
+#pragma HLS PIPELINE II=1
+                gV[j*X_D+h*X_DH+d]+=P(p[j]*gATTN[i*X_D+h*X_DH+d]); } }                                                      // MUL
+        float ex=0; for(int j=0;j<=i;j++){
+#pragma HLS PIPELINE II=1
+            ex+=p[j]*gp[j]; }
         for (int j=0;j<=i;j++){ float gs=P(p[j]*(gp[j]-ex))*ascale;                                                          // softmax Jacobian
-            for(int d=0;d<X_DH;d++){ gQ[i*X_D+h*X_DH+d]+=gs*WKf[j*X_D+h*X_DH+d]; gK[j*X_D+h*X_DH+d]+=gs*WQf[i*X_D+h*X_DH+d]; } }
+            for(int d=0;d<X_DH;d++){
+#pragma HLS PIPELINE II=1
+                gQ[i*X_D+h*X_DH+d]+=gs*WKf[j*X_D+h*X_DH+d]; gK[j*X_D+h*X_DH+d]+=gs*WQf[i*X_D+h*X_DH+d]; } }
     }
     for(int i=0;i<X_SEQ*X_D;i++){ gQ[i]=P(gQ[i]); gK[i]=P(gK[i]); gV[i]=P(gV[i]); }
     static float gX1[X_SEQ*X_D]; for(int i=0;i<X_SEQ*X_D;i++) gX1[i]=0; static float tmp[X_SEQ*X_D];
