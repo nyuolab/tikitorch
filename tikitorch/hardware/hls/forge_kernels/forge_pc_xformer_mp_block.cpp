@@ -282,7 +282,9 @@ static void bf_layernorm(const float *x, const float *gamma, const float *beta,
                          float *y, float *mean_out, float *s_out, int M) {
 #pragma HLS INLINE off
 BL_T: for (int t = 0; t < M; t++) {
-#pragma HLS PIPELINE II=1
+        // NOTE: outer PIPELINE removed — the body has 3 sequential factor-8 inner reductions over X_D
+        // plus transcendental log2/round, so an achievable single II is not cleanly computable. HLS now
+        // schedules the 8-wide inners naturally (fast synth); inner UNROLL factor=8 kept for area.
         float sum = 0;
     BL_S: for (int d = 0; d < X_D; d++) {
 #pragma HLS UNROLL factor=8
@@ -308,7 +310,8 @@ static void bf_matmul(const float *x, const float *Wf, float *y, int M, int I, i
 #pragma HLS INLINE off
 BM_T: for (int t = 0; t < M; t++)
     BM_O: for (int o = 0; o < O; o++) {
-#pragma HLS PIPELINE II=1
+            // NOTE: outer PIPELINE removed — inner trip count I is call-variable (X_D=64 or X_FFN=256),
+            // so a single fixed achievable II doesn't fit both. HLS schedules the 8-wide inner naturally.
             float acc = 0;
         BM_I: for (int i = 0; i < I; i++) {
 #pragma HLS UNROLL factor=8
@@ -325,7 +328,8 @@ static void bf_linear_bwd(const float *gy, const float *Wf, const float *x,
 #pragma HLS INLINE off
 LR_T: for (int t = 0; t < M; t++)
     LR_I: for (int i = 0; i < I; i++) {
-#pragma HLS PIPELINE II=1
+            // NOTE: outer PIPELINE removed — inner trip count O is call-variable (X_D / X_FFN / X_VOCAB),
+            // so a single fixed achievable II doesn't fit all callers. HLS schedules the 8-wide inner naturally.
             float acc = 0;
         LR_O: for (int o = 0; o < O; o++) {
 #pragma HLS UNROLL factor=8
@@ -335,7 +339,8 @@ LR_T: for (int t = 0; t < M; t++)
         }
 WG_O: for (int o = 0; o < O; o++)
     WG_I: for (int i = 0; i < I; i++) {
-#pragma HLS PIPELINE II=1
+            // NOTE: outer PIPELINE removed — inner trip count M is call-variable (X_SEQ here, but the
+            // function is shared); HLS schedules the 8-wide inner naturally. Inner UNROLL factor=8 kept.
             float acc = 0;
         WG_T: for (int t = 0; t < M; t++) {
 #pragma HLS UNROLL factor=8
@@ -349,7 +354,8 @@ WG_O: for (int o = 0; o < O; o++)
 static void bf_ln_bwd(const float *gy, const float *gamma, const float *s, float *dx, int M) {
 #pragma HLS INLINE off
 LB_T: for (int t = 0; t < M; t++) {
-#pragma HLS PIPELINE II=1
+        // NOTE: outer PIPELINE removed — body has 2 sequential factor-8 inner loops over X_D plus a
+        // scalar divide, so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
         float gxhat[X_D], mg = 0;
     LB_C: for (int d = 0; d < X_D; d++) {
 #pragma HLS UNROLL factor=8
@@ -562,7 +568,8 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
                 float sc[X_SEQ], mx=-1e30f;
             FA_SC: for (int j=0;j<=i;j++){
-#pragma HLS PIPELINE II=1
+#pragma HLS PIPELINE II=4
+                    // II=4 = ceil(X_DH(32)/8): cycles the 8-wide inner reduction needs -> achievable, fast synth.
                     float dot=0;
                 FA_SD: for(int d=0;d<X_DH;d++){
 #pragma HLS UNROLL factor=8
@@ -577,7 +584,8 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
 #pragma HLS PIPELINE II=1
                     Praw[(h*X_SEQ+i)*X_SEQ+j] /= sum; }
             FA_BD: for(int d=0;d<X_DH;d++){
-#pragma HLS PIPELINE II=1
+#pragma HLS PIPELINE II=8
+                    // II=8 = ceil(X_SEQ(64)/8): max cycles the 8-wide inner (j<=i, bound X_SEQ) needs -> achievable.
                     float blend=0;
                 FA_BJ: for(int j=0;j<=i;j++){
 #pragma HLS UNROLL factor=8
@@ -650,7 +658,8 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
         static float FWHEAD[X_VOCAB*X_D], FLNFG[X_D]; bload_f(buffer, MP_FWHEAD, FWHEAD, X_VOCAB*X_D); bload_f(buffer, MP_FLNFG, FLNFG, X_D);
         static float gLG[X_SEQ*X_VOCAB];
     CE: for (int t=0;t<X_SEQ;t++){
-#pragma HLS PIPELINE II=1
+            // NOTE: outer PIPELINE removed — body has 3 sequential factor-8 inner loops over X_VOCAB plus
+            // hls::exp, so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
             float mx=-1e30f;
         CE_MX: for(int v=0;v<X_VOCAB;v++){
 #pragma HLS UNROLL factor=8
@@ -704,7 +713,8 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
         const float* p=&Praw[(h*X_SEQ+i)*X_SEQ];
         float gp[X_SEQ];
     AB_GP: for (int j=0;j<=i;j++){
-#pragma HLS PIPELINE II=1
+            // NOTE: outer PIPELINE removed — body has 2 sequential factor-8 inner loops over X_DH (gp dot +
+            // gV scatter), so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
             float s=0;
         AB_GPD: for(int d=0;d<X_DH;d++){
 #pragma HLS UNROLL factor=8
@@ -722,7 +732,8 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
             ex+=p[j]*gp[j];
         }
     AB_JAC: for (int j=0;j<=i;j++){
-#pragma HLS PIPELINE II=1
+#pragma HLS PIPELINE II=4
+            // II=4 = ceil(X_DH(32)/8): cycles the 8-wide inner gQ/gK scatter needs -> achievable, fast synth.
             float gs=P(p[j]*(gp[j]-ex))*ascale;                                                          // softmax Jacobian
         AB_JACD: for(int d=0;d<X_DH;d++){
 #pragma HLS UNROLL factor=8
