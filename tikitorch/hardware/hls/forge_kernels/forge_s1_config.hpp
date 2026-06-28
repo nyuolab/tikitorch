@@ -122,6 +122,13 @@
 #ifndef S1_FWD_ONLY
 #define S1_FWD_ONLY   0
 #endif
+// GEMM activation precision (S1_GEMM_QX): 1 = dyadic-MAC y=q(x)*q(W) (BOTH operands snapped to pow2 — cheapest
+// but lossy: each activation -> one 2^k); 0 = q(W)*x_full (weight pow2, activation kept FULL int16, shifted by
+// the weight's exponent — still DSP=0 shift+add, far less lossy). Deploy uses 0: the both-pow2 GEMM made the
+// D=64 LM marginal (~3.2, sometimes < bigram); full-activation recovers ~2.66 (beats bigram by 0.81).
+#ifndef S1_GEMM_QX
+#define S1_GEMM_QX    1
+#endif
 
 // ----------------------------------------------------------------------------
 // POSITIONAL EMBEDDING (S1_POS_EMBED) — the context-localization fix.

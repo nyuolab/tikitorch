@@ -385,6 +385,7 @@ static void fwd_gemm(const data_t *xin, const code_t *wcode, int w_off, data_t *
     // Partition the T (row/token) dim COMPLETE so the IRED inner loop's T-way UNROLL gets T parallel
     // reads of xE/xS/xNZ[*][i] per cycle (the forge_fwd_wide dim=1 partition recipe). Without this the
     // T-way-unrolled MAC can't hit II=1 on a single BRAM port (II would balloon -> schedule blowup).
+#if S1_GEMM_QX
     static exp_t xE[S1_GEMM_TMAX][S1_GEMM_IMAX]; static bool xS[S1_GEMM_TMAX][S1_GEMM_IMAX]; static bool xNZ[S1_GEMM_TMAX][S1_GEMM_IMAX];
 #pragma HLS ARRAY_PARTITION variable=xE  cyclic factor=S1_LANE dim=1
 #pragma HLS ARRAY_PARTITION variable=xS  cyclic factor=S1_LANE dim=1
@@ -395,6 +396,7 @@ QX: for (int t = 0; t < M; t++)
 #pragma HLS LOOP_TRIPCOUNT min=128 max=512
             dyad(xin[t * I + i], xS[t][i], xE[t][i], xNZ[t][i]);
         }
+#endif
     // output-stationary: for each output o, stream the i-reduction over all T rows. The T (token) reduction
     // is NARROWED to LANE-wide chunks: cyclic-by-LANE banks give LANE conflict-free reads/cycle so the inner
     // LANE-way UNROLL pipelines II=1; the outer tt chunk loop walks the FULL T range in TMAX/LANE steps.
@@ -416,12 +418,19 @@ TT:         for (int tt = 0; tt < S1_GEMM_TMAX; tt += S1_LANE) {
 #pragma HLS UNROLL
                     int t = tt + tl;
                     if (t < M) {
+#if S1_GEMM_QX
                         exp_t ex = xE[t][i];
                         int e = (int)ew + (int)ex;
                         acc_t term = (acc_t)1 << e;
                         bool neg = sw ^ xS[t][i];
                         bool nz  = nzw & xNZ[t][i];
                         if (nz) acc[t] += neg ? (acc_t)(-term) : term;
+#else
+                        // q(W)*x_full: keep the FULL int16 activation, shift by the weight's exponent (DSP=0).
+                        acc_t xv = (acc_t)xin[t * I + i];
+                        acc_t term = (ew >= 0) ? (xv << (int)ew) : (xv >> (int)(-ew));
+                        if (nzw) acc[t] += sw ? (acc_t)(-term) : term;
+#endif
                     }
                 }
             }

@@ -53,7 +53,7 @@ def main():
     ap.add_argument("--bs",type=int,default=64); ap.add_argument("--taufloor",type=float,default=0.04)
     ap.add_argument("--madln",type=int,default=1); ap.add_argument("--aq",type=float,default=256.0)
     ap.add_argument("--out",type=str,default=""); ap.add_argument("--qx",type=int,default=0); a=ap.parse_args()
-    global AQ,QX_POW2; QX_POW2=bool(a.qx); torch.manual_seed(0); tr,va,V=load()
+    global AQ,QX_POW2; QX_POW2=bool(a.qx); torch.manual_seed(0); np.random.seed(0); tr,va,V=load()
     from collections import Counter
     cN=len(va); bg=Counter(zip(va[:-1],va[1:])); c0=Counter(va[:-1]); bgH=-sum((c/(cN-1))*math.log2(c/c0[x]) for (x,y),c in bg.items())
     print(f"V={V} D={a.D} L={a.L} T={a.T} madln={a.madln} aq={a.aq} | bigram={bgH:.3f}")
