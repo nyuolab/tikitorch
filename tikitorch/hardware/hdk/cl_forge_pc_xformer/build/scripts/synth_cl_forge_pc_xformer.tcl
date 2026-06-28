@@ -33,6 +33,21 @@ read_ip [glob $CL_DIR/design/ip/axi_crossbar_ddr/axi_crossbar_ddr.xci]
 synth_ip [get_ips pcblock_ocl_slice]
 synth_ip [get_ips axi_crossbar_ddr]
 
+# HLS BF16 floating-point operator IP — the mp kernel's BF16 backward uses single-precision fadd/fsub/faddfsub/
+# fcmp/fmul/fexp/fdiv + sitofp. Vitis HLS csynth emits only the operator WRAPPERS (.v, read via read_verilog
+# above) plus a companion *_ip.tcl generator for each; csynth never RUNS them, so the underlying floating_point
+# _ip cores are missing -> "module forge_pc_xformer_mp_block_..._ip not found" at synth (the AFI build #1 wall).
+# Source the generators here: each does create_ip (floating_point 7.1) + generate_target {synthesis simulation}
+# and sets generate_synth_checkpoint=false, so synth_design below synthesizes them INLINE with the CL (the path
+# HLS intends). The wrappers' _ip instantiations resolve at elaboration. (The int kernel had zero float ops,
+# hence never needed this.) The AFI build stages these into $CL_DIR/design/fpip/ from the HLS verilog dir.
+set fpip_tcls [lsort [glob -nocomplain $CL_DIR/design/fpip/*_ip.tcl]]
+puts "FPIP: [llength $fpip_tcls] HLS floating-point IP generators to source"
+foreach iptcl $fpip_tcls {
+  puts "FPIP: sourcing [file tail $iptcl]"
+  source $iptcl
+}
+
 synth_design -mode out_of_context \
              -top ${CL} \
              -verilog_define XSDB_SLV_DIS \

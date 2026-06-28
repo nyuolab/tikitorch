@@ -68,7 +68,12 @@ rm -rf "\$CLROOT"/design; cp -r "/opt/tiki/\$PKG_REL/design" "\$CLROOT"/design; 
 cp -f "/opt/tiki/\$PKG_REL/build/scripts/"*.tcl "\$CLROOT"/build/scripts/ 2>/dev/null || true
 mkdir -p "\$CLROOT/build/constraints"; cp -f "/opt/tiki/\$PKG_REL/build/constraints/"*.xdc "\$CLROOT"/build/constraints/ 2>/dev/null || true
 cp "\$KVDIR"/*.v "\$CLROOT"/design/ 2>/dev/null || true
-{ echo "== CL design =="; ls -la "\$CLROOT/design"; echo "== build/scripts =="; ls -la "\$CLROOT/build/scripts"; } | aws s3 cp - "\$S3_RESULTS/cl_layout.txt" --only-show-errors || true
+# stage the HLS floating-point operator IP GENERATORS (the *_ip.tcl that csynth emits next to the wrappers);
+# synth_cl_forge_pc_xformer.tcl sources them to create+inline-synth the floating_point cores the BF16 backward
+# references (AFI build #1 failed: "module ..._ip not found" because csynth never runs these generators).
+mkdir -p "\$CLROOT/design/fpip"; cp "\$KVDIR"/*_ip.tcl "\$CLROOT/design/fpip/" 2>/dev/null || true
+echo "FPIP generators staged: \$(ls "\$CLROOT/design/fpip"/*_ip.tcl 2>/dev/null | wc -l)"
+{ echo "== CL design =="; ls -la "\$CLROOT/design"; echo "== design/fpip =="; ls -la "\$CLROOT/design/fpip"; echo "== build/scripts =="; ls -la "\$CLROOT/build/scripts"; } | aws s3 cp - "\$S3_RESULTS/cl_layout.txt" --only-show-errors || true
 up
 # 3. gen IP
 echo "=== gen_ip START \$(date -u) ==="; vivado -mode batch -source "\$CLROOT/build/scripts/gen_ip.tcl" -tclargs "\$CLROOT/design/ip" 2>&1 | tail -30

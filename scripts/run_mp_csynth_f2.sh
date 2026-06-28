@@ -15,7 +15,7 @@ cmd_launch(){
   aws_ s3 cp "$STATE/src.tar.gz" "$S3SRC" --only-show-errors
   cat > "$STATE/user-data.sh" <<UDEOF
 #!/bin/bash
-shutdown -h +70 "tiki deadline" || true
+shutdown -h +180 "tiki deadline" || true
 exec > /var/log/tiki-mpcsynth.log 2>&1
 set -x; echo "BOOT \$(date -u)"; hostname
 S3RES="${S3RES}"
