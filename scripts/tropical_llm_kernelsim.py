@@ -119,8 +119,14 @@ def kernel_gemm(x_int, w, scale):
     pow2 rescale (>>GEMM_RESCALE) so SW can be large (precise weights) without sat16 overflow; sat16."""
     wv = dyad_scaled(w, scale)                            # [O,I] scaled-int weight values
     out = x_int @ wv.t()
-    if GEMM_RESCALE > 0:
-        out = afloor(out / float(1 << GEMM_RESCALE))      # arithmetic >> (pow2, DSP=0)
+    rs = 0
+    if GEMM_RESCALE < 0:                                  # AUTO: rescale by this matrix's own (pow2) weight scale
+        rs = int(round(math.log2(scale))) if scale > 1 else 0
+    elif GEMM_RESCALE > 0:
+        rs = GEMM_RESCALE
+    if rs > 0:
+        sm = out / float(1 << rs)                         # smooth (grad path)
+        out = sm + (afloor(sm) - sm).detach()             # STE floor: fwd = arithmetic >> , bwd = divide
     return sat16(ste_round(out))
 
 # ----------------------------- model -----------------------------
