@@ -41,14 +41,35 @@ Adding ONE coarse effect back to the clean model:
 ±2^k). The 2-bit LN reciprocal is second. Int activations are NOT the problem. Either of dyad-W or
 2-bit-LN alone caps you near bigram; you must fix both to get coherence.
 
-## A second, separate gap: the sim is ~0.77 optimistic vs the real kernel for the QAT model
-The QAT model is 3.56 in the sim but **4.33 on the real kernel**. (The old model agreed within 0.16,
-so the QAT model learned to exploit a sim quirk.) Ruled out: per-term GEMM floor (`xv>>-ew`, only
-−0.02), attention tie-break (true argmax-gather, ~0.00). Root cause not yet localized → a faithful
-sim needs a per-stage diff against the kernel's saved intermediate buffers (X1/R/logits regions).
+## The sim IS faithful (the "0.77 gap" was a temperature artifact — RESOLVED)
+Initially the QAT model looked like sim 3.56 vs kernel 4.33. Root-caused by dumping the kernel's
+intermediate buffers (`s1_dump.cpp`) and diffing vs the sim: X1 and **logits match** (logit
+mean|diff|=1.66 on logits ~±1000 = ~0.5%). The 4.33 was just the gate run at logit_temp=512; the
+real kernel swept over temp gives **3.575 @ t128 == the sim's 3.56**. So QAT-through-kernel-sim
+deploys faithfully, and the sweep numbers below are trustworthy for silicon. (Lesson: always sweep
+logit_temp when gating; the sim's bpc_sweep already does.)
+
+## The "quick fix" (multi-term dyad + finer LN) is REFUTED by measurement (8000 steps)
+| config | HARD bpc | note |
+|---|---|---|
+| K=1 mbits=2 (baseline) | 3.56 | = real kernel 3.575 @ t128 |
+| K=2 mbits=2 | 3.56 | multi-term weights: no help |
+| K=1 mbits=4 | 3.56 | finer LN: no help |
+| K=2 mbits=4 | 3.55 | both: no help |
+| K=3 mbits=4 | 3.51 | barely |
+| large-SW + pow2-rescale + K3 m4 | 5.28 | naive scale tweak: WORSE |
+
+Root cause is NOT the # of dyad terms — it's the **fixed-point SCALE design**: at SW=2 the weights
+`round(w*2)` zero out ~95% of entries (w≈0.125 → round(0.25)=0), so CSD terms can't help an
+already-zeroed weight; and the GEMM has **no accumulator rescale**, so you cannot raise the weight
+scale (to un-zero weights) without sat16 overflow on the residual path. The coarse effects COMPOUND
+(removing any single one still leaves ~3.5). So coherence needs a *co-designed* fixed-point pipeline
+(adequate weight scale + per-layer accumulator rescale + multi-term dyad + finer LN), AND a bigger
+model (the D=64/L2 float-equiv ceiling is only 2.78; D=256/L4 needs ≫5000 steps — undertrained here).
 
 ## Bottom line
-A **strict multiplier-free (pow2-weight) D=64 char-LM is fundamentally bigram-class.** Even a
+A **strict multiplier-free (pow2-weight) D=64 char-LM is fundamentally bigram-class**, and the
+obvious incremental fixes do NOT clear it (measured). Even a
 perfectly faithful QAT pipeline tops out around bigram, because the pow2-weight rounding (+0.77) and
 the coarse LN (+0.57) are the ceiling — not the recipe, not the int activations. Coherent text needs:
 - **multi-term dyadic weights** (w ≈ ±2^a±2^b, CSD) — still DSP=0 (2 shift-adds), ~halves +0.77; and/or

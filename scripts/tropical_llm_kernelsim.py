@@ -38,6 +38,9 @@ ABL_LN_EXACT = False   # ablation: true float /meanabs (skip 2-bit mantissa)
 ABL_W_EXACT  = False   # ablation: full-precision weights (skip dyad round-log2)
 ACT_Q = 1.0            # activation quant grid (1.0=integer=kernel; >1 = finer)
 ACT_NOCLIP = False     # ablation: disable sat16 clip
+DYAD_K = 1             # weight = sum of K signed powers of 2 (1=current single-pow2; >1 = CSD, still shift-add)
+GEMM_RESCALE = 0       # if >0: right-shift GEMM output by this (pow2 rescale; lets SW be large w/o overflow)
+LN_MBITS = 2           # LN reciprocal mantissa bits (kernel=2; 4 = finer)
 
 # ----------------------------- straight-through helpers -----------------------------
 def ste_round(x):                      # round to the ACT_Q grid, identity gradient
@@ -55,13 +58,18 @@ def dyad_scaled(w, scale):
     nonzero mask of round(w*scale).  forward = exact decoded value (scaled-int units);
     backward flows to w as if value == w*scale (smooth surrogate)."""
     ws = w * scale
-    wr = torch.round(ws)
-    a = wr.abs()
-    nz = (a >= 0.5).float()
-    e = torch.round(torch.log2(a.clamp_min(1.0)))
-    hard = torch.sign(wr) * torch.pow(2.0, e) * nz
+    if ABL_W_EXACT: return ws
+    target = torch.round(ws)            # integer weight to approximate as sum of DYAD_K powers of 2
+    hard = torch.zeros_like(target)
+    resid = target
+    for _ in range(DYAD_K):
+        a = resid.abs()
+        m = (a >= 0.5).float()          # add a term only while the residual still rounds to >=1
+        e = torch.round(torch.log2(a.clamp_min(1.0)))
+        term = torch.sign(resid) * torch.pow(2.0, e) * m
+        hard = hard + term
+        resid = resid - term
     soft = ws                           # smooth surrogate (grad path)
-    if ABL_W_EXACT: return soft
     return soft + (hard - soft).detach()
 
 # ----------------------------- faithful LayerNorm -----------------------------
@@ -71,29 +79,30 @@ def kernel_ln(x, g, b, SGAM):
     c = sat16(x - mean)
     meanabs = afloor(c.abs().sum(-1, keepdim=True) / float(1 << LOG2_D)).clamp_min(1.0)
 
-    # fdyad(meanabs) -> e, nq  (exact integer, detached: it's a fixed nonlinearity)
+    # fdyad(meanabs) -> e, nq  (exact integer, detached: it's a fixed nonlinearity). mb = LN mantissa bits.
     with torch.no_grad():
+        mb = LN_MBITS
         ma = meanabs
         p = afloor(torch.log2(ma))                       # highest set bit
         exact = (ma == torch.pow(2.0, p)).float()
         e = torch.where(exact > 0, -p, -(p + 1.0))
         nege = -e
-        numer = torch.pow(2.0, MBITS + nege)
+        numer = torch.pow(2.0, mb + nege)
         thresh = numer + afloor(ma / 2.0)
-        nbase = float(1 << MBITS)                         # 4
+        nbase = float(1 << mb)
         nq = torch.full_like(ma, nbase)
-        for step in range(1, (1 << MBITS) + 1):           # 1..4
+        for step in range(1, (1 << mb) + 1):
             acc = (nbase + step) * ma
             nq = torch.where(acc <= thresh, torch.full_like(ma, nbase + step), nq)
-        over = (nq >= float(1 << (MBITS + 1)))            # nq>=8 -> nq=4, e+=1
+        over = (nq >= float(1 << (mb + 1)))
         nq = torch.where(over, torch.full_like(nq, nbase), nq)
         e = torch.where(over, e + 1.0, e)
         nq = nq.clamp_min(nbase)
         nqm4 = nq - nbase
-        add = nqm4.clamp(0, 3)
-        # exact RESC: r = ((c*(4+add))>>2) then <<e / >>-e   (arithmetic floor shifts)
+        add = nqm4.clamp(0, (1 << mb) - 1)
+        # exact RESC: r = ((c*(nbase+add))>>mb) then <<e / >>-e   (arithmetic floor shifts)
         cn = c * (nbase + add)
-        r1 = afloor(cn / float(1 << MBITS))
+        r1 = afloor(cn / float(1 << mb))
         pe = torch.pow(2.0, e.abs())
         r_hard = torch.where(e >= 0, r1 * pe, afloor(r1 / pe))
 
@@ -106,9 +115,12 @@ def kernel_ln(x, g, b, SGAM):
 
 # ----------------------------- faithful GEMM (qx=0) -----------------------------
 def kernel_gemm(x_int, w, scale):
-    """x_int:[...,I] int-valued, w:[O,I].  out[...,o]=sum_i x_int[i]*dyad(round(w*scale)); sat16."""
+    """x_int:[...,I] int-valued, w:[O,I].  out[...,o]=sum_i x_int[i]*dyad(round(w*scale)); optional
+    pow2 rescale (>>GEMM_RESCALE) so SW can be large (precise weights) without sat16 overflow; sat16."""
     wv = dyad_scaled(w, scale)                            # [O,I] scaled-int weight values
     out = x_int @ wv.t()
+    if GEMM_RESCALE > 0:
+        out = afloor(out / float(1 << GEMM_RESCALE))      # arithmetic >> (pow2, DSP=0)
     return sat16(ste_round(out))
 
 # ----------------------------- model -----------------------------
@@ -240,11 +252,21 @@ def main():
     ap.add_argument('--ln_exact', type=int, default=0, help='ablation: exact /meanabs LN')
     ap.add_argument('--w_exact', type=int, default=0, help='ablation: full-precision weights')
     ap.add_argument('--fine_act', type=int, default=0, help='ablation: fine (1/16) unclipped activations ~= float')
+    ap.add_argument('--dyad_k', type=int, default=1, help='weight = sum of K signed powers of 2 (CSD; 1=current)')
+    ap.add_argument('--mbits', type=int, default=2, help='LN reciprocal mantissa bits (kernel=2; 4=finer)')
+    ap.add_argument('--D', type=int, default=64, help='model width (power of 2)')
+    ap.add_argument('--H', type=int, default=2, help='attention heads')
+    ap.add_argument('--ffn', type=int, default=256, help='FFN inner dim')
+    ap.add_argument('--gemm_rescale', type=int, default=0, help='pow2 right-shift of GEMM output (rescale)')
     ap.add_argument('--seed', type=int, default=0)
     a = ap.parse_args()
-    global ABL_LN_EXACT, ABL_W_EXACT, ACT_Q, ACT_NOCLIP
+    global ABL_LN_EXACT, ABL_W_EXACT, ACT_Q, ACT_NOCLIP, D, H, DH, FFN, LOG2_D
+    D = a.D; H = a.H; DH = a.D // a.H; FFN = a.ffn; LOG2_D = int(round(math.log2(a.D)))
     ABL_LN_EXACT = bool(a.ln_exact); ABL_W_EXACT = bool(a.w_exact)
     if a.fine_act: ACT_Q = 16.0; ACT_NOCLIP = True
+    global DYAD_K, LN_MBITS
+    global GEMM_RESCALE
+    DYAD_K = a.dyad_k; LN_MBITS = a.mbits; GEMM_RESCALE = a.gemm_rescale
     torch.manual_seed(a.seed); np.random.seed(a.seed)
     dev = "mps" if torch.backends.mps.is_available() else "cpu"
     SW = {kv.split(':')[0]: float(kv.split(':')[1]) for kv in a.SW.split(',')}
@@ -273,7 +295,7 @@ def main():
     print(f'[RESULT] kernel-sim QAT  soft_bpc={soft:.4f}(t{st})  HARD_bpc={hard:.4f}(t{ht})  bigram={bg}  '
           f'beats_bigram={"YES" if hard < bg else "NO"}')
     if a.out:
-        torch.save({'model': model.export_state(), 'cfg': {'L': a.L, 'SA': a.SA, 'SW': SW, 'SGAM': a.SGAM, 'SH': a.SH, 'temp': a.temp}}, a.out)
+        torch.save({'model': model.export_state(), 'cfg': {'L': a.L, 'SA': a.SA, 'SW': SW, 'SGAM': a.SGAM, 'SH': a.SH, 'temp': a.temp, 'dyad_k': a.dyad_k, 'mbits': a.mbits, 'D': a.D, 'H': a.H, 'ffn': a.ffn}}, a.out)
         print(f'[saved] {a.out}')
 
 if __name__ == '__main__':
