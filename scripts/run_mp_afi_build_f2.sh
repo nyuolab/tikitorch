@@ -110,7 +110,22 @@ tail -120 /tmp/aws_build.full.log; aws s3 cp /tmp/aws_build.full.log "\$S3_RESUL
 # 5. collect the Developer_CL.tar (the create-fpga-image input)
 ls -la "\$CLROOT/build/checkpoints/" "\$CLROOT/build/checkpoints/to_aws/" 2>&1 | aws s3 cp - "\$S3_RESULTS/checkpoints_listing.txt" --only-show-errors || true
 aws s3 cp "\$CLROOT/build/checkpoints/to_aws/" "\$S3_RESULTS/to_aws/" --recursive --exclude "*" --include "*Developer_CL.tar" --only-show-errors 2>/dev/null || true
-for r in \$(find "\$CLROOT/build" -name "*timing_summary*" 2>/dev/null); do aws s3 cp "\$r" "\$S3_RESULTS/reports/\$(basename "\$r")" --only-show-errors 2>/dev/null || true; done
+# upload ALL reports (the route WNS lives in *post_route_timing.rpt, NOT *timing_summary*)
+for r in \$(find "\$CLROOT/build/reports" -name "*.rpt" 2>/dev/null); do aws s3 cp "\$r" "\$S3_RESULTS/reports/\$(basename "\$r")" --only-show-errors 2>/dev/null || true; done
+# TIMING DIAGNOSTIC: open the post-route DCP -> report_clocks (is clk_kernel ~6.67ns/150MHz?) + worst paths
+# (which CLOCK + which nets are failing). Decisive for the CDC: did clk_kernel take effect, or is the violation
+# in the clk_main_a0 (250MHz) domain / the CDC boundary?
+DCP="\$(find "\$CLROOT/build/checkpoints" -name '*post_route*.dcp' 2>/dev/null | head -1)"
+if [ -n "\$DCP" ]; then
+  cat > /tmp/tdiag.tcl <<'TCL'
+open_checkpoint DCPPATH
+puts "===CLOCKS==="; report_clocks
+puts "===SUMMARY==="; report_timing_summary -delay_type max -max_paths 1 -no_detailed_paths
+puts "===WORST6==="; report_timing -max_paths 6 -nworst 1 -delay_type max -setup -input_pins
+TCL
+  sed -i "s#DCPPATH#\$DCP#" /tmp/tdiag.tcl
+  vivado -mode batch -source /tmp/tdiag.tcl 2>&1 | grep -iE "===|clk_kernel|clk_main_a0|clk_out|WNS|TNS|Slack|Source:|Destination:|Source Clock|Destination Clock|Data Path Delay|Logic Levels|Path Group|Requirement|Period|^ *[0-9.]+ +ns|Waveform" | head -120 | aws s3 cp - "\$S3_RESULTS/TIMING_DIAG.txt" --only-show-errors || true
+fi
 echo "rc done=\$(date -u)" | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 up; shutdown -h now
 UDEOF
