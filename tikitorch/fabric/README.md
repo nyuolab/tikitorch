@@ -90,6 +90,18 @@ Two schedules: `schedule="gpipe"` (all-fwd-then-all-bwd; default) and `schedule=
 is depth-proportional (`~S-1-l`), and it stashes only `~S` in-flight activations vs GPipe's
 `M` (load-bearing at d768). Throughput is ~equivalent when compute-bound at `M >> S`.
 
+Does that staleness actually hurt training? `scripts/pc_fabric_staleness_quality.py` measures it
+by comparing 1F1B-at-W against a *synchronous control at the same W* (same update frequency, zero
+staleness) — so the loss gap is the pure staleness penalty (depth 8, mean over 6 seeds):
+
+```
+W=1 (stale 7): penalty 1.45x   W=2: 1.17x   W=4: 1.04x   W=S-1: 1.00x   W=M: 1.00x (bit-exact)
+```
+
+So the depth-proportional staleness costs up to **+45% final loss at W=1**, fully recovered once
+`W >= ~depth`. The "bubble-free overlap" is real but it is *overlap at the price of a W-deep
+accumulation* — and now both halves are measurable on CPU, with one knob, before the silicon driver.
+
 The bit-exact `W = M == serial` equivalence (`tests/test_fabric.py`) is the correctness
 gate: the windowed local update reproduces backprop exactly when the window spans the
 sweep, so anything `W < M` is a *deliberate* staleness/throughput trade, measured.

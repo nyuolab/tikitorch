@@ -203,25 +203,36 @@ class PipelineRunner:
         )
 
 
-def run_serial(stages, inputs, targets, lr: float = 0.1) -> tuple[list[float], float]:
-    """Synchronous full-sweep baseline (= PC cascade with no staleness): all forwards,
-    all backwards, ONE accumulated apply. This is what W = M converges to, and the
-    reference the pipelined run is checked against. Returns (losses, wall_s)."""
+def run_serial(stages, inputs, targets, lr: float = 0.1,
+               window: int | None = None) -> tuple[list[float], float]:
+    """Synchronous baseline (= PC cascade with ZERO staleness): each microbatch's forward
+    and backward use the *same* weights, and the windowed mean grad is applied every
+    ``window`` microbatches. ``window=None`` -> one apply over the whole sweep (= W=M).
+
+    This is the no-staleness control: run it at window=W and compare to the 1F1B pipeline
+    at the same W -> the loss gap is the pure staleness penalty, isolated from the
+    update-frequency (SGD-vs-batch) difference, which is matched. Returns (losses, wall_s)."""
     S, M = len(stages), len(inputs)
+    W = M if window is None else max(1, int(window))
     t0 = time.perf_counter()
     losses = [0.0] * M
     acc = [[np.zeros_like(p) for p in st.params] for st in stages]
+    n = 0
     for k in range(M):
         a = inputs[k]
-        for l in range(S):                               # forward
+        for l in range(S):                               # forward (current weights)
             a = stages[l].forward(k, a)
         loss, e = stages[-1].loss_error(k, a, targets[k])
         losses[k] = float(loss)
-        for l in range(S - 1, -1, -1):                   # backward
+        for l in range(S - 1, -1, -1):                   # backward (same weights -> no staleness)
             grads, e = stages[l].backward(k, e)
             for i in range(len(grads)):
                 acc[l][i] += grads[i]
-    for l in range(S):                                   # one apply
-        for i, p in enumerate(stages[l].params):
-            p -= lr * acc[l][i] / M
+        n += 1
+        if n == W or k == M - 1:                          # synchronous windowed apply
+            for l in range(S):
+                for i, p in enumerate(stages[l].params):
+                    p -= lr * acc[l][i] / n
+                    acc[l][i][...] = 0.0
+            n = 0
     return losses, time.perf_counter() - t0
