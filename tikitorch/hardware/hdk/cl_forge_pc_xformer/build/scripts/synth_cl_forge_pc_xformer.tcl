@@ -33,6 +33,16 @@ read_ip [glob $CL_DIR/design/ip/axi_crossbar_ddr/axi_crossbar_ddr.xci]
 synth_ip [get_ips pcblock_ocl_slice]
 synth_ip [get_ips axi_crossbar_ddr]
 
+# CDC IP: clk_div_kernel (clk_wiz 250->150 MHz) + the two AXI clock converters that
+# bridge the kernel's clk_kernel domain to the clk_main_a0 fabric (gmem AXI4 512b /
+# control AXI4LITE 32b). Same read_ip + synth_ip OOC pattern as the CL IP above.
+read_ip [glob $CL_DIR/design/ip/clk_div_kernel/clk_div_kernel.xci]
+read_ip [glob $CL_DIR/design/ip/axi_cc_gmem/axi_cc_gmem.xci]
+read_ip [glob $CL_DIR/design/ip/axi_cc_ctrl/axi_cc_ctrl.xci]
+synth_ip [get_ips clk_div_kernel]
+synth_ip [get_ips axi_cc_gmem]
+synth_ip [get_ips axi_cc_ctrl]
+
 # HLS BF16 floating-point operator IP — the mp kernel's BF16 backward uses single-precision fadd/fsub/faddfsub/
 # fcmp/fmul/fexp/fdiv + sitofp. Vitis HLS csynth emits only the operator WRAPPERS (.v, read via read_verilog
 # above) plus a companion *_ip.tcl generator for each; csynth never RUNS them, so the underlying floating_point
