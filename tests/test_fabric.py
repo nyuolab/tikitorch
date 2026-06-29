@@ -117,6 +117,37 @@ def test_1f1b_window_bounds_staleness():
     assert res.max_staleness == 0   # W=M -> a single apply at the very end
 
 
+def test_double_buffer_preserves_order_and_correctness():
+    """Double-buffering (async per-link FIFO transport) must still deliver in order and
+    produce the same result -> bit-exact to serial at W=M, same as the synchronous link."""
+    inputs, targets = _synthetic_task()
+    s_serial = make_linear_pipeline([5, 8, 6, 3], seed=2)
+    s_db = make_linear_pipeline([5, 8, 6, 3], seed=2)
+    serial_losses, _ = run_serial(s_serial, inputs, targets, lr=0.05)
+    res = PipelineRunner(
+        s_db, make_thread_links(len(s_db), double_buffer=True), lr=0.05, window=len(inputs)
+    ).run(inputs, targets)
+    assert np.allclose(res.losses, serial_losses, atol=1e-9)   # in-order, correct
+    for a, b in zip(s_serial, s_db):
+        assert np.allclose(a.W, b.W, atol=1e-9)
+
+
+def test_double_buffer_hides_comms():
+    """With a slow transport, double-buffering (overlap comms w/ next compute) must beat
+    serialized comms (compute THEN comms) on wall-clock."""
+    from tikitorch.fabric.cost import HOST_RELAY_WORD
+    inputs, targets = _synthetic_task(n=10)
+    dims, S = [5, 8, 8, 3], 3
+    ser = PipelineRunner(make_linear_pipeline(dims, compute_ms=4.0),
+                         make_thread_links(S, transport=HOST_RELAY_WORD, msg_bytes=8192),
+                         lr=0.05, window=10).run(inputs, targets).wall_s
+    dbl = PipelineRunner(make_linear_pipeline(dims, compute_ms=4.0),
+                         make_thread_links(S, transport=HOST_RELAY_WORD, msg_bytes=8192,
+                                           double_buffer=True),
+                         lr=0.05, window=10).run(inputs, targets).wall_s
+    assert dbl < ser, f"double-buffer {dbl:.3f}s should beat serialized {ser:.3f}s"
+
+
 def test_cost_word_profile_reproduces_measured_relay_fraction():
     """The WORD profile is calibrated to the MEASURED 61% host-relay fraction — guard it."""
     from tikitorch.fabric import comms_fraction

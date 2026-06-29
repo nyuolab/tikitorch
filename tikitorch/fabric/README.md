@@ -146,5 +146,12 @@ the **load-bearing first lever**: it is what turns the measured `25.8 -> 4.0 ste
 relay-bound *regression* into compute-bound scaling. (Unlike a throughput model that asserts
 "comms = 0", every number here is explicit, calibrated, and adjustable.)
 
+A second, orthogonal lever — **double-buffering** (`make_thread_links(double_buffer=True)`): a
+per-link FIFO transport thread carries a message while the stage computes the *next* microbatch,
+so the rate is `1/max(compute, comms)` instead of `1/(compute+comms)`. Measured: it lifts the
+slow word-relay path `+1.27×` (it hides the compute behind the 16 ms comms) and is moot once
+comms << compute (burst/P2P are already compute-bound). It's the silicon driver's real design,
+and it's bit-exact + order-preserving (one transport thread per direction).
+
 This module is the concrete answer to "PC should make chip-to-chip comms simple" — it
 makes the simple pattern explicit, measurable, and reusable across every backend.

@@ -175,12 +175,18 @@ class PipelineRunner:
             threading.Thread(target=worker, args=(l, inputs, targets, M))
             for l in range(self.S)
         ]
+        for lk in self.links:                          # double-buffer transport threads (no-op if off)
+            if hasattr(lk, "start_transport"):
+                lk.start_transport()
         t0 = time.perf_counter()
         for t in threads:
             t.start()
         for t in threads:
             t.join()
         wall = time.perf_counter() - t0
+        for lk in self.links:                          # when stages join, all messages are delivered
+            if hasattr(lk, "stop_transport"):
+                lk.stop_transport()
 
         # staleness = how many weight-applies landed between a microbatch's fwd and bwd
         per_stage = []

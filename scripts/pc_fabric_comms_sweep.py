@@ -25,15 +25,17 @@ COMPUTE_MS = CAL_COMPUTE_S * 1e3   # 10.25 ms, MEASURED per-block fwd+bwd
 MSG = CAL_MSG_BYTES            # 8192 B neighbour message (D=64 seq=64 int16)
 
 
-def pipelined_toks(profile, S=4, M=20, reps=3):
+def pipelined_toks(profile, S=4, M=20, reps=3, double_buffer=False):
     """Measured-in-sim throughput of the bubble-free pipeline under `profile` (median of
-    `reps` runs — thread scheduling adds run-to-run jitter, largest when compute-bound)."""
+    `reps` runs — thread scheduling adds run-to-run jitter, largest when compute-bound).
+    double_buffer overlaps a message's transit with the NEXT compute."""
     dims = [8] + [16] * (S - 1) + [4]
     inputs, targets = _task(M, dims[0], dims[-1])
     walls = []
     for _ in range(reps):
         stages = make_linear_pipeline(dims, seed=1, compute_ms=COMPUTE_MS / 2.0)
-        links = make_thread_links(S, transport=profile, msg_bytes=MSG)
+        links = make_thread_links(S, transport=profile, msg_bytes=MSG,
+                                  double_buffer=double_buffer)
         walls.append(PipelineRunner(stages, links, lr=0.05, window=M).run(inputs, targets).wall_s)
     wall = float(np.median(walls))
     return M * SEQ / wall, wall
@@ -52,15 +54,18 @@ def main():
           f"{COMPUTE_MS:.2f} ms (MEASURED) | tok/microbatch: {SEQ}\n")
     word = PROFILES[0]
     word_tok, _ = pipelined_toks(word)
-    hdr = f"  {'transport':<38} {'comms/msg':>10} {'comms-frac':>10} {'tok/s (pipe)':>13} {'vs word':>9}"
+    hdr = (f"  {'transport':<38} {'comms/msg':>10} {'comms-frac':>10} "
+           f"{'serial tok/s':>12} {'+dbl-buf':>9} {'vs word':>8}")
     print(hdr); print("  " + "-" * (len(hdr) - 2))
     for p in PROFILES:
         cms = p.time_for(MSG) * 1e3
         frac = comms_fraction(p, MSG, CAL_COMPUTE_S)
         tok, _ = pipelined_toks(p)
-        print(f"  {p.name:<38} {cms:>8.2f}ms {frac*100:>9.1f}% {tok:>13.0f} {tok/word_tok:>8.2f}x")
-    print("  (once comms < a few %, the rate is COMPUTE-bound — burst/P2P/fabric are equivalent")
-    print("   on throughput; their remaining differences here are sim thread-jitter, not real.)")
+        tok_db, _ = pipelined_toks(p, double_buffer=True)
+        print(f"  {p.name:<38} {cms:>8.2f}ms {frac*100:>9.1f}% {tok:>12.0f} {tok_db:>9.0f} {tok_db/word_tok:>7.2f}x")
+    print("  serial tok/s = comms serialized w/ compute (today); +dbl-buf = transit overlaps the NEXT")
+    print("  compute (rate -> 1/max(compute,comms)). Double-buffer helps most when comms ~ compute;")
+    print("  once comms << compute (burst/P2P) the rate is compute-bound and double-buffer is moot.")
     # the transport fix is ONE lever; it multiplies with two other INDEPENDENTLY-measured ones.
     burst_tok, _ = pipelined_toks(PROFILES[1])
     print("\n  the levers (each measured on its own; the PRODUCT is a projection, not one run):")
