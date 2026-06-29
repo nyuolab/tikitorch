@@ -106,14 +106,30 @@ The bit-exact `W = M == serial` equivalence (`tests/test_fabric.py`) is the corr
 gate: the windowed local update reproduces backprop exactly when the window spans the
 sweep, so anything `W < M` is a *deliberate* staleness/throughput trade, measured.
 
+## The real workload — a transformer char-LM (`transformer_stage.py`)
+
+`LinearStage` exercises the machinery; `transformer_stage.py` is the faithful workload — a
+pre-LN causal transformer block (LN → attention → residual → LN → FFN → residual) whose local
+backward **is** the PC cascade through the block, **gradient-checked to ~1e-9** against numerical
+gradients (`tests/test_transformer_stage.py`). `make_charlm_pipeline(vocab, d, seq, n_blocks)`
+assembles `EmbedStage → n_blocks → HeadStage(CE)` — one block per chip, the actual model.
+
+```
+A real char-LM (embed + 2 blocks + head) trained ON the fabric pipeline:  bpb 4.04 -> 0.04
+Staleness on the real model (S=6, mid-training): 1F1B costs ~1.2x bpb at W<M, recovered at W=M
+```
+
+So the CPU fabric now trains the *real* model under the *real* schedule, and the staleness→quality
+cost is confirmed **directionally on the actual transformer**, not just a toy linear net.
+(`scripts/pc_fabric_charlm.py`.)
+
 ## Status & next
 
-- **Done:** interface, `ThreadLink`, `PipelineRunner` (GPipe **and** 1F1B schedules, windowed
-  local update + staleness + overlap instrumentation), `cost.py` transport model, reference
-  `LinearStage`, demos, tests (9/9).
-- **Next:** `HostRelayLink` (bursted) on the existing MNIST/Fashion AGFI → first
-  *measured* relay-free/bursted distributed throughput; a real PC-block (transformer) stage to
-  measure "does the recipe survive the depth-proportional staleness, at what W"; then `PcieP2PLink`.
+- **Done:** interface, `ThreadLink` (+ comms-cost transport model + double-buffering),
+  `PipelineRunner` (GPipe **and** 1F1B schedules, windowed local update + staleness + overlap),
+  reference `LinearStage`, **gradchecked transformer char-LM stage**, demos, tests (13/13).
+- **Next:** `HostRelayLink` (bursted) on the existing MNIST/Fashion AGFI → first *measured*
+  relay-free/bursted distributed throughput; then `PcieP2PLink`; scale the char-LM (deeper/d768).
 - **Refactor target:** factor the transport out of `tikitorch/fpga/silicon/
   forge_pc_xformer_*_shard.cpp` and the cross-instance TCP scaffold to *back* these
   interfaces, so the silicon drivers and the CPU sim share one runtime.
