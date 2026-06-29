@@ -107,9 +107,19 @@ CLKARG=""; [ -n "\$CLOCK_A" ] && CLKARG="--aws_clk_gen --clock_recipe_a \$CLOCK_
 echo "=== aws_build clock args: \${CLKARG:-(default A1/250MHz)} ==="
 ./aws_build_dcp_from_cl.py --cl "\$CL" \$CLKARG --no-encrypt > /tmp/aws_build.full.log 2>&1; echo "BUILD_RC=\$?"
 tail -120 /tmp/aws_build.full.log; aws s3 cp /tmp/aws_build.full.log "\$S3_RESULTS/aws_build.full.log" --only-show-errors || true
-# 5. collect the Developer_CL.tar (the create-fpga-image input)
+# 5. collect the Developer_CL.tar (the create-fpga-image input). This F2 HDK writes it to
+# checkpoints/<ts>.Developer_CL.tar directly (NOT checkpoints/to_aws/ — the old F1 convention);
+# grab it from WHEREVER it is so a closed build is never lost again. Only upload if timing met
+# (a clean post_route.dcp exists, i.e. no *.VIOLATED.dcp) so we don't ship a violated AFI.
 ls -la "\$CLROOT/build/checkpoints/" "\$CLROOT/build/checkpoints/to_aws/" 2>&1 | aws s3 cp - "\$S3_RESULTS/checkpoints_listing.txt" --only-show-errors || true
-aws s3 cp "\$CLROOT/build/checkpoints/to_aws/" "\$S3_RESULTS/to_aws/" --recursive --exclude "*" --include "*Developer_CL.tar" --only-show-errors 2>/dev/null || true
+TAR="\$(find "\$CLROOT/build/checkpoints" -name '*Developer_CL.tar' 2>/dev/null | head -1)"
+VIOL="\$(find "\$CLROOT/build/checkpoints" -name '*post_route*VIOLATED*.dcp' 2>/dev/null | head -1)"
+if [ -n "\$TAR" ] && [ -z "\$VIOL" ]; then
+  echo "TIMING MET -> uploading \$TAR"
+  aws s3 cp "\$TAR" "\$S3_RESULTS/to_aws/\$(basename "\$TAR")" --only-show-errors || true
+else
+  echo "NOT uploading tarball (TAR=\$TAR VIOLATED=\$VIOL) — timing not met or no tar"
+fi
 # upload ALL reports (the route WNS lives in *post_route_timing.rpt, NOT *timing_summary*)
 for r in \$(find "\$CLROOT/build/reports" -name "*.rpt" 2>/dev/null); do aws s3 cp "\$r" "\$S3_RESULTS/reports/\$(basename "\$r")" --only-show-errors 2>/dev/null || true; done
 # TIMING DIAGNOSTIC: open the post-route DCP -> report_clocks (is clk_kernel ~6.67ns/150MHz?) + worst paths
