@@ -287,12 +287,12 @@ BL_T: for (int t = 0; t < M; t++) {
         // schedules the 8-wide inners naturally (fast synth); inner UNROLL factor=8 kept for area.
         float sum = 0;
     BL_S: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
             sum += x[t*X_D+d];
         }
         float mean = sum / X_D; float asum = 0;
     BL_A: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
             float c = x[t*X_D+d]-mean; asum += c < 0 ? -c : c;
         }
         float scale = asum / X_D; if (scale < 1e-9f) scale = 1e-9f;
@@ -301,7 +301,7 @@ BL_T: for (int t = 0; t < M; t++) {
         float s = (1.0f + mant) * hls::ldexp(1.0f,e);
         mean_out[t] = mean; s_out[t] = s;
     BL_Y: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
             y[t*X_D+d] = gamma[d]*((x[t*X_D+d]-mean)/s) + beta[d];
         }
     }
@@ -314,7 +314,7 @@ BM_T: for (int t = 0; t < M; t++)
             // so a single fixed achievable II doesn't fit both. HLS schedules the 8-wide inner naturally.
             float acc = 0;
         BM_I: for (int i = 0; i < I; i++) {
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 acc += bf_dyad_f(Wf[o*I+i]) * x[t*I+i];     // dyad(master) * x  (forward-for-bwd, wide)
             }
             y[t*O+o] = acc;
@@ -332,7 +332,7 @@ LR_T: for (int t = 0; t < M; t++)
             // so a single fixed achievable II doesn't fit all callers. HLS schedules the 8-wide inner naturally.
             float acc = 0;
         LR_O: for (int o = 0; o < O; o++) {
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 acc += bf_dyad_f(Wf[o*I+i]) * gy[t*O+o];
             }
             dx[t*I+i] = P(acc);
@@ -343,7 +343,7 @@ WG_O: for (int o = 0; o < O; o++)
             // function is shared); HLS schedules the 8-wide inner naturally. Inner UNROLL factor=8 kept.
             float acc = 0;
         WG_T: for (int t = 0; t < M; t++) {
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 acc += gy[t*O+o] * x[t*I+i];
             }
             dW[o*I+i] += P(acc);
@@ -358,12 +358,12 @@ LB_T: for (int t = 0; t < M; t++) {
         // scalar divide, so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
         float gxhat[X_D], mg = 0;
     LB_C: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
             gxhat[d] = P(gy[t*X_D+d]*gamma[d]); mg += gxhat[d];
         }
         mg /= X_D;
     LB_D: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
             dx[t*X_D+d] = P((gxhat[d]-mg)/s[t]);
         }
     }
@@ -572,7 +572,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
                     // II=4 = ceil(X_DH(32)/8): cycles the 8-wide inner reduction needs -> achievable, fast synth.
                     float dot=0;
                 FA_SD: for(int d=0;d<X_DH;d++){
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                         dot += WQf[i*X_D+h*X_DH+d]*WKf[j*X_D+h*X_DH+d];
                     }
                     sc[j]=dot*scale; if(sc[j]>mx)mx=sc[j]; }
@@ -588,7 +588,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
                     // II=8 = ceil(X_SEQ(64)/8): max cycles the 8-wide inner (j<=i, bound X_SEQ) needs -> achievable.
                     float blend=0;
                 FA_BJ: for(int j=0;j<=i;j++){
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                         blend+=Praw[(h*X_SEQ+i)*X_SEQ+j]*WVf[j*X_D+h*X_DH+d];
                     }
                     WATTN[i*X_D+h*X_DH+d]=blend; }
@@ -662,16 +662,16 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             // hls::exp, so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
             float mx=-1e30f;
         CE_MX: for(int v=0;v<X_VOCAB;v++){
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 float l=WLG[t*X_VOCAB+v]; if(l>mx)mx=l;
             }
             float sum=0,pr[X_VOCAB];
         CE_EX: for(int v=0;v<X_VOCAB;v++){
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 pr[v]=hls::exp(WLG[t*X_VOCAB+v]-mx); sum+=pr[v];
             }
         CE_DV: for(int v=0;v<X_VOCAB;v++){
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 float p=pr[v]/sum, oh=(v==tgt[t])?1.0f:0.0f; gLG[t*X_VOCAB+v]=P((p-oh)/X_SEQ);
             }
         }
@@ -717,12 +717,12 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
             // gV scatter), so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
             float s=0;
         AB_GPD: for(int d=0;d<X_DH;d++){
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 s+=gATTN[i*X_D+h*X_DH+d]*WVf[j*X_D+h*X_DH+d];   // MUL (bf16)
             }
             gp[j]=s;
         AB_GVD: for(int d=0;d<X_DH;d++){
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 gV[j*X_D+h*X_DH+d]+=P(p[j]*gATTN[i*X_D+h*X_DH+d]);   // MUL
             }
         }
@@ -736,7 +736,7 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
             // II=4 = ceil(X_DH(32)/8): cycles the 8-wide inner gQ/gK scatter needs -> achievable, fast synth.
             float gs=P(p[j]*(gp[j]-ex))*ascale;                                                          // softmax Jacobian
         AB_JACD: for(int d=0;d<X_DH;d++){
-#pragma HLS UNROLL factor=8
+#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
                 gQ[i*X_D+h*X_DH+d]+=gs*WKf[j*X_D+h*X_DH+d]; gK[j*X_D+h*X_DH+d]+=gs*WQf[i*X_D+h*X_DH+d];
             }
         }

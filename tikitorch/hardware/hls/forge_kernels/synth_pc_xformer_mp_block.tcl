@@ -5,7 +5,11 @@
 set proj  forge_pc_xformer_mp_block_proj
 set top   forge_pc_xformer_mp_block
 set part  "xcvu47p-fsvh2892-2L-e"
-set period 4.0
+# Over-constrain to 3.0ns (target clock is 4.0ns/250MHz): forces HLS to pipeline the BF16 float datapath
+# harder, giving real post-route margin. AFI build #2 routed but MISSED at 4.0ns (WNS -1.688, 79% LUT one-SLR
+# congestion); paired with the float-loop unroll 8->2 cut to relieve congestion. F2 clk_main_a0 is hard-locked
+# at 250MHz (recipes can't lower it), so timing must close at 250MHz.
+set period 3.0
 
 open_project -reset $proj
 add_files forge_pc_xformer_mp_block.cpp -cflags "-I."
