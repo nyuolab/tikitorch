@@ -41,6 +41,9 @@ ACT_NOCLIP = False     # ablation: disable sat16 clip
 DYAD_K = 1             # weight = sum of K signed powers of 2 (1=current single-pow2; >1 = CSD, still shift-add)
 GEMM_RESCALE = 0       # if >0: right-shift GEMM output by this (pow2 rescale; lets SW be large w/o overflow)
 RS_GUARD = 0           # keep this many fractional/guard bits when auto-rescaling (less floor loss)
+LN_RECIP_FLOAT = False # use exact reciprocal of the INTEGER meanabs (isolate fdyad-mantissa cost)
+LN_MEANABS_GUARD = 0   # keep this many fractional bits in mean/meanabs (isolate meanabs-quant cost)
+LN_RECIP_K = 0         # >0: reciprocal 1/meanabs as K'-term CSD (mult-free accurate LN); replaces fdyad
 LN_MBITS = 2           # LN reciprocal mantissa bits (kernel=2; 4 = finer)
 
 # ----------------------------- straight-through helpers -----------------------------
@@ -76,9 +79,10 @@ def dyad_scaled(w, scale):
 # ----------------------------- faithful LayerNorm -----------------------------
 def kernel_ln(x, g, b, SGAM):
     """x: [...,D] integer-valued float. returns int16 LN output, faithful to layernorm_tok."""
-    mean = afloor(x.sum(-1, keepdim=True) / float(1 << LOG2_D))
+    mg = LN_MEANABS_GUARD
+    mean = afloor(x.sum(-1, keepdim=True) * float(1 << mg) / float(1 << LOG2_D)) / float(1 << mg)
     c = sat16(x - mean)
-    meanabs = afloor(c.abs().sum(-1, keepdim=True) / float(1 << LOG2_D)).clamp_min(1.0)
+    meanabs = (afloor(c.abs().sum(-1, keepdim=True) * float(1 << mg) / float(1 << LOG2_D)) / float(1 << mg)).clamp_min(1.0 / float(1 << mg))
 
     # fdyad(meanabs) -> e, nq  (exact integer, detached: it's a fixed nonlinearity). mb = LN mantissa bits.
     with torch.no_grad():
@@ -108,7 +112,20 @@ def kernel_ln(x, g, b, SGAM):
         r_hard = torch.where(e >= 0, r1 * pe, afloor(r1 / pe))
 
     r_soft = c / meanabs                                  # smooth /meanabs (grad path)
-    r = r_soft if ABL_LN_EXACT else (r_soft + (r_hard - r_soft).detach())
+    if ABL_LN_EXACT or LN_RECIP_FLOAT:
+        r = r_soft
+    elif LN_RECIP_K > 0:
+        with torch.no_grad():                             # K'-term CSD of 1/meanabs (mult-free reciprocal)
+            recip = 1.0 / meanabs
+            acc = torch.zeros_like(recip); res = recip
+            for _ in range(LN_RECIP_K):
+                e = torch.floor(torch.log2(res.clamp_min(1e-12)))   # nearest lower power of 2
+                term = torch.pow(2.0, e)
+                acc = acc + term; res = res - term
+            r_hard2 = c * acc                              # = sum of c shifted by each exponent (shift-adds)
+        r = r_soft + (r_hard2 - r_soft).detach()
+    else:
+        r = r_soft + (r_hard - r_soft).detach()
 
     gg = dyad_scaled(g, SGAM)                             # gamma value (=sign*2^ge), scaled-int units
     out = r * gg + ste_round(b * SGAM)
@@ -234,9 +251,10 @@ def bpc(model, data, dev, invtau, temp, iters=40, B=64):
     model.train(); return tot / n / math.log(2)
 
 def bpc_sweep(model, data, dev, invtau, iters=40, B=64):
-    """sweep the deploy-time logit temperature (like s1_deploy_eval) -> best bpc + its temp."""
+    """sweep the deploy-time logit temperature (scaled by SGAM, since logits ~ SGAM) -> best bpc + temp."""
     best, bt = 1e9, 0
-    for temp in [16, 32, 64, 96, 128, 192, 256, 384, 512, 768]:
+    sc = model.SGAM / 32.0
+    for temp in [t0 * sc for t0 in [16, 32, 64, 96, 128, 192, 256, 384, 512, 768]]:
         v = bpc(model, data, dev, invtau, temp, iters=iters, B=B)
         if v < best: best, bt = v, temp
     return best, bt
@@ -267,6 +285,9 @@ def main():
     ap.add_argument('--ffn', type=int, default=256, help='FFN inner dim')
     ap.add_argument('--gemm_rescale', type=int, default=0, help='pow2 right-shift of GEMM output (rescale)')
     ap.add_argument('--rs_guard', type=int, default=0, help='guard bits kept during auto-rescale')
+    ap.add_argument('--ln_recip_float', type=int, default=0, help='exact reciprocal of integer meanabs')
+    ap.add_argument('--ln_mab_guard', type=int, default=0, help='fractional bits in mean/meanabs')
+    ap.add_argument('--ln_recip_k', type=int, default=0, help='K-term CSD reciprocal LN (mult-free accurate)')
     ap.add_argument('--seed', type=int, default=0)
     a = ap.parse_args()
     global ABL_LN_EXACT, ABL_W_EXACT, ACT_Q, ACT_NOCLIP, D, H, DH, FFN, LOG2_D
@@ -276,6 +297,7 @@ def main():
     global DYAD_K, LN_MBITS
     global GEMM_RESCALE
     DYAD_K = a.dyad_k; LN_MBITS = a.mbits; GEMM_RESCALE = a.gemm_rescale
+    global LN_RECIP_FLOAT, LN_MEANABS_GUARD, LN_RECIP_K; LN_RECIP_FLOAT = bool(a.ln_recip_float); LN_MEANABS_GUARD = a.ln_mab_guard; LN_RECIP_K = a.ln_recip_k
     global RS_GUARD; RS_GUARD = a.rs_guard
     torch.manual_seed(a.seed); np.random.seed(a.seed)
     dev = "mps" if torch.backends.mps.is_available() else "cpu"
@@ -291,7 +313,7 @@ def main():
         frac = step / a.steps
         invtau = a.tau0 + (a.tau1 - a.tau0) * frac          # anneal attention -> hard
         x, y = batch(tr, a.B, dev)
-        lg = model(x, invtau).float() / a.temp
+        lg = model(x, invtau).float() / (a.temp * a.SGAM / 32.0)
         loss = F.cross_entropy(lg.reshape(-1, VREAL), y.reshape(-1))
         opt.zero_grad(); loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
