@@ -37,7 +37,16 @@ trap up EXIT
 ( while true; do sleep 60; up; done ) &
 echo "BOOT \$(date -u)"; hostname; nproc; free -g
 export HOME=/root; mkdir -p /root/.oasys /root/.Xilinx
-( command -v git-lfs >/dev/null 2>&1 || apt-get update -y && apt-get install -y git-lfs || yum install -y git-lfs ) || true
+# git-lfs is REQUIRED: hdk_setup.sh uses it to pull the F2 shell DCP, then sets HDK_IP_SRC_DIR. This AMI is
+# Ubuntu (hdk_setup's auto-install tries yum -> fails). Build #4 died exactly here ("git-lfs installation
+# failed" -> HDK_IP_SRC_DIR unset -> aws_build error). Install via apt, else fall back to the static github
+# binary (no package manager) so it's deterministic.
+if ! command -v git-lfs >/dev/null 2>&1; then apt-get update -y >/dev/null 2>&1 || true; apt-get install -y git-lfs >/dev/null 2>&1 || true; fi
+if ! command -v git-lfs >/dev/null 2>&1; then
+  ( cd /tmp && curl -fsSL https://github.com/git-lfs/git-lfs/releases/download/v3.5.1/git-lfs-linux-amd64-v3.5.1.tar.gz -o glfs.tgz \
+      && tar xzf glfs.tgz && cp git-lfs-3.5.1/git-lfs /usr/local/bin/git-lfs && chmod +x /usr/local/bin/git-lfs ) || true
+fi
+echo "git-lfs: $(command -v git-lfs || echo MISSING) $(git-lfs version 2>/dev/null | head -1)"
 AF=""; for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /home/*/aws-fpga /opt/aws-fpga; do [ -d "\$p/hdk" ] && AF="\$p" && break; done
 [ -z "\$AF" ] && { AF=/opt/aws-fpga; git clone https://github.com/aws/aws-fpga.git "\$AF"; }
 echo "AWS_FPGA=\$AF"
@@ -45,7 +54,14 @@ for s in /opt/Xilinx/Vivado/*/settings64.sh; do [ -f "\$s" ] && source "\$s"; do
 for s in /opt/Xilinx/Vitis_HLS/*/settings64.sh; do [ -f "\$s" ] && source "\$s"; done
 ( cd "\$AF" && git lfs install && git lfs pull ) > /tmp/lfs.txt 2>&1 || true
 cd "\$AF" && source hdk_setup.sh || true
-echo "HDK_DIR=\$HDK_DIR HDK_SHELL_DIR=\$HDK_SHELL_DIR"
+echo "HDK_DIR=\$HDK_DIR HDK_SHELL_DIR=\$HDK_SHELL_DIR HDK_IP_SRC_DIR=\$HDK_IP_SRC_DIR"
+# FAST-FAIL if hdk_setup didn't fully set up (don't waste ~20min reaching aws_build's HDK_IP_SRC_DIR error).
+if [ -z "\$HDK_IP_SRC_DIR" ]; then
+  echo "FATAL: hdk_setup did not set HDK_IP_SRC_DIR (git-lfs / shell-DCP pull failed)"
+  { echo "=== HDK SETUP FAILED ==="; echo "git-lfs: \$(command -v git-lfs)"; git-lfs version 2>&1; echo "--- lfs.txt ---"; tail -30 /tmp/lfs.txt 2>/dev/null; } | aws s3 cp - "\$S3_RESULTS/HDK_SETUP_FAILED.txt" --only-show-errors || true
+  echo "hdk-setup-fail \$(date -u)" | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
+  shutdown -h now; exit 1
+fi
 { echo "== aws_build_dcp_from_cl.py =="; find "\$AF" -name aws_build_dcp_from_cl.py 2>/dev/null;
   echo "== CL templates =="; ls -d "\$AF"/hdk/cl/examples/* "\$AF"/hdk/cl/developer_designs/* 2>/dev/null;
   echo "== vivado =="; command -v vivado; vivado -version 2>&1 | head -2; } > /tmp/diag.txt 2>&1
