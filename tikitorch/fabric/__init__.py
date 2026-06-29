@@ -14,6 +14,15 @@ for exactly that pattern, so the PC training loop is written once and run anywhe
 See ``link.NeighborLink`` for the interface every transport backend implements, and
 ``README.md`` for the design + the backend roadmap.
 """
+from .cost import (
+    HOST_RELAY_BURST,
+    HOST_RELAY_WORD,
+    ONFABRIC,
+    PCIE_P2P,
+    PROFILES,
+    TransportProfile,
+    comms_fraction,
+)
 from .link import LinkStats, NeighborLink
 from .runner import PipelineRunner, RunResult, run_serial
 from .thread_link import ThreadLink, make_thread_links
@@ -26,4 +35,11 @@ __all__ = [
     "PipelineRunner",
     "RunResult",
     "run_serial",
+    "TransportProfile",
+    "comms_fraction",
+    "PROFILES",
+    "HOST_RELAY_WORD",
+    "HOST_RELAY_BURST",
+    "PCIE_P2P",
+    "ONFABRIC",
 ]

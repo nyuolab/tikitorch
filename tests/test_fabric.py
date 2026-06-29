@@ -79,5 +79,26 @@ def test_runtime_actually_learns():
     assert last < first * 0.6, f"loss did not fall enough: {first:.4f} -> {last:.4f}"
 
 
+def test_cost_word_profile_reproduces_measured_relay_fraction():
+    """The WORD profile is calibrated to the MEASURED 61% host-relay fraction — guard it."""
+    from tikitorch.fabric import comms_fraction
+    from tikitorch.fabric.cost import CAL_COMPUTE_S, CAL_MSG_BYTES, HOST_RELAY_WORD
+    f = comms_fraction(HOST_RELAY_WORD, CAL_MSG_BYTES, CAL_COMPUTE_S)
+    assert abs(f - 0.61) < 0.01, f"word relay fraction {f:.3f} != measured 0.61"
+    assert HOST_RELAY_WORD.measured is True
+
+
+def test_cost_transport_ordering():
+    """Fixing the transport must monotonically cut per-message time; the real links are
+    all >>faster than word-at-a-time on an 8 KB message."""
+    from tikitorch.fabric.cost import (CAL_MSG_BYTES, HOST_RELAY_BURST,
+                                       HOST_RELAY_WORD, ONFABRIC, PCIE_P2P)
+    n = CAL_MSG_BYTES
+    tw, tb, tp, tf = (p.time_for(n) for p in
+                      (HOST_RELAY_WORD, HOST_RELAY_BURST, PCIE_P2P, ONFABRIC))
+    assert tw > 50 * tb            # word-at-a-time is catastrophically slower
+    assert tb >= tp >= tf or (max(tb, tp, tf) < 1e-4)   # the fast links are ~equivalent (all compute-bound)
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

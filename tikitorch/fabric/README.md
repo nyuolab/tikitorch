@@ -96,5 +96,33 @@ sweep, so anything `W < M` is a *deliberate* staleness/throughput trade, measure
   forge_pc_xformer_*_shard.cpp` and the cross-instance TCP scaffold to *back* these
   interfaces, so the silicon drivers and the CPU sim share one runtime.
 
+## Comms cost: the case for a chip-to-chip link (`cost.py`)
+
+The overlap above measures *how well stages pipeline*; `cost.py` adds *how expensive a
+neighbour message is*, so the runner produces **comms-aware** throughput and the value of
+each transport is quantified before it's built. `cost.TransportProfile.time_for(nbytes)`
+is one transparent formula (setup + bytes/bandwidth + per-word overhead); pass a profile to
+`make_thread_links(transport=..., msg_bytes=...)` and the runner's wall-clock includes comms.
+
+The `HOST_RELAY_WORD` profile is **calibrated to the MEASURED 61% host-relay fraction** (at
+the measured 10.25 ms/block, 8 KB neighbour message); `HOST_RELAY_BURST` / `PCIE_P2P` /
+`ONFABRIC` are realistic transport params (PROJECTED). `scripts/pc_fabric_comms_sweep.py`
+runs the *same* pipeline under each (measured-in-sim):
+
+```
+transport                      comms/msg  comms-frac   tok/s   vs word
+host-relay word (today)          16.05ms     61.0%      1125    1.0x     <- MEASURED-calibrated, relay-bound
+host-relay bursted DMA            0.02ms      0.2%       4319    3.9x     <- compute-bound
+PCIe P2P / on-fabric              ~0  ms      ~0 %      ~4300    3.9x     <- equivalent once compute-bound
+```
+
+So **getting off word-at-a-time host relay ≈ 3.9× throughput** (it removes the 61% relay and
+makes the pipeline compute-bound); the choice *among* burst / P2P / on-fabric is about scaling
+and host-CPU load, not this throughput. That transport lever multiplies with two independently
+measured ones — pipeline overlap (5.6×) and silicon replication (4.0×). A chip-to-chip link is
+the **load-bearing first lever**: it is what turns the measured `25.8 -> 4.0 steps/s`
+relay-bound *regression* into compute-bound scaling. (Unlike a throughput model that asserts
+"comms = 0", every number here is explicit, calibrated, and adjustable.)
+
 This module is the concrete answer to "PC should make chip-to-chip comms simple" — it
 makes the simple pattern explicit, measurable, and reusable across every backend.

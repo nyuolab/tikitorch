@@ -25,18 +25,29 @@ from .link import NeighborLink
 class ThreadLink(NeighborLink):
     """A single stage's endpoint, backed by Python queues shared with its neighbours."""
 
-    def __init__(self, stage, num_stages, fq_in, fq_out, bq_in, bq_out):
+    def __init__(self, stage, num_stages, fq_in, fq_out, bq_in, bq_out,
+                 transport=None, msg_bytes=None):
         super().__init__(stage, num_stages)
         self._fq_in = fq_in     # activations into THIS stage (from l-1 / host)
         self._fq_out = fq_out   # activations out to l+1            (None on last)
         self._bq_in = bq_in     # errors into THIS stage (from l+1 / host)
         self._bq_out = bq_out   # errors out to l-1                 (None on first)
+        self._transport = transport   # optional cost.TransportProfile -> models comms time
+        self._msg_bytes = msg_bytes   # model a realistic message size (else the array's nbytes)
+
+    def _transit(self, msg):
+        """Model the transport time of one message (serialized with compute = today's
+        no-double-buffer behaviour). None -> instantaneous (pure overlap study)."""
+        if self._transport is not None:
+            nb = self._msg_bytes if self._msg_bytes is not None else int(msg.nbytes)
+            time.sleep(self._transport.time_for(nb))
 
     # forward dataflow ----------------------------------------------------------
     def send_forward(self, tag, act):
         if self._fq_out is None:                       # last stage: nothing downstream
             return
         self._account_down(act)
+        self._transit(act)
         self._fq_out.put((tag, act))
 
     def recv_forward(self, tag):
@@ -51,6 +62,7 @@ class ThreadLink(NeighborLink):
         if self._bq_out is None:                       # first stage: nothing upstream
             return
         self._account_up(err)
+        self._transit(err)
         self._bq_out.put((tag, err))
 
     def recv_backward(self, tag):
@@ -72,12 +84,15 @@ class ThreadLink(NeighborLink):
         self._bq_in.put((tag, err))
 
 
-def make_thread_links(num_stages: int, maxsize: int = 0) -> list[ThreadLink]:
+def make_thread_links(num_stages: int, maxsize: int = 0, transport=None,
+                      msg_bytes=None) -> list[ThreadLink]:
     """Build a wired chain of ``num_stages`` ThreadLinks sharing the right queues.
 
     ``maxsize`` bounds each queue (0 = unbounded). A small bound (e.g. the
     accumulation window) models finite in-flight buffering and back-pressures a stage
     that races too far ahead of its neighbour — closer to real on-chip FIFO depth.
+    ``transport`` (a ``cost.TransportProfile``) makes each message take its modelled
+    transit time, so the runner's wall-clock includes comms (None = instantaneous).
     """
     # fq[l] feeds INTO stage l (host feeds fq[0]); bq[l] feeds INTO stage l (host feeds bq[S-1]).
     fq = [queue.Queue(maxsize) for _ in range(num_stages)]
@@ -88,5 +103,6 @@ def make_thread_links(num_stages: int, maxsize: int = 0) -> list[ThreadLink]:
         fq_out = fq[l + 1] if l + 1 < num_stages else None
         bq_in = bq[l]
         bq_out = bq[l - 1] if l - 1 >= 0 else None
-        links.append(ThreadLink(l, num_stages, fq_in, fq_out, bq_in, bq_out))
+        links.append(ThreadLink(l, num_stages, fq_in, fq_out, bq_in, bq_out,
+                                transport=transport, msg_bytes=msg_bytes))
     return links
