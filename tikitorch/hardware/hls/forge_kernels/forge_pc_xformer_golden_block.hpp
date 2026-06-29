@@ -4,6 +4,7 @@
 #define FORGE_PC_XFORMER_GOLDEN_BLOCK_HPP
 #include "forge_pc_xformer_golden.hpp"
 #include <map>
+#include <vector>   // GFOpt uses std::vector; Vitis CLANG csim needs the explicit include (g++ pulled it in transitively)
 #include <cmath>
 
 // All weights (int16 masters) + Adam m,v (int32) for one block + head.

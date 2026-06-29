@@ -10,10 +10,11 @@
 set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"; REGION="${REGION:-us-east-1}"
 AMI="${AMI:-ami-092fc5deb8f3c0f7d}"; ITYPE="${ITYPE:-z1d.6xlarge}"; ROLE="${ROLE:-tiki-sweep-runner}"
-# CL main clock recipe. A1=250MHz (4ns) was the default + MISSED timing by 1.688ns (BF16 float backward's
-# fmul/fadd/layernorm paths). A0=125MHz (8ns) gives +4ns slack -> closes with margin (kernel unchanged, runs
-# at half clock; throughput is a later optimization, correctness/coherence first).
-CLOCK_A="${CLOCK_A:-A0}"
+# CL main clock recipe. On F2, clk_main_a0 is HARD-LOCKED at 250MHz for EVERY recipe (the 125MHz MMCM setting
+# is #NOT SUPPORTED# in the AWS shell) — recipes only change clk_extra_*, which this kernel doesn't use, and a
+# custom recipe ALSO requires instantiating the aws_clk_gen IP in the CL top. So timing must CLOSE at 250MHz
+# (done via the float-loop unroll 8->2 congestion cut + HLS over-constrain). Leave CLOCK_A empty = build default.
+CLOCK_A="${CLOCK_A:-}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; STATE="$PROJECT_DIR/.tiki_mp_afi_state"; mkdir -p "$STATE"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
@@ -86,8 +87,9 @@ ls -la "\$CLROOT/design/ip" 2>&1 | head -20; up
 export CL_DIR="\$CLROOT"; BUILD_PY="\$(find "\$CLROOT/build" -name aws_build_dcp_from_cl.py 2>/dev/null | head -1)"
 echo "BUILD_PY=\$BUILD_PY"; chmod +x "\$BUILD_PY" 2>/dev/null; cd "\$(dirname "\$BUILD_PY")"
 echo "=== aws_build_dcp_from_cl START \$(date -u) ==="
-echo "=== CL clock recipe: clock_recipe_a=\$CLOCK_A ==="
-./aws_build_dcp_from_cl.py --cl "\$CL" --clock_recipe_a "\$CLOCK_A" --no-encrypt > /tmp/aws_build.full.log 2>&1; echo "BUILD_RC=\$?"
+CLKARG=""; [ -n "\$CLOCK_A" ] && CLKARG="--aws_clk_gen --clock_recipe_a \$CLOCK_A"
+echo "=== aws_build clock args: \${CLKARG:-(default A1/250MHz)} ==="
+./aws_build_dcp_from_cl.py --cl "\$CL" \$CLKARG --no-encrypt > /tmp/aws_build.full.log 2>&1; echo "BUILD_RC=\$?"
 tail -120 /tmp/aws_build.full.log; aws s3 cp /tmp/aws_build.full.log "\$S3_RESULTS/aws_build.full.log" --only-show-errors || true
 # 5. collect the Developer_CL.tar (the create-fpga-image input)
 ls -la "\$CLROOT/build/checkpoints/" "\$CLROOT/build/checkpoints/to_aws/" 2>&1 | aws s3 cp - "\$S3_RESULTS/checkpoints_listing.txt" --only-show-errors || true
