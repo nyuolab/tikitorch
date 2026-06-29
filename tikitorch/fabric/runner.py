@@ -51,6 +51,7 @@ class RunResult:
     num_stages: int = 0
     num_microbatches: int = 0
     window: int = 1
+    schedule: str = "gpipe"
 
     @property
     def overlap_speedup(self) -> float | None:
@@ -80,13 +81,17 @@ class RunResult:
 class PipelineRunner:
     """Run a sharded model over a NeighborLink chain with windowed local updates."""
 
-    def __init__(self, stages, links, lr: float = 0.1, window: int = 1):
+    def __init__(self, stages, links, lr: float = 0.1, window: int = 1,
+                 schedule: str = "gpipe"):
         if len(stages) != len(links):
             raise ValueError("stages and links must be the same length")
+        if schedule not in ("gpipe", "1f1b"):
+            raise ValueError("schedule must be 'gpipe' or '1f1b'")
         self.stages = stages
         self.links = links
         self.lr = float(lr)
         self.window = max(1, int(window))
+        self.schedule = schedule
         self.S = len(stages)
         # per-stage weight version + per-(stage,tag) version snapshots for staleness
         self._version = [0] * self.S
@@ -95,40 +100,67 @@ class PipelineRunner:
         self._losses: dict[int, float] = {}
         self._loss_lock = threading.Lock()
 
-    # -- the per-stage worker (one thread per chip) --------------------------------
-    def _stage_worker(self, l, inputs, targets, M):
+    # -- per-stage primitives (shared by both schedules) ---------------------------
+    def _do_forward(self, l, k, inputs):
         stage, link = self.stages[l], self.links[l]
-        # PHASE A — forward wavefront (streams activations down; overlaps across stages)
+        a_in = inputs[k] if link.is_first else link.recv_forward(k)
+        self._ver_at_fwd[l][k] = self._version[l]
+        a_out = stage.forward(k, a_in)
+        link.send_forward(k, a_out)
+        if link.is_last:                          # stash output for the loss/backward step
+            stage._last_out = getattr(stage, "_last_out", {})
+            stage._last_out[k] = a_out
+
+    def _do_backward(self, l, k, targets, acc):
+        stage, link = self.stages[l], self.links[l]
+        if link.is_last:
+            loss, e_out = stage.loss_error(k, stage._last_out[k], targets[k])
+            with self._loss_lock:
+                self._losses[k] = float(loss)
+        else:
+            e_out = link.recv_backward(k)
+        self._ver_at_bwd[l][k] = self._version[l]
+        grads, e_in = stage.backward(k, e_out)
+        link.send_backward(k, e_in)
+        for i in range(len(acc)):
+            acc[i] += grads[i]
+
+    def _apply(self, l, acc, n):                  # apply the windowed mean grad + bump version
+        for i, p in enumerate(self.stages[l].params):
+            p -= self.lr * acc[i] / n
+            acc[i][...] = 0.0
+        self._version[l] += 1
+
+    # -- GPipe schedule: all forwards, then all backwards (a fwd->bwd drain remains) ----
+    def _worker_gpipe(self, l, inputs, targets, M):
         for k in range(M):
-            a_in = inputs[k] if link.is_first else link.recv_forward(k)
-            self._ver_at_fwd[l][k] = self._version[l]
-            a_out = stage.forward(k, a_in)
-            link.send_forward(k, a_out)
-            if link.is_last:                      # stash output for the loss/backward phase
-                stage._last_out = getattr(stage, "_last_out", {})
-                stage._last_out[k] = a_out
-        # PHASE B — backward wavefront + windowed local update
-        acc = [np.zeros_like(p) for p in stage.params]
-        n_in_window = 0
+            self._do_forward(l, k, inputs)
+        acc = [np.zeros_like(p) for p in self.stages[l].params]
+        n = 0
         for k in range(M):
-            if link.is_last:
-                loss, e_out = stage.loss_error(k, stage._last_out[k], targets[k])
-                with self._loss_lock:
-                    self._losses[k] = float(loss)
-            else:
-                e_out = link.recv_backward(k)
-            self._ver_at_bwd[l][k] = self._version[l]
-            grads, e_in = stage.backward(k, e_out)
-            link.send_backward(k, e_in)
-            for i in range(len(acc)):
-                acc[i] += grads[i]
-            n_in_window += 1
-            if n_in_window == self.window or k == M - 1:   # close the window -> apply once
-                for i, p in enumerate(stage.params):
-                    p -= self.lr * acc[i] / n_in_window
-                    acc[i][...] = 0.0
-                self._version[l] += 1
-                n_in_window = 0
+            self._do_backward(l, k, targets, acc)
+            n += 1
+            if n == self.window or k == M - 1:
+                self._apply(l, acc, n); n = 0
+
+    # -- 1F1B schedule: warmup forwards, then interleave 1F+1B, then drain backwards ----
+    # Stage l keeps (S-l) microbatches in flight, so its backward lands ~(S-1-l) applies
+    # after its forward -> DEPTH-PROPORTIONAL staleness (deepest stage worst, loss stage 0),
+    # the real hardware mechanism. W >= the in-flight depth bounds it back to ~1.
+    def _worker_1f1b(self, l, inputs, targets, M):
+        warmup = min(self.S - 1 - l, M)
+        acc = [np.zeros_like(p) for p in self.stages[l].params]
+        n = 0
+        f = b = 0
+        for _ in range(warmup):                   # warmup: fill the pipe ahead of us
+            self._do_forward(l, f, inputs); f += 1
+        while b < M:                              # steady (1F+1B) then cooldown (B only)
+            if f < M:
+                self._do_forward(l, f, inputs); f += 1
+            self._do_backward(l, b, targets, acc); b += 1
+            n += 1
+            if n == self.window or b == M:
+                self._apply(l, acc, n); n = 0
 
     # -- run the whole pipeline ----------------------------------------------------
     def run(self, inputs, targets) -> RunResult:
@@ -138,8 +170,9 @@ class PipelineRunner:
         # feed the input stage up-front (queues buffer the forward wavefront)
         for k in range(M):
             self.links[0].feed_forward(k, inputs[k])
+        worker = self._worker_1f1b if self.schedule == "1f1b" else self._worker_gpipe
         threads = [
-            threading.Thread(target=self._stage_worker, args=(l, inputs, targets, M))
+            threading.Thread(target=worker, args=(l, inputs, targets, M))
             for l in range(self.S)
         ]
         t0 = time.perf_counter()
@@ -166,6 +199,7 @@ class PipelineRunner:
             num_stages=self.S,
             num_microbatches=M,
             window=self.window,
+            schedule=self.schedule,
         )
 
 

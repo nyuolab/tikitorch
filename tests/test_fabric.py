@@ -79,6 +79,44 @@ def test_runtime_actually_learns():
     assert last < first * 0.6, f"loss did not fall enough: {first:.4f} -> {last:.4f}"
 
 
+def test_1f1b_full_window_equals_serial():
+    """1F1B with W=M must ALSO reproduce the synchronous baseline bit-exact (no apply lands
+    within the window, so every fwd/bwd uses v0 -> = full-batch backprop)."""
+    inputs, targets = _synthetic_task()
+    lr = 0.05
+    s_serial = make_linear_pipeline([5, 8, 6, 3], seed=2)
+    s_pipe = make_linear_pipeline([5, 8, 6, 3], seed=2)
+    serial_losses, _ = run_serial(s_serial, inputs, targets, lr=lr)
+    res = PipelineRunner(s_pipe, make_thread_links(len(s_pipe)), lr=lr,
+                         window=len(inputs), schedule="1f1b").run(inputs, targets)
+    assert np.allclose(res.losses, serial_losses, atol=1e-9)
+    for a, b in zip(s_serial, s_pipe):
+        assert np.allclose(a.W, b.W, atol=1e-9)
+    assert res.max_staleness == 0 and res.schedule == "1f1b"
+
+
+def test_1f1b_staleness_is_depth_proportional():
+    """The hallmark of 1F1B: the deepest stage (l=0, farthest from the loss) carries the
+    most weight-staleness; the loss stage (l=S-1) carries ~none. (W=1, the worst case.)"""
+    S, M = 5, 16
+    res = PipelineRunner(make_linear_pipeline([4] + [8] * (S - 1) + [2], seed=3),
+                         make_thread_links(S), lr=0.05, window=1,
+                         schedule="1f1b").run(*_synthetic_task(M, 4, 2))
+    ps = res.per_stage_staleness
+    assert ps[-1] == 0, "the loss stage does F then immediately B -> zero staleness"
+    assert ps[0] >= ps[-1] + (S - 2), f"deepest stage should be ~S-1 stale, got {ps}"
+    assert ps == sorted(ps, reverse=True), f"staleness must decrease with depth: {ps}"
+
+
+def test_1f1b_window_bounds_staleness():
+    """A big enough accumulation window collapses the depth-proportional staleness to <=1."""
+    S, M = 5, 20
+    res = PipelineRunner(make_linear_pipeline([4] + [8] * (S - 1) + [2], seed=3),
+                         make_thread_links(S), lr=0.05, window=M,
+                         schedule="1f1b").run(*_synthetic_task(M, 4, 2))
+    assert res.max_staleness == 0   # W=M -> a single apply at the very end
+
+
 def test_cost_word_profile_reproduces_measured_relay_fraction():
     """The WORD profile is calibrated to the MEASURED 61% host-relay fraction — guard it."""
     from tikitorch.fabric import comms_fraction

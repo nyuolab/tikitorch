@@ -79,7 +79,16 @@ OVERLAP   8-stage pipeline, simulated 3ms/block, M=16 microbatches:
 
 STALENESS vs window W (depth 6, M=24):  W=1 -> max gap 23 ;  W=12 -> 1 ;  W=24(=M) -> 0
           at W=M: zero staleness AND the updated weights are bit-exact to synchronous backprop
+
+1F1B    per-stage staleness (depth 6, W=1):  [5, 4, 3, 2, 1, 0]  <- DEPTH-PROPORTIONAL
+          deepest stage (l=0, farthest from loss) = S-1 ; loss stage (l=S-1) = 0 (the real HW
+          mechanism). The window must cover the in-flight depth: W=S-1 -> 1, W=M -> 0.
 ```
+
+Two schedules: `schedule="gpipe"` (all-fwd-then-all-bwd; default) and `schedule="1f1b"`
+(warmup → interleave 1F+1B → drain). 1F1B is the faithful hardware schedule — its staleness
+is depth-proportional (`~S-1-l`), and it stashes only `~S` in-flight activations vs GPipe's
+`M` (load-bearing at d768). Throughput is ~equivalent when compute-bound at `M >> S`.
 
 The bit-exact `W = M == serial` equivalence (`tests/test_fabric.py`) is the correctness
 gate: the windowed local update reproduces backprop exactly when the window spans the
@@ -87,11 +96,12 @@ sweep, so anything `W < M` is a *deliberate* staleness/throughput trade, measure
 
 ## Status & next
 
-- **Done:** interface, `ThreadLink`, `PipelineRunner` (windowed local update + staleness +
-  overlap instrumentation), reference `LinearStage`, demo, tests (4/4).
+- **Done:** interface, `ThreadLink`, `PipelineRunner` (GPipe **and** 1F1B schedules, windowed
+  local update + staleness + overlap instrumentation), `cost.py` transport model, reference
+  `LinearStage`, demos, tests (9/9).
 - **Next:** `HostRelayLink` (bursted) on the existing MNIST/Fashion AGFI → first
-  *measured* relay-free/bursted distributed throughput; a true 1F1B schedule (depth-
-  proportional staleness) + a real PC-block stage; then `PcieP2PLink`.
+  *measured* relay-free/bursted distributed throughput; a real PC-block (transformer) stage to
+  measure "does the recipe survive the depth-proportional staleness, at what W"; then `PcieP2PLink`.
 - **Refactor target:** factor the transport out of `tikitorch/fpga/silicon/
   forge_pc_xformer_*_shard.cpp` and the cross-instance TCP scaffold to *back* these
   interfaces, so the silicon drivers and the CPU sim share one runtime.

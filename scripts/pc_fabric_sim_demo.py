@@ -76,9 +76,38 @@ def part2_staleness():
     print("     silicon-measured today: weight-staleness tolerates ~1 step (stale-8 = +2.0 bpb).")
 
 
+def part3_1f1b():
+    print("\n=== 3. 1F1B schedule: depth-proportional staleness (the real HW mechanism) ===")
+    S, M = 6, 24
+    dims = [5] + [10] * (S - 1) + [3]
+    inputs, targets = task(M, dims[0], dims[-1], seed=9)
+    res = PipelineRunner(make_linear_pipeline(dims, seed=2), make_thread_links(S),
+                         lr=0.05, window=1, schedule="1f1b").run(inputs, targets)
+    ps = res.per_stage_staleness
+    print(f"  per-stage staleness (W=1):  {ps}")
+    print(f"    stage l=0 (deepest, farthest from loss) = {ps[0]}  ...  l={S-1} (at the loss) = {ps[-1]}")
+    print(f"    -> depth-proportional (~S-1-l), unlike GPipe's sweep-length gap. The accumulation")
+    print(f"       window must cover the in-flight depth to bound it:")
+    for W in [1, 3, S - 1, M]:
+        r = PipelineRunner(make_linear_pipeline(dims, seed=2), make_thread_links(S),
+                           lr=0.05, window=W, schedule="1f1b").run(inputs, targets)
+        print(f"       W={W:>3}: max staleness {r.max_staleness}")
+    # throughput: at M>>S with no comms, GPipe and 1F1B are ~equivalent (the drain is small).
+    ms = 2.0
+    g = PipelineRunner(make_linear_pipeline(dims, seed=2, compute_ms=ms), make_thread_links(S),
+                       lr=0.05, window=M, schedule="gpipe").run(inputs, targets)
+    f = PipelineRunner(make_linear_pipeline(dims, seed=2, compute_ms=ms), make_thread_links(S),
+                       lr=0.05, window=M, schedule="1f1b").run(inputs, targets)
+    print(f"  wall (sim {ms:.0f}ms/block, S={S} M={M}): GPipe {g.wall_s*1e3:.0f}ms vs 1F1B "
+          f"{f.wall_s*1e3:.0f}ms ({g.wall_s/f.wall_s:.2f}x) — ~equivalent when compute-bound at M>>S.")
+    print("  1F1B's wins here are FIDELITY (the depth-proportional staleness above, = silicon) and")
+    print("  BOUNDED MEMORY: it stashes ~S in-flight activations vs GPipe's M (load-bearing at d768).")
+
+
 if __name__ == "__main__":
     print("tikitorch.fabric — distributed predictive-coding runtime (CPU ThreadLink backend)")
     part1_overlap()
     part2_staleness()
+    part3_1f1b()
     print("\nSame PipelineRunner logic runs on F2 by swapping ThreadLink -> HostRelayLink "
           "(existing AGFI) / PcieP2PLink, turning these into silicon-measured numbers.\n")
