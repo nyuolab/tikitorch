@@ -76,9 +76,65 @@ def dyad_scaled(w, scale):
     soft = ws                           # smooth surrogate (grad path)
     return soft + (hard - soft).detach()
 
+LN_KEXACT = False  # bit-exact integer LN mirror of the C++ kernel (recip_csd Q24 + guard cross-terms)
+
+def _msb(res):
+    """exact MSB bit-position of an integer-valued float64 tensor (>=1); 0 where res<1."""
+    p = torch.floor(torch.log2(res.clamp_min(1.0)))
+    p = torch.where(torch.pow(2.0, p + 1) <= res, p + 1.0, p)   # correct float log2 error
+    p = torch.where(torch.pow(2.0, p) > res, p - 1.0, p)
+    return p
+
+def kernel_ln_kexact(x, g, b, SGAM):
+    """BIT-EXACT integer LN matching forge_train_step_s1.cpp S1_KV2 layernorm_tok: integer mean/meanabs,
+    1/meanabs as a 4-term CSD (Q24 floor-div + top-4 set bits), gamma as 4-term round-log2 CSD, cross-term
+    sum with S1_LN_GUARD fractional bits then round-half-up. Forward = exact int; backward via STE (smooth)."""
+    GUARD = 12; RFRAC = 24; KR = LN_RECIP_K
+    mean = afloor(x.sum(-1, keepdim=True) / float(1 << LOG2_D))
+    c = sat16(x - mean)
+    meanabs = afloor(c.abs().sum(-1, keepdim=True) / float(1 << LOG2_D)).clamp_min(1.0)
+    with torch.no_grad():
+        # reciprocal: top-KR set bits of floor(2^24 / meanabs). EXACT integer floor-division (float64
+        # division can land at X.9999 and floor 1 low vs the kernel's integer divide -> off-by-1 -> argmax flip).
+        recip = ((torch.full_like(meanabs, float(1 << RFRAC)).to(torch.int64)) // meanabs.to(torch.int64)).to(meanabs.dtype)
+        erec = []; evalid = []; res = recip.clone()
+        for _ in range(KR):
+            p = _msb(res); v = (res >= 1.0)
+            erec.append(p - RFRAC); evalid.append(v)
+            res = res - torch.where(v, torch.pow(2.0, p), torch.zeros_like(res))
+        # gamma: 4-term round-log2 CSD of round(g*SGAM)  (matches export csd_terms_packed)
+        gs = torch.round(g * SGAM); gres = gs.clone()
+        ge = []; gsign = []; gnz = []
+        for _ in range(WCSD_K_LN()):
+            a = gres.abs(); nz = (a >= 1.0)
+            e = torch.round(torch.log2(a.clamp_min(1.0))).clamp(0, 31)
+            sign = (gres < 0)
+            term = torch.where(nz, torch.where(sign, -torch.pow(2.0, e), torch.pow(2.0, e)), torch.zeros_like(gres))
+            ge.append(e); gsign.append(sign); gnz.append(nz); gres = gres - term
+        hi = torch.zeros_like(c)
+        for k in range(KR):
+            for j in range(len(ge)):
+                sh = erec[k] + ge[j] + GUARD                     # [..,1] + [D]
+                pe = torch.pow(2.0, sh.abs())
+                term = torch.where(sh >= 0, c * pe, afloor(c / pe))
+                use = evalid[k] & gnz[j]
+                contrib = torch.where(use, torch.where(gsign[j], -term, term), torch.zeros_like(term))
+                hi = hi + contrib
+        r_hard = afloor((hi + float(1 << (GUARD - 1))) / float(1 << GUARD))
+        y_hard = sat16(r_hard + torch.round(b * SGAM))
+    # STE: forward = exact int LN; backward via the smooth c/meanabs*gamma + beta
+    gg = dyad_scaled(g, SGAM)
+    y_soft = sat16((c / meanabs) * gg + ste_round(b * SGAM))
+    return y_soft + (y_hard - y_soft).detach()
+
+def WCSD_K_LN():
+    return 4  # gamma CSD terms in the LN (matches S1_WCSD_K)
+
 # ----------------------------- faithful LayerNorm -----------------------------
 def kernel_ln(x, g, b, SGAM):
     """x: [...,D] integer-valued float. returns int16 LN output, faithful to layernorm_tok."""
+    if LN_KEXACT:
+        return kernel_ln_kexact(x, g, b, SGAM)
     mg = LN_MEANABS_GUARD
     mean = afloor(x.sum(-1, keepdim=True) * float(1 << mg) / float(1 << LOG2_D)) / float(1 << mg)
     c = sat16(x - mean)
@@ -179,8 +235,10 @@ def kernel_attn(Qm, Km, Vm, invtau, mask, soft_deploy=False):
         score = score.masked_fill(mask, float("-inf"))
         if invtau >= 1e5:
             # HARD deploy == the kernel: TRUE first-index argmax gather (NOT softmax-1e6 which AVERAGES
-            # tied-max scores; L1 int scores tie often, and the deep argmax is flip-sensitive).
-            jstar = score.argmax(-1)                                 # torch.argmax = first max (== kernel)
+            # tied-max scores; L1 int scores tie often, and the deep argmax is flip-sensitive). Force
+            # LOWEST-j on ties (== kernel's strictly-greater update) via a -j tiebreak below the score grid.
+            Tn = score.shape[-1]
+            jstar = (score * float(Tn + 1) - torch.arange(Tn, dtype=score.dtype, device=score.device)).argmax(-1)
             outs.append(torch.gather(V, 1, jstar.unsqueeze(-1).expand(-1, -1, DH)))
         else:
             p = torch.softmax(score * invtau, dim=-1)

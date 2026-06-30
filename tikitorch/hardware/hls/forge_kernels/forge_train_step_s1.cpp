@@ -547,6 +547,7 @@ RESC: for (int d = 0; d < S1_D; d++) {
         acc_t hi = 0;                                          // c*recip*gamma at +S1_LN_GUARD fractional bits
     GK: for (int k = 0; k < S1_RECIP_K; k++) {
 #pragma HLS UNROLL
+            if (erec[k] == -64) continue;                      // skip invalid recip terms (else cv>>large = -1 for cv<0)
         GJ: for (int j = 0; j < S1_WCSD_K; j++) {
 #pragma HLS UNROLL
                 uint32_t gc = (uint32_t)((gcode >> (8 * j)) & 0xFF);
@@ -560,6 +561,13 @@ RESC: for (int d = 0; d < S1_D; d++) {
         // round the high-precision product once (round-half-up), then add beta (int16, SGAM scale).
         acc_t r = (hi + ((acc_t)1 << (S1_LN_GUARD - 1))) >> S1_LN_GUARD;
         y[d] = sat16(r + (acc_t)beta[beta_off + d]);
+#if S1_DBG_ACAT
+        if ((long long)meanabs > 8000 && (long long)meanabs < 8100 && d == 3) {
+            printf("DBG meanabs=%lld cv=%lld gcode=0x%08x erec=[%d %d %d %d] hi=%lld\n",
+                   (long long)meanabs,(long long)cv,(unsigned)gcode,erec[0],erec[1],erec[2],erec[3],(long long)hi);
+            for (int k=0;k<S1_RECIP_K;k++){ if(erec[k]==-64)continue; for(int j=0;j<S1_WCSD_K;j++){ uint32_t gc=(uint32_t)((gcode>>(8*j))&0xFF); if((gc>>5)&1){ int sh=erec[k]+(int)(gc&0x1F)+S1_LN_GUARD; acc_t term=(sh>=0)?(cv<<sh):(cv>>(-sh)); printf("   k=%d j=%d gexp=%d sh=%d term=%lld\n",k,j,(int)(gc&0x1F),sh,(long long)(((gc>>7)&1)?-term:term)); }}}
+        }
+#endif
     }
 #else
     int e, nq;
@@ -897,13 +905,22 @@ LAYER: for (int l = 0; l < S1_N_LAYERS; l++) {
             }
         }
 
+#if S1_DBG_ACAT
+        if (l == 1) for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) buffer[S1_OFF_GR + t * S1_D + d] = (int32_t)Acat[t][d];
+#endif
         // ---- output projection [L][D] -> [L][D] then residual add ----
         fwd_gemm(&Acat[0][0], wo_oc, l * S1_D * S1_D, &AO[0][0], S1_L_SEQ, S1_D, S1_D);
+#if S1_DBG_ACAT
+        if (l == 1) for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) buffer[S1_OFF_GX1 + t * S1_D + d] = (int32_t)AO[t][d];
+#endif
     RES1: for (int t = 0; t < S1_L_SEQ; t++)
             for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
                 R[t][d] = sat16((acc_t)R[t][d] + (acc_t)AO[t][d]);
             }
+#if S1_DBG_ACAT
+        if (l == 1) for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) buffer[S1_OFF_GR + t * S1_D + d] = (int32_t)R[t][d];
+#endif
 
         // ---- LN2 ----
     LN2: for (int t = 0; t < S1_L_SEQ; t++) {

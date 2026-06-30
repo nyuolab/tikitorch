@@ -34,8 +34,8 @@ int main(int argc, char **argv) {
     forge_train_step_s1(buf.data(),0,0,0,0);
     FILE *f=fopen(out,"wb"); fwrite(buf.data(),4,S1_BUFLEN,f); fclose(f);
     // also print key offsets so python knows where to look
-    printf("OFF_LOGITS=%d OFF_X1=%d OFF_X2=%d OFF_R=%d OFF_JSTAR=%d OFF_TOKENS=%d L_SEQ=%d D=%d DH=%d H=%d V=%d BUFLEN=%d\n",
+    printf("OFF_LOGITS=%d OFF_X1=%d OFF_X2=%d OFF_R=%d OFF_GR=%d OFF_GX1=%d OFF_JSTAR=%d OFF_TOKENS=%d L_SEQ=%d D=%d DH=%d H=%d V=%d BUFLEN=%d\n",
            (int)S1_OFF_LOGITS, (int)s1_off_act(S1_OFF_X1,0), (int)s1_off_act(S1_OFF_X2,0), (int)s1_off_R(1),
-           (int)S1_OFF_ATTN_JSTAR, (int)S1_OFF_TOKENS, (int)S1_L_SEQ, (int)S1_D, (int)S1_DH, (int)S1_H, (int)S1_V, (int)S1_BUFLEN);
+           (int)S1_OFF_GR, (int)S1_OFF_GX1, (int)S1_OFF_ATTN_JSTAR, (int)S1_OFF_TOKENS, (int)S1_L_SEQ, (int)S1_D, (int)S1_DH, (int)S1_H, (int)S1_V, (int)S1_BUFLEN);
     return 0;
 }
