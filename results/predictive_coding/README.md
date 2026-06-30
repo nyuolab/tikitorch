@@ -3,6 +3,12 @@
 Navigational index for the distributed predictive-coding (PC) transformer effort.
 New here? Start at section 2 (the stack) then jump via the file map (section 3).
 
+> **★ Flagship status → [FLAGSHIP_SILICON_RESULT.md](FLAGSHIP_SILICON_RESULT.md)** — the
+> consolidated result: a distributed BF16 PC transformer **trains on 3 physical F2 FPGAs**
+> (bpb 6.9 → ~4.0, no global gradient), the 9-build timing-closure saga (root-caused), and the
+> open problems (the silicon quality plateau — *silicon-specific, ACCUM refuted*; throughput;
+> attention). Honest: structural flagship holds, **coherent quality not yet**.
+
 ---
 
 ## 1. What this is
