@@ -129,6 +129,24 @@ across 3 FPGAs with no global gradient; it just trains at batch 1.**
 - Verify in csim (bit-exact to a golden-with-accumulation) → free csynth gate (DSP_MULT=0, timing@150 MHz,
   one-SLR) → **one AFI build** → re-run at `ACCUM=16`.
 
+**BATCH vs DATA disentangled (the ACCUM sweep ran at fixed steps, so larger ACCUM also saw more sequences):**
+at a *matched* 9600 sequences, ACCUM=1 (batch 1) descends to ~3.35 then **wanders back up to 3.52** (noisy,
+floors ~3.4–3.5), while ACCUM=8 (batch 8) reaches **3.20** smoothly. So it is **both**: the old 3000-step
+runs were *undertrained* (→4.0), but batch-1 has an intrinsic ~3.4–3.5 noise floor regardless of data — only
+a real batch converges below the coherence bar. **Batch genuinely matters → the accumulation kernel is the
+right fix, not "just train longer."** (Fully refutes the data-only alternative.)
+
+### IMPLEMENTED + csim-VERIFIED (2026-06-30, commit `72bddd6`)
+- config `MP_GACC_*` persistent DDR accumulators (WQ..WDN, head, embed, pos) per chip; kernel reads `GZERO`
+  (cfg bit 159:128) and accumulates at all three grad sites (block weights, OUTPUT head, INPUT embed/pos);
+  driver `setcfg` gains `gzero=(k==0)`; runner carries `ACCUM`. All 16 unroll pragmas `factor=2`→`8`.
+- **Verified (local g++ csim, authentic ap_int + hls shims):** the gradcheck is still **bit-exact at ACCUM=1**
+  (KAT all-ones 0 / KAT random ≤1 bf16 ULP), and a new `forge_pc_xformer_mp_accum_tb` confirms the
+  accumulators **sum exactly** (acc1=g, acc2=2g, max|diff|=0.00e+00). DSP_MULT=0 preserved (adds + memory only).
+- **Next (user runs the build):** `bash scripts/run_mp_afi_build_f2.sh` (csynth gate inside it: DSP_MULT=0,
+  timing@150 MHz, 1-SLR) → new AGFI → `AGFI=<new> ACCUM=16 STEPS=large bash scripts/run_mp_xformer_shard_f2.sh
+  launch` → the coherent (~3.0) + ~4×-faster-kick flagship run.
+
 ---
 
 ## 4. OPEN PROBLEM #2 — coherence ceiling: the attention training wall
