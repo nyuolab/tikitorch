@@ -527,7 +527,11 @@ CEN: for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
         acc_t cv = (acc_t)x[d] - mean;
         c[d] = sat16(cv);
+#if S1_KV2
+        acc_t cc = (acc_t)c[d]; acc_t a = (cc < 0) ? -cc : cc;   // meanabs from the SATURATED c (== sim/trained model)
+#else
         acc_t a = (cv < 0) ? (acc_t)(-cv) : (acc_t)cv;
+#endif
         asum += a;
     }
     acc_t meanabs = asum >> S1_LOG2_D;
@@ -540,6 +544,9 @@ CEN: for (int d = 0; d < S1_D; d++) {
     int erec[S1_RECIP_K];
     recip_csd(meanabs, erec);
     e_out = erec[0]; nq_out = erec[1];
+#if S1_DBG_ACAT
+    static int s1_ln_call = 0; int my_call = s1_ln_call++;   // block-1 LN2 t=1 == call 193 (64*3+1)
+#endif
 RESC: for (int d = 0; d < S1_D; d++) {
 #pragma HLS PIPELINE II=1
         acc_t cv = (acc_t)c[d];
@@ -562,10 +569,11 @@ RESC: for (int d = 0; d < S1_D; d++) {
         acc_t r = (hi + ((acc_t)1 << (S1_LN_GUARD - 1))) >> S1_LN_GUARD;
         y[d] = sat16(r + (acc_t)beta[beta_off + d]);
 #if S1_DBG_ACAT
-        if ((long long)meanabs > 8000 && (long long)meanabs < 8100 && d == 3) {
-            printf("DBG meanabs=%lld cv=%lld gcode=0x%08x erec=[%d %d %d %d] hi=%lld\n",
-                   (long long)meanabs,(long long)cv,(unsigned)gcode,erec[0],erec[1],erec[2],erec[3],(long long)hi);
-            for (int k=0;k<S1_RECIP_K;k++){ if(erec[k]==-64)continue; for(int j=0;j<S1_WCSD_K;j++){ uint32_t gc=(uint32_t)((gcode>>(8*j))&0xFF); if((gc>>5)&1){ int sh=erec[k]+(int)(gc&0x1F)+S1_LN_GUARD; acc_t term=(sh>=0)?(cv<<sh):(cv>>(-sh)); printf("   k=%d j=%d gexp=%d sh=%d term=%lld\n",k,j,(int)(gc&0x1F),sh,(long long)(((gc>>7)&1)?-term:term)); }}}
+        if (my_call == 193 && d == 3) {
+            printf("DBG call=%d d=%d cv=%lld meanabs=%lld gcode=0x%08x erec=[%d %d %d %d] hi=%lld r=%lld beta=%d y=%lld\n",
+                   my_call,d,(long long)cv,(long long)meanabs,(unsigned)gcode,erec[0],erec[1],erec[2],erec[3],
+                   (long long)hi,(long long)((hi + ((acc_t)1 << (S1_LN_GUARD - 1))) >> S1_LN_GUARD),(int)beta[beta_off+d],(long long)y[d]);
+            for (int k=0;k<S1_RECIP_K;k++){ if(erec[k]==-64)continue; for(int j=0;j<S1_WCSD_K;j++){ uint32_t gc=(uint32_t)((gcode>>(8*j))&0xFF); if((gc>>5)&1){ int sh=erec[k]+(int)(gc&0x1F)+S1_LN_GUARD; acc_t term=(sh>=0)?(cv<<sh):(cv>>(-sh)); printf("   k=%d j=%d gexp=%d gsgn=%d sh=%d term=%lld\n",k,j,(int)(gc&0x1F),(int)((gc>>7)&1),sh,(long long)(((gc>>7)&1)?-term:term)); }}}
         }
 #endif
     }
@@ -1016,7 +1024,12 @@ LNF_ID: for (int t = 0; t < S1_L_SEQ; t++)
     //      This is EXACTLY the backbone GEMM (fwd_gemm) with x=Rn (=hf, the LN_F output), W=WHEAD codes,
     //      output dim V — a dyadic shift-add MAC, DSP=0. Computed for ALL positions at once into Logits_all;
     //      the per-position loop below reads it (no max, no argmax_head save). ----
-    static data_t Logits_all[S1_L_SEQ][S1_D >= S1_V ? S1_D : S1_V];   // [L_SEQ][V] (oversized to V<=col)
+    static data_t Logits_all[S1_L_SEQ][S1_V];   // [L_SEQ][V] — stride MUST be V (== fwd_gemm yout[t*O+o], O=V);
+                                                 // the old max(D,V) over-widened the stride when D>V (D=128,V=64)
+                                                 // -> rows 1+ misaligned (write stride V != read stride D). Dormant at D==V.
+#if S1_DBG_ACAT
+    for (int t = 0; t < S1_L_SEQ; t++) for (int d = 0; d < S1_D; d++) buffer[S1_OFF_GR + t * S1_D + d] = (int32_t)Rn[t][d];
+#endif
     fwd_gemm(&Rn[0][0], whead_oc, 0, &Logits_all[0][0], S1_L_SEQ, S1_D, S1_V, S1_HEAD_RSHIFT);
 #endif
 HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
