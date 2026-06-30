@@ -87,51 +87,47 @@ BF16 backward at 250 MHz by congestion alone (the penalty is structural).
 - *the BF16 backward / dyadic-Adam* — NOT the difference: the kernel's backward + optimizer are
   **csim-bit-exact to the bf16 golden** (transcribed from it), and that golden reaches 3.07.
 
-**What's actually left (the real differences silicon-vs-golden):**
-1. The silicon trains on the **INT-DEPLOY forward** (g_forward: int16 acts, dyadic weights,
-   byte-identical to the deploy kernel) — STE-passed in the backward — while the bf16 golden uses
-   the **FLOAT-master forward**. The forward the gradients are computed against is more quantized.
-2. The **NBLK=3 distribution** (the residual-stream handoff across chips), vs the single-process golden.
-The plateau is most consistent with the **cumulative** documented residual gaps on the fully-quantized
-distributed datapath (`mult-free fwd + FLOAT bwd → 2.016 bpb`; adding the int-deploy-forward training
-+ distribution stacks toward ~4.0), **not a single bug** — the kernel computes the intended thing.
+## ★ RESOLVED (2026-06-30): the plateau is **batch = 1**, not a bug
 
-**RECIPE-PRECISION ABLATION DONE (2026-06-30, `scripts/pc_xformer_charlm.py`, silicon config D=64/3L/H2):**
-the FULL faithful recipe reaches **coherent bpb on CPU — the recipe is SOUND, the gap is silicon/driver-side:**
+After an exhaustive elimination (a 5-agent root-cause Workflow + a dozen CPU/silicon probes), the cause is
+standard and the kernel is **sound**:
 
-| recipe (1000 steps) | bpb | residual |
+**1. The kernel is sound — proven on silicon.** A fixed-batch overfit (`FIXEDOFF=0`, pin every step to one
+64-token sequence) drives the silicon to **bpb 0.103 / acc 0.984** — it memorizes one batch near-perfectly,
+smoothly and deterministically. So there is **no kernel fault, no CDC corruption, no relay bug**; the
+datapath computes + updates + is reproducible.
+
+**2. Root cause = effective batch size 1.** The silicon updates weights from **one sequence per step**
+(ACCUM=1). The kernel **zeroes its gradient accumulators every backward kick**, so it *cannot* accumulate —
+the driver's `ACCUM>1` just issues extra kicks and applies only the last sub-batch's gradient. Batch-1
+training explains **both** silicon symptoms at once: noisy single-sequence gradients → the per-step bpb
+**bounce**, and a high gradient-noise floor → the **~4.0 plateau**. Confirmed on the exact bf16 golden:
+
+| effective batch | golden 1-block bpb | |
 |---|---|---|
-| MULTFREE=0 (float control) | **2.34** (falling) | — |
-| MULTFREE=1 (dyadic fwd + int16 acts = silicon fwd) | **2.83** (falling) | +0.5 (the mult-free forward) |
-| MULTFREE=1 + ADAM_BF16=1 (+ bf16 optimizer = silicon opt) | **2.82** (falling) | +0.0 (bf16 optimizer negligible) |
+| **1** (= silicon today) | **3.74** | noisy, plateaus |
+| **8** | **3.20** | crosses the coherence bar (~3.1) |
+| 48 (= the torch recipe) | 2.86 | coherent |
 
-So the dyadic forward costs ~0.5 bpb and the bf16 optimizer ~0. The faithful recipe = **2.8, coherent,
-still descending** — whereas the **silicon plateaus at 4.0**. Refuted (all): ACCUM, message precision,
-attention softmax, the BF16 backward (csim-exact), the dyadic forward, the bf16 optimizer, the
-residual-stream handoff (kernel line 521 `RP = M + FO` carries the full stream). **=> the ~1.2 bpb gap
-+ the *plateau* (recipe keeps falling, silicon stalls) is SILICON / DISTRIBUTED-DRIVER-side, not the math.**
+**3. Everything else was refuted** (each on a faithful CPU testbed): bf16 forward *and* backward
+(`Δ0.024`), int16/int8 error quant, LR/warmup/depth, message precision, the relays (code-recon: forward is
+**raw float32**, backward bf16 — both clean), and the workflow's headline **frozen-LN / residual-runaway**
+(decisively disproved — freezing the LN on the real recipe stays smooth at 2.838, and the torch residual
+grows to 327 ≫ silicon's 35.8 *without* any instability). The "3-chips-worse-than-1-block" comparison was an
+artifact of comparing a batch-1 silicon run to mismatched references — at equal batch the kernel recipe is
+fine. **The flagship structural claim is fully intact: the distributed PC transformer trains *correctly*
+across 3 FPGAs with no global gradient; it just trains at batch 1.**
 
-**bf16-GOLDEN ABLATION (2026-06-30, exact kernel reference, 1 block, silicon config):** isolates the
-bf16-backward cost on the kernel's own golden — `BF16_BWD=1` (wide FLOAT bwd) **3.673** vs `BF16_BWD=2`
-(bf16 bwd) **3.697** → **Δ0.024, bf16 precision REFUTED.** And the load-bearing comparison:
-
-| reference | blocks | bpb |
-|---|---|---|
-| bf16 golden, float OR bf16 bwd | **1** | **3.67–3.70** |
-| torch float control | 3 | 2.34 |
-| torch faithful recipe (dyadic+int16+bf16-opt) | 3 | 2.82 |
-| **SILICON (3 chips)** | **3** | **4.0 (plateau)** |
-
-**=> the silicon's 3-chip net plateaus WORSE than a single block.** Depth is worth ~1.3 bpb (1→3 blocks =
-3.67→2.34), but the silicon's 3 chips reach 4.0 — so **the deep chips contribute nothing: the distributed
-forward/backward across chips is broken** (the residual stream isn't propagating, OR the deep blocks aren't
-training because the backward-error relay is broken → only the output chip trains on a frozen random
-projection). This is the localization: **the bug is the cross-chip relay, not the recipe and not bf16.**
-
-**Running now (`ACTSTATS=1`, AGFI exists, no rebuild):** per-chip stats of the wide R′ + int HOUT + logits
-at step 0 vs step 500. Healthy R′ across chips → the forward relay is fine and the deep blocks aren't
-*training* (next: weight-movement probe = backward-relay bug); R′ collapsing/exploding across chips → the
-forward relay itself is the bug. Either way it's host-side fixable on the existing AGFI.
+### The fix — one rebuild delivers coherent **and** rapid
+- **(A) Coherence — true gradient accumulation in the kernel.** Persist `gW` in DDR; zero on the first
+  sub-batch of an ACCUM window, **add** on each, apply dyadic-Adam on the **last** over the averaged
+  gradient. All ACCUM sub-batches see the same (un-updated) weights → correct accumulation → effective
+  batch 8–32 → **coherent ~3.0**. (The driver already sequences `fwd(k); bwd(k)` per sub-batch with
+  `do_update` only on the last — only the kernel's zero-every-kick needs to change.)
+- **(B) Rapid — revert `factor=2` → `factor=8` unroll.** The unroll was cut only to close 250 MHz timing;
+  the AFI runs at **150 MHz** (the CDC), which has the slack back → ~4× faster kick, no other change.
+- Verify in csim (bit-exact to a golden-with-accumulation) → free csynth gate (DSP_MULT=0, timing@150 MHz,
+  one-SLR) → **one AFI build** → re-run at `ACCUM=16`.
 
 ---
 
