@@ -56,9 +56,26 @@ static void stage(int l,int off,int n){ for(long o=off;o<off+n;o+=262144){ long 
 static void kick(int l){ fpga_pci_poke(bar0[l],R_BUF0,0); fpga_pci_poke(bar0[l],R_BUF1,0);
     double t0=now_s(); fpga_pci_poke(bar0[l],R_AP_CTRL,AP_START); uint32_t c=0;
     while(now_s()-t0<20.0){ fpga_pci_peek(bar0[l],R_AP_CTRL,&c); if(c&AP_DONE)return; } fprintf(stderr,"KICK HUNG slot %d\n",l); exit(6); }
-static void readw(int l,int off,int32_t*dst,int n){ uint32_t v; for(int j=0;j<n;j++){ fpga_pci_peek(bar4r[l],(uint64_t)(off+j)*4,&v); dst[j]=(int32_t)v; } }
-// float-lane read: read int32 lanes then reinterpret as float
-static void readf(int l,int off,float*dst,int n){ uint32_t v; for(int j=0;j<n;j++){ fpga_pci_peek(bar4r[l],(uint64_t)(off+j)*4,&v); dst[j]=i2f((int32_t)v); } }
+// BURSTED readback (Track-B Stage-0): one mmap'd memcpy from the BAR4 read window instead of n
+// word-at-a-time fpga_pci_peek calls. The per-word peek (function-call + PCIe round-trip per 4 bytes)
+// was the 54-61%-of-wall-clock host-relay bottleneck; the write half (stage/write_burst) was already
+// bursted, so this makes the neighbour-message relay symmetric. Falls back to per-word peek if
+// fpga_pci_get_address is unavailable -> zero regression risk. Env READBURST=0 forces the old path.
+static int32_t g_rbuf[1<<18];
+static int g_readburst = -1;
+static inline int readburst_on(){ if(g_readburst<0){ const char*e=getenv("READBURST"); g_readburst = e?atoi(e):1; } return g_readburst; }
+static void readw(int l,int off,int32_t*dst,int n){
+    void*p=NULL;
+    if(readburst_on() && fpga_pci_get_address(bar4r[l],(uint64_t)off*4,(uint64_t)n,&p)==0 && p){ memcpy(dst,p,(size_t)n*4); return; }
+    uint32_t v; for(int j=0;j<n;j++){ fpga_pci_peek(bar4r[l],(uint64_t)(off+j)*4,&v); dst[j]=(int32_t)v; }
+}
+// float-lane read: bulk-read int32 lanes (one memcpy) then reinterpret as float
+static void readf(int l,int off,float*dst,int n){
+    void*p=NULL;
+    if(readburst_on() && n<=(1<<18) && fpga_pci_get_address(bar4r[l],(uint64_t)off*4,(uint64_t)n,&p)==0 && p){
+        memcpy(g_rbuf,p,(size_t)n*4); for(int j=0;j<n;j++) dst[j]=i2f(g_rbuf[j]); return; }
+    uint32_t v; for(int j=0;j<n;j++){ fpga_pci_peek(bar4r[l],(uint64_t)(off+j)*4,&v); dst[j]=i2f((int32_t)v); }
+}
 // stage a host float array into a DDR float region (lane bit-reinterpret then burst)
 static void put_f(int l,int off,const float*src,int n){ for(int j=0;j<n;j++) hbuf[l][off+j]=f2i(src[j]); stage(l,off,n); }
 // scratch for the deployed-int down-message (the int forward's HOUT->HIN relay; kept alongside the wide path so
