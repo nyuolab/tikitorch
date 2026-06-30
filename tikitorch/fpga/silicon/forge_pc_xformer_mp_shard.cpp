@@ -129,6 +129,26 @@ static void dump_master_file(const FMaster &m, const char* path){
 // master from the float master so the byte-identical int forward is dyad-faithful to the wide path.
 static double dyad_f(double wf){ double a=wf<0?-wf:wf; if(a<1e-30) return 0.0; int e=(int)lround(log2(a)); double p=ldexp(1.0,e); return wf<0?-p:p; }
 
+// per-chip activation-statistics probe (ACTSTATS=1; no-op otherwise) — localizes a silicon-side forward
+// degradation WITHOUT a CPU reference: does the WIDE residual stream R' (and the int deploy HOUT) collapse,
+// explode, or saturate across chips 0->L-1 or over training? Printed at step 0 and every 500 steps.
+static int g_actstats=-1;
+static int actstats_on(){ if(g_actstats<0){ const char*e=getenv("ACTSTATS"); g_actstats=e?atoi(e):0; } return g_actstats; }
+static void actstat(const char* tag, int chip, int step, const float* x, int n){
+    if(!actstats_on() || !(step==0 || step%500==0)) return;
+    double mn=1e300, mx=-1e300, sa=0; int bad=0;
+    for(int i=0;i<n;i++){ double v=x[i]; if(!(v==v) || v>1e300 || v<-1e300){bad++;continue;} if(v<mn)mn=v; if(v>mx)mx=v; sa+=v<0?-v:v; }
+    printf("[actstat] step %5d  %-8s chip %d  min=%+.3e max=%+.3e absmean=%.3e nan/inf=%d/%d\n",
+           step, tag, chip, mn, mx, sa/(n>0?n:1), bad, n); fflush(stdout);
+}
+static void actstat_i(const char* tag, int chip, int step, const int32_t* x, int n){
+    if(!actstats_on() || !(step==0 || step%500==0)) return;
+    long mn=1L<<40, mx=-(1L<<40); double sa=0; int sat=0;
+    for(int i=0;i<n;i++){ long v=x[i]; if(v<mn)mn=v; if(v>mx)mx=v; sa+=v<0?-v:v; if(v>=32767||v<=-32768)sat++; }
+    printf("[actstat] step %5d  %-8s chip %d  min=%ld max=%ld absmean=%.1f int16sat=%d/%d\n",
+           step, tag, chip, mn, mx, sa/(n>0?n:1), sat, n); fflush(stdout);
+}
+
 int main(int argc,char**argv){
     int steps = argc>1?atoi(argv[1]):2000;
     const char*dir = argc>2?argv[2]:"/tmp/pc_shakespeare";
@@ -246,6 +266,8 @@ int main(int argc,char**argv){
                 if(l<L-1){
                     readf(l, MP_GROUT, hmsg, X_SEQ*X_D);      // WIDE down-message: this block's R' -> next chip MP_GRIN
                     readw(l, XO_HOUT, ihmsg(), X_SEQ*X_D);    // int down-message: this block's int HOUT -> next chip XO_HIN
+                    actstat  ("R'(wide)", l, step, hmsg, X_SEQ*X_D);   // probe: wide residual stream across chips
+                    actstat_i("HOUT(int)", l, step, ihmsg(), X_SEQ*X_D);
                 }
             }
             // ===================== BACKWARD SWEEP: chip L-1 -> 0 =====================
@@ -259,6 +281,7 @@ int main(int argc,char**argv){
 
         // ===================== per-step bpb/acc from the OUTPUT chip's WIDE logits (== golden bpb) =====================
         readf(L-1, MP_WLG, wlg, X_SEQ*X_VOCAB);
+        actstat("logits", L-1, step, wlg, X_SEQ*X_VOCAB);   // probe: output-chip wide logits magnitude
         { int c=0; double bits=0; const double L2=log(2.0);
           for(int t=0;t<X_SEQ;t++){ int tg=data[last_off+t+1];
               double mx=-1e300; int am=0; for(int v=0;v<X_VOCAB;v++){ double lv=wlg[t*X_VOCAB+v]; if(lv>mx){mx=lv;am=v;} }
