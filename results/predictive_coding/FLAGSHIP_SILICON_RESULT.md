@@ -116,11 +116,20 @@ is settled.
 
 ## 5. OPEN PROBLEM #3 — throughput (host-relay-bound)
 
-**MEASURED:** 0.46 steps/s on silicon = **host-PCIe-relay-bound** — the same word-at-a-time readback
-that makes the existing fabric ~61 % comms-bound. This is *not* a compute limit. **The fix is the
-chip-to-chip comms work already de-risked in `tikitorch.fabric`:** burst readback (Stage-0,
-no rebuild), then PCIe-P2P / on-fabric links, plus double-buffering — modeled to recover ~3.9× ×
-the pipeline overlap. **This is the lever for "rapid" training and is independent of the quality gap.**
+**MEASURED:** 0.47 steps/s (~2.1 s/step). **CORRECTION (Track-B Stage-0 test, 2026-06-30):** this
+transformer is **COMPUTE-bound, not host-relay-bound.** Bursting the readback (mmap+memcpy via
+`fpga_pci_get_address` vs word-at-a-time peek) gave **0.47 vs 0.46 steps/s — no change** (bit-identical
+bpb). The "~61 % relay" was the MNIST-MLP rig; it does NOT transfer to the transformer. The 2.1 s/step is
+the **kernel kick**: the heavy BF16 backward at **150 MHz with `factor=2` unroll** (≈350 ms/kick × 6
+serial kicks/step). The real "rapid" levers, in order:
+- **Revert `factor=2` → `factor=8`** (full parallelism, ~4× faster kick). It was cut ONLY to close timing
+  at 250 MHz — but we now run at **150 MHz** (the CDC), where `factor=8` (79 % LUT / −1.688 ns @ 250 MHz)
+  regains ~+0.6 ns slack and should close. A rebuild — **combine it with the Track-A quality fix** in one AFI.
+- **Pipelined driver** (overlap the 3 chips' kicks across microbatches, ~3×, NO rebuild — the
+  `tikitorch.fabric` 1F1B/overlap is the blueprint). The current driver is GPipe-serial (6 serial kicks/step).
+The burst-readback path is kept (peek fallback, `READBURST` env) — harmless, and it matters once the kicks
+overlap. **0.47 steps/s is workable for the Track-A quality iteration (~53 min/1500-step run); defer the
+factor=8 rebuild to combine with the quality fix.**
 
 ---
 
