@@ -52,17 +52,49 @@
 // D=128 monolithic was in an area<->timing bind (ALLOCATION-sharing muxes -> WNS -4.6ns post-route across 5
 // AFI builds). Halving every dim shrinks the design ~4x -> ~18% LUT / ~16% BRAM -> the sharing muxes shrink and
 // it fits+closes with margin (keeps all 4 modes incl the fused trainer). All dims stay 16-divisible (wide bursts).
-#define S1_D        64      // d_model (was 128)
-#define S1_LOG2_D   6       // log2(D)=6: LayerNorm mean = sum >> 6 (no divider); D MUST == 1<<LOG2_D
-#define S1_H        2       // attention heads
-#define S1_DH       32      // head dim; H*DH == D (2*32=64)  (was 64)
-#define S1_FFN      256     // FFN inner width (4*D)  (was 512)
+// Dims are #ifndef-overridable so the kernel-v2 deploy build can set D=128/L4 (-DS1_D=128 ...)
+// while the legacy trainer keeps the D=64 default that fits/closes.
+#ifndef S1_D
+#define S1_D        64      // d_model (kernel-v2 deploy: 128)
+#endif
+#ifndef S1_LOG2_D
+#define S1_LOG2_D   6       // log2(D): LayerNorm mean = sum >> LOG2_D (no divider); D MUST == 1<<LOG2_D (128->7)
+#endif
+#ifndef S1_H
+#define S1_H        2       // attention heads (kernel-v2: 4)
+#endif
+#ifndef S1_DH
+#define S1_DH       32      // head dim; H*DH == D
+#endif
+#ifndef S1_FFN
+#define S1_FFN      256     // FFN inner width (4*D) (kernel-v2: 512)
+#endif
 #define S1_L_SEQ    64      // sequence length  (was 128)
 #define S1_V        64      // vocab (tied embed / LM-head)  (was 128; >= 8-symbol memorization task)
 #ifndef S1_N_LAYERS
 #define S1_N_LAYERS 1       // transformer blocks (offsets are layer-major); overridable via -DS1_N_LAYERS for deploy
 #endif
 #define S1_MBITS    2       // fine-dyadic LN mantissa bits (== forge_layernorm LN_MBITS)
+// ---- kernel-v2 (coherent strict-mult-free recipe) compile flags ----
+#ifndef S1_KV2
+#define S1_KV2      0       // 1 = kernel-v2: 4-term CSD weights + per-matrix rescale + CSD-reciprocal LN
+#endif
+#ifndef S1_GEMM_RSHIFT
+#define S1_GEMM_RSHIFT 6    // per-matrix pow2 accumulator rescale (= log2(SW); SW=64 -> 6) applied in fwd_gemm KV2
+#endif
+#ifndef S1_HEAD_RSHIFT
+#define S1_HEAD_RSHIFT 3    // head GEMM rescale (= log2(SH); SH=8 -> 3)
+#endif
+#ifndef S1_RECIP_K
+#define S1_RECIP_K  4       // LN reciprocal CSD terms (1/meanabs as K' shift-adds)
+#endif
+#ifndef S1_LN_GUARD
+#define S1_LN_GUARD 12      // guard/fractional bits in the LN cross-term accumulator (one round at the end,
+#endif                      // not per-term floor) so c*recip*gamma matches the sim's full-precision product
+
+#ifndef S1_WCSD_K
+#define S1_WCSD_K   4       // weight CSD terms packed into the int32 code (4 bytes, reuse wdecode format)
+#endif
 #define S1_LUT_N    256     // exp2 LUT entries (CE + attn)
 
 // ----------------------------------------------------------------------------

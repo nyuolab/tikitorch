@@ -62,10 +62,17 @@ import torch
 
 REPO = Path(__file__).resolve().parents[1]
 
-# ---- s1 dims (forge_s1_config.hpp at D=64/L2/V64) ----
+# ---- s1 dims (forge_s1_config.hpp at D=64/L2/V64; overridden by --offsets for the kernel-v2 deploy) ----
 D, H, DH, FFN, T, V, NL = 64, 2, 32, 256, 64, 64, 2
 VREAL = 39
 LUT_N = 256
+KV2 = False        # kernel-v2: pack 4-term CSD byte-codes into the int32 weight slot
+OFFSETS = None     # if set (from --offsets), use these exact kernel offsets instead of compute_offsets()
+
+
+def enc_w(W_float, scale):
+    """weight/gamma/head encoder: 4-term CSD packed int32 (kernel-v2) or single dyadic byte (legacy)."""
+    return enc_codes_csd(W_float, scale, WCSD_K) if KV2 else enc_codes(W_float, scale)
 
 
 def al16(x):
@@ -142,6 +149,33 @@ def enc_codes(W_float, scale):
     return np.array([s1_encode_value_to_code(round(v * scale)) for v in flat], dtype=np.int32)
 
 
+WCSD_K = 4   # weight CSD terms (kernel-v2); set from --offsets/--wcsd_k
+
+def csd_terms_packed(value, K):
+    """greedy K-term CSD of integer 'value' — exponent = round(log2(|resid|)) PER TERM, EXACTLY matching
+    scripts/tropical_llm_kernelsim.py dyad_scaled (torch.round(log2), NOT the MSB-bump dyad_exp_nz which
+    differs for ~23->5 and cost +0.25 bpc). Pack K byte-codes (sign|nz|exp) LE into one int32 (kernel wmac4)."""
+    resid = int(round(value)); packed = 0
+    for k in range(K):
+        if resid == 0:
+            b = 0                              # nz=0 term
+        else:
+            a = abs(resid)
+            ee = int(round(math.log2(a)))      # round-to-nearest-pow2 (== sim)
+            if ee < 0: ee = 0
+            if ee > 31: ee = 31
+            sgn = 1 if resid < 0 else 0
+            term = (-(1 << ee)) if sgn else (1 << ee)
+            b = (ee & 0x1F) | (1 << 5) | (sgn << 7)
+            resid -= term
+        packed |= (int(b) & 0xFF) << (8 * k)
+    return np.int32(np.uint32(packed))
+
+def enc_codes_csd(W_float, scale, K=4):
+    flat = np.asarray(W_float, dtype=np.float64).reshape(-1)
+    return np.array([csd_terms_packed(round(v * scale), K) for v in flat], dtype=np.int32)
+
+
 def enc_vals(W_float, scale):
     flat = np.asarray(W_float, dtype=np.float64).reshape(-1)
     return np.array([i16(v * scale) for v in flat], dtype=np.int32)
@@ -150,7 +184,7 @@ def enc_vals(W_float, scale):
 def build_buffer(ckpt_path, SA, SW, SGAM, SH, GCOMP):
     ck = torch.load(ckpt_path, map_location='cpu')
     sd = ck['model']
-    o = compute_offsets()
+    o = OFFSETS if OFFSETS is not None else compute_offsets()
     buf = np.zeros(BUFLEN, dtype=np.int32)
 
     # EMBED [V*D] int16 (rows VREAL..V-1 left 0; padded vocab never a target)
@@ -172,7 +206,7 @@ def build_buffer(ckpt_path, SA, SW, SGAM, SH, GCOMP):
         chunks = []
         for L in range(NL):
             w = sd[f'blocks.{L}.{nm}.w'].numpy()  # [O][I]
-            chunks.append(enc_codes(w, sw_of(nm)))
+            chunks.append(enc_w(w, sw_of(nm)))
         codes = np.concatenate(chunks)
         buf[o[region]:o[region] + codes.size] = codes
 
@@ -186,7 +220,7 @@ def build_buffer(ckpt_path, SA, SW, SGAM, SH, GCOMP):
         for L in range(NL):
             g = sd[f'blocks.{L}.{ln}.g'].numpy()
             b = sd[f'blocks.{L}.{ln}.b'].numpy()
-            gc.append(enc_codes(g * GCOMP, SGAM))
+            gc.append(enc_w(g * GCOMP, SGAM))
             bc.append(enc_vals(b, SGAM))
         buf[o[region_g]:o[region_g] + NL * D] = np.concatenate(gc)
         buf[o[region_b]:o[region_b] + NL * D] = np.concatenate(bc)
@@ -194,13 +228,13 @@ def build_buffer(ckpt_path, SA, SW, SGAM, SH, GCOMP):
     # LN_F (single) — MADLN keys lnf.g / lnf.b
     g = sd['lnf.g'].numpy()
     b = sd['lnf.b'].numpy()
-    buf[o['LNF_G']:o['LNF_G'] + D] = enc_codes(g * GCOMP, SGAM)
+    buf[o['LNF_G']:o['LNF_G'] + D] = enc_w(g * GCOMP, SGAM)
     buf[o['LNF_B']:o['LNF_B'] + D] = enc_vals(b, SGAM)
 
     # W_HEAD codes [V][D] (HEAD_MODE=1 dyadic-GEMM head; padded rows 0)
     hw = np.zeros((V, D), dtype=np.float64)
     hw[:VREAL] = sd['head.w'].numpy()
-    buf[o['W_HEAD']:o['W_HEAD'] + V * D] = enc_codes(hw, SH)
+    buf[o['W_HEAD']:o['W_HEAD'] + V * D] = enc_w(hw, SH)
 
     # CE / ATTN LUTs (Q16 exp2 — FT_CE_EXP2_Q16). Parse from forge_ce_lut.hpp.
     lut = load_ce_lut()
@@ -236,7 +270,17 @@ def main():
     ap.add_argument('--SGAM', type=int, default=32)
     ap.add_argument('--SH', type=int, default=8)
     ap.add_argument('--GCOMP', type=float, default=1.0)  # FAITHFUL: trained w/ MAD-LN, no std/MAD compensation
+    ap.add_argument('--offsets', default='', help='kernel offsets JSON (offsets_dump) -> exact dims/BUFLEN/offsets')
+    ap.add_argument('--kv2', type=int, default=0, help='1 = pack 4-term CSD weights (kernel-v2)')
+    ap.add_argument('--wcsd_k', type=int, default=4, help='weight CSD terms')
     a = ap.parse_args()
+    global D, H, DH, FFN, T, V, NL, BUFLEN, OFF_POS, OFF_LOGITS, OFFSETS, KV2, WCSD_K
+    KV2 = bool(a.kv2); WCSD_K = a.wcsd_k
+    if a.offsets:
+        j = json.loads(Path(a.offsets).read_text())
+        D, H, DH, FFN, T, V, NL = j['D'], j['H'], j['DH'], j['FFN'], j['T'], j['V'], j['NL']
+        BUFLEN, OFF_POS, OFF_LOGITS = j['BUFLEN'], j['OFF_POS'], j['OFF_LOGITS']
+        OFFSETS = j['offsets']
     SW = a.SW
     if a.SW_PM:
         SW = {k: int(v) for k, v in (kv.split(':') for kv in a.SW_PM.split(','))}

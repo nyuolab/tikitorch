@@ -67,7 +67,11 @@ typedef int32_t      prob_t;
 
 // on-chip resident weight encodings: byte-codes in int8 (wdecode masks &0xFF), int16 tables in int16,
 // LUTs / tokens / targets in int32 — minimal BRAM, reconstruction BIT-IDENTICAL to the v1 gmem read.
+#if S1_KV2
+typedef int32_t  code_t;        // kernel-v2: int32 holds 4 packed byte-codes (4-term weight CSD)
+#else
 typedef int8_t   code_t;        // pre-dyadic weight byte code (sign|nz|exp, 8 bits)
+#endif
 typedef int16_t  half_t;        // int16 table value (EMBED / W_HEAD / LN beta)
 
 static const acc_t S1_NEG_INF = (acc_t)(-((acc_t)1 << 40));   // attn causal-mask sentinel
@@ -118,13 +122,25 @@ LC_W: for (int w = 0; w < n_wide; w++) {
 LC_LANE: for (int lane = 0; lane < 16; lane++) {
 #pragma HLS UNROLL
             int lo = lane * 32;
+#if S1_KV2
+            dst[w * 16 + lane] = (code_t)(int32_t)v.range(lo + 31, lo);   // full int32 (4 packed CSD byte-codes)
+#else
             ap_uint<8> b = (ap_uint<8>)v.range(lo + 7, lo);
             dst[w * 16 + lane] = (code_t)(int8_t)(unsigned char)b;
+#endif
         }
     }
+#if S1_KV2
+    for (int i = (n_wide << 4); i < n_words; i++) dst[i] = (code_t)buffer[word_off + i];
+#else
     for (int i = (n_wide << 4); i < n_words; i++) dst[i] = (code_t)(int8_t)(buffer[word_off + i] & 0xFF);
+#endif
+#else
+#if S1_KV2
+    for (int i = 0; i < n_words; i++) dst[i] = (code_t)buffer[word_off + i];
 #else
     for (int i = 0; i < n_words; i++) dst[i] = (code_t)(int8_t)(buffer[word_off + i] & 0xFF);
+#endif
 #endif
 }
 
@@ -233,6 +249,45 @@ static inline void wdecode(int32_t code, bool &sgn, exp_t &e, bool &nz) {
     nz  = ((c >> 5) & 1) != 0;
     e   = (exp_t)(c & 0x1F);
 }
+
+#if S1_KV2
+// kernel-v2 weight MAC: the int32 code packs S1_WCSD_K byte-codes (one CSD term each, same wdecode
+// format). Returns sum_k (+/- xv<<e_k) — the weight*activation as K shift-adds (DSP=0). The per-term
+// exponents are non-negative (weights at SW=64 are >=1 in scaled-int); the GEMM rescales >> later.
+static inline acc_t wmac4(int32_t code, acc_t xv) {
+#pragma HLS INLINE
+    acc_t s = 0;
+WCSD: for (int k = 0; k < S1_WCSD_K; k++) {
+#pragma HLS UNROLL
+        uint32_t c = (uint32_t)((code >> (8 * k)) & 0xFF);
+        if ((c >> 5) & 1) {                                   // nz
+            acc_t term = xv << (int)(c & 0x1F);               // xv << exp  (exp >= 0)
+            s += ((c >> 7) & 1) ? (acc_t)(-term) : term;      // apply term sign
+        }
+    }
+    return s;
+}
+
+// kernel-v2 LayerNorm reciprocal: 1/meanabs as S1_RECIP_K signed powers of 2 (CSD), returned as
+// exponents e_out[k] (negative; r = sum_k c<<e_k via >> ). recip computed in Q-RFRAC fixed point
+// (a divide — restoring shift/subtract, NO multiply), then the top-K set bits are the CSD terms.
+#define S1_RFRAC 24
+static inline void recip_csd(acc_t meanabs, int e_out[S1_RECIP_K]) {
+#pragma HLS INLINE
+    if (meanabs < 1) meanabs = 1;
+    acc_t recip = ((acc_t)1 << S1_RFRAC) / meanabs;           // Q24 reciprocal of meanabs (<= 2^24)
+RCSD: for (int k = 0; k < S1_RECIP_K; k++) {
+#pragma HLS UNROLL
+        int p = -1;
+    RTOP: for (int b = S1_RFRAC + 1; b >= 0; b--) {           // leading set bit of the residual
+#pragma HLS UNROLL
+            if ((recip >> b) & 1) { p = b; break; }
+        }
+        if (p < 0) { e_out[k] = -64; }                        // residual 0 -> harmless huge negative shift
+        else { e_out[k] = p - S1_RFRAC; recip -= ((acc_t)1 << p); }   // subtract this power; e relative to Q24
+    }
+}
+#endif
 
 static inline data_t sat16(acc_t v) {
 #pragma HLS INLINE
@@ -379,8 +434,9 @@ static_assert(S1_TILE_V     % 16 == 0, "head tile stride must be 16-word aligned
 // The math/order is VERBATIM the templated version (just runtime-bounded) -> the int64 golden is unchanged.
 // =============================================================================
 static void fwd_gemm(const data_t *xin, const code_t *wcode, int w_off, data_t *yout,
-                     int M, int I, int O) {
+                     int M, int I, int O, int rshift = S1_GEMM_RSHIFT) {
 #pragma HLS INLINE off
+    (void)rshift;
     // dyad-quantize x once (q(x) = ±2^ex).
     // Partition the T (row/token) dim COMPLETE so the IRED inner loop's T-way UNROLL gets T parallel
     // reads of xE/xS/xNZ[*][i] per cycle (the forge_fwd_wide dim=1 partition recipe). Without this the
@@ -418,7 +474,10 @@ TT:         for (int tt = 0; tt < S1_GEMM_TMAX; tt += S1_LANE) {
 #pragma HLS UNROLL
                     int t = tt + tl;
                     if (t < M) {
-#if S1_GEMM_QX
+#if S1_KV2
+                        // kernel-v2: 4-term CSD weight (int32 code) MAC'd with the full int16 activation.
+                        acc[t] += wmac4((int32_t)wcode[w_off + o * I + i], (acc_t)xin[t * I + i]);
+#elif S1_GEMM_QX
                         exp_t ex = xE[t][i];
                         int e = (int)ew + (int)ex;
                         acc_t term = (acc_t)1 << e;
@@ -437,7 +496,11 @@ TT:         for (int tt = 0; tt < S1_GEMM_TMAX; tt += S1_LANE) {
         }
         for (int t = 0; t < M; t++) {
 #pragma HLS UNROLL factor=S1_LANE
+#if S1_KV2
+            yout[t * O + o] = sat16(acc[t] >> rshift);   // arithmetic >> = floor toward -inf (matches sim afloor)
+#else
             yout[t * O + o] = sat16(acc[t]);   // cast to int16 activation range (LN/attn consume int16)
+#endif
         }
     }
 }
@@ -469,6 +532,36 @@ CEN: for (int d = 0; d < S1_D; d++) {
     }
     acc_t meanabs = asum >> S1_LOG2_D;
 
+#if S1_KV2
+    // kernel-v2: y = c * (1/meanabs as K'-term CSD) * (gamma as K-term CSD) + beta. The double-CSD product
+    // is the K'*K cross-terms of c shifted by (recip_exp[k] + gamma_exp[j]) — all shift-adds, DSP=0. The
+    // recip exps are negative, the gamma exps positive (gamma~SGAM>=1), so the shifts land near 0 (no
+    // fractional-precision loss). Matches scripts/tropical_llm_kernelsim.py kernel_ln (LN_RECIP_K path).
+    int erec[S1_RECIP_K];
+    recip_csd(meanabs, erec);
+    e_out = erec[0]; nq_out = erec[1];
+RESC: for (int d = 0; d < S1_D; d++) {
+#pragma HLS PIPELINE II=1
+        acc_t cv = (acc_t)c[d];
+        int32_t gcode = (int32_t)gamma[gamma_off + d];
+        acc_t hi = 0;                                          // c*recip*gamma at +S1_LN_GUARD fractional bits
+    GK: for (int k = 0; k < S1_RECIP_K; k++) {
+#pragma HLS UNROLL
+        GJ: for (int j = 0; j < S1_WCSD_K; j++) {
+#pragma HLS UNROLL
+                uint32_t gc = (uint32_t)((gcode >> (8 * j)) & 0xFF);
+                if ((gc >> 5) & 1) {                           // gamma CSD term nonzero
+                    int sh = erec[k] + (int)(gc & 0x1F) + S1_LN_GUARD;   // recip(neg)+gamma(pos)+guard
+                    acc_t term = (sh >= 0) ? (cv << sh) : (cv >> (-sh));
+                    hi += ((gc >> 7) & 1) ? (acc_t)(-term) : term;       // gamma term sign (recip all +)
+                }
+            }
+        }
+        // round the high-precision product once (round-half-up), then add beta (int16, SGAM scale).
+        acc_t r = (hi + ((acc_t)1 << (S1_LN_GUARD - 1))) >> S1_LN_GUARD;
+        y[d] = sat16(r + (acc_t)beta[beta_off + d]);
+    }
+#else
     int e, nq;
     fdyad(meanabs, e, nq);
     e_out = e; nq_out = nq;
@@ -492,6 +585,7 @@ RESC: for (int d = 0; d < S1_D; d++) {
         acc_t yv = g + (acc_t)bd;
         y[d] = sat16(yv);
     }
+#endif
 }
 
 // =============================================================================
@@ -906,7 +1000,7 @@ LNF_ID: for (int t = 0; t < S1_L_SEQ; t++)
     //      output dim V — a dyadic shift-add MAC, DSP=0. Computed for ALL positions at once into Logits_all;
     //      the per-position loop below reads it (no max, no argmax_head save). ----
     static data_t Logits_all[S1_L_SEQ][S1_D >= S1_V ? S1_D : S1_V];   // [L_SEQ][V] (oversized to V<=col)
-    fwd_gemm(&Rn[0][0], whead_oc, 0, &Logits_all[0][0], S1_L_SEQ, S1_D, S1_V);
+    fwd_gemm(&Rn[0][0], whead_oc, 0, &Logits_all[0][0], S1_L_SEQ, S1_D, S1_V, S1_HEAD_RSHIFT);
 #endif
 HEADLOOP: for (int t = 0; t < S1_L_SEQ; t++) {
         int target = tgts[t];

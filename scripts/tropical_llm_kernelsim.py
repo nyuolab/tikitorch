@@ -177,8 +177,14 @@ def kernel_attn(Qm, Km, Vm, invtau, mask, soft_deploy=False):
         Q, K, V = Qm[..., sl], Km[..., sl], Vm[..., sl]              # [B,T,DH]
         score = -(Q.unsqueeze(2) - K.unsqueeze(1)).abs().sum(-1)     # [B,T,T]
         score = score.masked_fill(mask, float("-inf"))
-        p = torch.softmax(score * invtau, dim=-1)
-        outs.append(sat16(ste_round(p @ V)))
+        if invtau >= 1e5:
+            # HARD deploy == the kernel: TRUE first-index argmax gather (NOT softmax-1e6 which AVERAGES
+            # tied-max scores; L1 int scores tie often, and the deep argmax is flip-sensitive).
+            jstar = score.argmax(-1)                                 # torch.argmax = first max (== kernel)
+            outs.append(torch.gather(V, 1, jstar.unsqueeze(-1).expand(-1, -1, DH)))
+        else:
+            p = torch.softmax(score * invtau, dim=-1)
+            outs.append(sat16(ste_round(p @ V)))
     return torch.cat(outs, -1)                                       # [B,T,D]
 
 class KSimLM(nn.Module):
