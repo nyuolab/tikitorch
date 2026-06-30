@@ -96,11 +96,26 @@ The plateau is most consistent with the **cumulative** documented residual gaps 
 distributed datapath (`mult-free fwd + FLOAT bwd → 2.016 bpb`; adding the int-deploy-forward training
 + distribution stacks toward ~4.0), **not a single bug** — the kernel computes the intended thing.
 
-**The decisive next experiment:** an ablation on the (single-block) bf16 golden that swaps the
-FLOAT-master forward → the INT-DEPLOY g_forward (the silicon's exact fwd) while keeping the BF16-STE
-backward. If that alone plateaus toward ~4.0 → the int-deploy-forward-for-training is the dominant
-residual (fix = train on a less-quantized forward / better STE / finer act bits). Otherwise add the
-NBLK=3 handoff. (`tikitorch.fabric` hosts the distribution side.)
+**RECIPE-PRECISION ABLATION DONE (2026-06-30, `scripts/pc_xformer_charlm.py`, silicon config D=64/3L/H2):**
+the FULL faithful recipe reaches **coherent bpb on CPU — the recipe is SOUND, the gap is silicon/driver-side:**
+
+| recipe (1000 steps) | bpb | residual |
+|---|---|---|
+| MULTFREE=0 (float control) | **2.34** (falling) | — |
+| MULTFREE=1 (dyadic fwd + int16 acts = silicon fwd) | **2.83** (falling) | +0.5 (the mult-free forward) |
+| MULTFREE=1 + ADAM_BF16=1 (+ bf16 optimizer = silicon opt) | **2.82** (falling) | +0.0 (bf16 optimizer negligible) |
+
+So the dyadic forward costs ~0.5 bpb and the bf16 optimizer ~0. The faithful recipe = **2.8, coherent,
+still descending** — whereas the **silicon plateaus at 4.0**. Refuted (all): ACCUM, message precision,
+attention softmax, the BF16 backward (csim-exact), the dyadic forward, the bf16 optimizer, the
+residual-stream handoff (kernel line 521 `RP = M + FO` carries the full stream). **=> the ~1.2 bpb gap
++ the *plateau* (recipe keeps falling, silicon stalls) is SILICON / DISTRIBUTED-DRIVER-side, not the math.**
+
+**The decisive next experiment:** a **silicon one-step dump** — run one fwd kick, dump each chip's output
+(`RP`/`MP_GROUT`) and the logits, and compare to the CPU recipe on the *same input + init*. Bit-match →
+the issue is the multi-step training dynamics / the driver's distributed sweep (init/order, an accumulating
+relay bug); mismatch → a real on-silicon kernel/CDC effect localized to one op. Cheaper than any rebuild
+(the AGFI exists), and it's the last unrefuted branch.
 
 ---
 

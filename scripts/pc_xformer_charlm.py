@@ -98,10 +98,16 @@ class CharLM(nn.Module):
 
 
 # ---- dyadic-Adam: per-param pow2-adaptive step (mult-free on fabric), float here ----
+# ADAM_BF16=1 rounds the grad + the EMA moments to bf16 (7-bit mantissa) — models the SILICON optimizer
+# (bf16 m,v + bf16 backward grad) to test whether the optimizer precision is what stalls silicon at ~4.0.
+ADAM_BF16 = int(os.environ.get("ADAM_BF16", 0))
+def _bf16(x): return x.bfloat16().float()
 def dyadic_adam(params, lr):
     for p in params:
         if p.grad is None: continue
-        st = p._st; st['m'].mul_(0.875).add_(p.grad, alpha=0.125); st['v'].mul_(0.875).add_(p.grad.abs(), alpha=0.125)
+        g = _bf16(p.grad) if ADAM_BF16 else p.grad
+        st = p._st; st['m'].mul_(0.875).add_(g, alpha=0.125); st['v'].mul_(0.875).add_(g.abs(), alpha=0.125)
+        if ADAM_BF16: st['m'].copy_(_bf16(st['m'])); st['v'].copy_(_bf16(st['v']))
         scale = torch.pow(2.0, torch.floor(torch.log2((st['m'].abs()/(st['v']+1e-9)).clamp_min(1e-12))))
         p.data.add_(-lr * torch.sign(st['m']) * scale)
 
