@@ -245,7 +245,10 @@ int main(int argc,char**argv){
         //   current kernel ACCUM>1 reduces to the last sub-batch's update — see ASSUMPTIONS in the report).
         long last_off = 0;
         for(int k=0;k<ACCUM;k++){
-            long off = (long)(rand() % (ntok - X_SEQ - 2)); last_off = off;
+            // FIXEDOFF>=0 pins every batch to the same offset (overfit / kernel-can-fit sanity test on silicon):
+            // if the kernel is sound it must memorize one batch -> bpb -> ~0; a floor >>0 = a real kernel/HW fault.
+            static long g_fixedoff = getenv("FIXEDOFF") ? atol(getenv("FIXEDOFF")) : -1;
+            long off = g_fixedoff>=0 ? g_fixedoff : (long)(rand() % (ntok - X_SEQ - 2)); last_off = off;
             int do_update = (k==ACCUM-1) ? 1 : 0;
 
             // ===================== FORWARD SWEEP: chip 0 -> L-1 =====================
