@@ -528,7 +528,7 @@ CEN: for (int d = 0; d < S1_D; d++) {
         acc_t cv = (acc_t)x[d] - mean;
         c[d] = sat16(cv);
 #if S1_KV2
-        acc_t cc = (acc_t)c[d]; acc_t a = (cc < 0) ? -cc : cc;   // meanabs from the SATURATED c (== sim/trained model)
+        acc_t cc = (acc_t)c[d]; acc_t a = (cc < 0) ? (acc_t)(-cc) : cc;   // meanabs from the SATURATED c (== sim/trained model)
 #else
         acc_t a = (cv < 0) ? (acc_t)(-cv) : (acc_t)cv;
 #endif
