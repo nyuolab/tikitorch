@@ -111,11 +111,27 @@ attention softmax, the BF16 backward (csim-exact), the dyadic forward, the bf16 
 residual-stream handoff (kernel line 521 `RP = M + FO` carries the full stream). **=> the ~1.2 bpb gap
 + the *plateau* (recipe keeps falling, silicon stalls) is SILICON / DISTRIBUTED-DRIVER-side, not the math.**
 
-**The decisive next experiment:** a **silicon one-step dump** — run one fwd kick, dump each chip's output
-(`RP`/`MP_GROUT`) and the logits, and compare to the CPU recipe on the *same input + init*. Bit-match →
-the issue is the multi-step training dynamics / the driver's distributed sweep (init/order, an accumulating
-relay bug); mismatch → a real on-silicon kernel/CDC effect localized to one op. Cheaper than any rebuild
-(the AGFI exists), and it's the last unrefuted branch.
+**bf16-GOLDEN ABLATION (2026-06-30, exact kernel reference, 1 block, silicon config):** isolates the
+bf16-backward cost on the kernel's own golden — `BF16_BWD=1` (wide FLOAT bwd) **3.673** vs `BF16_BWD=2`
+(bf16 bwd) **3.697** → **Δ0.024, bf16 precision REFUTED.** And the load-bearing comparison:
+
+| reference | blocks | bpb |
+|---|---|---|
+| bf16 golden, float OR bf16 bwd | **1** | **3.67–3.70** |
+| torch float control | 3 | 2.34 |
+| torch faithful recipe (dyadic+int16+bf16-opt) | 3 | 2.82 |
+| **SILICON (3 chips)** | **3** | **4.0 (plateau)** |
+
+**=> the silicon's 3-chip net plateaus WORSE than a single block.** Depth is worth ~1.3 bpb (1→3 blocks =
+3.67→2.34), but the silicon's 3 chips reach 4.0 — so **the deep chips contribute nothing: the distributed
+forward/backward across chips is broken** (the residual stream isn't propagating, OR the deep blocks aren't
+training because the backward-error relay is broken → only the output chip trains on a frozen random
+projection). This is the localization: **the bug is the cross-chip relay, not the recipe and not bf16.**
+
+**Running now (`ACTSTATS=1`, AGFI exists, no rebuild):** per-chip stats of the wide R′ + int HOUT + logits
+at step 0 vs step 500. Healthy R′ across chips → the forward relay is fine and the deep blocks aren't
+*training* (next: weight-movement probe = backward-relay bug); R′ collapsing/exploding across chips → the
+forward relay itself is the bug. Either way it's host-side fixable on the existing AGFI.
 
 ---
 
