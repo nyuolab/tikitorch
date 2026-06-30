@@ -96,6 +96,21 @@ static const int MP_DG_GK  = MP_DG_GQ  + X_SEQ*X_D;        // [SEQ*D]
 static const int MP_DG_GV  = MP_DG_GK  + X_SEQ*X_D;        // [SEQ*D]
 static const int MP_DG_END = MP_DG_GV  + X_SEQ*X_D;
 
-static const int MP_BUFLEN= X_AL(MP_DG_END);
+// ---- gradient ACCUMULATORS (effective-batch / ACCUM>1): the kernel sums the per-sub-batch weight grads here
+//      across an accumulation window (zero on the first sub-batch, add each, dyadic-Adam on the last over the
+//      sum). Persisted in DDR so multiple BWD kicks accumulate -> effective batch = ACCUM. ----
+static const int MP_GACC     = X_AL(MP_DG_END);
+static const int MP_GACC_WQ  = MP_GACC;                    // [D*D]
+static const int MP_GACC_WK  = MP_GACC_WQ  + X_D*X_D;      // [D*D]
+static const int MP_GACC_WV  = MP_GACC_WK  + X_D*X_D;      // [D*D]
+static const int MP_GACC_WO  = MP_GACC_WV  + X_D*X_D;      // [D*D]
+static const int MP_GACC_WUP = MP_GACC_WO  + X_D*X_D;      // [FFN*D]
+static const int MP_GACC_WDN = MP_GACC_WUP + X_FFN*X_D;    // [D*FFN]
+static const int MP_GACC_WH  = MP_GACC_WDN + X_D*X_FFN;    // [VOCAB*D]  (OUTPUT chip head)
+static const int MP_GACC_EMB = MP_GACC_WH  + X_VOCAB*X_D;  // [VOCAB*D]  (INPUT chip embed)
+static const int MP_GACC_POS = MP_GACC_EMB + X_VOCAB*X_D;  // [SEQ*D]    (INPUT chip pos)
+static const int MP_GACC_END = MP_GACC_POS + X_SEQ*X_D;
+
+static const int MP_BUFLEN= X_AL(MP_GACC_END);
 
 #endif

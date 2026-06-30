@@ -84,8 +84,10 @@ static int32_t g_ihmsg[X_SEQ*X_D];
 static inline int32_t* ihmsg(){ return g_ihmsg; }
 
 // CFG word lanes: [phase, role, do_update, lrbits]  (lane 3 = fixed-point lr code, lr = lrbits*2^-20)
-static void setcfg(int l,int phase,int role,int doupd,int lrbits){
-    hbuf[l][XO_CFG+0]=phase; hbuf[l][XO_CFG+1]=role; hbuf[l][XO_CFG+2]=doupd; hbuf[l][XO_CFG+3]=lrbits; stage(l,XO_CFG,X_WL); }
+static void setcfg(int l,int phase,int role,int doupd,int lrbits,int gzero=0){
+    hbuf[l][XO_CFG+0]=phase; hbuf[l][XO_CFG+1]=role; hbuf[l][XO_CFG+2]=doupd; hbuf[l][XO_CFG+3]=lrbits;
+    hbuf[l][XO_CFG+4]=gzero;   // ACCUM>1: 1 on the first sub-batch -> kernel zeroes the grad accumulators
+    stage(l,XO_CFG,X_WL); }
 static int role_of(int l){ return (l==0)?X_RL_INPUT : (l==L-1)?X_RL_OUT : X_RL_HID; }
 
 // =====================================================================================================
@@ -237,12 +239,11 @@ int main(int argc,char**argv){
     for(int step=0; step<steps; step++){
         // char-LM linear warmup (== golden): lr = LR * min(1, (step+1)/WARMUP)
         double lr = LR * fmin(1.0, (step+1)/(double)(WARMUP>0?WARMUP:1));
-        // ACCUM>1: accumulate W sub-batches of grad before the optimizer apply (bounds weight-staleness ~1 per
-        //   the measured rule). DO_UPDATE=1 only on the LAST sub-batch; the kernel zeroes its grad accumulators
-        //   each BWD kick, so multi-step accumulation needs the kernel to keep gW across kicks — here we apply
-        //   the optimizer every sub-batch when ACCUM==1 (the de-risked default), and for ACCUM>1 we still issue
-        //   the per-sub-batch fwd/bwd but only DO_UPDATE on the last (kernel-accum is a kernel feature; with the
-        //   current kernel ACCUM>1 reduces to the last sub-batch's update — see ASSUMPTIONS in the report).
+        // ACCUM = effective BATCH size (the lever that takes silicon from the batch-1 ~4.0 plateau to a coherent
+        //   ~3.0; golden ACCUM 1/8/32 -> 3.74/3.20/2.95). The kernel now TRULY accumulates: GZERO=1 on the first
+        //   sub-batch zeroes the persistent DDR grad accumulators (MP_GACC_*), each later BWD adds, and DO_UPDATE=1
+        //   on the LAST sub-batch runs dyadic-Adam on the accumulated sum. So ACCUM>1 = a real batch of ACCUM
+        //   sequences per weight update (verified csim: acc1=g, acc2=2g). All ACCUM sub-batches see the same weights.
         long last_off = 0;
         for(int k=0;k<ACCUM;k++){
             // FIXEDOFF>=0 pins every batch to the same offset (overfit / kernel-can-fit sanity test on silicon):
@@ -275,7 +276,7 @@ int main(int argc,char**argv){
             }
             // ===================== BACKWARD SWEEP: chip L-1 -> 0 =====================
             for(int l=L-1;l>=0;l--){
-                setcfg(l, X_PH_BWD, role_of(l), do_update, do_update?lrcode(lr):0);   // DO_UPDATE -> bf16 dyadic-Adam apply
+                setcfg(l, X_PH_BWD, role_of(l), do_update, do_update?lrcode(lr):0, (k==0)?1:0);   // DO_UPDATE -> dyadic-Adam apply; k==0 -> zero grad-accum
                 if(l<L-1){ put_f(l, MP_GRIN, emsg, X_SEQ*X_D); xchip_msg += (long)X_SEQ*X_D; }  // neighbour WIDE error in
                 kick(l);
                 if(l>0) readf(l, MP_GROUT, emsg, X_SEQ*X_D);  // WIDE up-message: this block's input-grad -> prev chip MP_GRIN

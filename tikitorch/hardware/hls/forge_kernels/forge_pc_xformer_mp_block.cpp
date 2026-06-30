@@ -287,12 +287,12 @@ BL_T: for (int t = 0; t < M; t++) {
         // schedules the 8-wide inners naturally (fast synth); inner UNROLL factor=8 kept for area.
         float sum = 0;
     BL_S: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
             sum += x[t*X_D+d];
         }
         float mean = sum / X_D; float asum = 0;
     BL_A: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
             float c = x[t*X_D+d]-mean; asum += c < 0 ? -c : c;
         }
         float scale = asum / X_D; if (scale < 1e-9f) scale = 1e-9f;
@@ -301,7 +301,7 @@ BL_T: for (int t = 0; t < M; t++) {
         float s = (1.0f + mant) * hls::ldexp(1.0f,e);
         mean_out[t] = mean; s_out[t] = s;
     BL_Y: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
             y[t*X_D+d] = gamma[d]*((x[t*X_D+d]-mean)/s) + beta[d];
         }
     }
@@ -314,7 +314,7 @@ BM_T: for (int t = 0; t < M; t++)
             // so a single fixed achievable II doesn't fit both. HLS schedules the 8-wide inner naturally.
             float acc = 0;
         BM_I: for (int i = 0; i < I; i++) {
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 acc += bf_dyad_f(Wf[o*I+i]) * x[t*I+i];     // dyad(master) * x  (forward-for-bwd, wide)
             }
             y[t*O+o] = acc;
@@ -332,7 +332,7 @@ LR_T: for (int t = 0; t < M; t++)
             // so a single fixed achievable II doesn't fit all callers. HLS schedules the 8-wide inner naturally.
             float acc = 0;
         LR_O: for (int o = 0; o < O; o++) {
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 acc += bf_dyad_f(Wf[o*I+i]) * gy[t*O+o];
             }
             dx[t*I+i] = P(acc);
@@ -343,7 +343,7 @@ WG_O: for (int o = 0; o < O; o++)
             // function is shared); HLS schedules the 8-wide inner naturally. Inner UNROLL factor=8 kept.
             float acc = 0;
         WG_T: for (int t = 0; t < M; t++) {
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 acc += gy[t*O+o] * x[t*I+i];
             }
             dW[o*I+i] += P(acc);
@@ -358,12 +358,12 @@ LB_T: for (int t = 0; t < M; t++) {
         // scalar divide, so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
         float gxhat[X_D], mg = 0;
     LB_C: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
             gxhat[d] = P(gy[t*X_D+d]*gamma[d]); mg += gxhat[d];
         }
         mg /= X_D;
     LB_D: for (int d = 0; d < X_D; d++) {
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
             dx[t*X_D+d] = P((gxhat[d]-mg)/s[t]);
         }
     }
@@ -394,6 +394,8 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
     int DO_UP = (int)(ap_int<32>)cfgw.range(95, 64);
     int LRBITS = (int)(ap_int<32>)cfgw.range(127, 96);   // lr code: lr = LRBITS * 2^-20 (host stages a fixed-pt lr)
     float LR = (float)LRBITS * hls::ldexp(1.0f, -20);
+    int GZERO = (int)(ap_int<32>)cfgw.range(159, 128);   // ACCUM>1: 1 = first sub-batch of a window -> zero the grad
+                                                         //   accumulators; else add to them. dyadic-Adam (DO_UP) on the sum.
 
     // ---- DEPLOY int16 master weights (drive the byte-identical forward) ----
     static data_t WQ[X_D*X_D], WK[X_D*X_D], WV[X_D*X_D], WO[X_D*X_D];
@@ -572,7 +574,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
                     // II=4 = ceil(X_DH(32)/8): cycles the 8-wide inner reduction needs -> achievable, fast synth.
                     float dot=0;
                 FA_SD: for(int d=0;d<X_DH;d++){
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                         dot += WQf[i*X_D+h*X_DH+d]*WKf[j*X_D+h*X_DH+d];
                     }
                     sc[j]=dot*scale; if(sc[j]>mx)mx=sc[j]; }
@@ -588,7 +590,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
                     // II=8 = ceil(X_SEQ(64)/8): max cycles the 8-wide inner (j<=i, bound X_SEQ) needs -> achievable.
                     float blend=0;
                 FA_BJ: for(int j=0;j<=i;j++){
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                         blend+=Praw[(h*X_SEQ+i)*X_SEQ+j]*WVf[j*X_D+h*X_DH+d];
                     }
                     WATTN[i*X_D+h*X_DH+d]=blend; }
@@ -662,16 +664,16 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             // hls::exp, so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
             float mx=-1e30f;
         CE_MX: for(int v=0;v<X_VOCAB;v++){
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 float l=WLG[t*X_VOCAB+v]; if(l>mx)mx=l;
             }
             float sum=0,pr[X_VOCAB];
         CE_EX: for(int v=0;v<X_VOCAB;v++){
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 pr[v]=hls::exp(WLG[t*X_VOCAB+v]-mx); sum+=pr[v];
             }
         CE_DV: for(int v=0;v<X_VOCAB;v++){
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 float p=pr[v]/sum, oh=(v==tgt[t])?1.0f:0.0f; gLG[t*X_VOCAB+v]=P((p-oh)/X_SEQ);
             }
         }
@@ -681,6 +683,10 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
 #ifdef MP_DEBUG_GRADS
         bstore_f(buffer, MP_DG_WH, gWHEAD, X_VOCAB*X_D);   // DEBUG: kernel gWHEAD vs golden bg.WHEAD
 #endif
+        // gradient accumulation (effective batch = ACCUM): fold gWHEAD into its DDR accumulator
+        { static float aH[X_VOCAB*X_D];
+          if (!GZERO) { bload_f(buffer, MP_GACC_WH, aH, X_VOCAB*X_D); for(int i=0;i<X_VOCAB*X_D;i++) gWHEAD[i]+=aH[i]; }
+          bstore_f(buffer, MP_GACC_WH, gWHEAD, X_VOCAB*X_D); }
         // head dyadic-Adam (OUTPUT-only weight)
         if (DO_UP) {
             static float FWHEADm[X_VOCAB*X_D]; bload_f(buffer, MP_FWHEAD, FWHEADm, X_VOCAB*X_D);
@@ -717,12 +723,12 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
             // gV scatter), so a single achievable II isn't clean. HLS schedules the 8-wide inners naturally.
             float s=0;
         AB_GPD: for(int d=0;d<X_DH;d++){
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 s+=gATTN[i*X_D+h*X_DH+d]*WVf[j*X_D+h*X_DH+d];   // MUL (bf16)
             }
             gp[j]=s;
         AB_GVD: for(int d=0;d<X_DH;d++){
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 gV[j*X_D+h*X_DH+d]+=P(p[j]*gATTN[i*X_D+h*X_DH+d]);   // MUL
             }
         }
@@ -736,7 +742,7 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
             // II=4 = ceil(X_DH(32)/8): cycles the 8-wide inner gQ/gK scatter needs -> achievable, fast synth.
             float gs=P(p[j]*(gp[j]-ex))*ascale;                                                          // softmax Jacobian
         AB_JACD: for(int d=0;d<X_DH;d++){
-#pragma HLS UNROLL factor=2  // was 8: cut 4x to relieve SLR congestion (79%->~40% LUT) -> close timing @250MHz
+#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
                 gQ[i*X_D+h*X_DH+d]+=gs*WKf[j*X_D+h*X_DH+d]; gK[j*X_D+h*X_DH+d]+=gs*WQf[i*X_D+h*X_DH+d];
             }
         }
@@ -761,6 +767,24 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
     bstore_f(buffer, MP_DG_GQ, gQ, X_SEQ*X_D);  bstore_f(buffer, MP_DG_GK, gK, X_SEQ*X_D);
     bstore_f(buffer, MP_DG_GV, gV, X_SEQ*X_D);
 #endif
+    // (4b) GRADIENT ACCUMULATION (effective batch = ACCUM): fold this sub-batch's matmul-weight grads into the
+    //      persistent DDR accumulators. Zero on the first sub-batch (GZERO), add otherwise; gWQ..gWDN then hold the
+    //      running sum, so the dyadic-Adam below (only on the last sub-batch, DO_UP) steps on the accumulated grad.
+    {
+        static float aB[X_FFN*X_D];
+        if (!GZERO) {
+            bload_f(buffer, MP_GACC_WQ,  aB, X_D*X_D);   for(int i=0;i<X_D*X_D;i++)   gWQ[i]+=aB[i];
+            bload_f(buffer, MP_GACC_WK,  aB, X_D*X_D);   for(int i=0;i<X_D*X_D;i++)   gWK[i]+=aB[i];
+            bload_f(buffer, MP_GACC_WV,  aB, X_D*X_D);   for(int i=0;i<X_D*X_D;i++)   gWV[i]+=aB[i];
+            bload_f(buffer, MP_GACC_WO,  aB, X_D*X_D);   for(int i=0;i<X_D*X_D;i++)   gWO[i]+=aB[i];
+            bload_f(buffer, MP_GACC_WUP, aB, X_FFN*X_D); for(int i=0;i<X_FFN*X_D;i++) gWUP[i]+=aB[i];
+            bload_f(buffer, MP_GACC_WDN, aB, X_D*X_FFN); for(int i=0;i<X_D*X_FFN;i++) gWDN[i]+=aB[i];
+        }
+        bstore_f(buffer, MP_GACC_WQ,  gWQ,  X_D*X_D);   bstore_f(buffer, MP_GACC_WK,  gWK,  X_D*X_D);
+        bstore_f(buffer, MP_GACC_WV,  gWV,  X_D*X_D);   bstore_f(buffer, MP_GACC_WO,  gWO,  X_D*X_D);
+        bstore_f(buffer, MP_GACC_WUP, gWUP, X_FFN*X_D); bstore_f(buffer, MP_GACC_WDN, gWDN, X_D*X_FFN);
+    }
+
     // (5) dyadic-Adam on the float master (matmul weights; LN gammas/betas frozen)
     if (DO_UP) {
         static float mB[X_FFN*X_D], vB[X_FFN*X_D];
@@ -778,6 +802,11 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
         static float gE[X_VOCAB*X_D], gPo[X_SEQ*X_D]; for(int i=0;i<X_VOCAB*X_D;i++) gE[i]=0; for(int i=0;i<X_SEQ*X_D;i++) gPo[i]=0;
         for(int t=0;t<X_SEQ;t++){ int v=tok[t]; if(v<0)v=0; if(v>=X_VOCAB)v=X_VOCAB-1;
             for(int d=0;d<X_D;d++){ gE[v*X_D+d]+=gR[t*X_D+d]; gPo[t*X_D+d]+=gR[t*X_D+d]; } }
+        // gradient accumulation (effective batch = ACCUM): fold gE/gPo into their DDR accumulators
+        { static float aE[X_VOCAB*X_D];
+          if (!GZERO) { bload_f(buffer, MP_GACC_EMB, aE, X_VOCAB*X_D); for(int i=0;i<X_VOCAB*X_D;i++) gE[i]+=aE[i];
+                        bload_f(buffer, MP_GACC_POS, aE, X_SEQ*X_D);   for(int i=0;i<X_SEQ*X_D;i++)   gPo[i]+=aE[i]; }
+          bstore_f(buffer, MP_GACC_EMB, gE, X_VOCAB*X_D); bstore_f(buffer, MP_GACC_POS, gPo, X_SEQ*X_D); }
         if (DO_UP) {
             static float FEMB[X_VOCAB*X_D], FPOS[X_SEQ*X_D]; bload_f(buffer, MP_FEMB, FEMB, X_VOCAB*X_D); bload_f(buffer, MP_FPOS, FPOS, X_SEQ*X_D);
             static float mE[X_VOCAB*X_D], vE[X_VOCAB*X_D], mPo[X_SEQ*X_D], vPo[X_SEQ*X_D];
