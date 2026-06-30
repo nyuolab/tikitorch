@@ -27,7 +27,7 @@ class ThreadLink(NeighborLink):
     """A single stage's endpoint, backed by Python queues shared with its neighbours."""
 
     def __init__(self, stage, num_stages, fq_in, fq_out, bq_in, bq_out,
-                 transport=None, msg_bytes=None, double_buffer=False):
+                 transport=None, msg_bytes=None, double_buffer=False, quantize=None):
         super().__init__(stage, num_stages)
         self._fq_in = fq_in     # activations into THIS stage (from l-1 / host)
         self._fq_out = fq_out   # activations out to l+1            (None on last)
@@ -35,6 +35,9 @@ class ThreadLink(NeighborLink):
         self._bq_out = bq_out   # errors out to l-1                 (None on first)
         self._transport = transport   # optional cost.TransportProfile -> models comms time
         self._msg_bytes = msg_bytes   # model a realistic message size (else the array's nbytes)
+        # quantize: a callable applied to each neighbour message before it is sent — models the
+        # silicon's lossy inter-chip encoding (e.g. the int16 error rescale). None = exact (float).
+        self._quantize = quantize
         # double-buffering: the stage posts to an outbox and keeps computing while a per-link
         # FIFO transport thread carries the message -> comms overlaps the NEXT compute (rate
         # -> 1/max(compute,comms) instead of 1/(compute+comms)). FIFO = one thread per
@@ -79,6 +82,8 @@ class ThreadLink(NeighborLink):
     def send_forward(self, tag, act):
         if self._fq_out is None:                       # last stage: nothing downstream
             return
+        if self._quantize is not None:
+            act = self._quantize(act)
         self._account_down(act)
         if self._double_buffer:
             self._fwd_outbox.put((tag, act))           # returns immediately -> overlap
@@ -97,6 +102,8 @@ class ThreadLink(NeighborLink):
     def send_backward(self, tag, err):
         if self._bq_out is None:                       # first stage: nothing upstream
             return
+        if self._quantize is not None:
+            err = self._quantize(err)
         self._account_up(err)
         if self._double_buffer:
             self._bwd_outbox.put((tag, err))           # returns immediately -> overlap
@@ -124,7 +131,7 @@ class ThreadLink(NeighborLink):
 
 
 def make_thread_links(num_stages: int, maxsize: int = 0, transport=None,
-                      msg_bytes=None, double_buffer=False) -> list[ThreadLink]:
+                      msg_bytes=None, double_buffer=False, quantize=None) -> list[ThreadLink]:
     """Build a wired chain of ``num_stages`` ThreadLinks sharing the right queues.
 
     ``maxsize`` bounds each queue (0 = unbounded). A small bound (e.g. the
@@ -144,5 +151,5 @@ def make_thread_links(num_stages: int, maxsize: int = 0, transport=None,
         bq_out = bq[l - 1] if l - 1 >= 0 else None
         links.append(ThreadLink(l, num_stages, fq_in, fq_out, bq_in, bq_out,
                                 transport=transport, msg_bytes=msg_bytes,
-                                double_buffer=double_buffer))
+                                double_buffer=double_buffer, quantize=quantize))
     return links
