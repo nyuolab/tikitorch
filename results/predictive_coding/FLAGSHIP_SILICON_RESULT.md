@@ -78,18 +78,29 @@ BF16 backward at 250 MHz by congestion alone (the penalty is structural).
 - A mild, systematic shortfall (4.0 vs 3.65, not garbage/NaN) is the signature of **precision loss**,
   not a catastrophic CDC data bug.
 
-**Leading hypothesis:** the **distributed int16 inter-chip error message**. The sharding rescales
-the backward error to int16 between chips — an approximation the single-process golden does not
-have. Plausibly the deep chips receive degraded gradients → the plateau. (Secondary: the
-attention; acc 0.16 sits near the documented integer-attention-softmax ceiling 0.153.)
+**Hypotheses tested → REFUTED:**
+- *int16/bf16 inter-chip MESSAGE precision* — REFUTED. `scripts/pc_fabric_msg_precision.py` trains
+  the same multi-block char-LM varying ONLY the inter-chip message encoding (exact-float vs
+  int16-per-tensor vs bf16): **Δ = 0.0000 bpb**. Message quantization is benign.
+- *coarse attention softmax* — REFUTED by inspection: the mp kernel forward is the **precise
+  mult-free exp + warm dot attention**, not the exp2-LUT ceiling.
+- *the BF16 backward / dyadic-Adam* — NOT the difference: the kernel's backward + optimizer are
+  **csim-bit-exact to the bf16 golden** (transcribed from it), and that golden reaches 3.07.
 
-**Confound to clean up:** the CPU reference compared was **single-block**; the silicon is **NBLK=3**.
+**What's actually left (the real differences silicon-vs-golden):**
+1. The silicon trains on the **INT-DEPLOY forward** (g_forward: int16 acts, dyadic weights,
+   byte-identical to the deploy kernel) — STE-passed in the backward — while the bf16 golden uses
+   the **FLOAT-master forward**. The forward the gradients are computed against is more quantized.
+2. The **NBLK=3 distribution** (the residual-stream handoff across chips), vs the single-process golden.
+The plateau is most consistent with the **cumulative** documented residual gaps on the fully-quantized
+distributed datapath (`mult-free fwd + FLOAT bwd → 2.016 bpb`; adding the int-deploy-forward training
++ distribution stacks toward ~4.0), **not a single bug** — the kernel computes the intended thing.
 
-**The decisive next experiment (cheap, CPU):** a **distributed-faithful BF16 NBLK=3 golden** that
-models the int16 inter-chip messages. If it plateaus at ~4.0 → the message precision is confirmed
-(fix = wider / better-scaled inter-chip message, a driver/kernel change). If it reaches ~3.3 → a
-true on-chip CDC issue → re-run silicon with one-step dumps. **The `tikitorch.fabric` runtime
-already models the distributed regime, so it is the natural host for this experiment.**
+**The decisive next experiment:** an ablation on the (single-block) bf16 golden that swaps the
+FLOAT-master forward → the INT-DEPLOY g_forward (the silicon's exact fwd) while keeping the BF16-STE
+backward. If that alone plateaus toward ~4.0 → the int-deploy-forward-for-training is the dominant
+residual (fix = train on a less-quantized forward / better STE / finer act bits). Otherwise add the
+NBLK=3 handoff. (`tikitorch.fabric` hosts the distribution side.)
 
 ---
 
