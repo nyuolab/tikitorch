@@ -4,7 +4,7 @@
 #   + S1_ATTN_HARD=1 (argmax-gather) + S1_HEAD_MODE=1 (dyadic-GEMM head) + S1_POS_EMBED=1 + S1_FWD_ONLY=1.
 # Checks: DSP_MULT must be 0 (all shift-add), fit (<= 1 SLR ideally), timing met @ 4.0ns.
 # D=128 RISK: the D=128 monolithic TRAINER missed timing before, but this is FWD-ONLY (much smaller).
-set proj_dir forge_train_step_s1_kv2_proj
+set proj_dir forge_train_step_s1_proj
 set top      forge_train_step_s1
 set target_part "xcvu47p-fsvh2892-2L-e"
 set target_period_ns 4.0
