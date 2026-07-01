@@ -28,6 +28,43 @@ It is intentionally PyTorch-shaped: `import tikitorch as tt` and you get
 
 ---
 
+## ★ A tropical LLM generating on real FPGA silicon
+
+The end-to-end payoff: a **strictly multiplier-free** (DSP=0, all shift-add) tropical
+transformer character-LM, trained through a bit-exact integer mirror of the kernel, running
+**inference on a real AWS F2 FPGA** — generating recognizable Shakespeare and measuring
+**held-out 2.42 bits/char on-fabric, bit-exact to the CPU reference**.
+
+Generated on silicon (AGFI `agfi-082aa26aac7495798`, f2.6xlarge, D=128 / 4 layers, 62.5 MHz):
+
+```text
+goood let your dealy half canatst torsul in him falt nor hath warh
+worst indo your kho? romeos! gone!
+for bore time franidius tits isue: and men,
+and the field had fagante-siciuliath, old unto eventy
+...set upidece i grantle, mercrtaine, '3 him own to the glace.
+-warpen holsd did his done argloucester's yen ludinak-sewe...
+```
+
+Character-name-colon play format, real words, and actual names emerging (*romeos*,
+*gloucester's*) — from a model that never executes a single multiply.
+
+| model | bits/char ↓ | multiplies |
+|---|---|---|
+| bigram baseline | 3.47 | — |
+| comparable float **softmax** char-transformer (ref) | ~2.4–2.6 | many |
+| **this — tropical, measured on F2 silicon** | **2.42** | **zero (DSP=0)** |
+
+The multiplier-free model **beats the bigram baseline by ~1.0 bpc and matches a comparable
+float softmax transformer — with zero multiplies, on real silicon.** The recipe (all DSP=0):
+4-term dyadic-CSD (±2^k shift-add) weights + per-matrix pow2 accumulator rescale + a 4-term
+CSD-reciprocal LayerNorm + int16 activations + L1 argmax-gather attention, trained via QAT
+through a bit-exact integer sim of the kernel (float QAT is insufficient — the argmax attention
+is discontinuous, so a ±1 flips a gather). Full writeup with the on-fabric log:
+[`results/lm_shakespeare/S1_KV2_ON_SILICON.md`](results/lm_shakespeare/S1_KV2_ON_SILICON.md).
+
+---
+
 ## Install
 
 ```bash
