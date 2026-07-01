@@ -308,14 +308,19 @@ BL_T: for (int t = 0; t < M; t++) {
 }
 static void bf_matmul(const float *x, const float *Wf, float *y, int M, int I, int O) {
 #pragma HLS INLINE off
+    // HOIST the dyadic weight out of the row-redundant inner MAC: dyad(W) depends only on (o,i), so precompute
+    // it ONCE (O*I calls) instead of recomputing per row t (M*O*I). At SEQ=64 that is 64x fewer log2/round/ldexp
+    // AND takes the transcendental chain off the MAC critical path. Bit-identical (same value, computed once).
+    static float Wd[X_FFN*X_D];
+    BM_D: for (int j = 0; j < O*I; j++) {
+#pragma HLS PIPELINE II=1
+                Wd[j] = bf_dyad_f(Wf[j]); }
 BM_T: for (int t = 0; t < M; t++)
     BM_O: for (int o = 0; o < O; o++) {
-            // NOTE: outer PIPELINE removed — inner trip count I is call-variable (X_D=64 or X_FFN=256),
-            // so a single fixed achievable II doesn't fit both. HLS schedules the 8-wide inner naturally.
             float acc = 0;
         BM_I: for (int i = 0; i < I; i++) {
-#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
-                acc += bf_dyad_f(Wf[o*I+i]) * x[t*I+i];     // dyad(master) * x  (forward-for-bwd, wide)
+#pragma HLS UNROLL factor=8
+                acc += Wd[o*I+i] * x[t*I+i];     // dyad(master) * x  (forward-for-bwd, wide) — dyad hoisted
             }
             y[t*O+o] = acc;
         }
@@ -326,14 +331,17 @@ BM_T: for (int t = 0; t < M; t++)
 static void bf_linear_bwd(const float *gy, const float *Wf, const float *x,
                           float *dx, float *dW, int M, int I, int O) {
 #pragma HLS INLINE off
+    // HOIST dyad(W) out of the row-redundant dx MAC (see bf_matmul): precompute once (O*I) not per row (M*O*I).
+    static float Wd[X_FFN*X_D];
+    LR_D: for (int j = 0; j < O*I; j++) {
+#pragma HLS PIPELINE II=1
+                Wd[j] = bf_dyad_f(Wf[j]); }
 LR_T: for (int t = 0; t < M; t++)
     LR_I: for (int i = 0; i < I; i++) {
-            // NOTE: outer PIPELINE removed — inner trip count O is call-variable (X_D / X_FFN / X_VOCAB),
-            // so a single fixed achievable II doesn't fit all callers. HLS schedules the 8-wide inner naturally.
             float acc = 0;
         LR_O: for (int o = 0; o < O; o++) {
-#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
-                acc += bf_dyad_f(Wf[o*I+i]) * gy[t*O+o];
+#pragma HLS UNROLL factor=8
+                acc += Wd[o*I+i] * gy[t*O+o];     // dyad hoisted
             }
             dx[t*I+i] = P(acc);
         }
