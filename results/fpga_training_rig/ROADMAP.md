@@ -5,6 +5,21 @@ The culmination of the multiplier-free program: train a transformer LM **entirel
 F2 assets; numbers are grounded with arithmetic, not hype. (Design only — F2 builds are run by the
 user, not the agent.)
 
+> ## ★ MILESTONE ACHIEVED (2026-07-01): a coherent tropical LM generating on real F2 silicon
+> A strictly multiplier-free (DSP=0, all shift-add) tropical transformer character-LM — trained via
+> kernel-faithful QAT — ran **inference on a real f2.6xlarge FPGA** and generated recognizable
+> Shakespeare, with **held-out bpc = 2.4230 measured on-fabric, BIT-EXACT to the g++ reference and
+> beating bigram (3.47) by ~1.0**. Weights staged into on-card DDR with 0 readback mismatches; the
+> whole forward is zero multiplies. Model D=128/L4, AGFI `agfi-082aa26aac7495798`, kernel clk 62.5 MHz.
+> This realizes the "small tropical LLM on F2, coherent text" north star (inference/deploy side).
+> The recipe (all DSP=0): **4-term dyadic-CSD weights + per-matrix pow2 rescale + a 4-term
+> CSD-reciprocal LayerNorm**, trained through a *bit-exact integer sim mirror* of the kernel (float
+> QAT is insufficient — argmax attention is discontinuous). Full writeup:
+> [`../lm_shakespeare/S1_KV2_ON_SILICON.md`](../lm_shakespeare/S1_KV2_ON_SILICON.md); sample:
+> [`../lm_shakespeare/onfabric_gen/s1_kv2_f2_gen.txt`](../lm_shakespeare/onfabric_gen/s1_kv2_f2_gen.txt).
+> Honest scope: this is the **inference/deploy** proof (coherence + bit-exactness on silicon), NOT
+> yet the full on-fabric *training* flagship (A/B below) — a small model, 62.5 MHz, not tok/s-tuned.
+
 ## The honest flagship (two parts)
 
 A from-scratch GPT-2-124M pretrain on one F2 is **years** of wall-clock (see below) — so the
