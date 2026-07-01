@@ -29,7 +29,7 @@ cmd_build(){
 shutdown -h +330 "tiki-mpafi deadline" || true
 exec > /var/log/tiki-mpafi.log 2>&1
 set -x
-S3_SRC="${S3SRC}"; S3_RESULTS="${S3RES}"; CLOCK_A="${CLOCK_A}"
+S3_SRC="${S3SRC}"; S3_RESULTS="${S3RES}"; CLOCK_A="${CLOCK_A}"; CSYNTH_ONLY="${CSYNTH_ONLY}"
 CL="cl_forge_pc_xformer"; PKG_REL="tikitorch/hardware/hdk/cl_forge_pc_xformer"
 KERNEL_TCL="synth_pc_xformer_mp_block.tcl"; KERNEL_PROJ="forge_pc_xformer_mp_block_proj"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-mpafi.log "\$S3_RESULTS/build.log" --only-show-errors || true; }
@@ -75,6 +75,14 @@ VHLS="\$(command -v vitis_hls || ls /opt/Xilinx/Vitis_HLS/*/bin/vitis_hls 2>/dev
 echo "=== HLS \$KERNEL_TCL START \$(date -u) ==="; "\$VHLS" -f "\$KERNEL_TCL" 2>&1 | tail -30
 KVDIR="/opt/tiki/tikitorch/hardware/hls/forge_kernels/\$KERNEL_PROJ/solution1/syn/verilog"
 ls -la "\$KVDIR" | head; ls "\$KVDIR" | wc -l; up
+# ---- csynth per-loop latency report(s) — concatenate EVERY module report (the heavy work is in INLINE-off
+#      sub-functions bf_matmul/bf_linear_bwd/... each with its own report) so we can localize the 355ms loop ----
+: > /tmp/csynth.rpt
+for r in \$(find /opt/tiki/tikitorch/hardware/hls/forge_kernels/\$KERNEL_PROJ -name '*_csynth.rpt' 2>/dev/null | sort); do
+  echo "===================== \$r =====================" >> /tmp/csynth.rpt; cat "\$r" >> /tmp/csynth.rpt; echo >> /tmp/csynth.rpt; done
+echo "=== CSYNTH reports concatenated: \$(grep -c '=====================' /tmp/csynth.rpt) modules, \$(wc -l </tmp/csynth.rpt) lines ==="
+aws s3 cp /tmp/csynth.rpt "\$S3_RESULTS/csynth.rpt" --only-show-errors || true; up
+if [ -n "\$CSYNTH_ONLY" ]; then echo "=== CSYNTH_ONLY: skipping CL/P&R ==="; echo "csynth-only \$(date -u)" | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true; sync; shutdown -h now; exit 0; fi
 # 2. scaffold CL from HDK template
 TPL=""
 for cand in CL_TEMPLATE cl_template cl_dram_hbm_dma cl_dram_dma cl_mem_perf; do
