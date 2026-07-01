@@ -317,12 +317,18 @@ static void bf_matmul(const float *x, const float *Wf, float *y, int M, int I, i
                 Wd[j] = bf_dyad_f(Wf[j]); }
 BM_T: for (int t = 0; t < M; t++)
     BM_O: for (int o = 0; o < O; o++) {
-            float acc = 0;
+            // partial-sum reduction: 16 INDEPENDENT lanes break the loop-carried fp-add recurrence so the inner
+            // reduction pipelines at II=1 (vs II=80 when 8 unrolled adds chain into one acc). Tree-reduce at the end.
+            float ps[16];
+#pragma HLS ARRAY_PARTITION variable=ps complete dim=1
+            for (int k=0;k<16;k++) ps[k]=0;
         BM_I: for (int i = 0; i < I; i++) {
-#pragma HLS UNROLL factor=8
-                acc += Wd[o*I+i] * x[t*I+i];     // dyad(master) * x  (forward-for-bwd, wide) — dyad hoisted
+#pragma HLS PIPELINE II=1
+                ps[i&15] += Wd[o*I+i] * x[t*I+i];     // dyad(master) * x (wide) — dyad hoisted, lanes independent
             }
-            y[t*O+o] = acc;
+            float a0=(ps[0]+ps[1])+(ps[2]+ps[3]),   a1=(ps[4]+ps[5])+(ps[6]+ps[7]);
+            float a2=(ps[8]+ps[9])+(ps[10]+ps[11]), a3=(ps[12]+ps[13])+(ps[14]+ps[15]);
+            y[t*O+o] = (a0+a1)+(a2+a3);
         }
 }
 
@@ -338,23 +344,31 @@ static void bf_linear_bwd(const float *gy, const float *Wf, const float *x,
                 Wd[j] = bf_dyad_f(Wf[j]); }
 LR_T: for (int t = 0; t < M; t++)
     LR_I: for (int i = 0; i < I; i++) {
-            float acc = 0;
+            // partial-sum lanes -> II=1 reduction (was II=80 from 8 chained fp-adds); tree-reduce at the end
+            float ps[16];
+#pragma HLS ARRAY_PARTITION variable=ps complete dim=1
+            for (int k=0;k<16;k++) ps[k]=0;
         LR_O: for (int o = 0; o < O; o++) {
-#pragma HLS UNROLL factor=8
-                acc += Wd[o*I+i] * gy[t*O+o];     // dyad hoisted
+#pragma HLS PIPELINE II=1
+                ps[o&15] += Wd[o*I+i] * gy[t*O+o];     // dyad hoisted, lanes independent
             }
-            dx[t*I+i] = P(acc);
+            float a0=(ps[0]+ps[1])+(ps[2]+ps[3]),   a1=(ps[4]+ps[5])+(ps[6]+ps[7]);
+            float a2=(ps[8]+ps[9])+(ps[10]+ps[11]), a3=(ps[12]+ps[13])+(ps[14]+ps[15]);
+            dx[t*I+i] = P((a0+a1)+(a2+a3));
         }
 WG_O: for (int o = 0; o < O; o++)
     WG_I: for (int i = 0; i < I; i++) {
-            // NOTE: outer PIPELINE removed — inner trip count M is call-variable (X_SEQ here, but the
-            // function is shared); HLS schedules the 8-wide inner naturally. Inner UNROLL factor=8 kept.
-            float acc = 0;
+            // partial-sum lanes -> II=1 wgrad reduction (was II=80)
+            float ps[16];
+#pragma HLS ARRAY_PARTITION variable=ps complete dim=1
+            for (int k=0;k<16;k++) ps[k]=0;
         WG_T: for (int t = 0; t < M; t++) {
-#pragma HLS UNROLL factor=8  // restored from 2: the 150MHz CDC has the timing margin back -> ~4x faster kick
-                acc += gy[t*O+o] * x[t*I+i];
+#pragma HLS PIPELINE II=1
+                ps[t&15] += gy[t*O+o] * x[t*I+i];
             }
-            dW[o*I+i] += P(acc);
+            { float a0=(ps[0]+ps[1])+(ps[2]+ps[3]),   a1=(ps[4]+ps[5])+(ps[6]+ps[7]);
+              float a2=(ps[8]+ps[9])+(ps[10]+ps[11]), a3=(ps[12]+ps[13])+(ps[14]+ps[15]);
+              dW[o*I+i] += P((a0+a1)+(a2+a3)); }
         }
 }
 // LN backward EXACT to torch autograd of FDyadLN: s is stop-grad (round/floor block it) -> only mean coupling.
