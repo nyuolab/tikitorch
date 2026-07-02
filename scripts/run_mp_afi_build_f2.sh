@@ -29,7 +29,7 @@ cmd_build(){
 shutdown -h +330 "tiki-mpafi deadline" || true
 exec > /var/log/tiki-mpafi.log 2>&1
 set -x
-S3_SRC="${S3SRC}"; S3_RESULTS="${S3RES}"; CLOCK_A="${CLOCK_A}"; CSYNTH_ONLY="${CSYNTH_ONLY}"
+S3_SRC="${S3SRC}"; S3_RESULTS="${S3RES}"; CLOCK_A="${CLOCK_A}"; CSYNTH_ONLY="${CSYNTH_ONLY:-}"
 CL="cl_forge_pc_xformer"; PKG_REL="tikitorch/hardware/hdk/cl_forge_pc_xformer"
 KERNEL_TCL="synth_pc_xformer_mp_block.tcl"; KERNEL_PROJ="forge_pc_xformer_mp_block_proj"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-mpafi.log "\$S3_RESULTS/build.log" --only-show-errors || true; }
