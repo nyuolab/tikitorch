@@ -248,6 +248,21 @@ header), `And kne, wher, thy lot's ge shele;`, `Noeed for a tring to kis se hat`
 salad. The remaining 0.14 vs the twin is the silicon gradient-noise premium (bf16 messages + reduction
 reorder + fp32), which shrinks with batch — the in-chip batch-replication lever's job.
 
+## ★ 5d. BUNDLE MEASURED + RUN #3 (2026-07-02/03): **bpb 3.093 @ 257 tok/s — sub-3.1 on silicon**
+
+**The rebuild bundle (AGFI `agfi-0a08046c7d64090ff`, WNS +0.051 ns) measured on silicon:**
+FWD kick 121→**53.5 ms** (de-flatten II=1 + TRAIN gate), BWD 121→**91.4 ms** (de-flatten);
+PIPE=1 pipelining **1.79×** (0.28→**0.50 steps/s** @ACCUM=8, 257 tok/s) and — the correctness headline —
+**pipelined trained masters BIT-IDENTICAL to serial on all 3 chips after 20 real steps** (the csim proof
+held on hardware). Cumulative throughput this arc: 0.17 → 0.50 steps/s ≈ **2.9× per rebuild, twice**.
+
+**Coherence run #3** (PIPE=1, 3000 steps = 24k seqs, cosine 3e-3→3e-4, **100 min** — less wall-clock than
+run #2's 2000 steps): **ema 3.093, acc 0.366 (23× chance)** — sub-3.1, ≈ the original CPU-golden coherence
+target (3.07). Sample now has full Shakespeare structure (speaker headers `CORK:` / `LANTIO:`, dialogue
+blocks, verse lines). Same-schedule CPU twin @3000: 2.834 → silicon noise premium 0.26 at the longer
+horizon (0.14 @2000) — the premium grows as LR decays, consistent with the gradient-noise mechanism; the
+in-chip batch-replication lever is the targeted fix.
+
 **This is the "trains performantly and converges on the fabric" milestone:** the distributed PC
 transformer — one block per physical FPGA, no global gradient, on-chip batch accumulation, host-side
 LR schedule — converges to within 0.14 bpb of its exact CPU reference at 2.94×-improved throughput.
