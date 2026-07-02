@@ -31,7 +31,8 @@ static void put_f(int32_t*buf,int off,const double*src,int n){ for(int i=0;i<n;i
 static void put_i(int32_t*buf,int off,const int*src,int n){ for(int i=0;i<n;i++) buf[off+i]=src[i]; }
 static void read_f(const int32_t*buf,int off,double*dst,int n){ for(int i=0;i<n;i++) dst[i]=(double)i2f_(buf[off+i]); }
 static void setcfg(int32_t*buf,int phase,int role,int do_up,int lrbits,int gzero=1){
-    buf[XO_CFG+0]=phase; buf[XO_CFG+1]=role; buf[XO_CFG+2]=do_up; buf[XO_CFG+3]=lrbits; buf[XO_CFG+4]=gzero; }
+    buf[XO_CFG+0]=phase; buf[XO_CFG+1]=role; buf[XO_CFG+2]=do_up; buf[XO_CFG+3]=lrbits; buf[XO_CFG+4]=gzero;
+    buf[XO_CFG+5]=getenv("MPTRAIN")?atoi(getenv("MPTRAIN")):0; }   // TRAIN lane: 1 skips the deploy-int fwd
 static void stage_master(int32_t*buf, const BFM&m){
     put_f(buf,MP_FWQ,m.WQ,X_D*X_D); put_f(buf,MP_FWK,m.WK,X_D*X_D); put_f(buf,MP_FWV,m.WV,X_D*X_D); put_f(buf,MP_FWO,m.WO,X_D*X_D);
     put_f(buf,MP_FWUP,m.WUP,X_FFN*X_D); put_f(buf,MP_FWDN,m.WDN,X_D*X_FFN);

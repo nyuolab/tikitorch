@@ -53,9 +53,19 @@ static inline float   i2f(int32_t i){ union{float f; int32_t i;} c; c.i=i; retur
 // ---- burst-stage helpers (identical to the int shard's stage/kick/readw) ----
 static void stage(int l,int off,int n){ for(long o=off;o<off+n;o+=262144){ long k=(off+n-o<262144)?(off+n-o):262144;
     fpga_pci_write_burst(bar4[l],(uint64_t)o*4,(uint32_t*)(hbuf[l]+o),(uint64_t)k);} }
+// per-phase kick timing (bundle item 0): attribute wall-clock per chip x phase — fwd vs bwd kernel-exec ms
+// (kick() tight-spins AP_DONE, so the measured span IS kernel execution). g_phase set by the sweep loops.
+static int g_phase = 0;                       // 0=fwd 1=bwd (index into the accumulators)
+static double g_kick_s[2][8]; static long g_kick_n[2][8];
 static void kick(int l){ fpga_pci_poke(bar0[l],R_BUF0,0); fpga_pci_poke(bar0[l],R_BUF1,0);
     double t0=now_s(); fpga_pci_poke(bar0[l],R_AP_CTRL,AP_START); uint32_t c=0;
-    while(now_s()-t0<20.0){ fpga_pci_peek(bar0[l],R_AP_CTRL,&c); if(c&AP_DONE)return; } fprintf(stderr,"KICK HUNG slot %d\n",l); exit(6); }
+    while(now_s()-t0<20.0){ fpga_pci_peek(bar0[l],R_AP_CTRL,&c);
+        if(c&AP_DONE){ g_kick_s[g_phase][l]+=now_s()-t0; g_kick_n[g_phase][l]++; return; } }
+    fprintf(stderr,"KICK HUNG slot %d\n",l); exit(6); }
+static void kick_report(){
+    for(int p=0;p<2;p++) for(int l=0;l<8;l++) if(g_kick_n[p][l])
+        printf("[kicktime] %s chip %d: %.1f ms/kick (n=%ld)\n", p?"BWD":"FWD", l, 1e3*g_kick_s[p][l]/g_kick_n[p][l], g_kick_n[p][l]);
+    fflush(stdout); }
 // BURSTED readback (Track-B Stage-0): one mmap'd memcpy from the BAR4 read window instead of n
 // word-at-a-time fpga_pci_peek calls. The per-word peek (function-call + PCIe round-trip per 4 bytes)
 // was the 54-61%-of-wall-clock host-relay bottleneck; the write half (stage/write_burst) was already
@@ -84,9 +94,12 @@ static int32_t g_ihmsg[X_SEQ*X_D];
 static inline int32_t* ihmsg(){ return g_ihmsg; }
 
 // CFG word lanes: [phase, role, do_update, lrbits]  (lane 3 = fixed-point lr code, lr = lrbits*2^-20)
-static void setcfg(int l,int phase,int role,int doupd,int lrbits,int gzero=0){
+static int g_trainfast=-1;   // TRAINFAST=1 (default): kernel skips the deploy-int forward + driver skips the int relay
+static inline int trainfast(){ if(g_trainfast<0){ const char*e=getenv("TRAINFAST"); g_trainfast=e?atoi(e):1; } return g_trainfast; }
+static void setcfg(int l,int phase,int role,int doupd,int lrbits,int gzero=0,int train=0){
     hbuf[l][XO_CFG+0]=phase; hbuf[l][XO_CFG+1]=role; hbuf[l][XO_CFG+2]=doupd; hbuf[l][XO_CFG+3]=lrbits;
     hbuf[l][XO_CFG+4]=gzero;   // ACCUM>1: 1 on the first sub-batch -> kernel zeroes the grad accumulators
+    hbuf[l][XO_CFG+5]=train;   // 1 = skip the deploy-int forward (training kicks; ~8ms/fwd-kick saved)
     stage(l,XO_CFG,X_WL); }
 static int role_of(int l){ return (l==0)?X_RL_INPUT : (l==L-1)?X_RL_OUT : X_RL_HID; }
 
@@ -263,8 +276,9 @@ int main(int argc,char**argv){
             int do_update = (k==ACCUM-1) ? 1 : 0;
 
             // ===================== FORWARD SWEEP: chip 0 -> L-1 =====================
+            g_phase=0;
             for(int l=0;l<L;l++){
-                setcfg(l, X_PH_FWD, role_of(l), 0, 0);
+                setcfg(l, X_PH_FWD, role_of(l), 0, 0, 0, trainfast());
                 if(l==0){
                     // INPUT: stage token ids (both the int forward and the wide forward read XO_TOK)
                     for(int t=0;t<X_SEQ;t++) hbuf[0][XO_TOK+t]=data[off+t]; stage(0,XO_TOK,X_SEQ);
@@ -273,18 +287,19 @@ int main(int argc,char**argv){
                     // wide forward reads MP_GRIN as its block input R (kernel line ~535). Also feed the int path's
                     // XO_HIN (the deployed int forward's neighbour hidden-state) — staged from the int HOUT relay.
                     put_f(l, MP_GRIN, hmsg, X_SEQ*X_D);       xchip_msg += (long)X_SEQ*X_D;
-                    memcpy(hbuf[l]+XO_HIN, ihmsg(), 4*X_SEQ*X_D); stage(l,XO_HIN,X_SEQ*X_D);
+                    if(!trainfast()){ memcpy(hbuf[l]+XO_HIN, ihmsg(), 4*X_SEQ*X_D); stage(l,XO_HIN,X_SEQ*X_D); }
                 }
                 if(l==L-1){ for(int t=0;t<X_SEQ;t++) hbuf[l][XO_TGT+t]=data[off+t+1]; stage(l,XO_TGT,X_SEQ); }  // OUTPUT targets
                 kick(l);
                 if(l<L-1){
                     readf(l, MP_GROUT, hmsg, X_SEQ*X_D);      // WIDE down-message: this block's R' -> next chip MP_GRIN
-                    readw(l, XO_HOUT, ihmsg(), X_SEQ*X_D);    // int down-message: this block's int HOUT -> next chip XO_HIN
+                    if(!trainfast()) readw(l, XO_HOUT, ihmsg(), X_SEQ*X_D);   // int down-message (deploy path only)
                     actstat  ("R'(wide)", l, step, hmsg, X_SEQ*X_D);   // probe: wide residual stream across chips
                     actstat_i("HOUT(int)", l, step, ihmsg(), X_SEQ*X_D);
                 }
             }
             // ===================== BACKWARD SWEEP: chip L-1 -> 0 =====================
+            g_phase=1;
             for(int l=L-1;l>=0;l--){
                 setcfg(l, X_PH_BWD, role_of(l), do_update, do_update?lrcode(lr):0, (k==0)?1:0);   // DO_UPDATE -> dyadic-Adam apply; k==0 -> zero grad-accum
                 if(l<L-1){ put_f(l, MP_GRIN, emsg, X_SEQ*X_D); xchip_msg += (long)X_SEQ*X_D; }  // neighbour WIDE error in
@@ -307,11 +322,13 @@ int main(int argc,char**argv){
           if(step%50==0 || step==steps-1)
               printf("[xfmpshard] step %5d  bpb=%.3f bpb_ema=%.3f  acc=%.3f acc_ema=%.3f  lr=%.1e  (%.2f steps/s)\n",
                      step, bp, bpb_ema, ac, acc_ema, lr, (step+1)/(now_s()-t0));
+          if(step%200==0 && step>0) kick_report();
           fflush(stdout);
         }
     }
 
     double wall=now_s()-t0;
+    kick_report();
     printf("\n========== DISTRIBUTED BF16-MP PC TRANSFORMER on %d FPGAs ==========\n", L);
     printf("[throughput] %d steps (ACCUM=%d), %.1fs, %.2f steps/s | %.0f tok/s | final bpb_ema=%.3f acc_ema=%.3f\n",
            steps, ACCUM, wall, steps/wall, steps*(double)X_SEQ*ACCUM/wall, bpb_ema, acc_ema);
@@ -344,7 +361,7 @@ int main(int argc,char**argv){
         unsigned rng=12345;
         for(int s=0;s<NS;s++){
             for(int l=0;l<L;l++){
-                setcfg(l, X_PH_FWD, role_of(l), 0, 0);
+                setcfg(l, X_PH_FWD, role_of(l), 0, 0, 0, trainfast());
                 if(l==0){ for(int t=0;t<X_SEQ;t++) hbuf[0][XO_TOK+t]=ctx[t]; stage(0,XO_TOK,X_SEQ); }
                 else    { put_f(l, MP_GRIN, hmsg, X_SEQ*X_D); memcpy(hbuf[l]+XO_HIN, ihmsg(), 4*X_SEQ*X_D); stage(l,XO_HIN,X_SEQ*X_D); }
                 kick(l);

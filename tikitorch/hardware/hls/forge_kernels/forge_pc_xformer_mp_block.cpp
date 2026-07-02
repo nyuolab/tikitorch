@@ -418,6 +418,8 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
     float LR = (float)LRBITS * hls::ldexp(1.0f, -20);
     int GZERO = (int)(ap_int<32>)cfgw.range(159, 128);   // ACCUM>1: 1 = first sub-batch of a window -> zero the grad
                                                          //   accumulators; else add to them. dyadic-Adam (DO_UP) on the sum.
+    int TRAIN = (int)(ap_int<32>)cfgw.range(191, 160);   // 1 = training kick: SKIP the deploy-int forward (dead weight in
+                                                         //   training; bpb/backward use only the WIDE path). 0 = full/deploy.
 
     // ---- DEPLOY int16 master weights (drive the byte-identical forward) ----
     static data_t WQ[X_D*X_D], WK[X_D*X_D], WV[X_D*X_D], WO[X_D*X_D];
@@ -446,6 +448,8 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
     // =========================================================================================
     if (PHASE == X_PH_FWD) {
         // ---- DEPLOY (int) forward: byte-identical to forge_pc_xformer_block ----
+        // (skipped when TRAIN=1: it feeds neither the wide backward nor the bpb -> ~8 ms/fwd-kick saved)
+        if (!TRAIN) {
         if (ROLE == X_RL_INPUT) {
             static int32_t tok[X_SEQ];
             bload32(buffer, XO_TOK, tok, X_SEQ);
@@ -559,6 +563,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             rescale_band2(RP, HOUT, X_SEQ*X_D, X_ABITS);
             bstore(buffer, XO_HOUT, HOUT, X_SEQ*X_D);
         }
+        }   // !TRAIN (deploy-int forward gate)
 
         // ---- WIDE (float-master) forward-for-backward: fill the MP_* cache the STE backward differentiates ----
         // == bf16 golden bf_forward, on the FLOAT master loaded above. The deployed int forward above is the one
