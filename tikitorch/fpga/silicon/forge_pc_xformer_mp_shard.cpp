@@ -100,7 +100,7 @@ static void setcfg(int l,int phase,int role,int doupd,int lrbits,int gzero=0,int
     hbuf[l][XO_CFG+0]=phase; hbuf[l][XO_CFG+1]=role; hbuf[l][XO_CFG+2]=doupd; hbuf[l][XO_CFG+3]=lrbits;
     hbuf[l][XO_CFG+4]=gzero;   // ACCUM>1: 1 on the first sub-batch -> kernel zeroes the grad accumulators
     hbuf[l][XO_CFG+5]=train;   // 1 = skip the deploy-int forward (training kicks; ~8ms/fwd-kick saved)
-    hbuf[l][XO_CFG+6]=parity;  // cross-sub-batch PIPELINING slot (g&1): which copy of the per-sub-batch wide state
+    hbuf[l][XO_CFG+6]=parity;  // cross-sub-batch PIPELINING slot (g%MP_SLOTS): which copy of the per-sub-batch wide state
     stage(l,XO_CFG,X_WL); }
 static int role_of(int l){ return (l==0)?X_RL_INPUT : (l==L-1)?X_RL_OUT : X_RL_HID; }
 
@@ -114,6 +114,10 @@ static int kick_poll(int l){ uint32_t c=0; fpga_pci_peek(bar0[l],R_AP_CTRL,&c); 
 // cross-sub-batch PIPELINING: env PIPE (default 0 = the existing serial per-sub-batch sweeps, bit-compatible)
 static int g_pipe=-1;
 static inline int pipe_on(){ if(g_pipe<0){ const char*e=getenv("PIPE"); g_pipe=e?atoi(e):0; } return g_pipe; }
+// REBUILD #4: pipeline slot depth S=MP_SLOTS (was 2). DDR slot offset for a per-sub-batch wide/msg region:
+// slot 0 = the base region (offset 0), slots 1..MP_SLOTS-1 = the appended mirrors (stride MP_PAR_SPAN, first at
+// MP_PAR_OFF) — the exact formula the kernel's `po` uses (forge_pc_xformer_mp_block.cpp, cfg lane 6 = slot).
+static inline int slot_po(int slot){ return slot ? (MP_PAR_OFF + (slot-1)*MP_PAR_SPAN) : 0; }
 
 // =====================================================================================================
 // FLOAT-master init — BIT-EXACT to the de-risked golden bf_init (forge_pc_xformer_bf16_golden_block.hpp):
@@ -254,10 +258,10 @@ int main(int argc,char**argv){
     float *hmsg=(float*)malloc(4*X_SEQ*X_D);   // wide down-message (forward): MP_GROUT(l) -> MP_GRIN(l+1)
     float *emsg=(float*)malloc(4*X_SEQ*X_D);   // wide up-message  (backward): MP_GROUT(l) -> MP_GRIN(l-1)
     float *wlg =(float*)malloc(4*X_SEQ*X_VOCAB);  // OUTPUT chip wide logits (for bpb)
-    // PIPE scheduler: 2-DEEP boundary buffers indexed by g&1 (Bug-5) so an in-flight sub-batch g's message can't
-    // be clobbered by the other-parity sub-batch's message; per-step sub-batch offsets (drawn once up-front).
-    float *hmsg2[2]={(float*)malloc(4*X_SEQ*X_D),(float*)malloc(4*X_SEQ*X_D)};
-    float *emsg2[2]={(float*)malloc(4*X_SEQ*X_D),(float*)malloc(4*X_SEQ*X_D)};
+    // PIPE scheduler: MP_SLOTS-DEEP boundary buffers indexed by (g % MP_SLOTS) so an in-flight sub-batch g's
+    // message can't be clobbered by another slot's message; per-step sub-batch offsets (drawn once up-front).
+    float *hmsg2[MP_SLOTS], *emsg2[MP_SLOTS];
+    for(int s=0;s<MP_SLOTS;s++){ hmsg2[s]=(float*)malloc(4*X_SEQ*X_D); emsg2[s]=(float*)malloc(4*X_SEQ*X_D); }
     long  *soff=(long*)malloc(sizeof(long)*(ACCUM>0?ACCUM:1));
     long xchip_msg=0, xchip_weight=0, xchip_grad=0;
     double t0=now_s(); double bpb_ema=-1, acc_ema=-1;
@@ -331,13 +335,13 @@ int main(int argc,char**argv){
             }
         }
       } else {
-        // ============================ PIPELINED (PIPE=1): overlap sub-batches via two parity slots ============================
+        // ==================== PIPELINED (PIPE=1): overlap sub-batches via MP_SLOTS(=8) slots ====================
         // Instead of 2L serial kicks/sub-batch, run a dependency EVENT LOOP over the whole step's 2*L*ACCUM kicks
         // keyed by the GLOBAL sub-batch index g (=k within this step; windows never cross a step -> a barrier at
         // step end structurally satisfies the g%ACCUM==0 window-boundary constraint). A chip runs ONE kick at a
-        // time; it picks any READY op with BACKWARD-FIRST preference. Slot(g)=g&1: two in-flight sub-batches (g,g+1)
-        // never share a slot, so F(g+1) can precede B(g). GACC RMW needs strict ASCENDING bwd order per chip
-        // (monotonic bnext[]); GZERO on g==0, DO_UP on g==ACCUM-1 (structurally the first/last bwd of the window).
+        // time; it picks any READY op with BACKWARD-FIRST preference. Slot(g)=g%MP_SLOTS: up to MP_SLOTS in-flight
+        // sub-batches never share a slot, so F(g+k) (k<MP_SLOTS) can precede B(g). GACC RMW needs strict ASCENDING
+        // bwd order per chip (monotonic bnext[]); GZERO on g==0, DO_UP on g==ACCUM-1 (first/last bwd of the window).
         for(int k=0;k<ACCUM;k++) soff[k] = g_fixedoff>=0 ? g_fixedoff : (long)(rand() % (ntok - X_SEQ - 2));
         last_off = soff[ACCUM-1];
         int fdone[MAXL], bdone[MAXL], fnext[MAXL], bnext[MAXL], busy[MAXL], bph[MAXL], bg[MAXL];
@@ -346,7 +350,7 @@ int main(int argc,char**argv){
         while(ndone<total){
             // (1) reap completions: attribute timing + read this op's outgoing neighbour message into its slot buffer
             for(int l=0;l<L;l++) if(busy[l] && kick_poll(l)){
-                int ph=bph[l], g=bg[l], slot=g&1, po=slot?MP_PAR_OFF:0;
+                int ph=bph[l], g=bg[l], slot=g%MP_SLOTS, po=slot_po(slot);
                 g_kick_s[ph][l]+=now_s()-g_kick_t0[l]; g_kick_n[ph][l]++;
                 if(ph==0){ if(l<L-1){ readf(l, MP_GROUT+po, hmsg2[slot], X_SEQ*X_D); } fdone[l]++; }   // fwd down-msg R'
                 else     { if(l>0)  { readf(l, MP_GROUT+po, emsg2[slot], X_SEQ*X_D); } bdone[l]++; }   // bwd up-msg gR
@@ -357,15 +361,16 @@ int main(int argc,char**argv){
                 int gb=bnext[l];
                 int bwok = (gb<ACCUM) && (fdone[l]>gb) && (l==L-1 || bdone[l+1]>gb);           // B_l(g): F_l(g) & B_{l+1}(g)
                 int gf=fnext[l];
-                int fwok = (gf<ACCUM) && (l==0 || fdone[l-1]>gf) && (gf<2 || bdone[l]>gf-2);   // F_l(g): F_{l-1}(g) & B_l(g-2) slot free
+                // F_l(g): F_{l-1}(g) done AND the slot g%MP_SLOTS is free (its previous occupant B_l(g-MP_SLOTS) done).
+                int fwok = (gf<ACCUM) && (l==0 || fdone[l-1]>gf) && (gf<MP_SLOTS || bdone[l]>gf-MP_SLOTS);
                 if(bwok){
-                    int slot=gb&1, po=slot?MP_PAR_OFF:0;
+                    int slot=gb%MP_SLOTS, po=slot_po(slot);
                     int doup=(gb==ACCUM-1)?1:0, gz=(gb==0)?1:0;
                     setcfg(l, X_PH_BWD, role_of(l), doup, doup?lrcode(lr):0, gz, trainfast(), slot);
                     if(l<L-1){ put_f(l, MP_GRIN+po, emsg2[slot], X_SEQ*X_D); xchip_msg += (long)X_SEQ*X_D; }  // neighbour WIDE error in
                     kick_start(l); busy[l]=1; bph[l]=1; bg[l]=gb; bnext[l]++;
                 } else if(fwok){
-                    int slot=gf&1, po=slot?MP_PAR_OFF:0; long off=soff[gf];
+                    int slot=gf%MP_SLOTS, po=slot_po(slot); long off=soff[gf];
                     setcfg(l, X_PH_FWD, role_of(l), 0, 0, 0, trainfast(), slot);
                     if(l==0){
                         for(int t=0;t<X_SEQ;t++) hbuf[0][MP_TOK+slot*X_SEQ+t]=data[off+t]; stage(0,MP_TOK+slot*X_SEQ,X_SEQ);
@@ -382,8 +387,8 @@ int main(int argc,char**argv){
       }
 
         // ===================== per-step bpb/acc from the OUTPUT chip's WIDE logits (== golden bpb) =====================
-        // slot of the LAST sub-batch (k=ACCUM-1): 0 in serial, (ACCUM-1)&1 in pipe mode.
-        int metric_po = (pipe_on() && (((ACCUM-1)&1))) ? MP_PAR_OFF : 0;
+        // slot of the LAST sub-batch (k=ACCUM-1): 0 in serial, (ACCUM-1)%MP_SLOTS in pipe mode.
+        int metric_po = pipe_on() ? slot_po((ACCUM-1)%MP_SLOTS) : 0;
         readf(L-1, MP_WLG + metric_po, wlg, X_SEQ*X_VOCAB);
         actstat("logits", L-1, step, wlg, X_SEQ*X_VOCAB);   // probe: output-chip wide logits magnitude
         { int c=0; double bits=0; const double L2=log(2.0);

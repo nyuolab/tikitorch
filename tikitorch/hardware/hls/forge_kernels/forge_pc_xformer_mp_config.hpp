@@ -111,30 +111,37 @@ static const int MP_GACC_EMB = MP_GACC_WH  + X_VOCAB*X_D;  // [VOCAB*D]  (INPUT 
 static const int MP_GACC_POS = MP_GACC_EMB + X_VOCAB*X_D;  // [SEQ*D]    (INPUT chip pos)
 static const int MP_GACC_END = MP_GACC_POS + X_SEQ*X_D;
 
-// ---- CROSS-SUB-BATCH PIPELINING: parity (slot-1) copies of the PER-SUB-BATCH volatile state ----------------
-// Two slots (PARITY = cfg lane 6 = 0/1, indexed by the GLOBAL sub-batch index g&1) let sub-batch g+1's FWD run
-// before sub-batch g's BWD without clobbering the wide activation cache / neighbour messages -> ~2x overlap.
-// ONLY the per-sub-batch volatile state is doubled: the WHOLE wide cache MP_W* + MP_GRIN + MP_GROUT, plus new
+// ---- CROSS-SUB-BATCH PIPELINING: MP_SLOTS-deep copies of the PER-SUB-BATCH volatile state ------------------
+// REBUILD #4: pipeline slot depth S=8 (was 2). SLOT = cfg lane 6 = 0..MP_SLOTS-1, indexed by the GLOBAL
+// sub-batch index (g % MP_SLOTS). MP_SLOTS in-flight sub-batches can overlap without clobbering each other's
+// wide activation cache / neighbour messages -> up to ~MP_SLOTS-deep overlap (was 2). ONLY the per-sub-batch
+// volatile state is replicated: the WHOLE wide cache MP_W* + MP_GRIN + MP_GROUT (one span per slot), plus the
 // slot-indexed token/target lanes. The GRAD ACCUMULATORS (MP_GACC_*), the float/int MASTERS (MP_F*/XO_*), and
-// the dyadic-Adam moments (MP_MOM/MP_VAR/MP_MEMB..) are NOT per-sub-batch -> single-slot, never parityed.
+// the dyadic-Adam moments (MP_MOM/MP_VAR/MP_MEMB..) are NOT per-sub-batch -> single-slot, never replicated.
 //
 // [MP_WR .. MP_GROUT_END) is ONE CONTIGUOUS span (verified: every region is a 16-multiple and MP_GRIN's X_AL is
-// a no-op), so a single additive offset MP_PAR_OFF maps any slot-0 wide/msg region to its slot-1 mirror:
-//   slot1_addr(region) = region + MP_PAR_OFF   for region in [MP_WR, MP_GROUT_END).
-static const int MP_PAR_SPAN = (MP_GROUT + X_SEQ*X_D) - MP_WR;   // contiguous parity-covered span (words)
-static const int MP_PAR      = X_AL(MP_GACC_END);                // start of the appended slot-1 mirror block
+// a no-op), so a single additive offset maps any slot-0 wide/msg region to slot k's mirror. Slot 0 IS the base
+// region (offset 0); slots 1..MP_SLOTS-1 are MP_SLOTS-1 mirror spans appended contiguously with stride
+// MP_PAR_SPAN. MP_PAR (== old slot-1 mirror start) stays put so the offset for slot 1 is unchanged:
+//   slot_off(k) = (k==0) ? 0 : (MP_PAR_OFF + (k-1)*MP_PAR_SPAN)     [== MP_PAR + (k-1)*MP_PAR_SPAN - MP_WR]
+static const int MP_SLOTS    = 8;                               // pipeline slot depth (rebuild #4; was 2)
+static const int MP_PAR_SPAN = (MP_GROUT + X_SEQ*X_D) - MP_WR;   // contiguous per-slot wide/msg span (words)
+static const int MP_PAR      = X_AL(MP_GACC_END);                // start of the appended slot>=1 mirror block
 static const int MP_PAR_OFF  = MP_PAR - MP_WR;                   // add to a slot-0 wide/msg offset -> slot-1 copy
-static const int MP_PAR_END  = MP_PAR + MP_PAR_SPAN;
+static const int MP_PAR_END  = MP_PAR + (MP_SLOTS-1)*MP_PAR_SPAN;// end of ALL MP_SLOTS-1 mirrors (stride SPAN)
 // slot-indexed token / target lanes (int32): the WIDE forward embed (chip0), the CE (OUTPUT bwd), and the INPUT
-// bwd embed-scatter read tok/tgt at MP_TOK/MP_TGT + PARITY*X_SEQ. The deploy-int forward keeps reading XO_TOK.
-static const int MP_TOK      = MP_PAR_END;                       // [2*SEQ] tokens (slot g&1 at MP_TOK+PARITY*SEQ)
-static const int MP_TGT      = MP_TOK + 2*X_SEQ;                 // [2*SEQ] targets (slot g&1 at MP_TGT+PARITY*SEQ)
+// bwd embed-scatter read tok/tgt at MP_TOK/MP_TGT + SLOT*X_SEQ. The deploy-int forward keeps reading XO_TOK.
+static const int MP_TOK      = MP_PAR_END;                       // [MP_SLOTS*SEQ] tokens (slot k at MP_TOK+k*SEQ)
+static const int MP_TGT      = MP_TOK + MP_SLOTS*X_SEQ;          // [MP_SLOTS*SEQ] targets (slot k at MP_TGT+k*SEQ)
 
-static const int MP_BUFLEN= X_AL(MP_TGT + 2*X_SEQ);
+static const int MP_BUFLEN= X_AL(MP_TGT + MP_SLOTS*X_SEQ);
 
-// span must be one contiguous block for the single MP_PAR_OFF to be valid (else fall back to per-region offsets)
+// per-slot span must be one contiguous block for the single additive slot offset to be valid
 static_assert(MP_GRIN == MP_WLNFS + X_SEQ, "parity span not contiguous: MP_GRIN has an alignment gap");
 static_assert(MP_PAR_SPAN % X_WL == 0,     "parity span must be 16-word aligned");
 static_assert(MP_PAR_OFF % X_WL == 0,      "MP_PAR_OFF must be 16-word aligned (burst I/O)");
+static_assert(MP_PAR % X_WL == 0,          "mirror block base must be 16-word aligned (per-slot burst I/O)");
+static_assert(MP_PAR_END == MP_TOK,        "slot mirrors must end exactly at MP_TOK (no collision / no gap)");
+static_assert((MP_SLOTS*X_SEQ) % X_WL == 0,"tok/tgt slot lanes must be 16-word aligned");
 
 #endif
