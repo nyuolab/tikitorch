@@ -237,8 +237,18 @@ int main(int argc,char**argv){
     auto lrcode=[&](double lr){ long c=(long)llround(lr * (double)(1<<20)); if(c<0)c=0; if(c>0x7fffffffL)c=0x7fffffffL; return (int)c; };
 
     for(int step=0; step<steps; step++){
-        // char-LM linear warmup (== golden): lr = LR * min(1, (step+1)/WARMUP)
+        // char-LM linear warmup (== golden): lr = LR * min(1, (step+1)/WARMUP), then optional COSINE DECAY to
+        // LR*LR_MINFRAC over the run (LR_DECAY=1). WHY: the silicon's constant-LR loss floor sits higher than the
+        // CPU refs' (noisier effective gradient: bf16 messages + reduction reorder + fp32 arith; floor ~ LR*noise).
+        // MEASURED: constant 3e-3 plateaus at ema 3.80-3.83 from ~step 600 while every CPU ref descends; resuming
+        // the plateaued masters at LR 1e-3 immediately resumes descending -> ride the floor down with a schedule.
+        static int   LR_DECAY  = getenv("LR_DECAY")  ? atoi(getenv("LR_DECAY"))   : 0;
+        static double LR_MINFR = getenv("LR_MINFRAC")? atof(getenv("LR_MINFRAC")) : 0.1;
         double lr = LR * fmin(1.0, (step+1)/(double)(WARMUP>0?WARMUP:1));
+        if (LR_DECAY && step >= WARMUP) {
+            double t = (double)(step - WARMUP) / (double)(steps - WARMUP > 0 ? steps - WARMUP : 1);
+            lr = LR * (LR_MINFR + (1.0 - LR_MINFR) * 0.5 * (1.0 + cos(M_PI * t)));
+        }
         // ACCUM = effective BATCH size (the lever that takes silicon from the batch-1 ~4.0 plateau to a coherent
         //   ~3.0; golden ACCUM 1/8/32 -> 3.74/3.20/2.95). The kernel now TRULY accumulates: GZERO=1 on the first
         //   sub-batch zeroes the persistent DDR grad accumulators (MP_GACC_*), each later BWD adds, and DO_UPDATE=1
