@@ -426,6 +426,14 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
                                                          //   accumulators; else add to them. dyadic-Adam (DO_UP) on the sum.
     int TRAIN = (int)(ap_int<32>)cfgw.range(191, 160);   // 1 = training kick: SKIP the deploy-int forward (dead weight in
                                                          //   training; bpb/backward use only the WIDE path). 0 = full/deploy.
+    int PARITY = (int)(ap_int<32>)cfgw.range(223, 192);  // cross-sub-batch PIPELINING: which slot (0/1 = g&1) of the
+                                                         //   per-sub-batch volatile state (wide cache + msgs + tok/tgt).
+    // slot offset for EVERY per-sub-batch wide-cache / neighbour-message region (0 = slot0, MP_PAR_OFF = slot1).
+    // Applied at every bstore_f/bload_f/bstore/bload of an MP_W*/MP_GRIN/MP_GROUT region below; tok/tgt use
+    // MP_TOK/MP_TGT + PARITY*X_SEQ. Masters/GACC/adam-moments are NOT per-sub-batch -> never offset. PARITY is
+    // always 0 in deploy (TRAIN=0) mode, so the deploy-int forward + a default-0 cfg lane stay BIT-COMPATIBLE.
+    const int po = PARITY ? MP_PAR_OFF : 0;
+    const int pto = PARITY * X_SEQ;                      // slot offset for the int32 tok/tgt lanes
 
     // ---- DEPLOY int16 master weights (drive the byte-identical forward) ----
     static data_t WQ[X_D*X_D], WK[X_D*X_D], WV[X_D*X_D], WO[X_D*X_D];
@@ -582,22 +590,22 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             static float ln1m[X_SEQ], ln1ss[X_SEQ], ln2m[X_SEQ], ln2ss[X_SEQ];
             // block input R (float): INPUT embeds via the FLOAT embed/pos masters; else from the wide down-msg.
             if (ROLE == X_RL_INPUT) {
-                static int32_t tok[X_SEQ]; bload32(buffer, XO_TOK, tok, X_SEQ);
+                static int32_t tok[X_SEQ]; bload32(buffer, MP_TOK + pto, tok, X_SEQ);
                 static float FEMB[X_VOCAB*X_D], FPOS[X_SEQ*X_D];
                 bload_f(buffer, MP_FEMB, FEMB, X_VOCAB*X_D); bload_f(buffer, MP_FPOS, FPOS, X_SEQ*X_D);
                 for (int t=0;t<X_SEQ;t++){ int v=tok[t]; if(v<0)v=0; if(v>=X_VOCAB)v=X_VOCAB-1;
                     for (int d=0;d<X_D;d++) WR[t*X_D+d]=FEMB[v*X_D+d]+FPOS[t*X_D+d]; }
             } else {
-                bload_f(buffer, MP_GRIN, WR, X_SEQ*X_D);   // reuse: forward wide down-msg staged here by host
+                bload_f(buffer, MP_GRIN + po, WR, X_SEQ*X_D);   // reuse: forward wide down-msg staged here by host
                 // (host stages the upstream chip's wide R' into MP_GRIN before the FWD kick for HID/OUTPUT roles)
             }
-            bstore_f(buffer, MP_WR, WR, X_SEQ*X_D);
+            bstore_f(buffer, MP_WR + po, WR, X_SEQ*X_D);
             bf_layernorm(WR, FLN1G, FLN1B, WX1, ln1m, ln1ss, X_SEQ);
-            bstore_f(buffer, MP_WX1, WX1, X_SEQ*X_D);
+            bstore_f(buffer, MP_WX1 + po, WX1, X_SEQ*X_D);
             bf_matmul(WX1, FWQ, WQf, X_SEQ, X_D, X_D); bf_qact(WQf, X_SEQ*X_D);
             bf_matmul(WX1, FWK, WKf, X_SEQ, X_D, X_D); bf_qact(WKf, X_SEQ*X_D);
             bf_matmul(WX1, FWV, WVf, X_SEQ, X_D, X_D); bf_qact(WVf, X_SEQ*X_D);
-            bstore_f(buffer, MP_WQ, WQf, X_SEQ*X_D); bstore_f(buffer, MP_WK, WKf, X_SEQ*X_D); bstore_f(buffer, MP_WV, WVf, X_SEQ*X_D);
+            bstore_f(buffer, MP_WQ + po, WQf, X_SEQ*X_D); bstore_f(buffer, MP_WK + po, WKf, X_SEQ*X_D); bstore_f(buffer, MP_WV + po, WVf, X_SEQ*X_D);
             float scale = 1.0f/hls::sqrt((float)X_DH);
             static float Praw[X_H*X_SEQ*X_SEQ];
             for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
@@ -628,35 +636,35 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
                     }
                     WATTN[i*X_D+h*X_DH+d]=blend; }
             }
-            bstore_f(buffer, MP_WPRAW, Praw, X_H*X_SEQ*X_SEQ);
+            bstore_f(buffer, MP_WPRAW + po, Praw, X_H*X_SEQ*X_SEQ);
             bf_qact(WATTN, X_SEQ*X_D);                          // char-LM: proj(qact(y))
-            bstore_f(buffer, MP_WATTN, WATTN, X_SEQ*X_D);
+            bstore_f(buffer, MP_WATTN + po, WATTN, X_SEQ*X_D);
             static float AOf[X_SEQ*X_D]; bf_matmul(WATTN, FWO, AOf, X_SEQ, X_D, X_D);
             for(int i=0;i<X_SEQ*X_D;i++) WM[i]=WR[i]+AOf[i];
-            bstore_f(buffer, MP_WM, WM, X_SEQ*X_D);
+            bstore_f(buffer, MP_WM + po, WM, X_SEQ*X_D);
             bf_layernorm(WM, FLN2G, FLN2B, WX2, ln2m, ln2ss, X_SEQ);
-            bstore_f(buffer, MP_WX2, WX2, X_SEQ*X_D);
+            bstore_f(buffer, MP_WX2 + po, WX2, X_SEQ*X_D);
             static float HDpre[X_SEQ*X_FFN]; bf_matmul(WX2, FWUP, HDpre, X_SEQ, X_D, X_FFN);
             for(int i=0;i<X_SEQ*X_FFN;i++){ WRMASK[i]=HDpre[i]>0?1.0f:0.0f; WHD[i]=WRMASK[i]>0?HDpre[i]:0.0f; }
             bf_qact(WHD, X_SEQ*X_FFN);
-            bstore_f(buffer, MP_WHD, WHD, X_SEQ*X_FFN);
-            bstore_f(buffer, MP_WRMASK, WRMASK, X_SEQ*X_FFN);
+            bstore_f(buffer, MP_WHD + po, WHD, X_SEQ*X_FFN);
+            bstore_f(buffer, MP_WRMASK + po, WRMASK, X_SEQ*X_FFN);
             static float FOf[X_SEQ*X_D]; bf_matmul(WHD, FWDN, FOf, X_SEQ, X_FFN, X_D);
             for(int i=0;i<X_SEQ*X_D;i++) WRP[i]=WM[i]+FOf[i];
-            bstore_f(buffer, MP_WRP, WRP, X_SEQ*X_D);
-            bstore_f(buffer, MP_WLN1S, ln1ss, X_SEQ); bstore_f(buffer, MP_WLN2S, ln2ss, X_SEQ);
-            bstore_f(buffer, MP_WLN1M, ln1m, X_SEQ);  bstore_f(buffer, MP_WLN2M, ln2m, X_SEQ);
+            bstore_f(buffer, MP_WRP + po, WRP, X_SEQ*X_D);
+            bstore_f(buffer, MP_WLN1S + po, ln1ss, X_SEQ); bstore_f(buffer, MP_WLN2S + po, ln2ss, X_SEQ);
+            bstore_f(buffer, MP_WLN1M + po, ln1m, X_SEQ);  bstore_f(buffer, MP_WLN2M + po, ln2m, X_SEQ);
             if (ROLE == X_RL_OUT) {
                 static float FLNFG[X_D], FLNFB[X_D]; bload_f(buffer, MP_FLNFG, FLNFG, X_D); bload_f(buffer, MP_FLNFB, FLNFB, X_D);
                 static float FWHEAD[X_VOCAB*X_D]; bload_f(buffer, MP_FWHEAD, FWHEAD, X_VOCAB*X_D);
                 static float WXF[X_SEQ*X_D], WLG[X_SEQ*X_VOCAB], lnfm[X_SEQ], lnfss[X_SEQ];
                 bf_layernorm(WRP, FLNFG, FLNFB, WXF, lnfm, lnfss, X_SEQ);
                 bf_matmul(WXF, FWHEAD, WLG, X_SEQ, X_D, X_VOCAB);
-                bstore_f(buffer, MP_WXF, WXF, X_SEQ*X_D); bstore_f(buffer, MP_WLG, WLG, X_SEQ*X_VOCAB);
-                bstore_f(buffer, MP_WLNFS, lnfss, X_SEQ); bstore_f(buffer, MP_WLNFM, lnfm, X_SEQ);
+                bstore_f(buffer, MP_WXF + po, WXF, X_SEQ*X_D); bstore_f(buffer, MP_WLG + po, WLG, X_SEQ*X_VOCAB);
+                bstore_f(buffer, MP_WLNFS + po, lnfss, X_SEQ); bstore_f(buffer, MP_WLNFM + po, lnfm, X_SEQ);
             } else {
                 // HID/OUTPUT-as-non-final not used; but for non-OUTPUT also emit the wide R' as the down-msg
-                bstore_f(buffer, MP_GROUT, WRP, X_SEQ*X_D);   // host relays MP_GROUT -> downstream chip's MP_GRIN
+                bstore_f(buffer, MP_GROUT + po, WRP, X_SEQ*X_D);   // host relays MP_GROUT -> downstream chip's MP_GRIN
             }
         }
         return;
@@ -670,13 +678,13 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
     static float WATTN[X_SEQ*X_D], WM[X_SEQ*X_D], WX2[X_SEQ*X_D], WHD[X_SEQ*X_FFN];
     static float WRP[X_SEQ*X_D], WRMASK[X_SEQ*X_FFN], Praw[X_H*X_SEQ*X_SEQ];
     static float ln1ss[X_SEQ], ln2ss[X_SEQ];
-    bload_f(buffer, MP_WR, WR, X_SEQ*X_D);   bload_f(buffer, MP_WX1, WX1, X_SEQ*X_D);
-    bload_f(buffer, MP_WQ, WQf, X_SEQ*X_D);  bload_f(buffer, MP_WK, WKf, X_SEQ*X_D); bload_f(buffer, MP_WV, WVf, X_SEQ*X_D);
-    bload_f(buffer, MP_WATTN, WATTN, X_SEQ*X_D); bload_f(buffer, MP_WM, WM, X_SEQ*X_D);
-    bload_f(buffer, MP_WX2, WX2, X_SEQ*X_D);  bload_f(buffer, MP_WHD, WHD, X_SEQ*X_FFN);
-    bload_f(buffer, MP_WRP, WRP, X_SEQ*X_D);  bload_f(buffer, MP_WRMASK, WRMASK, X_SEQ*X_FFN);
-    bload_f(buffer, MP_WPRAW, Praw, X_H*X_SEQ*X_SEQ);
-    bload_f(buffer, MP_WLN1S, ln1ss, X_SEQ); bload_f(buffer, MP_WLN2S, ln2ss, X_SEQ);
+    bload_f(buffer, MP_WR + po, WR, X_SEQ*X_D);   bload_f(buffer, MP_WX1 + po, WX1, X_SEQ*X_D);
+    bload_f(buffer, MP_WQ + po, WQf, X_SEQ*X_D);  bload_f(buffer, MP_WK + po, WKf, X_SEQ*X_D); bload_f(buffer, MP_WV + po, WVf, X_SEQ*X_D);
+    bload_f(buffer, MP_WATTN + po, WATTN, X_SEQ*X_D); bload_f(buffer, MP_WM + po, WM, X_SEQ*X_D);
+    bload_f(buffer, MP_WX2 + po, WX2, X_SEQ*X_D);  bload_f(buffer, MP_WHD + po, WHD, X_SEQ*X_FFN);
+    bload_f(buffer, MP_WRP + po, WRP, X_SEQ*X_D);  bload_f(buffer, MP_WRMASK + po, WRMASK, X_SEQ*X_FFN);
+    bload_f(buffer, MP_WPRAW + po, Praw, X_H*X_SEQ*X_SEQ);
+    bload_f(buffer, MP_WLN1S + po, ln1ss, X_SEQ); bload_f(buffer, MP_WLN2S + po, ln2ss, X_SEQ);
 
     // float grad accumulators (zeroed; one kick = one accumulation pass, matching ACCUM=1 of the de-risk)
     static float gWQ[X_D*X_D], gWK[X_D*X_D], gWV[X_D*X_D], gWO[X_D*X_D], gWUP[X_FFN*X_D], gWDN[X_D*X_FFN];
@@ -687,9 +695,9 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
     if (ROLE == X_RL_OUT) {
         // (0) CE on the WIDE logits: grad_logit = softmax(wide LG) - onehot, mean over tokens; head + LNF bwd.
         static float WXF[X_SEQ*X_D], WLG[X_SEQ*X_VOCAB], lnfss[X_SEQ];
-        bload_f(buffer, MP_WXF, WXF, X_SEQ*X_D); bload_f(buffer, MP_WLG, WLG, X_SEQ*X_VOCAB);
-        bload_f(buffer, MP_WLNFS, lnfss, X_SEQ);
-        static int32_t tgt[X_SEQ]; bload32(buffer, XO_TGT, tgt, X_SEQ);
+        bload_f(buffer, MP_WXF + po, WXF, X_SEQ*X_D); bload_f(buffer, MP_WLG + po, WLG, X_SEQ*X_VOCAB);
+        bload_f(buffer, MP_WLNFS + po, lnfss, X_SEQ);
+        static int32_t tgt[X_SEQ]; bload32(buffer, MP_TGT + pto, tgt, X_SEQ);
         static float FWHEAD[X_VOCAB*X_D], FLNFG[X_D]; bload_f(buffer, MP_FWHEAD, FWHEAD, X_VOCAB*X_D); bload_f(buffer, MP_FLNFG, FLNFG, X_D);
         static float gLG[X_SEQ*X_VOCAB];
     CE: for (int t=0;t<X_SEQ;t++){
@@ -731,7 +739,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
         }
     } else {
         // seed gRP from the incoming WIDE (bf16) error message
-        static float GRIN[X_SEQ*X_D]; bload_f(buffer, MP_GRIN, GRIN, X_SEQ*X_D);
+        static float GRIN[X_SEQ*X_D]; bload_f(buffer, MP_GRIN + po, GRIN, X_SEQ*X_D);
         for (int i=0;i<X_SEQ*X_D;i++) gRP[i]=GRIN[i];
     }
 
@@ -831,7 +839,7 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
 
     // (6) emit: INPUT scatters gR -> float EMB/POS (+ their adam) ; else the WIDE up-message gRout = bf16(gR).
     if (ROLE == X_RL_INPUT) {
-        static int32_t tok[X_SEQ]; bload32(buffer, XO_TOK, tok, X_SEQ);
+        static int32_t tok[X_SEQ]; bload32(buffer, MP_TOK + pto, tok, X_SEQ);
         static float gE[X_VOCAB*X_D], gPo[X_SEQ*X_D]; for(int i=0;i<X_VOCAB*X_D;i++) gE[i]=0; for(int i=0;i<X_SEQ*X_D;i++) gPo[i]=0;
         for(int t=0;t<X_SEQ;t++){ int v=tok[t]; if(v<0)v=0; if(v>=X_VOCAB)v=X_VOCAB-1;
             for(int d=0;d<X_D;d++){ gE[v*X_D+d]+=gR[t*X_D+d]; gPo[t*X_D+d]+=gR[t*X_D+d]; } }
@@ -852,7 +860,7 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
         }
     } else {
         static float GROUT[X_SEQ*X_D]; for(int i=0;i<X_SEQ*X_D;i++) GROUT[i]=P(gR[i]);   // bf16-wide up-message
-        bstore_f(buffer, MP_GROUT, GROUT, X_SEQ*X_D);
+        bstore_f(buffer, MP_GROUT + po, GROUT, X_SEQ*X_D);
     }
     (void)WR;
 }

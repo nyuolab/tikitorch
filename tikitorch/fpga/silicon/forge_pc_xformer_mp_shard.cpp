@@ -93,15 +93,27 @@ static void put_f(int l,int off,const float*src,int n){ for(int j=0;j<n;j++) hbu
 static int32_t g_ihmsg[X_SEQ*X_D];
 static inline int32_t* ihmsg(){ return g_ihmsg; }
 
-// CFG word lanes: [phase, role, do_update, lrbits]  (lane 3 = fixed-point lr code, lr = lrbits*2^-20)
+// CFG word lanes: [phase, role, do_update, lrbits, gzero, train, parity]  (lane 3 = fixed-point lr, lr=lrbits*2^-20)
 static int g_trainfast=-1;   // TRAINFAST=1 (default): kernel skips the deploy-int forward + driver skips the int relay
 static inline int trainfast(){ if(g_trainfast<0){ const char*e=getenv("TRAINFAST"); g_trainfast=e?atoi(e):1; } return g_trainfast; }
-static void setcfg(int l,int phase,int role,int doupd,int lrbits,int gzero=0,int train=0){
+static void setcfg(int l,int phase,int role,int doupd,int lrbits,int gzero=0,int train=0,int parity=0){
     hbuf[l][XO_CFG+0]=phase; hbuf[l][XO_CFG+1]=role; hbuf[l][XO_CFG+2]=doupd; hbuf[l][XO_CFG+3]=lrbits;
     hbuf[l][XO_CFG+4]=gzero;   // ACCUM>1: 1 on the first sub-batch -> kernel zeroes the grad accumulators
     hbuf[l][XO_CFG+5]=train;   // 1 = skip the deploy-int forward (training kicks; ~8ms/fwd-kick saved)
+    hbuf[l][XO_CFG+6]=parity;  // cross-sub-batch PIPELINING slot (g&1): which copy of the per-sub-batch wide state
     stage(l,XO_CFG,X_WL); }
 static int role_of(int l){ return (l==0)?X_RL_INPUT : (l==L-1)?X_RL_OUT : X_RL_HID; }
+
+// ---- ASYNC kick (PIPE scheduler): split kick() into start (poke AP_START) + poll (peek AP_DONE) so the
+//      scheduler can run ONE kick at a time on EACH chip concurrently and overlap sub-batches. Timing is
+//      attributed on completion by the phase of the finished kick (g_kick_s/g_kick_n stay meaningful). ----
+static double g_kick_t0[MAXL];
+static void kick_start(int l){ fpga_pci_poke(bar0[l],R_BUF0,0); fpga_pci_poke(bar0[l],R_BUF1,0);
+    g_kick_t0[l]=now_s(); fpga_pci_poke(bar0[l],R_AP_CTRL,AP_START); }
+static int kick_poll(int l){ uint32_t c=0; fpga_pci_peek(bar0[l],R_AP_CTRL,&c); return (c&AP_DONE)?1:0; }
+// cross-sub-batch PIPELINING: env PIPE (default 0 = the existing serial per-sub-batch sweeps, bit-compatible)
+static int g_pipe=-1;
+static inline int pipe_on(){ if(g_pipe<0){ const char*e=getenv("PIPE"); g_pipe=e?atoi(e):0; } return g_pipe; }
 
 // =====================================================================================================
 // FLOAT-master init — BIT-EXACT to the de-risked golden bf_init (forge_pc_xformer_bf16_golden_block.hpp):
@@ -242,6 +254,11 @@ int main(int argc,char**argv){
     float *hmsg=(float*)malloc(4*X_SEQ*X_D);   // wide down-message (forward): MP_GROUT(l) -> MP_GRIN(l+1)
     float *emsg=(float*)malloc(4*X_SEQ*X_D);   // wide up-message  (backward): MP_GROUT(l) -> MP_GRIN(l-1)
     float *wlg =(float*)malloc(4*X_SEQ*X_VOCAB);  // OUTPUT chip wide logits (for bpb)
+    // PIPE scheduler: 2-DEEP boundary buffers indexed by g&1 (Bug-5) so an in-flight sub-batch g's message can't
+    // be clobbered by the other-parity sub-batch's message; per-step sub-batch offsets (drawn once up-front).
+    float *hmsg2[2]={(float*)malloc(4*X_SEQ*X_D),(float*)malloc(4*X_SEQ*X_D)};
+    float *emsg2[2]={(float*)malloc(4*X_SEQ*X_D),(float*)malloc(4*X_SEQ*X_D)};
+    long  *soff=(long*)malloc(sizeof(long)*(ACCUM>0?ACCUM:1));
     long xchip_msg=0, xchip_weight=0, xchip_grad=0;
     double t0=now_s(); double bpb_ema=-1, acc_ema=-1;
     srand(123);
@@ -268,10 +285,14 @@ int main(int argc,char**argv){
         //   on the LAST sub-batch runs dyadic-Adam on the accumulated sum. So ACCUM>1 = a real batch of ACCUM
         //   sequences per weight update (verified csim: acc1=g, acc2=2g). All ACCUM sub-batches see the same weights.
         long last_off = 0;
+        static long g_fixedoff = getenv("FIXEDOFF") ? atol(getenv("FIXEDOFF")) : -1;   // see below
+      if(!pipe_on()){
+        // ============================ SERIAL (PIPE=0, default, bit-compatible) ============================
+        // Per sub-batch: a full FWD sweep 0->L-1 then a full BWD sweep L-1->0. PARITY stays 0 (setcfg default),
+        // so the kernel uses slot 0 for all per-sub-batch state — byte-identical to the pre-pipelining kernel.
         for(int k=0;k<ACCUM;k++){
             // FIXEDOFF>=0 pins every batch to the same offset (overfit / kernel-can-fit sanity test on silicon):
             // if the kernel is sound it must memorize one batch -> bpb -> ~0; a floor >>0 = a real kernel/HW fault.
-            static long g_fixedoff = getenv("FIXEDOFF") ? atol(getenv("FIXEDOFF")) : -1;
             long off = g_fixedoff>=0 ? g_fixedoff : (long)(rand() % (ntok - X_SEQ - 2)); last_off = off;
             int do_update = (k==ACCUM-1) ? 1 : 0;
 
@@ -280,8 +301,10 @@ int main(int argc,char**argv){
             for(int l=0;l<L;l++){
                 setcfg(l, X_PH_FWD, role_of(l), 0, 0, 0, trainfast());
                 if(l==0){
-                    // INPUT: stage token ids (both the int forward and the wide forward read XO_TOK)
-                    for(int t=0;t<X_SEQ;t++) hbuf[0][XO_TOK+t]=data[off+t]; stage(0,XO_TOK,X_SEQ);
+                    // INPUT: stage token ids. The WIDE forward reads MP_TOK (slot 0); the deploy-int forward reads
+                    // XO_TOK (only when !trainfast). MP_TOK slot 0 == what XO_TOK held pre-pipelining -> bit-compatible.
+                    for(int t=0;t<X_SEQ;t++) hbuf[0][MP_TOK+t]=data[off+t]; stage(0,MP_TOK,X_SEQ);
+                    if(!trainfast()){ for(int t=0;t<X_SEQ;t++) hbuf[0][XO_TOK+t]=data[off+t]; stage(0,XO_TOK,X_SEQ); }
                 } else {
                     // HID/OUTPUT: stage the upstream chip's WIDE R' as this chip's down-message (MP_GRIN); the
                     // wide forward reads MP_GRIN as its block input R (kernel line ~535). Also feed the int path's
@@ -289,7 +312,7 @@ int main(int argc,char**argv){
                     put_f(l, MP_GRIN, hmsg, X_SEQ*X_D);       xchip_msg += (long)X_SEQ*X_D;
                     if(!trainfast()){ memcpy(hbuf[l]+XO_HIN, ihmsg(), 4*X_SEQ*X_D); stage(l,XO_HIN,X_SEQ*X_D); }
                 }
-                if(l==L-1){ for(int t=0;t<X_SEQ;t++) hbuf[l][XO_TGT+t]=data[off+t+1]; stage(l,XO_TGT,X_SEQ); }  // OUTPUT targets
+                if(l==L-1){ for(int t=0;t<X_SEQ;t++) hbuf[l][MP_TGT+t]=data[off+t+1]; stage(l,MP_TGT,X_SEQ); }  // OUTPUT targets (wide CE reads MP_TGT slot 0)
                 kick(l);
                 if(l<L-1){
                     readf(l, MP_GROUT, hmsg, X_SEQ*X_D);      // WIDE down-message: this block's R' -> next chip MP_GRIN
@@ -307,9 +330,61 @@ int main(int argc,char**argv){
                 if(l>0) readf(l, MP_GROUT, emsg, X_SEQ*X_D);  // WIDE up-message: this block's input-grad -> prev chip MP_GRIN
             }
         }
+      } else {
+        // ============================ PIPELINED (PIPE=1): overlap sub-batches via two parity slots ============================
+        // Instead of 2L serial kicks/sub-batch, run a dependency EVENT LOOP over the whole step's 2*L*ACCUM kicks
+        // keyed by the GLOBAL sub-batch index g (=k within this step; windows never cross a step -> a barrier at
+        // step end structurally satisfies the g%ACCUM==0 window-boundary constraint). A chip runs ONE kick at a
+        // time; it picks any READY op with BACKWARD-FIRST preference. Slot(g)=g&1: two in-flight sub-batches (g,g+1)
+        // never share a slot, so F(g+1) can precede B(g). GACC RMW needs strict ASCENDING bwd order per chip
+        // (monotonic bnext[]); GZERO on g==0, DO_UP on g==ACCUM-1 (structurally the first/last bwd of the window).
+        for(int k=0;k<ACCUM;k++) soff[k] = g_fixedoff>=0 ? g_fixedoff : (long)(rand() % (ntok - X_SEQ - 2));
+        last_off = soff[ACCUM-1];
+        int fdone[MAXL], bdone[MAXL], fnext[MAXL], bnext[MAXL], busy[MAXL], bph[MAXL], bg[MAXL];
+        for(int l=0;l<L;l++){ fdone[l]=bdone[l]=fnext[l]=bnext[l]=0; busy[l]=0; }
+        int total=2*L*ACCUM, ndone=0; double last_progress=now_s();
+        while(ndone<total){
+            // (1) reap completions: attribute timing + read this op's outgoing neighbour message into its slot buffer
+            for(int l=0;l<L;l++) if(busy[l] && kick_poll(l)){
+                int ph=bph[l], g=bg[l], slot=g&1, po=slot?MP_PAR_OFF:0;
+                g_kick_s[ph][l]+=now_s()-g_kick_t0[l]; g_kick_n[ph][l]++;
+                if(ph==0){ if(l<L-1){ readf(l, MP_GROUT+po, hmsg2[slot], X_SEQ*X_D); } fdone[l]++; }   // fwd down-msg R'
+                else     { if(l>0)  { readf(l, MP_GROUT+po, emsg2[slot], X_SEQ*X_D); } bdone[l]++; }   // bwd up-msg gR
+                busy[l]=0; ndone++; last_progress=now_s();
+            }
+            // (2) dispatch: for each idle chip pick a ready op, BACKWARD-FIRST (drains slots), else a ready forward
+            for(int l=0;l<L;l++) if(!busy[l]){
+                int gb=bnext[l];
+                int bwok = (gb<ACCUM) && (fdone[l]>gb) && (l==L-1 || bdone[l+1]>gb);           // B_l(g): F_l(g) & B_{l+1}(g)
+                int gf=fnext[l];
+                int fwok = (gf<ACCUM) && (l==0 || fdone[l-1]>gf) && (gf<2 || bdone[l]>gf-2);   // F_l(g): F_{l-1}(g) & B_l(g-2) slot free
+                if(bwok){
+                    int slot=gb&1, po=slot?MP_PAR_OFF:0;
+                    int doup=(gb==ACCUM-1)?1:0, gz=(gb==0)?1:0;
+                    setcfg(l, X_PH_BWD, role_of(l), doup, doup?lrcode(lr):0, gz, trainfast(), slot);
+                    if(l<L-1){ put_f(l, MP_GRIN+po, emsg2[slot], X_SEQ*X_D); xchip_msg += (long)X_SEQ*X_D; }  // neighbour WIDE error in
+                    kick_start(l); busy[l]=1; bph[l]=1; bg[l]=gb; bnext[l]++;
+                } else if(fwok){
+                    int slot=gf&1, po=slot?MP_PAR_OFF:0; long off=soff[gf];
+                    setcfg(l, X_PH_FWD, role_of(l), 0, 0, 0, trainfast(), slot);
+                    if(l==0){
+                        for(int t=0;t<X_SEQ;t++) hbuf[0][MP_TOK+slot*X_SEQ+t]=data[off+t]; stage(0,MP_TOK+slot*X_SEQ,X_SEQ);
+                        if(!trainfast()){ for(int t=0;t<X_SEQ;t++) hbuf[0][XO_TOK+t]=data[off+t]; stage(0,XO_TOK,X_SEQ); }
+                    } else {
+                        put_f(l, MP_GRIN+po, hmsg2[slot], X_SEQ*X_D); xchip_msg += (long)X_SEQ*X_D;   // upstream chip's R' -> down-message
+                    }
+                    if(l==L-1){ for(int t=0;t<X_SEQ;t++) hbuf[l][MP_TGT+slot*X_SEQ+t]=data[off+t+1]; stage(l,MP_TGT+slot*X_SEQ,X_SEQ); }  // OUTPUT targets (read in this g's BWD)
+                    kick_start(l); busy[l]=1; bph[l]=0; bg[l]=gf; fnext[l]++;
+                }
+            }
+            if(now_s()-last_progress>60.0){ fprintf(stderr,"PIPE SCHED STALL: no progress 60s (done %d/%d)\n",ndone,total); return 7; }
+        }
+      }
 
         // ===================== per-step bpb/acc from the OUTPUT chip's WIDE logits (== golden bpb) =====================
-        readf(L-1, MP_WLG, wlg, X_SEQ*X_VOCAB);
+        // slot of the LAST sub-batch (k=ACCUM-1): 0 in serial, (ACCUM-1)&1 in pipe mode.
+        int metric_po = (pipe_on() && (((ACCUM-1)&1))) ? MP_PAR_OFF : 0;
+        readf(L-1, MP_WLG + metric_po, wlg, X_SEQ*X_VOCAB);
         actstat("logits", L-1, step, wlg, X_SEQ*X_VOCAB);   // probe: output-chip wide logits magnitude
         { int c=0; double bits=0; const double L2=log(2.0);
           for(int t=0;t<X_SEQ;t++){ int tg=data[last_off+t+1];
@@ -361,8 +436,8 @@ int main(int argc,char**argv){
         unsigned rng=12345;
         for(int s=0;s<NS;s++){
             for(int l=0;l<L;l++){
-                setcfg(l, X_PH_FWD, role_of(l), 0, 0, 0, trainfast());
-                if(l==0){ for(int t=0;t<X_SEQ;t++) hbuf[0][XO_TOK+t]=ctx[t]; stage(0,XO_TOK,X_SEQ); }
+                setcfg(l, X_PH_FWD, role_of(l), 0, 0, 0, trainfast());   // sampling: serial, PARITY=0 (slot 0)
+                if(l==0){ for(int t=0;t<X_SEQ;t++){ hbuf[0][MP_TOK+t]=ctx[t]; hbuf[0][XO_TOK+t]=ctx[t]; } stage(0,MP_TOK,X_SEQ); stage(0,XO_TOK,X_SEQ); }
                 else    { put_f(l, MP_GRIN, hmsg, X_SEQ*X_D); memcpy(hbuf[l]+XO_HIN, ihmsg(), 4*X_SEQ*X_D); stage(l,XO_HIN,X_SEQ*X_D); }
                 kick(l);
                 if(l<L-1){ readf(l, MP_GROUT, hmsg, X_SEQ*X_D); readw(l, XO_HOUT, ihmsg(), X_SEQ*X_D); }

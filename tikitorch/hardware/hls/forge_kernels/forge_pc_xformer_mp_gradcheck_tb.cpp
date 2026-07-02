@@ -69,6 +69,8 @@ static Res run_kat(const BFM&bm_in, const int*tok, const int*tgt, double LR, con
     // stage the kernel master + warmed-zero adam (gradcheck doesn't need warmed m/v; we check the GRADIENT)
     stage_master(buf,bm);
     put_i(buf,XO_TOK,tok,X_SEQ); put_i(buf,XO_TGT,tgt,X_SEQ);
+    // parity/pipelining: the WIDE forward + CE read tok/tgt from MP_TOK/MP_TGT + PARITY*X_SEQ (PARITY=0 here)
+    put_i(buf,MP_TOK,tok,X_SEQ); put_i(buf,MP_TGT,tgt,X_SEQ);
     int lrbits=(int)lround(LR*1048576.0);
 
     // OUTPUT role reads its wide block input from MP_GRIN — feed it the golden's float R (ba.R) so the kernel's

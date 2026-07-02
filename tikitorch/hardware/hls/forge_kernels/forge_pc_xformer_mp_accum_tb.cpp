@@ -39,6 +39,8 @@ int main(){
     static BFA ba; bf_forward(bm,ba,tok);                       // golden fwd -> ba.R seeds the OUTPUT block input
     for(int i=0;i<MP_BUFLEN;i++) buf[i]=0;
     stage_master(bm); put_i(buf,XO_TOK,tok,X_SEQ); put_i(buf,XO_TGT,tgt,X_SEQ);
+    // parity/pipelining: the WIDE forward + CE read tok/tgt from MP_TOK/MP_TGT + PARITY*X_SEQ (PARITY=0 here)
+    put_i(buf,MP_TOK,tok,X_SEQ); put_i(buf,MP_TGT,tgt,X_SEQ);
     for(int i=0;i<X_SEQ*X_D;i++) buf[MP_GRIN+i]=f2i_((float)ba.R[i]);
     for(int i=0;i<X_SEQ*X_D;i++) buf[XO_HIN+i]=0; for(int i=0;i<X_LUT_N;i++) buf[XO_LUT+i]=0;
 
