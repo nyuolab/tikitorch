@@ -317,6 +317,8 @@ static void bf_matmul(const float *x, const float *Wf, float *y, int M, int I, i
                 Wd[j] = bf_dyad_f(Wf[j]); }
 BM_T: for (int t = 0; t < M; t++)
     BM_O: for (int o = 0; o < O; o++) {
+#pragma HLS LOOP_FLATTEN off
+
             // partial-sum reduction: 16 INDEPENDENT lanes break the loop-carried fp-add recurrence so the inner
             // reduction pipelines at II=1 (vs II=80 when 8 unrolled adds chain into one acc). Tree-reduce at the end.
             float ps[16];
@@ -344,6 +346,8 @@ static void bf_linear_bwd(const float *gy, const float *Wf, const float *x,
                 Wd[j] = bf_dyad_f(Wf[j]); }
 LR_T: for (int t = 0; t < M; t++)
     LR_I: for (int i = 0; i < I; i++) {
+#pragma HLS LOOP_FLATTEN off
+
             // partial-sum lanes -> II=1 reduction (was II=80 from 8 chained fp-adds); tree-reduce at the end
             float ps[16];
 #pragma HLS ARRAY_PARTITION variable=ps complete dim=1
@@ -358,6 +362,8 @@ LR_T: for (int t = 0; t < M; t++)
         }
 WG_O: for (int o = 0; o < O; o++)
     WG_I: for (int i = 0; i < I; i++) {
+#pragma HLS LOOP_FLATTEN off
+
             // partial-sum lanes -> II=1 wgrad reduction (was II=80)
             float ps[16];
 #pragma HLS ARRAY_PARTITION variable=ps complete dim=1
