@@ -312,7 +312,6 @@ static void bf_matmul(const float *x, const float *Wf, float *y, int M, int I, i
     // it ONCE (O*I calls) instead of recomputing per row t (M*O*I). At SEQ=64 that is 64x fewer log2/round/ldexp
     // AND takes the transcendental chain off the MAC critical path. Bit-identical (same value, computed once).
     static float Wd[X_FFN*X_D];
-#pragma HLS bind_storage variable=Wd type=ram_2p impl=uram   // 16384-float dyad cache: 1 write/cyc then 1 read/cyc MAC -> ram_2p URAM
     BM_D: for (int j = 0; j < O*I; j++) {
 #pragma HLS PIPELINE II=1
                 Wd[j] = bf_dyad_f(Wf[j]); }
@@ -342,65 +341,36 @@ static void bf_linear_bwd(const float *gy, const float *Wf, const float *x,
 #pragma HLS INLINE off
     // HOIST dyad(W) out of the row-redundant dx MAC (see bf_matmul): precompute once (O*I) not per row (M*O*I).
     static float Wd[X_FFN*X_D];
-    // LEVER A (rebuild #4): the dx nest unrolls its MIDDLE level (LR_I over i) by 2 and the wgrad nest unrolls
-    // its MIDDLE level (WG_I over i) by 2 — HALF as many inner-reduction pipeline fills, ~2x fewer loop-overhead
-    // cycles. The two doubled operands (Wd[o*I+i]/Wd[o*I+i+1] in dx, x[t*I+i]/x[t*I+i+1] in wgrad) are adjacent,
-    // opposite-parity addresses, so a CYCLIC factor-2 partition banks them even/odd -> 2 concurrent 1-port reads
-    // per cycle (II=1 preserved). I is always even (D=64 or FFN=256), so i+=2 tiles exactly. The arithmetic per
-    // output is IDENTICAL to the pre-unroll kernel (same [idx&15] lane, same tree-reduce order, same operand
-    // order) — a pure SCHEDULE change, so the gradients stay bit-identical (gradcheck: KAT1 bit-exact, KAT2
-    // relerr EXACTLY 5.000e-03, unchanged).
-#pragma HLS ARRAY_PARTITION variable=Wd cyclic factor=2 dim=1   // even/odd banks: 2 concurrent Wd reads for the dx unroll
-#pragma HLS ARRAY_PARTITION variable=x  cyclic factor=2 dim=1   // even/odd banks: 2 concurrent x  reads for the wgrad unroll
-    // URAM rebind: after the cyclic factor-2 partition, Wd is TWO 8192-float banks; bind BOTH to ram_2p URAM.
-    // Each bank serves the unrolled dx nest's single even/odd read per cycle (1 port), well within ram_2p's 2.
-#pragma HLS bind_storage variable=Wd type=ram_2p impl=uram
     LR_D: for (int j = 0; j < O*I; j++) {
 #pragma HLS PIPELINE II=1
                 Wd[j] = bf_dyad_f(Wf[j]); }
 LR_T: for (int t = 0; t < M; t++)
-    LR_I: for (int i = 0; i < I; i += 2) {   // MIDDLE unroll x2: process i and i+1 concurrently
+    LR_I: for (int i = 0; i < I; i++) {
 #pragma HLS LOOP_FLATTEN off
-
-            // TWO partial-sum lane sets (i -> ps_a, i+1 -> ps_b); one shared gy read per o feeds both. II=1.
-            float ps_a[16], ps_b[16];
-#pragma HLS ARRAY_PARTITION variable=ps_a complete dim=1
-#pragma HLS ARRAY_PARTITION variable=ps_b complete dim=1
-            for (int k=0;k<16;k++) { ps_a[k]=0; ps_b[k]=0; }
+            float ps[16];
+#pragma HLS ARRAY_PARTITION variable=ps complete dim=1
+            for (int k=0;k<16;k++) ps[k]=0;
         LR_O: for (int o = 0; o < O; o++) {
 #pragma HLS PIPELINE II=1
-                float g = gy[t*O+o];                   // ONE shared gy read feeds both columns
-                ps_a[o&15] += Wd[o*I+i]   * g;         // column i     (== the pre-unroll ps for i)
-                ps_b[o&15] += Wd[o*I+i+1] * g;         // column i+1   (== the pre-unroll ps for i+1)
+                ps[o&15] += Wd[o*I+i] * gy[t*O+o];
             }
-            { float a0=(ps_a[0]+ps_a[1])+(ps_a[2]+ps_a[3]),   a1=(ps_a[4]+ps_a[5])+(ps_a[6]+ps_a[7]);
-              float a2=(ps_a[8]+ps_a[9])+(ps_a[10]+ps_a[11]), a3=(ps_a[12]+ps_a[13])+(ps_a[14]+ps_a[15]);
-              dx[t*I+i] = P((a0+a1)+(a2+a3)); }
-            { float b0=(ps_b[0]+ps_b[1])+(ps_b[2]+ps_b[3]),   b1=(ps_b[4]+ps_b[5])+(ps_b[6]+ps_b[7]);
-              float b2=(ps_b[8]+ps_b[9])+(ps_b[10]+ps_b[11]), b3=(ps_b[12]+ps_b[13])+(ps_b[14]+ps_b[15]);
-              dx[t*I+i+1] = P((b0+b1)+(b2+b3)); }
+            float a0=(ps[0]+ps[1])+(ps[2]+ps[3]),   a1=(ps[4]+ps[5])+(ps[6]+ps[7]);
+            float a2=(ps[8]+ps[9])+(ps[10]+ps[11]), a3=(ps[12]+ps[13])+(ps[14]+ps[15]);
+            dx[t*I+i] = P((a0+a1)+(a2+a3));
         }
 WG_O: for (int o = 0; o < O; o++)
-    WG_I: for (int i = 0; i < I; i += 2) {   // MIDDLE unroll x2: process columns i and i+1 concurrently
+    WG_I: for (int i = 0; i < I; i++) {
 #pragma HLS LOOP_FLATTEN off
-
-            // TWO partial-sum lane sets (i -> ps_a, i+1 -> ps_b); one shared gy read per t feeds both. II=1.
-            float ps_a[16], ps_b[16];
-#pragma HLS ARRAY_PARTITION variable=ps_a complete dim=1
-#pragma HLS ARRAY_PARTITION variable=ps_b complete dim=1
-            for (int k=0;k<16;k++) { ps_a[k]=0; ps_b[k]=0; }
+            float ps[16];
+#pragma HLS ARRAY_PARTITION variable=ps complete dim=1
+            for (int k=0;k<16;k++) ps[k]=0;
         WG_T: for (int t = 0; t < M; t++) {
 #pragma HLS PIPELINE II=1
-                float g = gy[t*O+o];                   // ONE shared gy read (indep of i) feeds both columns
-                ps_a[t&15] += g * x[t*I+i];            // column i     (== the pre-unroll ps for i)
-                ps_b[t&15] += g * x[t*I+i+1];          // column i+1   (== the pre-unroll ps for i+1)
+                ps[t&15] += gy[t*O+o] * x[t*I+i];
             }
-            { float a0=(ps_a[0]+ps_a[1])+(ps_a[2]+ps_a[3]),   a1=(ps_a[4]+ps_a[5])+(ps_a[6]+ps_a[7]);
-              float a2=(ps_a[8]+ps_a[9])+(ps_a[10]+ps_a[11]), a3=(ps_a[12]+ps_a[13])+(ps_a[14]+ps_a[15]);
-              dW[o*I+i] += P((a0+a1)+(a2+a3)); }
-            { float b0=(ps_b[0]+ps_b[1])+(ps_b[2]+ps_b[3]),   b1=(ps_b[4]+ps_b[5])+(ps_b[6]+ps_b[7]);
-              float b2=(ps_b[8]+ps_b[9])+(ps_b[10]+ps_b[11]), b3=(ps_b[12]+ps_b[13])+(ps_b[14]+ps_b[15]);
-              dW[o*I+i+1] += P((b0+b1)+(b2+b3)); }
+            float a0=(ps[0]+ps[1])+(ps[2]+ps[3]),   a1=(ps[4]+ps[5])+(ps[6]+ps[7]);
+            float a2=(ps[8]+ps[9])+(ps[10]+ps[11]), a3=(ps[12]+ps[13])+(ps[14]+ps[15]);
+            dW[o*I+i] += P((a0+a1)+(a2+a3));
         }
 }
 // LN backward EXACT to torch autograd of FDyadLN: s is stop-grad (round/floor block it) -> only mean coupling.
@@ -477,16 +447,9 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
     // ---- FLOAT master (trainable; the STE backward + dyadic-Adam operate on these) ----
     // URAM rebind (rebuild #4): the float masters are BIG (D*D=4096..FFN*D=16384 floats) and LOW-PORT — each is
     // burst-loaded once (1 write/cyc) then read once/elem to build the local dyad Wd, so a 2-port ram_2p URAM
-    // fits with room to spare and moves this weight off BRAM. (csim ignores bind_storage: no functional risk.)
     static float FWQ[X_D*X_D], FWK[X_D*X_D], FWV[X_D*X_D], FWO[X_D*X_D];
     static float FWUP[X_FFN*X_D], FWDN[X_D*X_FFN];
     static float FLN1G[X_D], FLN1B[X_D], FLN2G[X_D], FLN2B[X_D];
-#pragma HLS bind_storage variable=FWQ  type=ram_2p impl=uram
-#pragma HLS bind_storage variable=FWK  type=ram_2p impl=uram
-#pragma HLS bind_storage variable=FWV  type=ram_2p impl=uram
-#pragma HLS bind_storage variable=FWO  type=ram_2p impl=uram
-#pragma HLS bind_storage variable=FWUP type=ram_2p impl=uram
-#pragma HLS bind_storage variable=FWDN type=ram_2p impl=uram
     bload_f(buffer, MP_FWQ, FWQ, X_D*X_D); bload_f(buffer, MP_FWK, FWK, X_D*X_D);
     bload_f(buffer, MP_FWV, FWV, X_D*X_D); bload_f(buffer, MP_FWO, FWO, X_D*X_D);
     bload_f(buffer, MP_FWUP, FWUP, X_FFN*X_D); bload_f(buffer, MP_FWDN, FWDN, X_D*X_FFN);
@@ -632,10 +595,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             // WVf (read 8-wide-unrolled DIRECTLY in the attention score/blend loops -> need >2 ports) and WX1/WX2/
             // WHD/WATTN (consumed as bf_linear_bwd's cyclic-factor-2-partitioned `x` operand -> HLS must own their
             // 2-bank interface). Those stay auto-BRAM so no schedule/port regression.
-#pragma HLS bind_storage variable=WR     type=ram_2p impl=uram
-#pragma HLS bind_storage variable=WM     type=ram_2p impl=uram
-#pragma HLS bind_storage variable=WRP    type=ram_2p impl=uram
-#pragma HLS bind_storage variable=WRMASK type=ram_2p impl=uram
             // block input R (float): INPUT embeds via the FLOAT embed/pos masters; else from the wide down-msg.
             if (ROLE == X_RL_INPUT) {
                 static int32_t tok[X_SEQ]; bload32(buffer, MP_TOK + pto, tok, X_SEQ);
@@ -694,7 +653,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             bf_layernorm(WM, FLN2G, FLN2B, WX2, ln2m, ln2ss, X_SEQ);
             bstore_f(buffer, MP_WX2 + po, WX2, X_SEQ*X_D);
             static float HDpre[X_SEQ*X_FFN];
-#pragma HLS bind_storage variable=HDpre type=ram_2p impl=uram   // 16384-float bf_matmul y-out + 1D relu read -> URAM
             bf_matmul(WX2, FWUP, HDpre, X_SEQ, X_D, X_FFN);
             for(int i=0;i<X_SEQ*X_FFN;i++){ WRMASK[i]=HDpre[i]>0?1.0f:0.0f; WHD[i]=WRMASK[i]>0?HDpre[i]:0.0f; }
             bf_qact(WHD, X_SEQ*X_FFN);
@@ -744,12 +702,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
     // URAM rebind (rebuild #4): the weight-grad accumulators (D*D=4096 .. FFN*D=16384 floats) are written by
     // bf_linear_bwd's dW (a read-modify-write in the NON-pipelined wgrad epilogue -> <=2 seq ports) and folded
     // into DDR + stepped by dyadic-Adam via 1-port loops. Low-port + big -> ram_2p URAM.
-#pragma HLS bind_storage variable=gWQ  type=ram_2p impl=uram
-#pragma HLS bind_storage variable=gWK  type=ram_2p impl=uram
-#pragma HLS bind_storage variable=gWV  type=ram_2p impl=uram
-#pragma HLS bind_storage variable=gWO  type=ram_2p impl=uram
-#pragma HLS bind_storage variable=gWUP type=ram_2p impl=uram
-#pragma HLS bind_storage variable=gWDN type=ram_2p impl=uram
     for (int i=0;i<X_D*X_D;i++){ gWQ[i]=0;gWK[i]=0;gWV[i]=0;gWO[i]=0; }
     for (int i=0;i<X_FFN*X_D;i++) gWUP[i]=0; for (int i=0;i<X_D*X_FFN;i++) gWDN[i]=0;
 
@@ -894,8 +846,6 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
     // (5) dyadic-Adam on the float master (matmul weights; LN gammas/betas frozen)
     if (DO_UP) {
         static float mB[X_FFN*X_D], vB[X_FFN*X_D];
-#pragma HLS bind_storage variable=mB type=ram_2p impl=uram   // FFN*D=16384 adam m (1R1W simple-dual across all matmul weights) -> URAM
-#pragma HLS bind_storage variable=vB type=ram_2p impl=uram   // FFN*D=16384 adam v (1R1W simple-dual) -> URAM
         bload_f(buffer, MP_MOM+MP_OFF_FWQ, mB, X_D*X_D); bload_f(buffer, MP_VAR+MP_OFF_FWQ, vB, X_D*X_D); bf_adam_one(FWQ, gWQ, mB, vB, X_D*X_D, LR); bstore_f(buffer, MP_FWQ, FWQ, X_D*X_D); bstore_f(buffer, MP_MOM+MP_OFF_FWQ, mB, X_D*X_D); bstore_f(buffer, MP_VAR+MP_OFF_FWQ, vB, X_D*X_D);
         bload_f(buffer, MP_MOM+MP_OFF_FWK, mB, X_D*X_D); bload_f(buffer, MP_VAR+MP_OFF_FWK, vB, X_D*X_D); bf_adam_one(FWK, gWK, mB, vB, X_D*X_D, LR); bstore_f(buffer, MP_FWK, FWK, X_D*X_D); bstore_f(buffer, MP_MOM+MP_OFF_FWK, mB, X_D*X_D); bstore_f(buffer, MP_VAR+MP_OFF_FWK, vB, X_D*X_D);
         bload_f(buffer, MP_MOM+MP_OFF_FWV, mB, X_D*X_D); bload_f(buffer, MP_VAR+MP_OFF_FWV, vB, X_D*X_D); bf_adam_one(FWV, gWV, mB, vB, X_D*X_D, LR); bstore_f(buffer, MP_FWV, FWV, X_D*X_D); bstore_f(buffer, MP_MOM+MP_OFF_FWV, mB, X_D*X_D); bstore_f(buffer, MP_VAR+MP_OFF_FWV, vB, X_D*X_D);
@@ -919,8 +869,6 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
             static float FEMB[X_VOCAB*X_D], FPOS[X_SEQ*X_D];
             bload_f(buffer, MP_FEMB, FEMB, X_VOCAB*X_D); bload_f(buffer, MP_FPOS, FPOS, X_SEQ*X_D);
             static float mE[X_VOCAB*X_D], vE[X_VOCAB*X_D], mPo[X_SEQ*X_D], vPo[X_SEQ*X_D];
-#pragma HLS bind_storage variable=mE  type=ram_2p impl=uram   // embed adam m (1R1W) -> URAM
-#pragma HLS bind_storage variable=vE  type=ram_2p impl=uram   // embed adam v (1R1W) -> URAM
             bload_f(buffer, MP_MEMB, mE, X_VOCAB*X_D); bload_f(buffer, MP_VEMB, vE, X_VOCAB*X_D);
             bload_f(buffer, MP_MPOS, mPo, X_SEQ*X_D); bload_f(buffer, MP_VPOS, vPo, X_SEQ*X_D);
             bf_adam_one(FEMB, gE, mE, vE, X_VOCAB*X_D, LR); bf_adam_one(FPOS, gPo, mPo, vPo, X_SEQ*X_D, LR);
