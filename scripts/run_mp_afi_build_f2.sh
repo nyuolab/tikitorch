@@ -15,7 +15,7 @@ AMI="${AMI:-ami-092fc5deb8f3c0f7d}"; ITYPE="${ITYPE:-z1d.6xlarge}"; ROLE="${ROLE
 # custom recipe ALSO requires instantiating the aws_clk_gen IP in the CL top. So timing must CLOSE at 250MHz
 # (done via the float-loop unroll 8->2 congestion cut + HLS over-constrain). Leave CLOCK_A empty = build default.
 CLOCK_A="${CLOCK_A:-}"
-PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; STATE="$PROJECT_DIR/.tiki_mp_afi_state"; mkdir -p "$STATE"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; STATE="${STATE_DIR:-$PROJECT_DIR/.tiki_mp_afi_state}"; mkdir -p "$STATE"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
 cmd_build(){
