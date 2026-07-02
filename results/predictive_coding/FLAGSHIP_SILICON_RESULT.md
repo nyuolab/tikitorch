@@ -248,6 +248,19 @@ header), `And kne, wher, thy lot's ge shele;`, `Noeed for a tring to kis se hat`
 salad. The remaining 0.14 vs the twin is the silicon gradient-noise premium (bf16 messages + reduction
 reorder + fp32), which shrinks with batch — the in-chip batch-replication lever's job.
 
+## ★ 5e. (b) MULTI-CHIP MILESTONE (2026-07-03): 8-block PC transformer on 8 physical FPGAs
+
+`mpxfshard-20260702T183333Z`, all 8 slots of one f2.48xlarge, ONE transformer block per chip (INPUT + 6
+HIDDEN + OUTPUT), AGFI `agfi-0a08046c7d64090ff` (S=2 pipelining), ACCUM=8, cosine, 1500 steps:
+- **bpb 6.9 → ema 3.675, acc 0.260 (17x chance)**, monotone descent (mid-descent, not converged — a deeper
+  model needs more steps, and S=2 throttled it).
+- **Gate-C clean at 8 chips: 0 weights / 0 gradients crossed, 2.75 GB pure neighbour messages** (7 hidden
+  down + 7 error up/pass). The no-global-sync contract holds 8-deep.
+- Per-chip kicktime uniform (BWD 91.3 ms hidden / 99.0 ms output) — the role-based kernel runs identically
+  on every slot; **no rebuild needed to go from 3 to 8 chips.**
+- Throughput 0.20 steps/s = the S=2-at-L=8 penalty (~24% overlap util; serial path 16 kicks deep). The
+  shipped-next **S=8 kernel** (DDR-only, csynth-confirmed same 97%/3% profile) restores full pipelining.
+
 ## ★ 5d. BUNDLE MEASURED + RUN #3 (2026-07-02/03): **bpb 3.093 @ 257 tok/s — sub-3.1 on silicon**
 
 **The rebuild bundle (AGFI `agfi-0a08046c7d64090ff`, WNS +0.051 ns) measured on silicon:**
