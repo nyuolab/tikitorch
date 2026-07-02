@@ -208,13 +208,27 @@ dyadic-Adam on the sum):
 | **3-block exact-kernel repro** | 3.61 → 3.53 | **descending** |
 | **silicon 3-chip** | 3.80 → 3.83 @1400 | **flat** |
 
-So the plateau is NOT depth/frozen-LN recipe (the 3-block repro descends) — **a silicon-vs-reference
-divergence of ~0.3+ persists that appears only past ~step 600.** In progress (the signature-result
-technique): **replay the repro with the silicon's exact init** (bit-exact `init_master` regeneration,
-SEED=0) — plateau reproduced → init/order artifact (host-side fix); still descends → kernel-level
-divergence → diff the trained masters (dumped to S3) / one-step dump-and-compare. Suspects after that:
-the 1-ULP reduction reorder interacting with late training, or the bf16 Adam moment state at silicon
-precision vs the repro's float64 moments.
+So the plateau is NOT depth/frozen-LN recipe (the 3-block repro descends).
+
+**PLATEAU ROOT-CAUSED (2026-07-02): the constant-LR noise floor.** Full elimination, each on a
+faithful twin with kernel-exact ACCUM semantics: depth ✗ · exact init ✗ (bit-exact `init_master` regen)
+· exact data order ✗ (glibc `srand(123)` reimplemented + verified against the canonical vector; real
+token bin) · **fp32 weight/moment state ✗** (the fp32-adam twin descends 3.564@699 — refuting my own
+registered underflow hypothesis, as did the silicon: predicted FLAT, measured DESCENDS). The decisive
+silicon measurement: **resuming the plateaued masters at LR 1e-3 descends immediately, 3.83 → ema
+3.649 in 500 steps** (the best silicon number of run #1's lineage), approaching a new ~3.6 floor.
+
+**Mechanism:** SGD-family training floors at ≈ LR × gradient-noise. The silicon's effective gradient is
+noisier than the CPU references (bf16 inter-chip messages + the 1-ULP reduction reorder + fp32
+arithmetic vs the refs' fp64), so the same constant LR floors higher (3.82 vs ~3.4). Calibration:
+floor(3e-3) ≈ 3.82, floor(1e-3) ≈ 3.6–3.65; crude linear extrapolation → asymptote ~3.5, i.e. the
+schedule closes most of the gap and the *residual* vs CPU is the noise itself — which the in-chip
+batch-replication lever (N datapaths/SLR sharing URAM weights, gradient summed locally, no global
+sync; morph-LM-proven N=4 linear) attacks as batch de-noising.
+
+**Fix (host-side, no rebuild, commit `4f680f8`):** warmup → cosine LR decay to `LR×LR_MINFRAC`
+(`LR_DECAY=1`, driver + runner). **Coherence run #2** (from scratch, ACCUM=8, 2000 steps, 3e-3→3e-4)
+is measuring it, with a same-schedule CPU twin as the reference line.
 
 ---
 
