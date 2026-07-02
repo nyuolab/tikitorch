@@ -159,3 +159,16 @@ Work scaling: linears SEQ·D² (64×), attention SEQ²·D (64×, fastest in SEQ)
 | Step budget (§1.3), S=3/ACCUM ladder, L=8 collapse, dual-engine asymptote | **COMPUTED-ESTIMATE** (discrete-event sim reproducing 3 measured anchors; host constants calibrated not per-call-measured; <3% sensitivity to kick attribution) | /tmp/wf3_sched.py |
 | Lever gains (#4–#10), area deltas, replication budgets | **COMPUTED-ESTIMATE** (csynth extrapolation; one measured calibration point: DSP-bound 16-lane II=1 linear = +27 DSP/+7k LUT vs DSP-free twin) | csynth + kernel source |
 | 30M/124M kick times, BRAM/PRAW verdicts, fit wall D≈96–128 | **COMPUTED-ESTIMATE** (analytic scaling laws off the D=64 report, ±1.5× band; BRAM counts ±1 block; confirm with one D=256 csynth) | §2.3 |
+
+---
+
+## UPDATE 2026-07-03: Lever A + S=8 built (csynth-gated)
+
+- **S=8 pipeline slots** (rebuild #4, decoupled): DDR-only, csynth free-fit (BRAM 97%/URAM 3% == shipped
+  de-flatten AFI). Fixes the S=2-at-L=8 utilization cliff (~24% → full). AFI building.
+- **Lever A + budgeted URAM** (rebuild #5): csynth-CONFIRMED **BRAM 61% / URAM 48% / LUT 74%, one SLR**, and
+  **bf_linear_bwd 4.28M→2.19M cyc = 1.95×** (the backward-linear 2× win, II=1 preserved). Budget lesson from
+  #4: bind ONLY high-fill (≥4096 words/bank) arrays — Wd/HDpre/gHD/HDa/WRMASK — not tiny high-bank arrays
+  (which wasted URAM to 237%). AFI building concurrently. Projected BWD kick 91→~58 ms → pipeline steady-state
+  (gated by max(fwd,bwd)) ~1.6× on top of S=8.
+
