@@ -640,8 +640,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             if (ROLE == X_RL_INPUT) {
                 static int32_t tok[X_SEQ]; bload32(buffer, MP_TOK + pto, tok, X_SEQ);
                 static float FEMB[X_VOCAB*X_D], FPOS[X_SEQ*X_D];
-#pragma HLS bind_storage variable=FEMB type=ram_2p impl=uram   // VOCAB*D=4096 embed master: burst-load + 1D gather -> URAM
-#pragma HLS bind_storage variable=FPOS type=ram_2p impl=uram   // SEQ*D=4096 pos master:  burst-load + 1D gather   -> URAM
                 bload_f(buffer, MP_FEMB, FEMB, X_VOCAB*X_D); bload_f(buffer, MP_FPOS, FPOS, X_SEQ*X_D);
                 for (int t=0;t<X_SEQ;t++){ int v=tok[t]; if(v<0)v=0; if(v>=X_VOCAB)v=X_VOCAB-1;
                     for (int d=0;d<X_D;d++) WR[t*X_D+d]=FEMB[v*X_D+d]+FPOS[t*X_D+d]; }
@@ -690,7 +688,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             bf_qact(WATTN, X_SEQ*X_D);                          // char-LM: proj(qact(y))
             bstore_f(buffer, MP_WATTN + po, WATTN, X_SEQ*X_D);
             static float AOf[X_SEQ*X_D];
-#pragma HLS bind_storage variable=AOf type=ram_2p impl=uram   // bf_matmul y-out (1 wr) + 1D residual read -> URAM
             bf_matmul(WATTN, FWO, AOf, X_SEQ, X_D, X_D);
             for(int i=0;i<X_SEQ*X_D;i++) WM[i]=WR[i]+AOf[i];
             bstore_f(buffer, MP_WM + po, WM, X_SEQ*X_D);
@@ -704,7 +701,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             bstore_f(buffer, MP_WHD + po, WHD, X_SEQ*X_FFN);
             bstore_f(buffer, MP_WRMASK + po, WRMASK, X_SEQ*X_FFN);
             static float FOf[X_SEQ*X_D];
-#pragma HLS bind_storage variable=FOf type=ram_2p impl=uram   // bf_matmul y-out (1 wr) + 1D residual read -> URAM
             bf_matmul(WHD, FWDN, FOf, X_SEQ, X_FFN, X_D);
             for(int i=0;i<X_SEQ*X_D;i++) WRP[i]=WM[i]+FOf[i];
             bstore_f(buffer, MP_WRP + po, WRP, X_SEQ*X_D);
@@ -713,7 +709,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             if (ROLE == X_RL_OUT) {
                 static float FLNFG[X_D], FLNFB[X_D]; bload_f(buffer, MP_FLNFG, FLNFG, X_D); bload_f(buffer, MP_FLNFB, FLNFB, X_D);
                 static float FWHEAD[X_VOCAB*X_D];
-#pragma HLS bind_storage variable=FWHEAD type=ram_2p impl=uram   // VOCAB*D=4096 head master (Wf-arg, 1-port) -> URAM
                 bload_f(buffer, MP_FWHEAD, FWHEAD, X_VOCAB*X_D);
                 static float WXF[X_SEQ*X_D], WLG[X_SEQ*X_VOCAB], lnfm[X_SEQ], lnfss[X_SEQ];
                 bf_layernorm(WRP, FLNFG, FLNFB, WXF, lnfm, lnfss, X_SEQ);
@@ -766,7 +761,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
         bload_f(buffer, MP_WLNFS + po, lnfss, X_SEQ);
         static int32_t tgt[X_SEQ]; bload32(buffer, MP_TGT + pto, tgt, X_SEQ);
         static float FWHEAD[X_VOCAB*X_D], FLNFG[X_D];
-#pragma HLS bind_storage variable=FWHEAD type=ram_2p impl=uram   // VOCAB*D=4096 head master (Wf-arg to bf_linear_bwd, 1-port) -> URAM
         bload_f(buffer, MP_FWHEAD, FWHEAD, X_VOCAB*X_D); bload_f(buffer, MP_FLNFG, FLNFG, X_D);
         static float gLG[X_SEQ*X_VOCAB];
     CE: for (int t=0;t<X_SEQ;t++){
@@ -788,7 +782,6 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             }
         }
         static float gWHEAD[X_VOCAB*X_D];
-#pragma HLS bind_storage variable=gWHEAD type=ram_2p impl=uram   // VOCAB*D=4096 head grad accum (dW RMW + adam, low-port) -> URAM
         for (int i=0;i<X_VOCAB*X_D;i++) gWHEAD[i]=0;
         static float gXF[X_SEQ*X_D]; bf_linear_bwd(gLG, FWHEAD, WXF, gXF, gWHEAD, X_SEQ, X_D, X_VOCAB);
         bf_ln_bwd(gXF, FLNFG, lnfss, gRP, X_SEQ);
@@ -797,17 +790,13 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
 #endif
         // gradient accumulation (effective batch = ACCUM): fold gWHEAD into its DDR accumulator
         { static float aH[X_VOCAB*X_D];
-#pragma HLS bind_storage variable=aH type=ram_2p impl=uram   // VOCAB*D=4096 head grad-accum DDR scratch (burst load + 1D add) -> URAM
           if (!GZERO) { bload_f(buffer, MP_GACC_WH, aH, X_VOCAB*X_D); for(int i=0;i<X_VOCAB*X_D;i++) gWHEAD[i]+=aH[i]; }
           bstore_f(buffer, MP_GACC_WH, gWHEAD, X_VOCAB*X_D); }
         // head dyadic-Adam (OUTPUT-only weight)
         if (DO_UP) {
             static float FWHEADm[X_VOCAB*X_D];
-#pragma HLS bind_storage variable=FWHEADm type=ram_2p impl=uram   // VOCAB*D=4096 head master (bf_adam_one 1R1W) -> URAM
             bload_f(buffer, MP_FWHEAD, FWHEADm, X_VOCAB*X_D);
             static float mH[X_VOCAB*X_D], vH[X_VOCAB*X_D];
-#pragma HLS bind_storage variable=mH type=ram_2p impl=uram   // adam m (1R1W simple-dual) -> URAM
-#pragma HLS bind_storage variable=vH type=ram_2p impl=uram   // adam v (1R1W simple-dual) -> URAM
             bload_f(buffer, MP_MOM+MP_OFF_FHEAD, mH, X_VOCAB*X_D); bload_f(buffer, MP_VAR+MP_OFF_FHEAD, vH, X_VOCAB*X_D);
             bf_adam_one(FWHEADm, gWHEAD, mH, vH, X_VOCAB*X_D, LR);
             bstore_f(buffer, MP_FWHEAD, FWHEADm, X_VOCAB*X_D);
@@ -889,7 +878,6 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
     //      running sum, so the dyadic-Adam below (only on the last sub-batch, DO_UP) steps on the accumulated grad.
     {
         static float aB[X_FFN*X_D];
-#pragma HLS bind_storage variable=aB type=ram_2p impl=uram   // FFN*D=16384 grad-accum DDR scratch (burst load + 1D add) -> URAM
         if (!GZERO) {
             bload_f(buffer, MP_GACC_WQ,  aB, X_D*X_D);   for(int i=0;i<X_D*X_D;i++)   gWQ[i]+=aB[i];
             bload_f(buffer, MP_GACC_WK,  aB, X_D*X_D);   for(int i=0;i<X_D*X_D;i++)   gWK[i]+=aB[i];
@@ -929,14 +917,10 @@ ABWD: for (int h=0;h<X_H;h++) for (int i=0;i<X_SEQ;i++) {
           bstore_f(buffer, MP_GACC_EMB, gE, X_VOCAB*X_D); bstore_f(buffer, MP_GACC_POS, gPo, X_SEQ*X_D); }
         if (DO_UP) {
             static float FEMB[X_VOCAB*X_D], FPOS[X_SEQ*X_D];
-#pragma HLS bind_storage variable=FEMB type=ram_2p impl=uram   // VOCAB*D=4096 embed master (bf_adam_one 1R1W) -> URAM
-#pragma HLS bind_storage variable=FPOS type=ram_2p impl=uram   // SEQ*D=4096 pos master  (bf_adam_one 1R1W) -> URAM
             bload_f(buffer, MP_FEMB, FEMB, X_VOCAB*X_D); bload_f(buffer, MP_FPOS, FPOS, X_SEQ*X_D);
             static float mE[X_VOCAB*X_D], vE[X_VOCAB*X_D], mPo[X_SEQ*X_D], vPo[X_SEQ*X_D];
 #pragma HLS bind_storage variable=mE  type=ram_2p impl=uram   // embed adam m (1R1W) -> URAM
 #pragma HLS bind_storage variable=vE  type=ram_2p impl=uram   // embed adam v (1R1W) -> URAM
-#pragma HLS bind_storage variable=mPo type=ram_2p impl=uram   // pos adam m (1R1W) -> URAM
-#pragma HLS bind_storage variable=vPo type=ram_2p impl=uram   // pos adam v (1R1W) -> URAM
             bload_f(buffer, MP_MEMB, mE, X_VOCAB*X_D); bload_f(buffer, MP_VEMB, vE, X_VOCAB*X_D);
             bload_f(buffer, MP_MPOS, mPo, X_SEQ*X_D); bload_f(buffer, MP_VPOS, vPo, X_SEQ*X_D);
             bf_adam_one(FEMB, gE, mE, vE, X_VOCAB*X_D, LR); bf_adam_one(FPOS, gPo, mPo, vPo, X_SEQ*X_D, LR);
