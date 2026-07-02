@@ -5,9 +5,13 @@ New here? Start at section 2 (the stack) then jump via the file map (section 3).
 
 > **★ Flagship status → [FLAGSHIP_SILICON_RESULT.md](FLAGSHIP_SILICON_RESULT.md)** — the
 > consolidated result: a distributed BF16 PC transformer **trains on 3 physical F2 FPGAs**
-> (bpb 6.9 → ~4.0, no global gradient), the 9-build timing-closure saga (root-caused), and the
-> open problems (the silicon quality plateau — *silicon-specific, ACCUM refuted*; throughput;
-> attention). Honest: structural flagship holds, **coherent quality not yet**.
+> (no global gradient). Both former open problems are **RESOLVED (2026-06-30/07-01)**:
+> the quality plateau was **effective batch = 1** (kernel proven sound by a silicon overfit
+> to bpb 0.103; fixed by true in-kernel gradient accumulation, csim-verified) and the
+> throughput wall was **II=80** in the fp reductions (fixed by partial-sum lanes →
+> **2.94× measured**, 0.47 → 1.38 steps/s, AFI `agfi-0846ef96674df0815`). Honest: the
+> batch-8 coherence run (target ≤3.2 bpb, golden = 3.196) is in flight; grads are now
+> within-1-bf16-ULP of the golden rather than bit-exact (the fast-GEMM reorder trade-off).
 
 ---
 
