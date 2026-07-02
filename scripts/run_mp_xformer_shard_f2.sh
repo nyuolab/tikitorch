@@ -8,7 +8,7 @@ set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"; REGION="${REGION:-us-east-1}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-f2.48xlarge}"; AMI="${AMI:-ami-092fc5deb8f3c0f7d}"
 AGFI="${AGFI:?set AGFI}"; STEPS="${STEPS:-3000}"; NSLOTS="${NSLOTS:-3}"; MAX_MINUTES="${MAX_MINUTES:-90}"; ROLE="${ROLE:-tiki-sweep-runner}"
-XF_LR="${XF_LR:-3e-3}"; XF_WARMUP="${XF_WARMUP:-120}"; SEED="${SEED:-0}"; SAMPLE="${SAMPLE:-400}"; ACTSTATS="${ACTSTATS:-0}"; FIXEDOFF="${FIXEDOFF:--1}"; ACCUM="${ACCUM:-1}"
+XF_LR="${XF_LR:-3e-3}"; XF_WARMUP="${XF_WARMUP:-120}"; SEED="${SEED:-0}"; SAMPLE="${SAMPLE:-400}"; ACTSTATS="${ACTSTATS:-0}"; FIXEDOFF="${FIXEDOFF:--1}"; ACCUM="${ACCUM:-1}"; INIT_S3="${INIT_S3:-}"
 BINS_S3="${BINS_S3:-s3://tiki-sweep-739966866637/pc_shakespeare_mp_bins}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; STATE_DIR="$PROJECT_DIR/.tiki_mp_xformer_shard_state"; mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/run.env"; aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
@@ -25,7 +25,7 @@ shutdown -h +${MAX_MINUTES} dl || true
 exec > /var/log/tiki-mpxfshard.log 2>&1
 set -x; export HOME=/root
 S3_SRC="${S3_SRC}"; S3_RESULTS="${S3_RESULTS}"; AGFI="${AGFI}"; STEPS="${STEPS}"; NSLOTS="${NSLOTS}"; BINS_S3="${BINS_S3}"
-XF_LR="${XF_LR}"; XF_WARMUP="${XF_WARMUP}"; SEED="${SEED}"; SAMPLE="${SAMPLE}"; ACTSTATS="${ACTSTATS}"; FIXEDOFF="${FIXEDOFF}"; ACCUM="${ACCUM}"
+XF_LR="${XF_LR}"; XF_WARMUP="${XF_WARMUP}"; SEED="${SEED}"; SAMPLE="${SAMPLE}"; ACTSTATS="${ACTSTATS}"; FIXEDOFF="${FIXEDOFF}"; ACCUM="${ACCUM}"; INIT_S3="${INIT_S3}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-mpxfshard.log "\$S3_RESULTS/mpxfshard.log" --only-show-errors || true; }
 trap up EXIT
 ( while true; do sleep 30; up; done ) &
@@ -38,9 +38,10 @@ SLOTS=""; for s in \$(seq 0 \$((NSLOTS-1))); do SLOTS="\$SLOTS \$s"; sudo \$FC -
 sleep 4; for s in \$SLOTS; do sudo \$FD -S \$s 2>&1 | tee -a /tmp/img.txt; done; up
 mkdir -p /opt/tiki && cd /opt/tiki && for i in 1 2 3; do aws s3 cp "\$S3_SRC" s.tgz && break; sleep 8; done && tar xzf s.tgz
 mkdir -p /tmp/pc_shakespeare; for fn in train.u16 val.u16 itos.txt; do aws s3 cp "\$BINS_S3/\$fn" /tmp/pc_shakespeare/\$fn --only-show-errors; done
+if [ -n "\$INIT_S3" ]; then mkdir -p /tmp/init; for l in 0 1 2 3 4 5 6 7; do aws s3 cp "\$INIT_S3/master\$l.f32" /tmp/init/master\$l.f32 --only-show-errors 2>/dev/null || true; done; export INIT_DIR=/tmp/init; ls -la /tmp/init; fi
 g++ -O2 -std=c++14 -I"\$SDK/include" -I/opt/tiki/tikitorch/hardware/hls/forge_kernels \
     /opt/tiki/tikitorch/fpga/silicon/forge_pc_xformer_mp_shard.cpp -lfpga_mgmt -o /tmp/xfmpshard 2>&1 | tee /tmp/build.txt; up
-export XF_LR XF_WARMUP SEED SAMPLE ACTSTATS FIXEDOFF ACCUM DUMP_DIR=/tmp
+export XF_LR XF_WARMUP SEED SAMPLE ACTSTATS FIXEDOFF ACCUM DUMP_DIR=/tmp   # INIT_DIR exported above when INIT_S3 set
 ( sudo -E /tmp/xfmpshard "\$STEPS" /tmp/pc_shakespeare \$SLOTS 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
 for fdump in img build train; do aws s3 cp /tmp/\$fdump.txt "\$S3_RESULTS/\$fdump.txt" --only-show-errors || true; done
 for w in /tmp/xfmp_master*.f32; do [ -f "\$w" ] && aws s3 cp "\$w" "\$S3_RESULTS/\$(basename \$w)" --only-show-errors || true; done
