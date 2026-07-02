@@ -177,8 +177,10 @@ unroll *created* the stall; that's why widening it (and everything else) was a n
 
 **Fix:** 16 independent partial-sum lanes (`ps[i&15] += w·x`) + tree-reduce → **II 80→1** (csynth-confirmed;
 top-fn 355 → 44–65 ms; `bf_matmul` 31→12 ms, `bf_linear_bwd` 63→10 ms). Commits `db51373`/`20f9a41`.
-- **Honest deltas:** silicon ~121 ms vs csynth 44–65 ms → ~60 ms/kick residual (DDR access latency /
-  data-dependent bound) not yet attributed — the next csynth-vs-silicon comparison target.
+- **Honest deltas — RESOLVED 2026-07-02:** the "~60 ms residual" was a UNITS error (csynth reports at the
+  3.0 ns synth clock; at the deployment 6.667 ns csynth predicts ~121 ms = the measured kick exactly). The
+  real remaining lever: the partial-sum loops achieved **II=4, not II=1** (HLS auto-flatten folds the
+  epilogue into the pipeline) → `LOOP_FLATTEN off` (commit `3eff193`) targets ~2–3× more on the MACs.
 - **Precision trade-off:** the reduction reorder makes grads/acts **within 1 bf16 ULP** of the golden
   instead of bit-exact (standard for a fast GEMM; deterministic; benign for dyadic-Adam). The gradcheck
   gate is re-aligned to ≤1 ULP and still fails on any real bug.
