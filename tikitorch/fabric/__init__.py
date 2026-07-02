@@ -25,6 +25,7 @@ from .cost import (
 )
 from .link import LinkStats, NeighborLink
 from .runner import PipelineRunner, RunResult, run_serial
+from .tcp_link import TcpLink, make_tcp_chain, make_tcp_links_local, run_chain_segment
 from .thread_link import ThreadLink, make_thread_links
 
 __all__ = [
@@ -32,6 +33,10 @@ __all__ = [
     "LinkStats",
     "ThreadLink",
     "make_thread_links",
+    "TcpLink",
+    "make_tcp_chain",
+    "make_tcp_links_local",
+    "run_chain_segment",
     "PipelineRunner",
     "RunResult",
     "run_serial",
