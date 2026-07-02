@@ -190,6 +190,34 @@ report first.** At 1.38 steps/s, ACCUM=8×1500 steps ≈ 2.4 h — the coherence
 
 ---
 
+## 5b. COHERENCE RUN #1 (2026-07-02, MEASURED): batch-8 lands at 3.825 — better, structured, not yet coherent
+
+**Run:** `ACCUM=8 STEPS=1500` on the fast AFI (`agfi-0846ef96674df0815`), 3 chips, 2.4 h.
+**Final: ema 3.825, acc 0.240 (15× chance). Gate-C clean: 0 weights / 0 gradients crossed chips
+(786 MB of pure neighbour messages).** The 400-token sample decodes to word-shaped proto-English with
+Shakespeare *structure* (line breaks, speaker-colon headers, dialogue punctuation: `S: GRkmeushe…`,
+`Whpuindo,` `My :`) — consistent with ~3.8 bpb: real structure, not yet coherent words.
+
+**Honest read:** real accumulation moved the plateau 4.0-4.5 → **3.83 flat** (from ~step 600) — but the
+CPU references DESCEND past it. With kernel-exact ACCUM semantics (grads summed over the window, one
+dyadic-Adam on the sum):
+
+| @step 600 → 700, ACCUM=8 | ema | trend |
+|---|---|---|
+| 1-block exact-kernel repro | 3.56 → 3.46 | descending (→ golden's 3.196@1200) |
+| **3-block exact-kernel repro** | 3.61 → 3.53 | **descending** |
+| **silicon 3-chip** | 3.80 → 3.83 @1400 | **flat** |
+
+So the plateau is NOT depth/frozen-LN recipe (the 3-block repro descends) — **a silicon-vs-reference
+divergence of ~0.3+ persists that appears only past ~step 600.** In progress (the signature-result
+technique): **replay the repro with the silicon's exact init** (bit-exact `init_master` regeneration,
+SEED=0) — plateau reproduced → init/order artifact (host-side fix); still descends → kernel-level
+divergence → diff the trained masters (dumped to S3) / one-step dump-and-compare. Suspects after that:
+the 1-ULP reduction reorder interacting with late training, or the bf16 Adam moment state at silicon
+precision vs the repro's float64 moments.
+
+---
+
 ## 6. PATH FORWARD — to a coherent model, trained rapidly
 
 Two orthogonal tracks (the quality gap and the throughput gap are independent):
