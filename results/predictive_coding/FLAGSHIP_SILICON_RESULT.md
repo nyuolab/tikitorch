@@ -159,22 +159,34 @@ is settled.
 
 ---
 
-## 5. OPEN PROBLEM #3 — throughput (host-relay-bound)
+## 5. THROUGHPUT — ★SOLVED 2026-07-01: 2.94× measured (the II=80 story)
 
-**MEASURED:** 0.47 steps/s (~2.1 s/step). **CORRECTION (Track-B Stage-0 test, 2026-06-30):** this
-transformer is **COMPUTE-bound, not host-relay-bound.** Bursting the readback (mmap+memcpy via
-`fpga_pci_get_address` vs word-at-a-time peek) gave **0.47 vs 0.46 steps/s — no change** (bit-identical
-bpb). The "~61 % relay" was the MNIST-MLP rig; it does NOT transfer to the transformer. The 2.1 s/step is
-the **kernel kick**: the heavy BF16 backward at **150 MHz with `factor=2` unroll** (≈350 ms/kick × 6
-serial kicks/step). The real "rapid" levers, in order:
-- **Revert `factor=2` → `factor=8`** (full parallelism, ~4× faster kick). It was cut ONLY to close timing
-  at 250 MHz — but we now run at **150 MHz** (the CDC), where `factor=8` (79 % LUT / −1.688 ns @ 250 MHz)
-  regains ~+0.6 ns slack and should close. A rebuild — **combine it with the Track-A quality fix** in one AFI.
-- **Pipelined driver** (overlap the 3 chips' kicks across microbatches, ~3×, NO rebuild — the
-  `tikitorch.fabric` 1F1B/overlap is the blueprint). The current driver is GPipe-serial (6 serial kicks/step).
-The burst-readback path is kept (peek fallback, `READBURST` env) — harmless, and it matters once the kicks
-overlap. **0.47 steps/s is workable for the Track-A quality iteration (~53 min/1500-step run); defer the
-factor=8 rebuild to combine with the quality fix.**
+**MEASURED ON SILICON: 1.38 steps/s (was 0.47) = 2.94×; kick 355 → ~121 ms.**
+AFI `agfi-0846ef96674df0815` (partial-sum kernel, timing MET WNS +0.003 ns @150 MHz CDC).
+
+**The road there is the lesson.** Three plausible levers each failed on silicon (each a ~5 h build):
+1. ~~host-relay-bound~~ → bursting the readback: 0.47 vs 0.46 (I/O is bursted, ~0.2 ms/kick).
+2. ~~inner-compute-bound~~ → `factor=2→8` unroll: no change.
+3. ~~dyad transcendental in the inner MAC~~ → hoisting it (bit-exact, correct, 64× redundancy): no change.
+
+The **csynth per-loop table** (a `CSYNTH_ONLY=1` ~15-min pass, no P&R — now built into
+`run_mp_afi_build_f2.sh`, which uploads every module's `*_csynth.rpt`) gave the real answer in one shot:
+the dominant reductions (`bf_matmul` BM, `bf_linear_bwd` LR/WG, trip 131k) were pipelined at **II=80**
+(target 1) — the `factor=8` UNROLL chains 8 dependent fp-adds into ONE accumulator (~10 cyc each). The
+unroll *created* the stall; that's why widening it (and everything else) was a no-op.
+
+**Fix:** 16 independent partial-sum lanes (`ps[i&15] += w·x`) + tree-reduce → **II 80→1** (csynth-confirmed;
+top-fn 355 → 44–65 ms; `bf_matmul` 31→12 ms, `bf_linear_bwd` 63→10 ms). Commits `db51373`/`20f9a41`.
+- **Honest deltas:** silicon ~121 ms vs csynth 44–65 ms → ~60 ms/kick residual (DDR access latency /
+  data-dependent bound) not yet attributed — the next csynth-vs-silicon comparison target.
+- **Precision trade-off:** the reduction reorder makes grads/acts **within 1 bf16 ULP** of the golden
+  instead of bit-exact (standard for a fast GEMM; deterministic; benign for dyadic-Adam). The gradcheck
+  gate is re-aligned to ≤1 ULP and still fails on any real bug.
+- Remaining levers (unbuilt): pipelined driver / 1F1B across chips (~3×), persistent on-chip weights
+  (scaling-critical as D grows), gating the dead int-deploy forward during training (~24 ms/fwd-kick).
+
+**PROCESS RULE (memory: hls-reduction-ii-lesson): no perf-motivated rebuild without the csynth per-loop
+report first.** At 1.38 steps/s, ACCUM=8×1500 steps ≈ 2.4 h — the coherence run is practical.
 
 ---
 
