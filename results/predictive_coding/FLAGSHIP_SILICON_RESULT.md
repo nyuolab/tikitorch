@@ -227,8 +227,28 @@ batch-replication lever (N datapaths/SLR sharing URAM weights, gradient summed l
 sync; morph-LM-proven N=4 linear) attacks as batch de-noising.
 
 **Fix (host-side, no rebuild, commit `4f680f8`):** warmup → cosine LR decay to `LR×LR_MINFRAC`
-(`LR_DECAY=1`, driver + runner). **Coherence run #2** (from scratch, ACCUM=8, 2000 steps, 3e-3→3e-4)
-is measuring it, with a same-schedule CPU twin as the reference line.
+(`LR_DECAY=1`, driver + runner).
+
+## ★ 5c. COHERENCE RUN #2 (2026-07-02, MEASURED): **bpb 3.187 — converged on the fabric**
+
+**From scratch, ACCUM=8 × 2000 steps (16,000 sequences ≈ 1.0M tokens), cosine 3e-3→3e-4, 3.2 h, 88 tok/s,
+3 physical FPGAs, Gate-C clean.** Monotone descent the whole run (3.80@600 → 3.58@1000 → 3.32@1400 →
+**ema 3.187 @2000**, still creeping down), **acc 0.348 ema / 0.422 final batch (22–27× chance)**.
+
+| same init / order / data / schedule | ema @2000 |
+|---|---|
+| exact CPU twin (fp64 wide) | 3.049 |
+| **silicon, 3 chips** | **3.187** (**gap 0.14** — was 0.4+ at constant LR) |
+| (single-block golden, constant 3e-3, for scale) | 3.196 |
+
+**Sample (decoded):** real English-like words + Shakespeare structure — `ING LAT:` (a mangled speaker
+header), `And kne, wher, thy lot's ge shele;`, `Noeed for a tring to kis se hat` — vs run #1's letter
+salad. The remaining 0.14 vs the twin is the silicon gradient-noise premium (bf16 messages + reduction
+reorder + fp32), which shrinks with batch — the in-chip batch-replication lever's job.
+
+**This is the "trains performantly and converges on the fabric" milestone:** the distributed PC
+transformer — one block per physical FPGA, no global gradient, on-chip batch accumulation, host-side
+LR schedule — converges to within 0.14 bpb of its exact CPU reference at 2.94×-improved throughput.
 
 ---
 
