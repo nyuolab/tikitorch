@@ -44,14 +44,41 @@ counts and wait-times are recorded per stage (the Gate-C instrumentation).
 | Backend          | Where        | Status | Notes |
 |------------------|--------------|--------|-------|
 | `ThreadLink`     | CPU sim / CI | **done** | threads + queues; real concurrency, laptop-runnable |
+| `TcpLink`        | farm         | **done** | cross-instance neighbour link; mixed local+TCP chains, framed LE protocol (magic+crc32, fails loudly), either-side-first connect retry; **2-process split BIT-EXACT to ThreadLink** (`tests/test_tcp_link.py`) |
 | `HostRelayLink`  | F2           | next   | bursted host DMA on the **existing AGFI** (no rebuild) — first measured relay-bursted throughput |
 | `PcieP2PLink`    | F2           | next   | direct neighbour-DDR within an instance (bypasses the host) |
-| `TcpLink`        | farm         | later  | cross-instance neighbour link (16-FPGA / 2-instance) |
 | `FabricLink`     | future       | later  | on-die SLR / GT link |
 
 The PC training loop is written against `NeighborLink` only, so the *same*
 `PipelineRunner` logic runs on each backend — validate on `ThreadLink`, then measure on
 silicon.
+
+## Scaling across boxes — why the chain composes (and what "trivially" needs)
+
+PC's comms graph is nearest-neighbour with **constant message size in chip count**
+(`SEQ×D` floats per hop per direction), so multi-instance fabrics are literal
+concatenation: local hops inside each box + **one TCP hop per box boundary per
+direction**. Adding an instance adds one boundary with constant traffic — vs backprop's
+all-reduce, whose traffic grows with model size across all nodes.
+
+The boundary is never the bottleneck (placement-group arithmetic, per boundary per
+ACCUM=8 step, fwd+bwd):
+
+| config | msg/hop | per step | wire @25 Gbps | vs the kick |
+|---|---|---|---|---|
+| today: D=64, SEQ=64, 3 chips | 16 KB | ~262 KB | ~0.1 ms | 121 ms (measured) |
+| 124M-ish: D=768, SEQ=256, ~14 chips / 2 boxes | 786 KB | ~12.6 MB | ~4 ms | multi-second (compute ~D²) |
+
+Three prerequisites before "trivially" holds for *throughput* (not just protocol):
+1. **Pipelining** (`NEXT_REBUILD_BUNDLE.md` item 1): the serial fwd/bwd sweep has an
+   O(N)-kick critical path per sub-batch — 16 chips ≈ 32 serial kicks. The
+   double-buffered activation cache makes sub-batches overlap (staleness-free inside an
+   ACCUM window), holding per-chip utilization ~constant as N grows. Required for large N.
+2. **Port the TCP boundary into the silicon driver** (`forge_pc_xformer_mp_shard.cpp`):
+   mechanical — a relay thread speaking the same framed protocol at the boundary chip,
+   verified against this module's bit-exact Python twin.
+3. **Mid-run reconnect**: `TcpLink` retries on connect but not mid-run; multi-hour
+   cross-instance runs need keepalive/resume at the boundary.
 
 ## The runtime — `PipelineRunner`
 
