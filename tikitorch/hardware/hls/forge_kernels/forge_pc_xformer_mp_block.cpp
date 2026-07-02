@@ -341,36 +341,60 @@ static void bf_linear_bwd(const float *gy, const float *Wf, const float *x,
 #pragma HLS INLINE off
     // HOIST dyad(W) out of the row-redundant dx MAC (see bf_matmul): precompute once (O*I) not per row (M*O*I).
     static float Wd[X_FFN*X_D];
+    // LEVER A (rebuild #5): middle-loop unroll x2 on BOTH nests — dx's LR_I (over i) and wgrad's WG_I (over i)
+    // process i and i+1 concurrently: HALF the inner-reduction pipeline fills. The two doubled operands
+    // (Wd[o*I+i]/Wd[o*I+i+1] in dx; x[t*I+i]/x[t*I+i+1] in wgrad) are adjacent opposite-parity addresses, so a
+    // CYCLIC factor-2 partition banks them even/odd -> 2 concurrent 1-port reads/cyc (II=1 preserved). I always
+    // even (D=64 / FFN=256). Arithmetic per output is IDENTICAL (same [idx&15] lane, same tree-reduce+operand
+    // order) => pure SCHEDULE change, gradients bit-identical (gradcheck: KAT1 bit-exact, KAT2 relerr 5.000e-03).
+    // URAM (rebuild #5, budgeted): Wd (this bf_linear_bwd copy ONLY) -> ram_2p URAM so the Lever-A cyclic-2
+    // duplication lands in URAM not BRAM. The `x` operands (caller's WHD/WX2/WATTN/WX1/WXF) STAY BRAM: HLS must
+    // own their 2-bank partition interface. Budget: BRAM_saved/URAM_spent ratio picks single-bank 16K arrays only.
+#pragma HLS ARRAY_PARTITION variable=Wd cyclic factor=2 dim=1
+#pragma HLS ARRAY_PARTITION variable=x  cyclic factor=2 dim=1
+#pragma HLS bind_storage variable=Wd type=ram_2p impl=uram
     LR_D: for (int j = 0; j < O*I; j++) {
 #pragma HLS PIPELINE II=1
                 Wd[j] = bf_dyad_f(Wf[j]); }
 LR_T: for (int t = 0; t < M; t++)
-    LR_I: for (int i = 0; i < I; i++) {
+    LR_I: for (int i = 0; i < I; i += 2) {   // MIDDLE unroll x2
 #pragma HLS LOOP_FLATTEN off
-            float ps[16];
-#pragma HLS ARRAY_PARTITION variable=ps complete dim=1
-            for (int k=0;k<16;k++) ps[k]=0;
+            float ps_a[16], ps_b[16];
+#pragma HLS ARRAY_PARTITION variable=ps_a complete dim=1
+#pragma HLS ARRAY_PARTITION variable=ps_b complete dim=1
+            for (int k=0;k<16;k++) { ps_a[k]=0; ps_b[k]=0; }
         LR_O: for (int o = 0; o < O; o++) {
 #pragma HLS PIPELINE II=1
-                ps[o&15] += Wd[o*I+i] * gy[t*O+o];
+                float g = gy[t*O+o];                   // one shared gy read feeds both columns
+                ps_a[o&15] += Wd[o*I+i]   * g;
+                ps_b[o&15] += Wd[o*I+i+1] * g;
             }
-            float a0=(ps[0]+ps[1])+(ps[2]+ps[3]),   a1=(ps[4]+ps[5])+(ps[6]+ps[7]);
-            float a2=(ps[8]+ps[9])+(ps[10]+ps[11]), a3=(ps[12]+ps[13])+(ps[14]+ps[15]);
-            dx[t*I+i] = P((a0+a1)+(a2+a3));
+            { float a0=(ps_a[0]+ps_a[1])+(ps_a[2]+ps_a[3]),   a1=(ps_a[4]+ps_a[5])+(ps_a[6]+ps_a[7]);
+              float a2=(ps_a[8]+ps_a[9])+(ps_a[10]+ps_a[11]), a3=(ps_a[12]+ps_a[13])+(ps_a[14]+ps_a[15]);
+              dx[t*I+i] = P((a0+a1)+(a2+a3)); }
+            { float b0=(ps_b[0]+ps_b[1])+(ps_b[2]+ps_b[3]),   b1=(ps_b[4]+ps_b[5])+(ps_b[6]+ps_b[7]);
+              float b2=(ps_b[8]+ps_b[9])+(ps_b[10]+ps_b[11]), b3=(ps_b[12]+ps_b[13])+(ps_b[14]+ps_b[15]);
+              dx[t*I+i+1] = P((b0+b1)+(b2+b3)); }
         }
 WG_O: for (int o = 0; o < O; o++)
-    WG_I: for (int i = 0; i < I; i++) {
+    WG_I: for (int i = 0; i < I; i += 2) {   // MIDDLE unroll x2
 #pragma HLS LOOP_FLATTEN off
-            float ps[16];
-#pragma HLS ARRAY_PARTITION variable=ps complete dim=1
-            for (int k=0;k<16;k++) ps[k]=0;
+            float ps_a[16], ps_b[16];
+#pragma HLS ARRAY_PARTITION variable=ps_a complete dim=1
+#pragma HLS ARRAY_PARTITION variable=ps_b complete dim=1
+            for (int k=0;k<16;k++) { ps_a[k]=0; ps_b[k]=0; }
         WG_T: for (int t = 0; t < M; t++) {
 #pragma HLS PIPELINE II=1
-                ps[t&15] += gy[t*O+o] * x[t*I+i];
+                float g = gy[t*O+o];                   // one shared gy read (indep of i) feeds both columns
+                ps_a[t&15] += g * x[t*I+i];
+                ps_b[t&15] += g * x[t*I+i+1];
             }
-            float a0=(ps[0]+ps[1])+(ps[2]+ps[3]),   a1=(ps[4]+ps[5])+(ps[6]+ps[7]);
-            float a2=(ps[8]+ps[9])+(ps[10]+ps[11]), a3=(ps[12]+ps[13])+(ps[14]+ps[15]);
-            dW[o*I+i] += P((a0+a1)+(a2+a3));
+            { float a0=(ps_a[0]+ps_a[1])+(ps_a[2]+ps_a[3]),   a1=(ps_a[4]+ps_a[5])+(ps_a[6]+ps_a[7]);
+              float a2=(ps_a[8]+ps_a[9])+(ps_a[10]+ps_a[11]), a3=(ps_a[12]+ps_a[13])+(ps_a[14]+ps_a[15]);
+              dW[o*I+i] += P((a0+a1)+(a2+a3)); }
+            { float b0=(ps_b[0]+ps_b[1])+(ps_b[2]+ps_b[3]),   b1=(ps_b[4]+ps_b[5])+(ps_b[6]+ps_b[7]);
+              float b2=(ps_b[8]+ps_b[9])+(ps_b[10]+ps_b[11]), b3=(ps_b[12]+ps_b[13])+(ps_b[14]+ps_b[15]);
+              dW[o*I+i+1] += P((b0+b1)+(b2+b3)); }
         }
 }
 // LN backward EXACT to torch autograd of FDyadLN: s is stop-grad (round/floor block it) -> only mean coupling.
@@ -548,7 +572,9 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
         bstore(buffer, XO_X2, X2, X_SEQ*X_D);
         bstore32(buffer, XO_LN2S, ln2s, X_SEQ*2);
         static data_t HD[X_SEQ*X_FFN]; static data_t RMASK[X_SEQ*X_FFN];
-        { static acc_t HDa[X_SEQ*X_FFN]; dyad_matmul(X2, WUP, HDa, X_SEQ, X_D, X_FFN);
+        { static acc_t HDa[X_SEQ*X_FFN];
+#pragma HLS bind_storage variable=HDa type=ram_2p impl=uram
+        dyad_matmul(X2, WUP, HDa, X_SEQ, X_D, X_FFN);
         RELU: for (int i = 0; i < X_SEQ*X_FFN; i++) {
 #pragma HLS PIPELINE II=1
                 bool pos = (HDa[i] > 0); RMASK[i] = pos ? (data_t)1 : (data_t)0;
@@ -588,6 +614,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             static float WR[X_SEQ*X_D], WX1[X_SEQ*X_D], WQf[X_SEQ*X_D], WKf[X_SEQ*X_D], WVf[X_SEQ*X_D];
             static float WATTN[X_SEQ*X_D], WM[X_SEQ*X_D], WX2[X_SEQ*X_D], WHD[X_SEQ*X_FFN];
             static float WRP[X_SEQ*X_D], WRMASK[X_SEQ*X_FFN];
+#pragma HLS bind_storage variable=WRMASK type=ram_2p impl=uram
             static float ln1m[X_SEQ], ln1ss[X_SEQ], ln2m[X_SEQ], ln2ss[X_SEQ];
             // URAM rebind (rebuild #4): the low-port members of the wide fwd cache go to URAM. WR/WM/WRP (SEQ*D)
             // and WRMASK (SEQ*FFN=16384) are only burst-stored + read via 1-port loops / sub-function pointer
@@ -653,6 +680,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
             bf_layernorm(WM, FLN2G, FLN2B, WX2, ln2m, ln2ss, X_SEQ);
             bstore_f(buffer, MP_WX2 + po, WX2, X_SEQ*X_D);
             static float HDpre[X_SEQ*X_FFN];
+#pragma HLS bind_storage variable=HDpre type=ram_2p impl=uram
             bf_matmul(WX2, FWUP, HDpre, X_SEQ, X_D, X_FFN);
             for(int i=0;i<X_SEQ*X_FFN;i++){ WRMASK[i]=HDpre[i]>0?1.0f:0.0f; WHD[i]=WRMASK[i]>0?HDpre[i]:0.0f; }
             bf_qact(WHD, X_SEQ*X_FFN);
@@ -688,6 +716,7 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
     static float WR[X_SEQ*X_D], WX1[X_SEQ*X_D], WQf[X_SEQ*X_D], WKf[X_SEQ*X_D], WVf[X_SEQ*X_D];
     static float WATTN[X_SEQ*X_D], WM[X_SEQ*X_D], WX2[X_SEQ*X_D], WHD[X_SEQ*X_FFN];
     static float WRP[X_SEQ*X_D], WRMASK[X_SEQ*X_FFN], Praw[X_H*X_SEQ*X_SEQ];
+#pragma HLS bind_storage variable=WRMASK type=ram_2p impl=uram
     static float ln1ss[X_SEQ], ln2ss[X_SEQ];
     bload_f(buffer, MP_WR + po, WR, X_SEQ*X_D);   bload_f(buffer, MP_WX1 + po, WX1, X_SEQ*X_D);
     bload_f(buffer, MP_WQ + po, WQf, X_SEQ*X_D);  bload_f(buffer, MP_WK + po, WKf, X_SEQ*X_D); bload_f(buffer, MP_WV + po, WVf, X_SEQ*X_D);
@@ -762,7 +791,9 @@ extern "C" void forge_pc_xformer_mp_block(ap_uint<512> *buffer) {
 
     // (1) FFN: RP=M+FO ; FO=WDN(HD) ; HD=qact(relu(WUP(X2)))
     static float gM[X_SEQ*X_D]; for(int i=0;i<X_SEQ*X_D;i++) gM[i]=gRP[i];
-    static float gHD[X_SEQ*X_FFN]; bf_linear_bwd(gRP, FWDN, WHD, gHD, gWDN, X_SEQ, X_FFN, X_D);
+    static float gHD[X_SEQ*X_FFN];
+#pragma HLS bind_storage variable=gHD type=ram_2p impl=uram
+    bf_linear_bwd(gRP, FWDN, WHD, gHD, gWDN, X_SEQ, X_FFN, X_D);
     for(int i=0;i<X_SEQ*X_FFN;i++) if(WRMASK[i]==0.0f) gHD[i]=0;
     static float gX2[X_SEQ*X_D]; bf_linear_bwd(gHD, FWUP, WX2, gX2, gWUP, X_SEQ, X_D, X_FFN);
     // (2) LN2 over M -> add into gM
