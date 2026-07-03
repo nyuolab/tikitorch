@@ -484,6 +484,14 @@ until its gate passes.** CSYNTH_ONLY precedes every perf rebuild (process rule).
   the **max K that closes 150 MHz** (LUT/DSP say ≥128 fits; timing is the real cap). **No AFI until G0
   is green.**
 
+### ★ PHASE 1 G0 RESULT (2026-07-03, csynth-MEASURED): the streamed s2 kernel FITS at D=512
+Round 1 FAILED (resident activations: BRAM 1382%/SLR; K=128 csynth >5.5h = non-iterable, retired).
+Round 2 (full activation streaming, 34.7->0.86MB resident, ZERO numeric drift, bit-identical across
+tiles/K): **BRAM 33% / DSP 29% / LUT 83% / URAM 2% — PASS at K=32**; streaming + MAC loops II=1 achieved.
+Static latency bounds are envelope artifacts (runtime-bound helper loops assume trip 2^27) -> the real
+kick time is Phase-1.5's silicon measurement. PLAN CHANGE: skip the D=256 AFI — the kernel fits at D=512,
+so ONE D=512 AFI serves both the single-chip roofline (1.5) and the 30M 8-chip run (Phase 2).
+
 ### Phase 1.5 — D=256 stepping stone on ONE FPGA (validate the roofline on silicon)
 - **Build:** the redesigned kernel at D=256 (4–6M params), one block, one FPGA (the S1-isolated F2
   box, never the shared `tiki-f2-silicon`).
