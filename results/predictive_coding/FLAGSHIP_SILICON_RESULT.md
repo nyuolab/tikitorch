@@ -248,6 +248,19 @@ header), `And kne, wher, thy lot's ge shele;`, `Noeed for a tring to kis se hat`
 salad. The remaining 0.14 vs the twin is the silicon gradient-noise premium (bf16 messages + reduction
 reorder + fp32), which shrinks with batch — the in-chip batch-replication lever's job.
 
+## ★ 5f. LEVER A + S=8 MEASURED (2026-07-03): balanced 53ms kicks, 2.3x pipeline, bit-identical
+
+Rebuild #5 AFI `agfi-0178d18e506033944` (S=8 slots + Lever A 2x backward-unroll + budgeted URAM; timing MET
++0.069ns — the URAM rebind IMPROVED margin by relieving BRAM congestion). Measured on silicon (L=3):
+- **Lever A: BWD kick 91.4 -> 52.2 ms (1.75x)**, FWD 53.7 ms unchanged -> **kicks now BALANCED** (~53 each),
+  the ideal pipeline shape (steady-state gated by max(fwd,bwd), so ~zero bubble).
+- **S=8 pipelining: PIPE=0 masters == PIPE=1 masters BIT-IDENTICAL on all 3 chips** (8-deep slot logic proven
+  on silicon). steps/s 0.38 serial -> **0.88 pipelined = 2.3x overlap** (vs old S=2's 1.79x). **451 tok/s.**
+- Cumulative: 0.50 -> 0.88 steps/s this build (1.76x); ~8.7x over the pre-bundle baseline.
+- URAM budget lesson (memory hls-reduction-ii-lesson): bind by BRAM_saved/URAM_spent ratio (high-fill >=4096
+  words/bank arrays only), not array count — #4 bound tiny arrays -> 237% URAM; #5's 6-array set -> BRAM 61%/
+  URAM 48%, fits with margin.
+
 ## ★ 5e. (b) MULTI-CHIP MILESTONE (2026-07-03): 8-block PC transformer on 8 physical FPGAs
 
 `mpxfshard-20260702T183333Z`, all 8 slots of one f2.48xlarge, ONE transformer block per chip (INPUT + 6
