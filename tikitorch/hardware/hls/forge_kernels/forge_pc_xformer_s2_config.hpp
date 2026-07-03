@@ -53,8 +53,13 @@
 #define S2_TILE_I 128       // weight-tile contraction cols (max cap; runtime from CFG lane 8; MUST be a multiple of S2_K)
 #endif
 #ifndef S2_SEQ_TILE
-#define S2_SEQ_TILE 64      // activation-strip row block over SEQ (max cap; runtime from CFG lane 9)
+#define S2_SEQ_TILE 64      // activation-strip row block over SEQ (COMPILE-TIME after FIX A; -D to sweep across builds)
 #endif
+// FIX A: the tile sizes are now COMPILE-TIME (the s2_gemm runtime CFG-lane 7/8/9 clamps were deleted so HLS can
+// prove the K-wide MAC's y-reuse distance >> tree depth -> inner II=1). Sweep them via separate -D builds.
+// FIX C: max contraction length across every s2_gemm call — the per-c0 hoisted weight cache Bcache[TILE_O x KC].
+#define S2_MAX2(a,b) ((a)>(b)?(a):(b))
+#define S2_KC_MAX S2_MAX2(S2_MAX2(S2_D,S2_FFN),S2_MAX2(S2_SEQ,S2_VOCAB))
 
 // ------------------------------- roles / phases (CFG word lanes) -------------------------------
 #define S2_PH_FWD   0

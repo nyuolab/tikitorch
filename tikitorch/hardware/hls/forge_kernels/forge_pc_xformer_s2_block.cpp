@@ -29,10 +29,11 @@
 //
 // ================================ RESIDENT-ARRAY (BRAM) CENSUS @ D=512 defaults ================================
 // The BUDGET is < ~5.4 MB (80% of the 6.75 MB one-SLR BRAM). Every persistent on-chip array, in bytes:
-//   s2_gemm     Btile0/Btile1   2 x [128*128] fp32          = 2 x 65536  = 128 KB   (weight/Bres tile ping-pong)
-//               lhstile         1 x [64*128]  fp32          =     32768  =  32 KB   (activation tile, per i-tile)
-//               y               1 x [64*128]  fp32          =     32768  =  32 KB   (output-strip accumulator)
-//               row/gaccrow     2 x [128]     fp32          =      1024  =   1 KB
+//   s2_gemm x2  Bcache          2 x [128*2048] fp32         = 2 x 1048576 = 2.10 MB  (FIX C: whole-c0 dyad'd weight
+//               (engines A+B)                                                          cache, hoisted above r0; FIX G
+//               lhstile         2 x [64*128]  fp32          = 2 x 32768   =  64 KB     duplicates the engine so BWD
+//               y               2 x [64*128]  fp32          = 2 x 32768   =  64 KB     DX+WG overlap in DATAFLOW)
+//               row/gaccrow     2 x [128*2]   fp32          = 2 x 1024    =   2 KB
 //   s2_adam     Wt/mt/vt/gt     4 x [4096]    fp32          =     65536  =  64 KB   (adam RMW tiles)
 //   s2_lnstrip  LN row-block    1 x [64*512]  fp32          =    131072  = 128 KB   (LN fwd/bwd, in place)
 //   s2_tA/s2_tB elementwise     2 x [2048]    fp32          =     16384  =  16 KB   (copy/add/zero/qact/relu)
@@ -41,7 +42,9 @@
 //   LN scalars  ln1s/ln2s/lnfs  3 x [256]     fp32          =      3072  =   3 KB
 //   misc rows   femb/fpos/tok.. ~6 x [512]    fp32          =    ~12288  = ~12 KB
 //   -----------------------------------------------------------------------------------------------------
-//   TOTAL persistent on-chip                                                         ~= 0.85 MB  (<< 5.4 MB budget)
+//   TOTAL persistent on-chip                                                         ~= 2.9 MB  (< 5.4 MB budget)
+//   (Bcache is TILE_O*KC_MAX = the per-c0 hoisted weight tile; KC_MAX=FFN=2048 at D=512. The two-engine 2.1 MB
+//    is the FIX C+G cost — still comfortably inside the one-SLR budget; DSP stays 1-2% as the MACs are dyad-shift.)
 // Nothing above is a full-SEQ tensor; the ~34 MB of full-SEQ statics (WR..gV, gyT/xT, the 4 MB debug temp)
 // are DELETED. The only sizes that scale with the model are the attn head slices (SEQ*DH) and the LN strip
 // (SEQ_TILE*D); both stay small and D-tileable. (See the BEFORE census in the accompanying report.)
@@ -72,6 +75,21 @@ static inline float bf_dyad_f(float wf) {
     int e = (int)hls::round(hls::log2(a));
     float p = hls::ldexp(1.0f, e);
     return wf < 0 ? -p : p;
+}
+
+// FIX B/E partial-sum lanes: L independent accumulators indexed [i & (L-1)] break the loop-carried fp-add
+// recurrence (reuse distance L >= the adder latency) so a reduction loop pipelines at achieved-II=1; a final
+// balanced tree folds the L lanes. Same recipe as the mp kernel's bf_matmul. This REORDERS the summation, so
+// results are within-1-bf16-ULP (NOT bit-exact) vs a sequential reference — the TB CHECK-1 gate is <= 1 ULP.
+#define S2_LANES 8
+static inline float s2_lanesum(float *lane) {      // S2_LANES power of two; folds lane[0..L) -> scalar (in place)
+#pragma HLS INLINE
+    for (int s = 1; s < S2_LANES; s <<= 1)
+        for (int j = 0; j < S2_LANES; j += (s << 1)) {
+#pragma HLS UNROLL
+            lane[j] += lane[j + s];
+        }
+    return lane[0];
 }
 
 // ---- 512-bit burst I/O (float lane + int32 lane) — one float/int per 32-bit lane, reused lane-for-lane ----
@@ -204,11 +222,22 @@ LNRB: for (int r0 = 0; r0 < M; r0 += S2_SEQ_TILE) {
         bload_f(buffer, x_off + r0 * S2_D, s2_lnstrip, TR * S2_D);
     LN_T: for (int t = 0; t < TR; t++) {
             float *xr = s2_lnstrip + t * S2_D;
-            float sum = 0;
-        LN_S: for (int d = 0; d < S2_D; d++) sum += xr[d];
-            float mean = sum / S2_D; float asum = 0;
-        LN_A: for (int d = 0; d < S2_D; d++) { float c = xr[d] - mean; asum += c < 0 ? -c : c; }
-            float scale = asum / S2_D; if (scale < 1e-9f) scale = 1e-9f;
+            float slane[S2_LANES];                                   // FIX E: laned mean-sum (LN_S was II=6)
+#pragma HLS ARRAY_PARTITION variable=slane complete dim=1
+            for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
+        LN_S: for (int d = 0; d < S2_D; d++) {
+#pragma HLS PIPELINE II=1
+                slane[d & (S2_LANES-1)] += xr[d];
+            }
+            float mean = s2_lanesum(slane) / S2_D;
+            float alane[S2_LANES];                                   // FIX E: laned abs-dev-sum (LN_A was II=6)
+#pragma HLS ARRAY_PARTITION variable=alane complete dim=1
+            for (int l = 0; l < S2_LANES; l++) alane[l] = 0;
+        LN_A: for (int d = 0; d < S2_D; d++) {
+#pragma HLS PIPELINE II=1
+                float c = xr[d] - mean; alane[d & (S2_LANES-1)] += c < 0 ? -c : c;
+            }
+            float scale = s2_lanesum(alane) / S2_D; if (scale < 1e-9f) scale = 1e-9f;
             int e = (int)hls::floor(hls::log2(scale));
             float mant = hls::round((scale / hls::ldexp(1.0f, e) - 1.0f) * (1 << S2_MBITS)) / (float)(1 << S2_MBITS);
             float s = (1.0f + mant) * hls::ldexp(1.0f, e);
@@ -226,9 +255,15 @@ LBRB: for (int r0 = 0; r0 < M; r0 += S2_SEQ_TILE) {
         bload_f(buffer, gy_off + r0 * S2_D, s2_lnstrip, TR * S2_D);
     LB_T: for (int t = 0; t < TR; t++) {
             float *gr = s2_lnstrip + t * S2_D;
-            float gxhat[S2_D], mg = 0;
-        LB_C: for (int d = 0; d < S2_D; d++) { gxhat[d] = P(gr[d] * gamma[d]); mg += gxhat[d]; }
-            mg /= S2_D;
+            float gxhat[S2_D];
+            float mlane[S2_LANES];                                   // FIX E: laned mean-of-gxhat (LB_C was II=6)
+#pragma HLS ARRAY_PARTITION variable=mlane complete dim=1
+            for (int l = 0; l < S2_LANES; l++) mlane[l] = 0;
+        LB_C: for (int d = 0; d < S2_D; d++) {
+#pragma HLS PIPELINE II=1
+                gxhat[d] = P(gr[d] * gamma[d]); mlane[d & (S2_LANES-1)] += gxhat[d];
+            }
+            float mg = s2_lanesum(mlane) / S2_D;
         LB_D: for (int d = 0; d < S2_D; d++) gr[d] = P((gxhat[d] - mg) / s[r0 + t]);
         }
         bstore_f(buffer, dx_off + r0 * S2_D, s2_lnstrip, TR * S2_D);
@@ -265,7 +300,7 @@ static inline float s2_treeK(const float *a, const float *b) {
 // ------------------------------------------------------------------------------------------------------
 // s2_gemm — the reusable K-wide streamed contraction engine (fwd matmul, bwd dx, bwd wgrad). EVERYTHING is
 // a DDR offset now (lhs_off/Bres_off/out_off) — no resident full tensors. On-chip it holds only:
-//   Btile0/Btile1 [TILE_O x TILE_I]  weight (FWD/DX) or transposed-x (WG) tile ping-pong
+//   Bcache        [TILE_O x KC_MAX]  FIX C: ALL i-tiles for the current c0, weight-dyad'd (FWD/DX) or x (WG) ONCE
 //   lhstile       [SEQ_TILE x TILE_I] the activation tile for the current (row-block, i-tile)
 //   y             [SEQ_TILE x TILE_O] the output-strip accumulator
 //
@@ -279,112 +314,111 @@ static inline float s2_treeK(const float *a, const float *b) {
 //               WG     = gmem[Bres_off + k*cols + c]   (= x, transposed on load; no dyad)
 //   FWD/DX stream the output strip to out_off; WG does the gmem GACC read-modify-write.
 // ------------------------------------------------------------------------------------------------------
-static void s2_gemm(int mode, ap_uint<512> *buffer, int Woff,
-                    int lhs_off, int Bres_off, int out_off,
-                    int rows, int cols, int KC,
-                    int seq_tile, int tile_o, int tile_i,
-                    int gacc_off, int gzero) {
-#pragma HLS INLINE off
-    static float Btile0[S2_TILE_O * S2_TILE_I];
-    static float Btile1[S2_TILE_O * S2_TILE_I];
-#pragma HLS ARRAY_PARTITION variable=Btile0 cyclic factor=S2_K dim=1
-#pragma HLS ARRAY_PARTITION variable=Btile1 cyclic factor=S2_K dim=1
-    static float lhstile[S2_SEQ_TILE * S2_TILE_I];         // resident activation tile (streamed per i-tile)
-#pragma HLS ARRAY_PARTITION variable=lhstile cyclic factor=S2_K dim=1
-    static float y[S2_SEQ_TILE * S2_TILE_O];               // per row-block output accumulators
-    static float row[S2_TILE_O > S2_TILE_I ? S2_TILE_O : S2_TILE_I];
-    static float gaccrow[S2_TILE_O];
-
-    if (tile_o <= 0 || tile_o > S2_TILE_O) tile_o = S2_TILE_O;
-    if (tile_i <= 0 || tile_i > S2_TILE_I) tile_i = S2_TILE_I;
-    if (seq_tile <= 0 || seq_tile > S2_SEQ_TILE) seq_tile = S2_SEQ_TILE;
-
-    for (int c0 = 0; c0 < cols; c0 += tile_o) {
-        int TC = (cols - c0 < tile_o) ? (cols - c0) : tile_o;
-        for (int r0 = 0; r0 < rows; r0 += seq_tile) {
-            int TR = (rows - r0 < seq_tile) ? (rows - r0) : seq_tile;
-            for (int i = 0; i < TR * tile_o; i++) y[i] = 0.0f;   // zero over the ACCESS stride (tile_o), not TC
-
-            int NI = (KC + tile_i - 1) / tile_i;              // number of contraction (I) tiles
-            // -------- acquire the B operand i-tile: weight (FWD/DX, dyad'd) or transposed-x (WG) --------
-            #define S2_ACQUIRE(DST, IT) do {                                                              \
-                int _i0 = (IT) * tile_i; int _TI = (KC - _i0 < tile_i) ? (KC - _i0) : tile_i;             \
-                if (mode == S2M_DX) {                                                                     \
-                    for (int _k = 0; _k < _TI; _k++) {                                                    \
-                        bload_f(buffer, Woff + (_i0 + _k) * cols + c0, row, TC);                          \
-                        for (int _c = 0; _c < TC; _c++) (DST)[_c * tile_i + _k] = bf_dyad_f(row[_c]);     \
-                    }                                                                                     \
-                } else if (mode == S2M_FWD) {                                                             \
-                    for (int _c = 0; _c < TC; _c++) {                                                     \
-                        bload_f(buffer, Woff + (c0 + _c) * KC + _i0, row, _TI);                           \
-                        for (int _k = 0; _k < _TI; _k++) (DST)[_c * tile_i + _k] = bf_dyad_f(row[_k]);    \
-                    }                                                                                     \
-                } else { /* WG: B = x[SEQ x I] transposed on load, no dyad */                             \
-                    for (int _k = 0; _k < _TI; _k++) {                                                    \
-                        bload_f(buffer, Bres_off + (_i0 + _k) * cols + c0, row, TC);                      \
-                        for (int _c = 0; _c < TC; _c++) (DST)[_c * tile_i + _k] = row[_c];                \
-                    }                                                                                     \
-                }                                                                                         \
-            } while (0)
-            // -------- load the activation lhs i-tile into lhstile (contiguous-k or WG-transposed) --------
-            #define S2_LOAD_LHS(IT) do {                                                                  \
-                int _i0 = (IT) * tile_i; int _TI = (KC - _i0 < tile_i) ? (KC - _i0) : tile_i;             \
-                if (mode == S2M_WG) { /* lhs = gy[SEQ x rows] transposed: lhstile[r][k]=gy[k*rows+(r0+r)] */\
-                    for (int _k = 0; _k < _TI; _k++) {                                                    \
-                        bload_f(buffer, lhs_off + (_i0 + _k) * rows + r0, row, TR);                       \
-                        for (int _r = 0; _r < TR; _r++) lhstile[_r * tile_i + _k] = row[_r];              \
-                    }                                                                                     \
-                } else { /* FWD/DX: lhs[rows x KC] contiguous-k: lhstile[r][k]=lhs[(r0+r)*KC+_i0+k] */    \
-                    for (int _r = 0; _r < TR; _r++)                                                       \
-                        bload_f(buffer, lhs_off + (r0 + _r) * KC + _i0, lhstile + _r * tile_i, _TI);      \
-                }                                                                                         \
-            } while (0)
-
-            float *bufA = Btile0, *bufB = Btile1;
-            S2_ACQUIRE(bufA, 0);
-            for (int it = 0; it < NI; it++) {
-                int i0 = it * tile_i;
-                int TI = (KC - i0 < tile_i) ? (KC - i0) : tile_i;
-                float *cur  = (it & 1) ? bufB : bufA;
-                float *next = (it & 1) ? bufA : bufB;
-                if (it + 1 < NI) S2_ACQUIRE(next, it + 1);    // prefetch B tile it+1 while consuming it (ping-pong)
-                S2_LOAD_LHS(it);                              // stream activation tile it into lhstile
-                // -------- consume i-tile `it`: K-wide MAC, inner II=1 over (r,c) per k-block --------
-                for (int kb = 0; kb < TI; kb += S2_K) {       // k-blocks in GLOBAL k order (tile-independent)
-                    for (int r = 0; r < TR; r++) {
-                        const float *aptr = lhstile + r * tile_i + kb;
-                        for (int c = 0; c < TC; c++) {
-#pragma HLS PIPELINE II=1
-                            y[r * tile_o + c] += s2_treeK(aptr, cur + c * tile_i + kb);
-                        }
-                    }
-                }
-            }
-            #undef S2_ACQUIRE
-            #undef S2_LOAD_LHS
-            // -------- finalize + write this row-block's outputs --------
-            if (mode == S2M_WG) {
-                for (int r = 0; r < TR; r++) {
-                    if (!gzero) bload_f(buffer, gacc_off + (r0 + r) * cols + c0, gaccrow, TC);
-                    for (int c = 0; c < TC; c++) {
-                        float v = P(y[r * tile_o + c]);
-                        if (!gzero) v += gaccrow[c];
-                        gaccrow[c] = v;
-                    }
-                    bstore_f(buffer, gacc_off + (r0 + r) * cols + c0, gaccrow, TC);
-                }
-            } else {
-                for (int r = 0; r < TR; r++) {
-                    for (int c = 0; c < TC; c++) {
-                        float v = y[r * tile_o + c];
-                        row[c] = (mode == S2M_DX) ? P(v) : v;
-                    }
-                    bstore_f(buffer, out_off + (r0 + r) * cols + c0, row, TC);
-                }
-            }
-        }
-    }
+// FIX A: tile sizes are COMPILE-TIME (S2_TILE_O/S2_TILE_I/S2_SEQ_TILE constants; the runtime CFG-lane clamps are
+//   gone) so the y[r*tile_o+c] access stride is a compile-time constant -> HLS can prove the MAC's reuse distance
+//   (TR*TC) >> the ~49-cyc tree depth and pipeline the inner (r,c) MAC at achieved-II=1 (was II=3 from a false
+//   inter-dependence on y). A belt-and-braces `#pragma HLS DEPENDENCE variable=y inter false` is added too.
+// FIX C: the per-(c0) weight/x operand i-tiles are streamed + dyad'd ONCE into Bcache[TC x KC] ABOVE the r0
+//   row-block loop (was re-acquired per row-block => 4x redundant DMA+dyad at SEQ=256). The MAC reads Bcache
+//   in the SAME global-k order, so the per-output accumulation sequence is byte-identical (CHECK 2 bit-exact).
+// The engine body is a macro over the function NAME only. The on-chip arrays keep FIXED source names (Bcache/
+// lhstile/y/row/gaccrow) — each expansion is a distinct function, so its `static` locals are DISTINCT variables
+// (a separate HW instance) even though they share the same source identifier; the HLS pragmas are function-scoped
+// and refer to that function's own locals, so the _Pragma strings can be constant literals.
+#define S2_GEMM_ENGINE(NAME)                                                                                   \
+static void NAME(int mode, ap_uint<512> *buffer, int Woff,                                                    \
+                 int lhs_off, int Bres_off, int out_off,                                                       \
+                 int rows, int cols, int KC, int gacc_off, int gzero) {                                       \
+    _Pragma("HLS INLINE off")                                                                                  \
+    static float Bcache[S2_TILE_O * S2_KC_MAX];    /* FIX C: all i-tiles for the current c0, dyad'd ONCE */    \
+    _Pragma("HLS ARRAY_PARTITION variable=Bcache cyclic factor=S2_K dim=1")                                    \
+    static float lhstile[S2_SEQ_TILE * S2_TILE_I];                                                             \
+    _Pragma("HLS ARRAY_PARTITION variable=lhstile cyclic factor=S2_K dim=1")                                   \
+    static float y[S2_SEQ_TILE * S2_TILE_O];                                                                   \
+    static float row[S2_TILE_O > S2_TILE_I ? S2_TILE_O : S2_TILE_I];                                           \
+    static float gaccrow[S2_TILE_O];                                                                           \
+    const int tile_o = S2_TILE_O, tile_i = S2_TILE_I, seq_tile = S2_SEQ_TILE;  /* FIX A: compile-time */       \
+    for (int c0 = 0; c0 < cols; c0 += tile_o) {                                                                \
+        int TC = (cols - c0 < tile_o) ? (cols - c0) : tile_o;                                                  \
+        int NI = (KC + tile_i - 1) / tile_i;              /* number of contraction (I) tiles */                \
+        /* ---- FIX C: HOIST the operand acquire above r0 — stream + dyad every i-tile ONCE per (c0). Bcache  */\
+        /*      is laid out [c * KC + kglobal]; bursts stay row-major (per-row 128f = 512B min; only when     */\
+        /*      NI==1 i.e. tile_i>=KC are rows contiguous enough to coalesce — never at D=512 dims, noted). */ \
+        for (int it = 0; it < NI; it++) {                                                                      \
+            int _i0 = it * tile_i; int _TI = (KC - _i0 < tile_i) ? (KC - _i0) : tile_i;                        \
+            if (mode == S2M_DX) {                                                                             \
+                for (int _k = 0; _k < _TI; _k++) {                                                            \
+                    bload_f(buffer, Woff + (_i0 + _k) * cols + c0, row, TC);                                  \
+                    for (int _c = 0; _c < TC; _c++) Bcache[_c * KC + _i0 + _k] = bf_dyad_f(row[_c]);          \
+                }                                                                                             \
+            } else if (mode == S2M_FWD) {                                                                     \
+                for (int _c = 0; _c < TC; _c++) {                                                             \
+                    bload_f(buffer, Woff + (c0 + _c) * KC + _i0, row, _TI);                                   \
+                    for (int _k = 0; _k < _TI; _k++) Bcache[_c * KC + _i0 + _k] = bf_dyad_f(row[_k]);         \
+                }                                                                                             \
+            } else { /* WG: B = x[SEQ x I] transposed on load, no dyad */                                     \
+                for (int _k = 0; _k < _TI; _k++) {                                                            \
+                    bload_f(buffer, Bres_off + (_i0 + _k) * cols + c0, row, TC);                              \
+                    for (int _c = 0; _c < TC; _c++) Bcache[_c * KC + _i0 + _k] = row[_c];                     \
+                }                                                                                             \
+            }                                                                                                 \
+        }                                                                                                     \
+        for (int r0 = 0; r0 < rows; r0 += seq_tile) {                                                          \
+            int TR = (rows - r0 < seq_tile) ? (rows - r0) : seq_tile;                                          \
+            for (int i = 0; i < TR * tile_o; i++) y[i] = 0.0f;   /* zero over the ACCESS stride tile_o */      \
+            for (int it = 0; it < NI; it++) {                                                                  \
+                int i0 = it * tile_i;                                                                          \
+                int TI = (KC - i0 < tile_i) ? (KC - i0) : tile_i;                                              \
+                /* -------- load the activation lhs i-tile (contiguous-k, or WG-transposed) -------- */       \
+                if (mode == S2M_WG) {                                                                          \
+                    for (int _k = 0; _k < TI; _k++) {                                                          \
+                        bload_f(buffer, lhs_off + (i0 + _k) * rows + r0, row, TR);                             \
+                        for (int _r = 0; _r < TR; _r++) lhstile[_r * tile_i + _k] = row[_r];                   \
+                    }                                                                                          \
+                } else {                                                                                       \
+                    for (int _r = 0; _r < TR; _r++)                                                            \
+                        bload_f(buffer, lhs_off + (r0 + _r) * KC + i0, lhstile + _r * tile_i, TI);             \
+                }                                                                                              \
+                /* -------- consume i-tile `it`: K-wide MAC, inner II=1 over (r,c) per k-block -------- */     \
+                for (int kb = 0; kb < TI; kb += S2_K) {   /* k-blocks in GLOBAL k order (tile-independent) */  \
+                    for (int r = 0; r < TR; r++) {                                                             \
+                        const float *aptr = lhstile + r * tile_i + kb;                                         \
+                        for (int c = 0; c < TC; c++) {                                                         \
+                            _Pragma("HLS PIPELINE II=1")                                                       \
+                            _Pragma("HLS DEPENDENCE variable=y inter false")                                   \
+                            y[r * tile_o + c] += s2_treeK(aptr, Bcache + c * KC + i0 + kb);                    \
+                        }                                                                                      \
+                    }                                                                                          \
+                }                                                                                              \
+            }                                                                                                 \
+            /* -------- finalize + write this row-block's outputs -------- */                                  \
+            if (mode == S2M_WG) {                                                                              \
+                for (int r = 0; r < TR; r++) {                                                                 \
+                    if (!gzero) bload_f(buffer, gacc_off + (r0 + r) * cols + c0, gaccrow, TC);                 \
+                    for (int c = 0; c < TC; c++) {                                                             \
+                        float v = P(y[r * tile_o + c]);                                                        \
+                        if (!gzero) v += gaccrow[c];                                                           \
+                        gaccrow[c] = v;                                                                        \
+                    }                                                                                          \
+                    bstore_f(buffer, gacc_off + (r0 + r) * cols + c0, gaccrow, TC);                            \
+                }                                                                                              \
+            } else {                                                                                           \
+                for (int r = 0; r < TR; r++) {                                                                 \
+                    for (int c = 0; c < TC; c++) {                                                             \
+                        float v = y[r * tile_o + c];                                                           \
+                        row[c] = (mode == S2M_DX) ? P(v) : v;                                                  \
+                    }                                                                                          \
+                    bstore_f(buffer, out_off + (r0 + r) * cols + c0, row, TC);                                 \
+                }                                                                                              \
+            }                                                                                                 \
+        }                                                                                                     \
+    }                                                                                                         \
 }
+// FIX G: instantiate the engine TWICE (each function's `static` locals are its own => two independent HW
+// instances) so the backward's DX-route and WG for the SAME linear can run concurrently in a DATAFLOW region
+// (DSP is at 1-2%, plenty of room). csim: both are the identical body so outputs are byte-identical.
+S2_GEMM_ENGINE(s2_gemm)
+S2_GEMM_ENGINE(s2_gemm_b)
 
 // ------------------------------------------------------------------------------------------------------
 // s2_adam_stream — dyadic-Adam apply as a DDR read-modify-write stream (§2.3.3). (== golden; unchanged.)
@@ -418,9 +452,22 @@ static void s2_adam_stream(ap_uint<512> *buffer, int Woff, int mom_off, int var_
 // convenience: run a full weight-grad (dW = gy^T @ x) via the WG engine + GACC-RMW. gy/x stream from DDR;
 // the SEQ-contiguous transpose the K-wide tree needs happens inside s2_gemm's tile loads (no resident gyT/xT).
 static void s2_wgrad(ap_uint<512> *buffer, int gy_off, int x_off, int O, int I, int M,
-                     int gacc_off, int gzero, int seq_tile, int tile_o, int tile_i) {
+                     int gacc_off, int gzero) {
 #pragma HLS INLINE off
-    s2_gemm(S2M_WG, buffer, 0, gy_off, x_off, 0, O, I, M, seq_tile, tile_o, tile_i, gacc_off, gzero);
+    s2_gemm(S2M_WG, buffer, 0, gy_off, x_off, 0, O, I, M, gacc_off, gzero);
+}
+
+// FIX G: the FFN (WUP) DX-route + weight-grad as a DATAFLOW pair on the TWO engine instances. gX2 (engine A, DX)
+// and gWUP (engine B, WG) both READ the masked gHD (S2_BG_HD) and write DISJOINT tensors (S2_BG_X2 vs GACC_WUP),
+// so they are order-independent — csim runs them sequentially (outputs byte-identical to the old two calls) while
+// HLS overlaps them. REMAINING for full silicon overlap: both engines share the single `gmem` m_axi port, so the
+// two operand streams still arbitrate on one DDR channel; splitting into a 2nd m_axi bundle would decouple the
+// DMA. The MAC arrays are per-instance already, so the compute overlaps regardless.
+static void s2_ffn_wup_dxwg(ap_uint<512> *buffer, int po, int gzero) {
+#pragma HLS INLINE off
+#pragma HLS DATAFLOW
+    s2_gemm  (S2M_DX, buffer, S2_FWUP, S2_BG_HD, 0, S2_BG_X2, S2_SEQ, S2_D, S2_FFN, 0, 0);            // gX2 (A)
+    s2_gemm_b(S2M_WG, buffer, 0, S2_BG_HD, S2_WX2 + po, 0, S2_FFN, S2_D, S2_SEQ, S2_GACC_WUP, gzero); // gWUP (B)
 }
 
 // ======================================================================================================
@@ -448,17 +495,34 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
         for (int i = 0; i < S2_SEQ; i++) {
             float sc[S2_SEQ], pr[S2_SEQ], mx = -1e30f;
             for (int j = 0; j <= i; j++) {
-                float dot = 0;
-                for (int d = 0; d < S2_DH; d++) dot += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
+                float lane[S2_LANES];                                    // FIX B: laned score-dot (was II=2)
+#pragma HLS ARRAY_PARTITION variable=lane complete dim=1
+                for (int l = 0; l < S2_LANES; l++) lane[l] = 0;
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS PIPELINE II=1
+                    lane[d & (S2_LANES-1)] += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
+                }
+                float dot = s2_lanesum(lane);
                 sc[j] = dot * scale; if (sc[j] > mx) mx = sc[j];
             }
-            float sum = 0;
-            for (int j = 0; j <= i; j++) { float e = hls::exp(sc[j]-mx); pr[j] = e; sum += e; }
+            float slane[S2_LANES];                                       // FIX B: laned exp-sum (was II=6)
+#pragma HLS ARRAY_PARTITION variable=slane complete dim=1
+            for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
+            for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+                float e = hls::exp(sc[j]-mx); pr[j] = e; slane[j & (S2_LANES-1)] += e;
+            }
+            float sum = s2_lanesum(slane);
             for (int j = 0; j <= i; j++) pr[j] /= sum;
             for (int d = 0; d < S2_DH; d++) {
-                float blend = 0;
-                for (int j = 0; j <= i; j++) blend += pr[j] * s2_Vh[j*S2_DH+d];
-                s2_Ah[i*S2_DH+d] = blend;
+                float blane[S2_LANES];                                   // FIX B: laned P@V blend (was II=7)
+#pragma HLS ARRAY_PARTITION variable=blane complete dim=1
+                for (int l = 0; l < S2_LANES; l++) blane[l] = 0;
+                for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+                    blane[j & (S2_LANES-1)] += pr[j] * s2_Vh[j*S2_DH+d];
+                }
+                s2_Ah[i*S2_DH+d] = s2_lanesum(blane);
             }
         }
         for (int t = 0; t < S2_SEQ; t++) bstore_f(buffer, wattn_off + t*S2_D + h*S2_DH, s2_Ah + t*S2_DH, S2_DH);
@@ -478,28 +542,62 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
         }
         for (int i = 0; i < S2_SEQ*S2_DH; i++) { s2_Bh[i] = 0; s2_Ch[i] = 0; s2_Dh[i] = 0; }
         for (int i = 0; i < S2_SEQ; i++) {
-            // ---- PRAW RECOMPUTE: rebuild this (h,i) softmax row from cached Q,K in the exact forward order ----
+            // ---- PRAW RECOMPUTE: rebuild this (h,i) softmax row from cached Q,K (SAME laned order as fwd) ----
             float p[S2_SEQ], mx = -1e30f;
             for (int j = 0; j <= i; j++) {
-                float dot = 0;
-                for (int d = 0; d < S2_DH; d++) dot += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
-                p[j] = dot * ascale; if (p[j] > mx) mx = p[j];
+                float lane[S2_LANES];                                    // FIX B: laned score-dot
+#pragma HLS ARRAY_PARTITION variable=lane complete dim=1
+                for (int l = 0; l < S2_LANES; l++) lane[l] = 0;
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS PIPELINE II=1
+                    lane[d & (S2_LANES-1)] += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
+                }
+                p[j] = s2_lanesum(lane) * ascale; if (p[j] > mx) mx = p[j];
             }
-            float sum = 0;
-            for (int j = 0; j <= i; j++) { float e = hls::exp(p[j]-mx); p[j] = e; sum += e; }
+            float slane[S2_LANES];                                       // FIX B: laned exp-sum
+#pragma HLS ARRAY_PARTITION variable=slane complete dim=1
+            for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
+            for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+                float e = hls::exp(p[j]-mx); p[j] = e; slane[j & (S2_LANES-1)] += e;
+            }
+            float sum = s2_lanesum(slane);
             for (int j = 0; j <= i; j++) p[j] /= sum;
             // ---- attention backward on the recomputed probs (== mp ABWD / twin scalar) ----
             float gp[S2_SEQ];
             for (int j = 0; j <= i; j++) {
-                float s = 0;
-                for (int d = 0; d < S2_DH; d++) s += s2_Ah[i*S2_DH+d] * s2_Vh[j*S2_DH+d];
-                gp[j] = s;
-                for (int d = 0; d < S2_DH; d++) s2_Dh[j*S2_DH+d] += P(p[j] * s2_Ah[i*S2_DH+d]);
+                float glane[S2_LANES];                                   // FIX B: laned gp = <gATTN_i, V_j>
+#pragma HLS ARRAY_PARTITION variable=glane complete dim=1
+                for (int l = 0; l < S2_LANES; l++) glane[l] = 0;
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS PIPELINE II=1
+                    glane[d & (S2_LANES-1)] += s2_Ah[i*S2_DH+d] * s2_Vh[j*S2_DH+d];
+                }
+                gp[j] = s2_lanesum(glane);
+                for (int d = 0; d < S2_DH; d++) s2_Dh[j*S2_DH+d] += P(p[j] * s2_Ah[i*S2_DH+d]);   // gV: i-reduction, order kept
             }
-            float ex = 0; for (int j = 0; j <= i; j++) ex += p[j]*gp[j];
+            float exlane[S2_LANES];                                      // FIX B: laned ex = sum_j p*gp
+#pragma HLS ARRAY_PARTITION variable=exlane complete dim=1
+            for (int l = 0; l < S2_LANES; l++) exlane[l] = 0;
             for (int j = 0; j <= i; j++) {
-                float gs = P(p[j]*(gp[j]-ex)) * ascale;
-                for (int d = 0; d < S2_DH; d++) { s2_Bh[i*S2_DH+d] += gs*s2_Kh[j*S2_DH+d]; s2_Ch[j*S2_DH+d] += gs*s2_Qh[i*S2_DH+d]; }
+#pragma HLS PIPELINE II=1
+                exlane[j & (S2_LANES-1)] += p[j]*gp[j];
+            }
+            float ex = s2_lanesum(exlane);
+            // precompute gs[j] so the gQ (Bh, j-reduction) can be laned; gK (Ch) has no j-recurrence -> direct.
+            float gsv[S2_SEQ];
+            for (int j = 0; j <= i; j++) gsv[j] = P(p[j]*(gp[j]-ex)) * ascale;
+            for (int j = 0; j <= i; j++)                                 // gK: Ch[j] accumulates over i (outer) -> order kept
+                for (int d = 0; d < S2_DH; d++) s2_Ch[j*S2_DH+d] += gsv[j]*s2_Qh[i*S2_DH+d];
+            for (int d = 0; d < S2_DH; d++) {                            // FIX B: gQ (Bh) laned over j (was II=2)
+                float qlane[S2_LANES];
+#pragma HLS ARRAY_PARTITION variable=qlane complete dim=1
+                for (int l = 0; l < S2_LANES; l++) qlane[l] = 0;
+                for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+                    qlane[j & (S2_LANES-1)] += gsv[j]*s2_Kh[j*S2_DH+d];
+                }
+                s2_Bh[i*S2_DH+d] += s2_lanesum(qlane);
             }
         }
         // heads write disjoint columns of gQ/gK/gV → the per-element accumulation is complete within this head,
@@ -528,9 +626,7 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
     int GZERO = (int)(ap_int<32>)cfgw.range(159, 128);
     int TRAIN = (int)(ap_int<32>)cfgw.range(191, 160);   (void)TRAIN;   // train-only kernel (deploy omitted)
     int SLOT  = (int)(ap_int<32>)cfgw.range(223, 192);
-    int TO    = (int)(ap_int<32>)cfgw.range(255, 224);   // runtime TILE_O (0 => default)
-    int TI    = (int)(ap_int<32>)cfgw.range(287, 256);   // runtime TILE_I
-    int ST    = (int)(ap_int<32>)cfgw.range(319, 288);   // runtime SEQ_TILE
+    // FIX A: CFG lanes 7/8/9 (tile_o/tile_i/seq_tile) are no longer read — the tiles are compile-time now.
     const int po  = SLOT ? (S2_PAR_OFF + (SLOT - 1) * S2_PAR_SPAN) : 0;
     const int pto = SLOT * S2_SEQ;
 
@@ -563,27 +659,27 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
         s2_layernorm_ddr(buffer, S2_WR + po, FLN1G, FLN1B, S2_WX1 + po, ln1s, S2_SEQ);
 
         // Q,K,V = qact( X1 @ dyad(W{Q,K,V})^T ) — streamed weight, K-wide, mult-free
-        s2_gemm(S2M_FWD, buffer, S2_FWQ, S2_WX1 + po, 0, S2_WQ + po, S2_SEQ, S2_D, S2_D, ST, TO, TI, 0, 0); s2_qact_ddr(buffer, S2_WQ + po, S2_SEQ*S2_D);
-        s2_gemm(S2M_FWD, buffer, S2_FWK, S2_WX1 + po, 0, S2_WK + po, S2_SEQ, S2_D, S2_D, ST, TO, TI, 0, 0); s2_qact_ddr(buffer, S2_WK + po, S2_SEQ*S2_D);
-        s2_gemm(S2M_FWD, buffer, S2_FWV, S2_WX1 + po, 0, S2_WV + po, S2_SEQ, S2_D, S2_D, ST, TO, TI, 0, 0); s2_qact_ddr(buffer, S2_WV + po, S2_SEQ*S2_D);
+        s2_gemm(S2M_FWD, buffer, S2_FWQ, S2_WX1 + po, 0, S2_WQ + po, S2_SEQ, S2_D, S2_D, 0, 0); s2_qact_ddr(buffer, S2_WQ + po, S2_SEQ*S2_D);
+        s2_gemm(S2M_FWD, buffer, S2_FWK, S2_WX1 + po, 0, S2_WK + po, S2_SEQ, S2_D, S2_D, 0, 0); s2_qact_ddr(buffer, S2_WK + po, S2_SEQ*S2_D);
+        s2_gemm(S2M_FWD, buffer, S2_FWV, S2_WX1 + po, 0, S2_WV + po, S2_SEQ, S2_D, S2_D, 0, 0); s2_qact_ddr(buffer, S2_WV + po, S2_SEQ*S2_D);
 
         // attention (streamed per head): scores = Q.K/sqrt(DH), causal softmax, ATTN = P@V, then qact.
         s2_attn_fwd(buffer, S2_WQ + po, S2_WK + po, S2_WV + po, S2_WATTN + po);
         s2_qact_ddr(buffer, S2_WATTN + po, S2_SEQ*S2_D);
 
         // AO = ATTN @ dyad(WO)^T ; M = R + AO   (WM first holds AO, then the residual add)
-        s2_gemm(S2M_FWD, buffer, S2_FWO, S2_WATTN + po, 0, S2_WM + po, S2_SEQ, S2_D, S2_D, ST, TO, TI, 0, 0);
+        s2_gemm(S2M_FWD, buffer, S2_FWO, S2_WATTN + po, 0, S2_WM + po, S2_SEQ, S2_D, S2_D, 0, 0);
         s2_add_ddr(buffer, S2_WR + po, S2_WM + po, S2_WM + po, S2_SEQ*S2_D, 0);
 
         s2_layernorm_ddr(buffer, S2_WM + po, FLN2G, FLN2B, S2_WX2 + po, ln2s, S2_SEQ);
 
         // HDpre = X2 @ dyad(WUP)^T ; relu (+ mask) ; qact   (WHD first holds HDpre raw)
-        s2_gemm(S2M_FWD, buffer, S2_FWUP, S2_WX2 + po, 0, S2_WHD + po, S2_SEQ, S2_FFN, S2_D, ST, TO, TI, 0, 0);
+        s2_gemm(S2M_FWD, buffer, S2_FWUP, S2_WX2 + po, 0, S2_WHD + po, S2_SEQ, S2_FFN, S2_D, 0, 0);
         s2_relu_mask_ddr(buffer, S2_WHD + po, S2_WRMASK + po, S2_SEQ*S2_FFN);
         s2_qact_ddr(buffer, S2_WHD + po, S2_SEQ*S2_FFN);
 
         // FO = HD @ dyad(WDN)^T ; RP = M + FO   (WRP first holds FO)
-        s2_gemm(S2M_FWD, buffer, S2_FWDN, S2_WHD + po, 0, S2_WRP + po, S2_SEQ, S2_D, S2_FFN, ST, TO, TI, 0, 0);
+        s2_gemm(S2M_FWD, buffer, S2_FWDN, S2_WHD + po, 0, S2_WRP + po, S2_SEQ, S2_D, S2_FFN, 0, 0);
         s2_add_ddr(buffer, S2_WM + po, S2_WRP + po, S2_WRP + po, S2_SEQ*S2_D, 0);
 
         bstore_f(buffer, S2_WLN1S + po, ln1s, S2_SEQ); bstore_f(buffer, S2_WLN2S + po, ln2s, S2_SEQ);
@@ -591,7 +687,7 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
         if (ROLE == S2_RL_OUT) {
             static float FLNFG[S2_D], FLNFB[S2_D]; bload_f(buffer, S2_FLNFG, FLNFG, S2_D); bload_f(buffer, S2_FLNFB, FLNFB, S2_D);
             s2_layernorm_ddr(buffer, S2_WRP + po, FLNFG, FLNFB, S2_WXF + po, lnfs, S2_SEQ);
-            s2_gemm(S2M_FWD, buffer, S2_FWHEAD, S2_WXF + po, 0, S2_WLG + po, S2_SEQ, S2_VOCAB, S2_D, ST, TO, TI, 0, 0);
+            s2_gemm(S2M_FWD, buffer, S2_FWHEAD, S2_WXF + po, 0, S2_WLG + po, S2_SEQ, S2_VOCAB, S2_D, 0, 0);
             bstore_f(buffer, S2_WLNFS + po, lnfs, S2_SEQ);
         } else {
             s2_copy_ddr(buffer, S2_WRP + po, S2_GROUT + po, S2_SEQ*S2_D, 0);   // wide down-msg to the next chip
@@ -621,8 +717,8 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
             for (int v = 0; v < S2_VOCAB; v++) { float p = pr[v]/sum, oh = (v==tgt[t])?1.0f:0.0f; lgrow[v] = P((p-oh)/S2_SEQ); }
             bstore_f(buffer, S2_BG_LG + t*S2_VOCAB, lgrow, S2_VOCAB);
         }
-        s2_gemm(S2M_DX, buffer, S2_FWHEAD, S2_BG_LG, 0, S2_BG_XF, S2_SEQ, S2_D, S2_VOCAB, ST, TO, TI, 0, 0);   // dx = gLG@dyad(WHEAD)
-        s2_wgrad(buffer, S2_BG_LG, S2_WXF + po, S2_VOCAB, S2_D, S2_SEQ, S2_GACC_WH, GZERO, ST, TO, TI);         // dW head + GACC
+        s2_gemm(S2M_DX, buffer, S2_FWHEAD, S2_BG_LG, 0, S2_BG_XF, S2_SEQ, S2_D, S2_VOCAB, 0, 0);   // dx = gLG@dyad(WHEAD)
+        s2_wgrad(buffer, S2_BG_LG, S2_WXF + po, S2_VOCAB, S2_D, S2_SEQ, S2_GACC_WH, GZERO);         // dW head + GACC
         s2_ln_bwd_ddr(buffer, S2_BG_XF, FLNFG, lnfs, S2_BG_RP, S2_SEQ);                                         // gRP
         if (DO_UP) s2_adam_stream(buffer, S2_FWHEAD, S2_MOM+S2_OFF_FHEAD, S2_VAR+S2_OFF_FHEAD, S2_GACC_WH, S2_VOCAB*S2_D, LR);
     } else {
@@ -631,27 +727,26 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
 
     // (1) FFN backward: RP=M+FO, FO=WDN(HD), HD=qact(relu(WUP(X2)))
     s2_copy_ddr(buffer, S2_BG_RP, S2_BG_M, S2_SEQ*S2_D, 0);                                                     // gM = gRP
-    s2_gemm(S2M_DX, buffer, S2_FWDN, S2_BG_RP, 0, S2_BG_HD, S2_SEQ, S2_FFN, S2_D, ST, TO, TI, 0, 0);            // gHD = gRP@dyad(WDN)
-    s2_wgrad(buffer, S2_BG_RP, S2_WHD + po, S2_D, S2_FFN, S2_SEQ, S2_GACC_WDN, GZERO, ST, TO, TI);              // gWDN + GACC
+    s2_gemm(S2M_DX, buffer, S2_FWDN, S2_BG_RP, 0, S2_BG_HD, S2_SEQ, S2_FFN, S2_D, 0, 0);                        // gHD = gRP@dyad(WDN)
+    s2_wgrad(buffer, S2_BG_RP, S2_WHD + po, S2_D, S2_FFN, S2_SEQ, S2_GACC_WDN, GZERO);                          // gWDN + GACC
     s2_relu_apply_ddr(buffer, S2_BG_HD, S2_WRMASK + po, S2_SEQ*S2_FFN);                                         // mask gHD
-    s2_gemm(S2M_DX, buffer, S2_FWUP, S2_BG_HD, 0, S2_BG_X2, S2_SEQ, S2_D, S2_FFN, ST, TO, TI, 0, 0);            // gX2 = gHD@dyad(WUP)
-    s2_wgrad(buffer, S2_BG_HD, S2_WX2 + po, S2_FFN, S2_D, S2_SEQ, S2_GACC_WUP, GZERO, ST, TO, TI);              // gWUP + GACC
+    s2_ffn_wup_dxwg(buffer, po, GZERO);   // FIX G: gX2 (engine A, DX) || gWUP (engine B, WG) — DATAFLOW, disjoint out
     // (2) LN2 over M
     s2_ln_bwd_ddr(buffer, S2_BG_X2, FLN2G, ln2s, S2_BG_TMP, S2_SEQ);                                            // gM2 -> TMP
     s2_add_ddr(buffer, S2_BG_M, S2_BG_TMP, S2_BG_M, S2_SEQ*S2_D, 1);                                            // gM = P(gM + gM2)
     // (3) attention backward: M=R+AO, AO=WO(ATTN), ATTN=qact(P@V), P=softmax(QK/sqrt(DH)) [PRAW RECOMPUTE]
     s2_copy_ddr(buffer, S2_BG_M, S2_BG_R, S2_SEQ*S2_D, 0);                                                      // gR = gM
-    s2_gemm(S2M_DX, buffer, S2_FWO, S2_BG_M, 0, S2_BG_ATTN, S2_SEQ, S2_D, S2_D, ST, TO, TI, 0, 0);              // gATTN = gM@dyad(WO)
-    s2_wgrad(buffer, S2_BG_M, S2_WATTN + po, S2_D, S2_D, S2_SEQ, S2_GACC_WO, GZERO, ST, TO, TI);                // gWO + GACC
+    s2_gemm(S2M_DX, buffer, S2_FWO, S2_BG_M, 0, S2_BG_ATTN, S2_SEQ, S2_D, S2_D, 0, 0);                          // gATTN = gM@dyad(WO)
+    s2_wgrad(buffer, S2_BG_M, S2_WATTN + po, S2_D, S2_D, S2_SEQ, S2_GACC_WO, GZERO);                            // gWO + GACC
     s2_attn_bwd(buffer, S2_WQ + po, S2_WK + po, S2_WV + po, S2_BG_ATTN, S2_BG_Q, S2_BG_K, S2_BG_V);            // gQ,gK,gV (P'd)
     // (4) gX1 += dyad(W{Q,K,V})^T-route ; wgrad each ; then LN1
     s2_zero_ddr(buffer, S2_BG_X1, S2_SEQ*S2_D);
-    s2_gemm(S2M_DX, buffer, S2_FWQ, S2_BG_Q, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, ST, TO, TI, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
-    s2_wgrad(buffer, S2_BG_Q, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WQ, GZERO, ST, TO, TI);
-    s2_gemm(S2M_DX, buffer, S2_FWK, S2_BG_K, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, ST, TO, TI, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
-    s2_wgrad(buffer, S2_BG_K, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WK, GZERO, ST, TO, TI);
-    s2_gemm(S2M_DX, buffer, S2_FWV, S2_BG_V, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, ST, TO, TI, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
-    s2_wgrad(buffer, S2_BG_V, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WV, GZERO, ST, TO, TI);
+    s2_gemm(S2M_DX, buffer, S2_FWQ, S2_BG_Q, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
+    s2_wgrad(buffer, S2_BG_Q, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WQ, GZERO);
+    s2_gemm(S2M_DX, buffer, S2_FWK, S2_BG_K, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
+    s2_wgrad(buffer, S2_BG_K, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WK, GZERO);
+    s2_gemm(S2M_DX, buffer, S2_FWV, S2_BG_V, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
+    s2_wgrad(buffer, S2_BG_V, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WV, GZERO);
     s2_copy_ddr(buffer, S2_BG_X1, S2_BG_X1, S2_SEQ*S2_D, 1);                                                    // gX1 = P(gX1)
     s2_ln_bwd_ddr(buffer, S2_BG_X1, FLN1G, ln1s, S2_BG_TMP, S2_SEQ);                                            // gR1 -> TMP
     s2_add_ddr(buffer, S2_BG_R, S2_BG_TMP, S2_BG_R, S2_SEQ*S2_D, 1);                                            // gR = P(gR + gR1)

@@ -249,11 +249,20 @@ int main(int argc,char**argv){
         for(long i=0;i<(long)S2_SEQ*S2_D;i++) hmsg[i]=(float)(bf_n()*0.5);
         put_f(0, S2_GRIN, hmsg, (long)S2_SEQ*S2_D);
         int lrb=lrcode(LR);
+        // FIX F: DO_UP semantics match real training. Default (KICKMEAS_DOUP unset => -1): DO_UP only on the LAST
+        // sub-batch of each ACCUM window (adam-apply amortized over ACCUM steps), GZERO on the first — so the
+        // measured per-kick cost reflects the training roofline, not an adam-every-step upper bound. Set
+        // KICKMEAS_DOUP=1 to force DO_UP every kick (old behavior), =0 to measure pure fwd+bwd (no optimizer).
+        int KM_DOUP = getenv("KICKMEAS_DOUP") ? atoi(getenv("KICKMEAS_DOUP")) : -1;
+        printf("[KICKMEAS] DO_UP mode: %s (ACCUM=%d)\n",
+               KM_DOUP<0 ? "last-of-ACCUM-window (train-like)" : (KM_DOUP?"every kick":"never (fwd+bwd only)"), ACCUM);
         for(int s=0;s<msteps;s++){
             long off = g_fixedoff>=0 ? g_fixedoff : (long)(rand() % (ntok - S2_SEQ - 2));
+            int doup = (KM_DOUP>=0) ? KM_DOUP : (((s % ACCUM)==(ACCUM-1)) ? 1 : 0);
+            int gz   = (KM_DOUP>=0) ? 1       : (((s % ACCUM)==0)         ? 1 : 0);
             for(int t=0;t<S2_SEQ;t++) hbuf[0][S2_TGT+t]=data[off+t+1]; stage(0,S2_TGT,S2_SEQ);
-            g_phase=0; setcfg(0, S2_PH_FWD, S2_RL_OUT, 0, 0, 1, 0);           kick(0);
-            g_phase=1; setcfg(0, S2_PH_BWD, S2_RL_OUT, 1, lrb, 1, 0);          kick(0);   // do_up=1, gzero=1 (batch-1)
+            g_phase=0; setcfg(0, S2_PH_FWD, S2_RL_OUT, 0, 0, gz, 0);            kick(0);
+            g_phase=1; setcfg(0, S2_PH_BWD, S2_RL_OUT, doup, doup?lrb:0, gz, 0); kick(0);
         }
         kick_report();
         double fwd = g_kick_n[0][0]?1e3*g_kick_s[0][0]/g_kick_n[0][0]:0;
