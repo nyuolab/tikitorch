@@ -248,6 +248,19 @@ header), `And kne, wher, thy lot's ge shele;`, `Noeed for a tring to kis se hat`
 salad. The remaining 0.14 vs the twin is the silicon gradient-noise premium (bf16 messages + reduction
 reorder + fp32), which shrinks with batch — the in-chip batch-replication lever's job.
 
+## ★ 5g. FULLY-PIPELINED 8-FPGA (2026-07-03): 0.59 steps/s = 2.95x the S=2 run, SAME bpb
+
+`mpxfshard-20260703T004425Z`, #5 AFI, all 8 chips, S=8 + Lever A, PIPE=1, 1500 steps:
+- **0.59 steps/s (was 0.20 at S=2) = 2.95x; 303 tok/s; 42 min (was 123).** BWD kicks 52 ms (Lever A).
+- **bpb ema 3.675 IDENTICAL to the S=2 run** — the honesty check: pipelining + Lever A are pure-speed
+  (bit-exact math), so the quality number is unchanged, only the wall-clock. Gate-C clean (2.75 GB
+  neighbour-only, 0 global). Depth-8 is mid-descent at 1500 steps (a deeper model needs more steps; the
+  point here is THROUGHPUT, not the depth-8 convergence).
+
+**Throughput arc (all MEASURED):** 0.058-equiv baseline -> partial-sum 2.94x -> de-flatten+TRAIN+pipe -> S=8
++Lever A. At L=3: 0.88 steps/s / 451 tok/s. At L=8: 0.59 steps/s / 303 tok/s. Next lever = replication
+(throughput xN AND the noise-premium fix).
+
 ## ★ 5f. LEVER A + S=8 MEASURED (2026-07-03): balanced 53ms kicks, 2.3x pipeline, bit-identical
 
 Rebuild #5 AFI `agfi-0178d18e506033944` (S=8 slots + Lever A 2x backward-unroll + budgeted URAM; timing MET
