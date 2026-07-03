@@ -166,7 +166,29 @@ static const int S2_PAR_END  = S2_PAR + (S2_SLOTS-1)*S2_PAR_SPAN;
 static const int S2_TOK      = S2_PAR_END;                          // [SLOTS*SEQ]
 static const int S2_TGT      = S2_TOK + S2_SLOTS*S2_SEQ;            // [SLOTS*SEQ]
 
-static const int S2_BUFLEN   = S2_AL(S2_TGT + S2_SLOTS*S2_SEQ);
+// ------------------------------- BACKWARD activation-gradient scratch (DDR; streamed row-blocked) -------------------------------
+// The G0 footprint-wall fix (§2.3/§2.4): the bwd activation-gradient tensors were on-chip full-SEQ `static`
+// arrays. They now live in DDR and are streamed as [SEQ_TILE x D] / [SEQ_TILE x FFN] strips. SINGLE bank
+// (one slot in flight per bwd invocation; every grad folds into its GACC before the kernel returns, so no
+// per-slot mirror is needed here). ONE shared temp (S2_BG_TMP) covers the never-simultaneously-live
+// {gM2, dx-route tmp, gR1}. These are DDR only — they add ZERO on-chip residency.
+static const int S2_BG      = S2_AL(S2_TGT + S2_SLOTS*S2_SEQ);
+static const int S2_BG_LG   = S2_BG;                        // [SEQ*VOCAB] gLG
+static const int S2_BG_XF   = S2_BG_LG   + S2_SEQ*S2_VOCAB; // [SEQ*D]    gXF
+static const int S2_BG_RP   = S2_BG_XF   + S2_SEQ*S2_D;     // [SEQ*D]    gRP (incoming residual grad)
+static const int S2_BG_M    = S2_BG_RP   + S2_SEQ*S2_D;     // [SEQ*D]    gM
+static const int S2_BG_HD   = S2_BG_M    + S2_SEQ*S2_D;     // [SEQ*FFN]  gHD
+static const int S2_BG_X2   = S2_BG_HD   + S2_SEQ*S2_FFN;   // [SEQ*D]    gX2
+static const int S2_BG_R    = S2_BG_X2   + S2_SEQ*S2_D;     // [SEQ*D]    gR  (running residual grad / emit src)
+static const int S2_BG_ATTN = S2_BG_R    + S2_SEQ*S2_D;     // [SEQ*D]    gATTN
+static const int S2_BG_Q    = S2_BG_ATTN + S2_SEQ*S2_D;     // [SEQ*D]    gQ
+static const int S2_BG_K    = S2_BG_Q    + S2_SEQ*S2_D;     // [SEQ*D]    gK
+static const int S2_BG_V    = S2_BG_K    + S2_SEQ*S2_D;     // [SEQ*D]    gV
+static const int S2_BG_X1   = S2_BG_V    + S2_SEQ*S2_D;     // [SEQ*D]    gX1
+static const int S2_BG_TMP  = S2_BG_X1   + S2_SEQ*S2_D;     // [SEQ*D]    shared temp (gM2 / dx-route tmp / gR1)
+static const int S2_BG_END  = S2_BG_TMP  + S2_SEQ*S2_D;
+
+static const int S2_BUFLEN   = S2_AL(S2_BG_END);
 
 // per-slot span contiguity (single additive slot offset must be valid)
 static_assert(S2_GRIN == S2_WLNFS + S2_SEQ, "parity span not contiguous: S2_GRIN has an alignment gap");
@@ -177,5 +199,9 @@ static_assert(S2_PAR_END == S2_TOK,         "slot mirrors must end exactly at S2
 static_assert((S2_SLOTS*S2_SEQ) % S2_WL == 0,"tok/tgt slot lanes must be 16-word aligned");
 static_assert(S2_TILE_I % S2_K == 0,        "S2_TILE_I must be a multiple of S2_K (K-block tiling)");
 static_assert(S2_H*S2_DH == S2_D,           "H*DH must equal D");
+static_assert(S2_BG % S2_WL == 0,           "backward-grad scratch base must be 16-word aligned (burst I/O)");
+static_assert((S2_SEQ*S2_D) % S2_WL == 0,   "SEQ*D must be 16-word aligned (strip burst I/O)");
+static_assert((S2_SEQ*S2_FFN) % S2_WL == 0, "SEQ*FFN must be 16-word aligned (strip burst I/O)");
+static_assert((S2_SEQ*S2_VOCAB) % S2_WL == 0,"SEQ*VOCAB must be 16-word aligned (strip burst I/O)");
 
 #endif
