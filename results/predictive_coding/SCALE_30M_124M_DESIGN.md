@@ -446,6 +446,18 @@ before committing the run.**
 
 ---
 
+## 5.9 PHASE-0 RESULT (2026-07-03, MEASURED): the recipe's numerics HOLD at 30M scale
+
+D=512/L=8/FFN=2048/SEQ=256/V=256(byte) = **25.56M params**, exact-kernel CPU twin (dyadic fwd + bf16 STE bwd
++ dyadic-Adam + cosine + ACCUM=8), enwik8 20M-token bin, 500 steps (~1M tokens seen — deliberately
+undertrained; the gate is trajectory shape):
+- **bpb 8.42 → ema 4.48 (batches 3.6–4.2), monotone through the full cosine decay** — no plateau, no
+  divergence, no NaN. D=64 regression passed first (recipe intact after parameterization).
+- **Residual BOUNDED + self-regulating at depth 8 / D=512**: peak ~476 @step 225 → declines to ~120–170.
+  The depth-blowup risk is REFUTED at this scale.
+- **No dyadic-Adam underflow**: |W|max grows 0.044→0.24; descent continues at LR=3e-4.
+- Float control (MULTFREE=0, same everything) running → the measured mult-free premium at 30M completes G4.
+
 ## 6. Phased execution plan
 
 Each phase names its **build**, its **gate**, and whether it touches silicon. **No phase advances
