@@ -1,0 +1,11 @@
+{"seed": 0, "arm": "iid_ceiling", "val_bpc": 2.4291, "updates": 11763}
+{"seed": 0, "arm": "stream_cascade", "val_bpc": 2.6289, "updates": 1500}
+{"seed": 0, "arm": "stream_rehearsal", "val_bpc": 2.7082, "updates": 1500}
+{"seed": 0, "arm": "stream_two_speed", "val_bpc": 2.7339, "updates": 1099}
+{"arm": "iid_ceiling", "event": "sample", "text": "et us his nature pound in onaton;\nUnless you have mine amonest out of himself to deed with his hing:\nI thought my soung more overwither therefore coldam our devir his giviness\nThan I know not blood bad with his ento tony.\n\nQUEEN ELIZABETH:\nShall you 'reason no fit in with convey, doth but with shoul"}
+{"arm": "stream_two_speed", "event": "sample", "text": "eiond seracgely wister, sure you weren his elciose.\nis what's trastevily casent thes, Kasters; hay and noerristen hy jestand hir heal well me your him teathing inst und retomed dead,\nI have the beard, dies not soars,\nAngeecing liather in thather\nsteet.\nI'll fead, in my these and weath their stonges "}
+{"seed": 1, "arm": "iid_ceiling", "val_bpc": 2.4244, "updates": 11763}
+{"seed": 1, "arm": "stream_cascade", "val_bpc": 2.6191, "updates": 1500}
+{"seed": 1, "arm": "stream_rehearsal", "val_bpc": 2.6983, "updates": 1500}
+{"seed": 1, "arm": "stream_two_speed", "val_bpc": 2.7462, "updates": 1086}
+{"event": "bars", "bigram_floor_bpc": 3.5806, "repo_bars": {"bf16_golden_transformer_bpb": 3.07, "nanogpt_class_bpc": "~2.0-2.1"}}

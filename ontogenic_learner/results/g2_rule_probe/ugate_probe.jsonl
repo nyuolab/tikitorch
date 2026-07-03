@@ -1,0 +1,6 @@
+{"config": "plain_g0.0625_s16", "finite": false, "wiki_100": NaN, "shak_100": NaN, "drift_100": NaN, "survived_stage1": false}
+{"config": "mu_g0.0625_s16", "finite": true, "wiki_100": 2.726, "shak_100": 4.927, "drift_100": 0.201, "survived_stage1": true, "shak_600": 5.485, "wiki_600": 3.92, "gap_to_cascade": 1.804}
+{"config": "mu_g0.125_s16", "finite": true, "wiki_100": 2.788, "shak_100": 4.722, "drift_100": 0.264, "survived_stage1": true, "shak_600": 5.284, "wiki_600": 4.611, "gap_to_cascade": 1.603}
+{"config": "mu_g0.0625_s32", "finite": true, "wiki_100": 2.697, "shak_100": 5.138, "drift_100": 0.173, "survived_stage1": true, "shak_600": 84.65, "wiki_600": 56.774, "gap_to_cascade": 80.969}
+{"config": "mu_g0.125_s32", "finite": true, "wiki_100": 2.787, "shak_100": 4.688, "drift_100": 0.263, "survived_stage1": true, "shak_600": 5.407, "wiki_600": 4.63, "gap_to_cascade": 1.726}
+{"config": "cascade600_ref", "shak_600": 3.681, "wiki_600": 2.685, "base_wiki": 2.525, "base_shak": 5.629}

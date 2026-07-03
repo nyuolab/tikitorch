@@ -1,0 +1,24 @@
+{"arm": "fleet_ties500", "seed": 0, "event": "transfer", "after": "merge@500", "bpc_wiki": 2.998, "bpc_shakespeare": 3.5655, "bpc_code": 4.3381}
+{"arm": "fleet_ties500", "seed": 0, "event": "transfer", "after": "merge@1000", "bpc_wiki": 3.016, "bpc_shakespeare": 3.3628, "bpc_code": 3.5883}
+{"arm": "fleet_ties500", "seed": 0, "event": "transfer", "after": "final", "bpc_wiki": 2.9821, "bpc_shakespeare": 3.136, "bpc_code": 3.9684, "mb_weights_moved": 99.7}
+{"arm": "fleet_ties500", "seed": 0, "event": "done", "updates": 585, "fwd_eq": 3255, "mb_weights_moved": 99.7, "wall_s": 14.3}
+{"arm": "fleet_fish500", "seed": 0, "event": "transfer", "after": "merge@500", "bpc_wiki": 3.0757, "bpc_shakespeare": 3.5013, "bpc_code": 3.5475}
+{"arm": "fleet_fish500", "seed": 0, "event": "transfer", "after": "merge@1000", "bpc_wiki": 2.9101, "bpc_shakespeare": 3.1391, "bpc_code": 3.2641}
+{"arm": "fleet_fish500", "seed": 0, "event": "transfer", "after": "final", "bpc_wiki": 2.8814, "bpc_shakespeare": 3.0158, "bpc_code": 3.2174, "mb_weights_moved": 99.7}
+{"arm": "fleet_fish500", "seed": 0, "event": "done", "updates": 585, "fwd_eq": 3255, "mb_weights_moved": 99.7, "wall_s": 14.6}
+{"arm": "fleet_asym500", "seed": 0, "event": "transfer", "after": "merge@500", "bpc_wiki": 2.966, "bpc_shakespeare": 3.7049, "bpc_code": 3.6681}
+{"arm": "fleet_asym500", "seed": 0, "event": "transfer", "after": "merge@1000", "bpc_wiki": 2.9368, "bpc_shakespeare": 3.4943, "bpc_code": 3.2684}
+{"arm": "fleet_asym500", "seed": 0, "event": "transfer", "after": "final", "bpc_wiki": 2.8886, "bpc_shakespeare": 3.3624, "bpc_code": 3.2011, "mb_weights_moved": 99.7}
+{"arm": "fleet_asym500", "seed": 0, "event": "done", "updates": 585, "fwd_eq": 3255, "mb_weights_moved": 99.7, "wall_s": 14.7}
+{"arm": "fleet_ties500", "seed": 1, "event": "transfer", "after": "merge@500", "bpc_wiki": 3.0621, "bpc_shakespeare": 3.5243, "bpc_code": 4.3988}
+{"arm": "fleet_ties500", "seed": 1, "event": "transfer", "after": "merge@1000", "bpc_wiki": 3.0837, "bpc_shakespeare": 3.4066, "bpc_code": 3.6315}
+{"arm": "fleet_ties500", "seed": 1, "event": "transfer", "after": "final", "bpc_wiki": 2.9767, "bpc_shakespeare": 3.1331, "bpc_code": 3.8685, "mb_weights_moved": 99.7}
+{"arm": "fleet_ties500", "seed": 1, "event": "done", "updates": 585, "fwd_eq": 3255, "mb_weights_moved": 99.7, "wall_s": 15.0}
+{"arm": "fleet_fish500", "seed": 1, "event": "transfer", "after": "merge@500", "bpc_wiki": 3.0996, "bpc_shakespeare": 3.5, "bpc_code": 3.5787}
+{"arm": "fleet_fish500", "seed": 1, "event": "transfer", "after": "merge@1000", "bpc_wiki": 2.9539, "bpc_shakespeare": 3.1469, "bpc_code": 3.2668}
+{"arm": "fleet_fish500", "seed": 1, "event": "transfer", "after": "final", "bpc_wiki": 2.8996, "bpc_shakespeare": 3.0054, "bpc_code": 3.1963, "mb_weights_moved": 99.7}
+{"arm": "fleet_fish500", "seed": 1, "event": "done", "updates": 585, "fwd_eq": 3255, "mb_weights_moved": 99.7, "wall_s": 15.0}
+{"arm": "fleet_asym500", "seed": 1, "event": "transfer", "after": "merge@500", "bpc_wiki": 3.0289, "bpc_shakespeare": 3.6709, "bpc_code": 3.6859}
+{"arm": "fleet_asym500", "seed": 1, "event": "transfer", "after": "merge@1000", "bpc_wiki": 3.0059, "bpc_shakespeare": 3.5301, "bpc_code": 3.2773}
+{"arm": "fleet_asym500", "seed": 1, "event": "transfer", "after": "final", "bpc_wiki": 2.9357, "bpc_shakespeare": 3.4185, "bpc_code": 3.1718, "mb_weights_moved": 99.7}
+{"arm": "fleet_asym500", "seed": 1, "event": "done", "updates": 585, "fwd_eq": 3255, "mb_weights_moved": 99.7, "wall_s": 15.3}

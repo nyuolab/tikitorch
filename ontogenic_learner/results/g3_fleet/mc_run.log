@@ -1,0 +1,38 @@
+vocab=61 wiki:5000k shakespeare:1115k docs:836k code:1532k
+===== G3 seed 0: phylogeny (3000 steps) =====
+  [solo_A s0] final: wiki=3.010 shakespeare=2.903 code=7.036
+  [solo_B s0] final: wiki=3.238 shakespeare=4.250 code=3.040
+  [fleet_mc150 s0] merge@300: wiki=2.793 shakespeare=3.437 code=4.074
+  [fleet_mc150 s0] merge@600: wiki=2.859 shakespeare=3.381 code=3.768
+  [fleet_mc150 s0] merge@900: wiki=2.906 shakespeare=3.275 code=3.646
+  [fleet_mc150 s0] merge@1200: wiki=2.939 shakespeare=3.220 code=3.651
+  [fleet_mc150 s0] final: wiki=2.916 shakespeare=3.124 code=3.670
+  [fleet_mc500 s0] merge@500: wiki=2.750 shakespeare=3.367 code=4.248
+  [fleet_mc500 s0] merge@1000: wiki=2.837 shakespeare=3.162 code=3.740
+  [fleet_mc500 s0] final: wiki=2.905 shakespeare=3.133 code=3.598
+  [pooled s0] final: wiki=3.075 shakespeare=3.293 code=3.029
+===== G3 seed 1: phylogeny (3000 steps) =====
+  [solo_A s1] final: wiki=2.981 shakespeare=2.903 code=7.121
+  [solo_B s1] final: wiki=3.271 shakespeare=4.259 code=3.046
+  [fleet_mc150 s1] merge@300: wiki=2.822 shakespeare=3.417 code=4.073
+  [fleet_mc150 s1] merge@600: wiki=2.891 shakespeare=3.366 code=3.815
+  [fleet_mc150 s1] merge@900: wiki=2.916 shakespeare=3.309 code=3.640
+  [fleet_mc150 s1] merge@1200: wiki=2.941 shakespeare=3.228 code=3.635
+  [fleet_mc150 s1] final: wiki=2.955 shakespeare=3.232 code=3.613
+  [fleet_mc500 s1] merge@500: wiki=2.804 shakespeare=3.386 code=4.365
+  [fleet_mc500 s1] merge@1000: wiki=2.878 shakespeare=3.176 code=3.810
+  [fleet_mc500 s1] final: wiki=2.870 shakespeare=3.138 code=3.594
+  [pooled s1] final: wiki=3.112 shakespeare=3.074 code=3.011
+
+================= G3 VERDICT (mean over seeds) =================
+         arm  A(shak)  B(code)    wiki
+      solo_A    2.903    7.078   2.995
+      solo_B    4.254    3.043   3.255
+ fleet_mc150    3.178    3.641   2.936
+ fleet_mc500    3.136    3.596   2.887
+      pooled    3.183    3.020   3.093
+  fleet_mc150: home retained (≤solo+0.05)? False | away gained (≥0.30)? True => no
+  fleet_mc500: home retained (≤solo+0.05)? False | away gained (≥0.30)? True => no
+
+  G3 verdict: NO-GO/PARTIAL — see spec §4
+(166s total, device=mps)

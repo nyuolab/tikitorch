@@ -1,0 +1,104 @@
+{
+ "summary": {
+  "frozen": {
+   "final_avg_bpc": 6.5478,
+   "mean_forgetting_bpc": 0.0,
+   "base_drift_bpc": 0.0,
+   "mean_plasticity_frac": 0.0
+  },
+  "cascade": {
+   "final_avg_bpc": 3.5285,
+   "mean_forgetting_bpc": 0.6098,
+   "base_drift_bpc": 0.7119,
+   "mean_plasticity_frac": 1.0
+  },
+  "rehearsal": {
+   "final_avg_bpc": 3.6153,
+   "mean_forgetting_bpc": 0.6059,
+   "base_drift_bpc": 0.9162,
+   "mean_plasticity_frac": 0.9749
+  },
+  "rehearsal_bal": {
+   "final_avg_bpc": 3.5337,
+   "mean_forgetting_bpc": 0.51,
+   "base_drift_bpc": 0.7953,
+   "mean_plasticity_frac": 0.9794
+  },
+  "rehearsal50": {
+   "final_avg_bpc": 4.0095,
+   "mean_forgetting_bpc": 0.8337,
+   "base_drift_bpc": 1.3159,
+   "mean_plasticity_frac": 0.9031
+  },
+  "rehearsal50_bal": {
+   "final_avg_bpc": 3.8227,
+   "mean_forgetting_bpc": 0.6977,
+   "base_drift_bpc": 1.1121,
+   "mean_plasticity_frac": 0.9333
+  },
+  "two_speed_casc": {
+   "final_avg_bpc": 3.4885,
+   "mean_forgetting_bpc": 0.4415,
+   "base_drift_bpc": 0.5726,
+   "mean_plasticity_frac": 0.9828
+  },
+  "two_speed_casc_z000": {
+   "final_avg_bpc": 3.4803,
+   "mean_forgetting_bpc": 0.3114,
+   "base_drift_bpc": 0.5909,
+   "mean_plasticity_frac": 0.9585
+  },
+  "two_speed_casc_z075": {
+   "final_avg_bpc": 3.6107,
+   "mean_forgetting_bpc": 0.2534,
+   "base_drift_bpc": 0.5457,
+   "mean_plasticity_frac": 0.9063
+  },
+  "two_speed_casc_z150": {
+   "final_avg_bpc": 3.8071,
+   "mean_forgetting_bpc": 0.0304,
+   "base_drift_bpc": 0.5305,
+   "mean_plasticity_frac": 0.796
+  }
+ },
+ "verdict": "GO",
+ "args": {
+  "context": 12,
+  "hidden": 256,
+  "depth": 4,
+  "batch": 256,
+  "lr": 0.001,
+  "lr_slow": 0.0003,
+  "base_steps": 1200,
+  "stream_batches": 1500,
+  "budget": 600,
+  "fast_budget": 450,
+  "sleep_every": 150,
+  "sleep_updates": 15,
+  "settle": 16,
+  "gamma": 0.125,
+  "tag": "_g12",
+  "gate_z": 0.25,
+  "reservoir": 4096,
+  "val_windows": 4096,
+  "eval_every": 100,
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "arms": [
+   "frozen",
+   "cascade",
+   "rehearsal",
+   "rehearsal_bal",
+   "rehearsal50",
+   "rehearsal50_bal",
+   "two_speed_casc",
+   "two_speed_casc_z000",
+   "two_speed_casc_z075",
+   "two_speed_casc_z150"
+  ],
+  "smoke": false
+ }
+}

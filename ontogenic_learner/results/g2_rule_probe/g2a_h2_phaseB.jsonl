@@ -1,0 +1,148 @@
+{"arm": "bp", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.4939, "bpc_shakespeare": 5.7124, "bpc_docs": 6.9867, "bpc_code": 7.7871, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.808, "z": 31.104}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 3.7654, "z": 0.502}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 3.1682, "z": -0.231}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 2.7227, "z": -0.995}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 2.268, "z": -1.889}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 2.6642, "z": -0.244}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 2.7428, "z": 0.416}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 2.7482, "z": 0.324}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 2.3989, "z": -0.848}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 2.3318, "z": -0.806}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 2.6318, "z": 0.821}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 1.7851, "z": -2.886}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 2.737, "z": 1.237}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 2.6508, "z": 0.79}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 2.5366, "z": 0.418}
+{"arm": "bp", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.0163, "bpc_shakespeare": 2.8439, "bpc_docs": 6.7334, "bpc_code": 7.3483, "updates": 600, "fwd_eq": 3300, "diverged": 0}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 7.6835, "z": 27.282}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 3.4196, "z": -0.137}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 3.1115, "z": -0.727}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 3.8924, "z": 0.541}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 2.984, "z": -0.386}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 3.0115, "z": -0.1}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 4.1353, "z": 1.36}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 3.3855, "z": 0.341}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 2.8133, "z": -0.459}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 3.587, "z": 1.421}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 2.8532, "z": 0.001}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 3.4717, "z": 2.191}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 3.1061, "z": 0.143}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 3.1318, "z": -0.278}
+{"arm": "bp", "seed": 0, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 2.965, "z": -0.924}
+{"arm": "bp", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 3.1281, "bpc_shakespeare": 3.5277, "bpc_docs": 3.1528, "bpc_code": 3.4271, "updates": 1200, "fwd_eq": 6600, "diverged": 0}
+{"arm": "bp", "seed": 0, "event": "transfer", "after": "code@k64", "bpc_wiki": 3.3525, "bpc_shakespeare": 3.617, "bpc_docs": 3.2898, "bpc_code": 3.0871, "updates": 1264, "fwd_eq": 6792, "diverged": 0}
+{"arm": "bp", "seed": 0, "event": "transfer", "after": "code@k256", "bpc_wiki": 3.7061, "bpc_shakespeare": 4.0649, "bpc_docs": 3.5833, "bpc_code": 3.0251, "updates": 1456, "fwd_eq": 7368, "diverged": 0}
+{"arm": "bp", "seed": 0, "event": "transfer", "after": "code@k1024", "bpc_wiki": 3.5703, "bpc_shakespeare": 3.9818, "bpc_docs": 3.3793, "bpc_code": 2.6705, "updates": 2224, "fwd_eq": 9672, "diverged": 0}
+{"arm": "bp", "seed": 0, "event": "done", "probe": "h2", "updates": 2224, "fwd_eq": 9672, "diverged": 0, "wall_s": 22.8}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.4939, "bpc_shakespeare": 5.7124, "bpc_docs": 6.9867, "bpc_code": 7.7871, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.808, "z": 31.104}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 3.7606, "z": 0.495}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 3.163, "z": -0.241}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 2.7267, "z": -0.983}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 2.293, "z": -1.796}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 2.6615, "z": -0.239}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 2.7547, "z": 0.474}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 2.7522, "z": 0.339}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 2.4304, "z": -0.734}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 2.383, "z": -0.596}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 2.5897, "z": 0.592}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 1.793, "z": -2.827}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 2.739, "z": 1.238}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 2.6529, "z": 0.815}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 2.5462, "z": 0.47}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 2.9776, "bpc_shakespeare": 2.8125, "bpc_docs": 6.6628, "bpc_code": 7.3107, "updates": 600, "fwd_eq": 17700, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 7.5021, "z": 26.74}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 3.386, "z": -0.171}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 3.0973, "z": -0.747}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 3.9081, "z": 0.559}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 2.9582, "z": -0.448}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 3.0028, "z": -0.142}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 4.2153, "z": 1.455}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 3.4676, "z": 0.473}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 2.8736, "z": -0.326}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 3.5816, "z": 1.346}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 2.7766, "z": -0.218}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 3.432, "z": 2.063}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 3.1142, "z": 0.147}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 3.118, "z": -0.307}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 2.9788, "z": -0.908}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 3.1493, "bpc_shakespeare": 3.5801, "bpc_docs": 3.1444, "bpc_code": 3.4198, "updates": 1200, "fwd_eq": 35400, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "code@k64", "bpc_wiki": 3.3893, "bpc_shakespeare": 3.6207, "bpc_docs": 3.2741, "bpc_code": 3.1043, "updates": 1264, "fwd_eq": 37128, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "code@k256", "bpc_wiki": 3.7635, "bpc_shakespeare": 4.1332, "bpc_docs": 3.6532, "bpc_code": 3.0711, "updates": 1456, "fwd_eq": 42312, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "code@k1024", "bpc_wiki": 3.5688, "bpc_shakespeare": 4.0302, "bpc_docs": 3.3495, "bpc_code": 2.6703, "updates": 2224, "fwd_eq": 63048, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "done", "probe": "h2", "updates": 2224, "fwd_eq": 63048, "diverged": 0, "wall_s": 54.0}
+{"arm": "bp", "seed": 1, "event": "transfer", "after": "base", "bpc_wiki": 2.5569, "bpc_shakespeare": 6.0382, "bpc_docs": 7.2032, "bpc_code": 7.9775, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.8877, "z": 30.308}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 3.8293, "z": 0.507}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 3.154, "z": -0.338}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 2.7814, "z": -0.947}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 2.324, "z": -1.95}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 2.6532, "z": -0.453}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 2.7082, "z": 0.119}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 2.7018, "z": 0.036}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 2.4581, "z": -0.579}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 2.3642, "z": -0.648}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 2.5257, "z": 0.347}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 1.812, "z": -2.696}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 2.717, "z": 1.188}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 2.7176, "z": 1.141}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 2.5048, "z": 0.299}
+{"arm": "bp", "seed": 1, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.0144, "bpc_shakespeare": 2.8573, "bpc_docs": 6.9642, "bpc_code": 7.6733, "updates": 600, "fwd_eq": 3300, "diverged": 0}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 7.6802, "z": 26.988}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 3.4459, "z": -0.122}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 3.1619, "z": -0.674}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 3.9811, "z": 0.65}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 2.8938, "z": -0.551}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 2.9736, "z": -0.196}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 4.1727, "z": 1.364}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 3.4326, "z": 0.378}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 2.9874, "z": -0.092}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 3.4528, "z": 1.008}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 2.8682, "z": 0.008}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 3.3718, "z": 1.865}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 3.0697, "z": 0.065}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 3.2087, "z": -0.121}
+{"arm": "bp", "seed": 1, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 2.8847, "z": -1.101}
+{"arm": "bp", "seed": 1, "event": "transfer", "after": "docs", "bpc_wiki": 3.1956, "bpc_shakespeare": 3.5856, "bpc_docs": 3.1436, "bpc_code": 3.4162, "updates": 1200, "fwd_eq": 6600, "diverged": 0}
+{"arm": "bp", "seed": 1, "event": "transfer", "after": "code@k64", "bpc_wiki": 3.4215, "bpc_shakespeare": 3.6341, "bpc_docs": 3.2679, "bpc_code": 3.0626, "updates": 1264, "fwd_eq": 6792, "diverged": 0}
+{"arm": "bp", "seed": 1, "event": "transfer", "after": "code@k256", "bpc_wiki": 3.7727, "bpc_shakespeare": 4.0868, "bpc_docs": 3.577, "bpc_code": 3.0398, "updates": 1456, "fwd_eq": 7368, "diverged": 0}
+{"arm": "bp", "seed": 1, "event": "transfer", "after": "code@k1024", "bpc_wiki": 3.5702, "bpc_shakespeare": 4.1116, "bpc_docs": 3.3143, "bpc_code": 2.6725, "updates": 2224, "fwd_eq": 9672, "diverged": 0}
+{"arm": "bp", "seed": 1, "event": "done", "probe": "h2", "updates": 2224, "fwd_eq": 9672, "diverged": 0, "wall_s": 22.9}
+{"arm": "relax_p50_i24", "seed": 1, "event": "transfer", "after": "base", "bpc_wiki": 2.5569, "bpc_shakespeare": 6.0382, "bpc_docs": 7.2032, "bpc_code": 7.9775, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.8877, "z": 30.308}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 3.8293, "z": 0.507}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 3.1626, "z": -0.325}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 2.7716, "z": -0.972}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 2.3214, "z": -1.947}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 2.66, "z": -0.407}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 2.7292, "z": 0.228}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 2.7391, "z": 0.227}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 2.4307, "z": -0.681}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 2.3869, "z": -0.526}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 2.5441, "z": 0.426}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 1.8149, "z": -2.706}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 2.7472, "z": 1.266}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 2.7257, "z": 1.13}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 2.5075, "z": 0.244}
+{"arm": "relax_p50_i24", "seed": 1, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.0187, "bpc_shakespeare": 2.8708, "bpc_docs": 6.8897, "bpc_code": 7.5056, "updates": 600, "fwd_eq": 17700, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 7.81, "z": 28.181}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 3.4131, "z": -0.142}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 3.1948, "z": -0.625}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 4.0053, "z": 0.734}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 2.9208, "z": -0.478}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 2.9754, "z": -0.164}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 4.1241, "z": 1.324}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 3.4729, "z": 0.481}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 2.9442, "z": -0.185}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 3.4947, "z": 1.121}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 2.8733, "z": 0.015}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 3.3911, "z": 1.896}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 3.1073, "z": 0.135}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 3.1598, "z": -0.241}
+{"arm": "relax_p50_i24", "seed": 1, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 3.0239, "z": -0.811}
+{"arm": "relax_p50_i24", "seed": 1, "event": "transfer", "after": "docs", "bpc_wiki": 3.1985, "bpc_shakespeare": 3.6546, "bpc_docs": 3.1289, "bpc_code": 3.4609, "updates": 1200, "fwd_eq": 35400, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 1, "event": "transfer", "after": "code@k64", "bpc_wiki": 3.4367, "bpc_shakespeare": 3.7269, "bpc_docs": 3.255, "bpc_code": 3.0886, "updates": 1264, "fwd_eq": 37128, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 1, "event": "transfer", "after": "code@k256", "bpc_wiki": 3.7899, "bpc_shakespeare": 4.1727, "bpc_docs": 3.6074, "bpc_code": 3.0516, "updates": 1456, "fwd_eq": 42312, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 1, "event": "transfer", "after": "code@k1024", "bpc_wiki": 3.5771, "bpc_shakespeare": 4.1534, "bpc_docs": 3.359, "bpc_code": 2.672, "updates": 2224, "fwd_eq": 63048, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 1, "event": "done", "probe": "h2", "updates": 2224, "fwd_eq": 63048, "diverged": 0, "wall_s": 54.1}

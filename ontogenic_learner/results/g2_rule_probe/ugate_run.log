@@ -1,0 +1,15 @@
+vocab=61 wiki:5000k shakespeare:1115k docs:836k code:1532k
+===== U-gate: phylogeny pretrain =====
+  base: wiki=2.525 shak=5.629
+  cascade-600 ref: shak=3.681 wiki=2.685
+  [plain_g0.0625_s16] stage1: finite=False wiki=nan (drift +nan) shak=nan (0s)
+  [mu_g0.0625_s16] stage1: finite=True wiki=2.726 (drift +0.201) shak=4.927 (7s)
+  [mu_g0.0625_s16] stage2: shak=5.485 (cascade 3.681, gap +1.804) wiki=3.920
+  [mu_g0.125_s16] stage1: finite=True wiki=2.788 (drift +0.264) shak=4.722 (7s)
+  [mu_g0.125_s16] stage2: shak=5.284 (cascade 3.681, gap +1.603) wiki=4.611
+  [mu_g0.0625_s32] stage1: finite=True wiki=2.697 (drift +0.173) shak=5.138 (12s)
+  [mu_g0.0625_s32] stage2: shak=84.650 (cascade 3.681, gap +80.969) wiki=56.774
+  [mu_g0.125_s32] stage1: finite=True wiki=2.787 (drift +0.263) shak=4.688 (12s)
+  [mu_g0.125_s32] stage2: shak=5.407 (cascade 3.681, gap +1.726) wiki=4.630
+
+U-GATE verdict: not yet (criteria: finite, drift<0.5, |gap to cascade|<=0.15)

@@ -34,3 +34,10 @@ results/fpga_silicon/hdk_probe/
 
 # local API keys (results/graphics/.env etc.)
 **/.env
+
+# organism/experiments derived state
+data/experience_stream/
+organism_life/
+.tiki_organism_state/
+.tiki_g1b_state*/
+organism_report_sync/

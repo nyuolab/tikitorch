@@ -1,0 +1,300 @@
+{"arm": "relax_p100_i24", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.4939, "bpc_shakespeare": 5.7124, "bpc_docs": 6.9867, "bpc_code": 7.7871, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.808, "z": 31.104}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 3.7654, "z": 0.502}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 3.1682, "z": -0.231}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 2.7227, "z": -0.995}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 2.268, "z": -1.889}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 2.6642, "z": -0.244}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 2.7428, "z": 0.416}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 2.7482, "z": 0.324}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 2.3989, "z": -0.848}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 2.3318, "z": -0.806}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 2.6318, "z": 0.821}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 1.7851, "z": -2.886}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 2.737, "z": 1.237}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 2.6508, "z": 0.79}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 2.5366, "z": 0.418}
+{"arm": "relax_p100_i24", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.0163, "bpc_shakespeare": 2.8439, "bpc_docs": 6.7334, "bpc_code": 7.3483, "updates": 600, "fwd_eq": 17700, "diverged": 0}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 7.6835, "z": 27.282}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 3.4196, "z": -0.137}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 3.1115, "z": -0.727}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 3.8924, "z": 0.541}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 2.984, "z": -0.386}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 3.0115, "z": -0.1}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 4.1353, "z": 1.36}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 3.3855, "z": 0.341}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 2.8133, "z": -0.459}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 3.587, "z": 1.421}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 2.8532, "z": 0.001}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 3.4717, "z": 2.191}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 3.1061, "z": 0.143}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 3.1318, "z": -0.278}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 2.965, "z": -0.924}
+{"arm": "relax_p100_i24", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 3.1281, "bpc_shakespeare": 3.5277, "bpc_docs": 3.1528, "bpc_code": 3.4271, "updates": 1200, "fwd_eq": 35400, "diverged": 0}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 0, "loss_bpc": 2.9442, "z": -0.763}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 100, "loss_bpc": 3.1809, "z": -0.542}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 200, "loss_bpc": 2.6845, "z": -0.954}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 300, "loss_bpc": 3.1678, "z": 0.179}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 400, "loss_bpc": 2.2395, "z": -1.431}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 500, "loss_bpc": 4.0951, "z": 2.876}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 600, "loss_bpc": 2.839, "z": 0.517}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 700, "loss_bpc": 2.474, "z": -0.332}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 800, "loss_bpc": 1.6289, "z": -2.105}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 900, "loss_bpc": 2.8245, "z": 0.452}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1000, "loss_bpc": 2.8061, "z": -0.21}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1100, "loss_bpc": 2.3184, "z": -0.789}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1200, "loss_bpc": 2.5201, "z": -0.038}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1300, "loss_bpc": 3.2415, "z": 1.294}
+{"arm": "relax_p100_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1400, "loss_bpc": 2.9757, "z": 0.896}
+{"arm": "relax_p100_i24", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 3.5091, "bpc_shakespeare": 4.047, "bpc_docs": 3.4446, "bpc_code": 2.7022, "updates": 1800, "fwd_eq": 53100, "diverged": 0}
+{"arm": "relax_p100_i24", "seed": 0, "event": "done", "probe": "h1", "updates": 1800, "fwd_eq": 53100, "diverged": 0, "wall_s": 69.1}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.4939, "bpc_shakespeare": 5.7124, "bpc_docs": 6.9867, "bpc_code": 7.7871, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.808, "z": 31.104}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 3.7606, "z": 0.495}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 3.163, "z": -0.241}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 2.7267, "z": -0.983}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 2.293, "z": -1.796}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 2.6615, "z": -0.239}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 2.7547, "z": 0.474}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 2.7522, "z": 0.339}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 2.4304, "z": -0.734}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 2.383, "z": -0.596}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 2.5897, "z": 0.592}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 1.793, "z": -2.827}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 2.739, "z": 1.238}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 2.6529, "z": 0.815}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 2.5462, "z": 0.47}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 2.9776, "bpc_shakespeare": 2.8125, "bpc_docs": 6.6628, "bpc_code": 7.3107, "updates": 600, "fwd_eq": 17700, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 7.5021, "z": 26.74}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 3.386, "z": -0.171}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 3.0973, "z": -0.747}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 3.9081, "z": 0.559}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 2.9582, "z": -0.448}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 3.0028, "z": -0.142}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 4.2153, "z": 1.455}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 3.4676, "z": 0.473}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 2.8736, "z": -0.326}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 3.5816, "z": 1.346}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 2.7766, "z": -0.218}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 3.432, "z": 2.063}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 3.1142, "z": 0.147}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 3.118, "z": -0.307}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 2.9788, "z": -0.908}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 3.1493, "bpc_shakespeare": 3.5801, "bpc_docs": 3.1444, "bpc_code": 3.4198, "updates": 1200, "fwd_eq": 35400, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 0, "loss_bpc": 2.9344, "z": -0.796}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 100, "loss_bpc": 3.1857, "z": -0.523}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 200, "loss_bpc": 2.6717, "z": -0.985}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 300, "loss_bpc": 3.193, "z": 0.221}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 400, "loss_bpc": 2.2889, "z": -1.33}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 500, "loss_bpc": 3.9929, "z": 2.651}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 600, "loss_bpc": 2.8399, "z": 0.524}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 700, "loss_bpc": 2.5257, "z": -0.227}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 800, "loss_bpc": 1.6157, "z": -2.135}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 900, "loss_bpc": 2.8695, "z": 0.537}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1000, "loss_bpc": 2.8009, "z": -0.199}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1100, "loss_bpc": 2.2791, "z": -0.833}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1200, "loss_bpc": 2.4912, "z": -0.08}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1300, "loss_bpc": 3.2104, "z": 1.259}
+{"arm": "relax_p50_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1400, "loss_bpc": 2.9212, "z": 0.801}
+{"arm": "relax_p50_i24", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 3.5271, "bpc_shakespeare": 3.9979, "bpc_docs": 3.4743, "bpc_code": 2.7284, "updates": 1800, "fwd_eq": 53100, "diverged": 0}
+{"arm": "relax_p50_i24", "seed": 0, "event": "done", "probe": "h1", "updates": 1800, "fwd_eq": 53100, "diverged": 0, "wall_s": 49.0}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.4939, "bpc_shakespeare": 5.7124, "bpc_docs": 6.9867, "bpc_code": 7.7871, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.808, "z": 31.104}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 5.1278, "z": 0.74}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 3.9126, "z": -0.328}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 3.7234, "z": -0.721}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 2.9884, "z": -2.254}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 3.8087, "z": -0.449}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 3.8393, "z": -0.095}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 3.6788, "z": -0.408}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 3.4568, "z": -1.067}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 3.7684, "z": 0.348}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 3.302, "z": -1.025}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 3.6286, "z": 0.336}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 3.4638, "z": -0.09}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 3.3081, "z": -0.528}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 3.5095, "z": 0.758}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 2.6685, "bpc_shakespeare": 3.6872, "bpc_docs": 5.4093, "bpc_code": 5.873, "updates": 600, "fwd_eq": 17700, "diverged": 0}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 5.2768, "z": 10.154}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 4.1456, "z": -0.018}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 4.0343, "z": -0.496}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 4.8778, "z": 0.961}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 3.5466, "z": -1.3}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 4.011, "z": -0.136}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 5.0503, "z": 1.2}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 3.8821, "z": -0.507}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 3.8221, "z": -0.392}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 4.3256, "z": 0.3}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 4.5302, "z": 0.869}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 4.4226, "z": 0.889}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 4.3816, "z": 0.525}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 4.3624, "z": 0.048}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 3.9824, "z": -0.849}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 2.9026, "bpc_shakespeare": 3.7251, "bpc_docs": 4.1037, "bpc_code": 4.2, "updates": 1200, "fwd_eq": 35400, "diverged": 0}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 0, "loss_bpc": 3.5826, "z": -1.181}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 100, "loss_bpc": 4.8932, "z": 0.674}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 200, "loss_bpc": 3.9797, "z": -0.578}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 300, "loss_bpc": 4.062, "z": -0.234}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 400, "loss_bpc": 3.3413, "z": -1.457}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 500, "loss_bpc": 4.4952, "z": 0.716}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 600, "loss_bpc": 4.3979, "z": 0.863}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 700, "loss_bpc": 3.6608, "z": -0.307}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 800, "loss_bpc": 2.6241, "z": -2.465}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 900, "loss_bpc": 3.5938, "z": -0.458}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1000, "loss_bpc": 3.3862, "z": -1.149}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1100, "loss_bpc": 3.3935, "z": -1.008}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1200, "loss_bpc": 3.1761, "z": -1.161}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1300, "loss_bpc": 4.0823, "z": 0.798}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1400, "loss_bpc": 4.0564, "z": 0.763}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 2.969, "bpc_shakespeare": 3.7408, "bpc_docs": 3.9314, "bpc_code": 3.4267, "updates": 1800, "fwd_eq": 53100, "diverged": 0}
+{"arm": "relax_p50_i24_lr4", "seed": 0, "event": "done", "probe": "h1", "updates": 1800, "fwd_eq": 53100, "diverged": 0, "wall_s": 49.1}
+{"arm": "relax_p25_i24", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.4939, "bpc_shakespeare": 5.7124, "bpc_docs": 6.9867, "bpc_code": 7.7871, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.808, "z": 31.104}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 3.8424, "z": 0.495}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 3.1877, "z": -0.315}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 2.7835, "z": -0.991}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 2.3371, "z": -1.923}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 2.6879, "z": -0.418}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 2.7972, "z": 0.327}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 2.8793, "z": 0.603}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 2.5145, "z": -0.807}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 2.4875, "z": -0.556}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 2.6487, "z": 0.495}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 1.9242, "z": -2.803}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 2.7825, "z": 1.112}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 2.7208, "z": 0.753}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 2.6012, "z": 0.307}
+{"arm": "relax_p25_i24", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.0031, "bpc_shakespeare": 2.865, "bpc_docs": 6.9288, "bpc_code": 7.3757, "updates": 600, "fwd_eq": 17700, "diverged": 0}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 7.6502, "z": 27.481}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 3.6973, "z": -0.005}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 3.2108, "z": -0.733}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 4.0802, "z": 0.61}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 2.9933, "z": -0.619}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 3.2448, "z": 0.01}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 4.2823, "z": 1.368}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 3.4562, "z": 0.204}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 3.0111, "z": -0.296}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 3.6908, "z": 1.316}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 2.8865, "z": -0.353}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 3.4593, "z": 1.712}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 3.299, "z": 0.316}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 3.3068, "z": -0.185}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 3.096, "z": -0.91}
+{"arm": "relax_p25_i24", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 3.1504, "bpc_shakespeare": 3.5155, "bpc_docs": 3.2965, "bpc_code": 3.4905, "updates": 1200, "fwd_eq": 35400, "diverged": 0}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 0, "loss_bpc": 2.9985, "z": -0.953}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 100, "loss_bpc": 3.5383, "z": -0.13}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 200, "loss_bpc": 2.786, "z": -1.033}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 300, "loss_bpc": 3.2878, "z": 0.164}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 400, "loss_bpc": 2.4577, "z": -1.19}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 500, "loss_bpc": 4.3692, "z": 3.09}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 600, "loss_bpc": 3.0656, "z": 0.602}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 700, "loss_bpc": 2.6359, "z": -0.329}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 800, "loss_bpc": 1.7006, "z": -2.204}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 900, "loss_bpc": 3.0714, "z": 0.605}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1000, "loss_bpc": 2.8543, "z": -0.337}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1100, "loss_bpc": 2.3878, "z": -0.882}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1200, "loss_bpc": 2.6017, "z": -0.086}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1300, "loss_bpc": 3.2968, "z": 1.201}
+{"arm": "relax_p25_i24", "seed": 0, "event": "stream", "phase": "code", "step": 1400, "loss_bpc": 3.0198, "z": 0.688}
+{"arm": "relax_p25_i24", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 3.5541, "bpc_shakespeare": 4.0693, "bpc_docs": 3.6424, "bpc_code": 2.7947, "updates": 1800, "fwd_eq": 53100, "diverged": 0}
+{"arm": "relax_p25_i24", "seed": 0, "event": "done", "probe": "h1", "updates": 1800, "fwd_eq": 53100, "diverged": 0, "wall_s": 40.7}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.4939, "bpc_shakespeare": 5.7124, "bpc_docs": 6.9867, "bpc_code": 7.7871, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.808, "z": 31.104}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 5.9901, "z": 0.944}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 4.616, "z": -0.213}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 4.6856, "z": -0.508}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 3.7522, "z": -1.977}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 5.2075, "z": -0.2}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 5.3226, "z": -0.095}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 5.3282, "z": -0.181}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 5.3544, "z": -0.377}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 6.0874, "z": 1.057}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 5.2287, "z": -1.032}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 6.1448, "z": 1.37}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 5.4493, "z": -0.558}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 5.2067, "z": -1.038}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 5.8264, "z": 0.956}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 4.2709, "bpc_shakespeare": 5.9131, "bpc_docs": 6.9705, "bpc_code": 7.322, "updates": 600, "fwd_eq": 12900, "diverged": 0}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 7.6681, "z": 6.925}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 6.1522, "z": -0.068}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 6.4392, "z": -0.128}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 7.3741, "z": 1.237}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 5.7776, "z": -1.167}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 7.1403, "z": 0.718}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 7.7522, "z": 0.933}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 6.8056, "z": -0.254}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 6.5711, "z": -0.507}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 7.1308, "z": -0.003}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 7.7828, "z": 0.846}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 7.2363, "z": 0.192}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 7.9359, "z": 0.908}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 7.7256, "z": 0.05}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 6.9084, "z": -0.924}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 4.9132, "bpc_shakespeare": 6.656, "bpc_docs": 7.7589, "bpc_code": 8.0225, "updates": 1200, "fwd_eq": 25800, "diverged": 0}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 0, "loss_bpc": 6.4016, "z": -1.172}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 100, "loss_bpc": 10.1976, "z": 1.111}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 200, "loss_bpc": 8.1916, "z": -0.351}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 300, "loss_bpc": 8.6559, "z": -0.161}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 400, "loss_bpc": 7.9136, "z": -0.832}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 500, "loss_bpc": 11.4429, "z": 1.753}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 600, "loss_bpc": 10.4241, "z": 0.923}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 700, "loss_bpc": 8.5249, "z": -0.47}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 800, "loss_bpc": 7.4916, "z": -1.542}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 900, "loss_bpc": 8.4387, "z": -0.88}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1000, "loss_bpc": 7.5093, "z": -1.632}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1100, "loss_bpc": 10.601, "z": -0.243}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1200, "loss_bpc": 10.0861, "z": -0.752}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1300, "loss_bpc": 15.6121, "z": 0.956}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1400, "loss_bpc": 17.7823, "z": 0.679}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 11.2361, "bpc_shakespeare": 18.0912, "bpc_docs": 21.1973, "bpc_code": 21.1562, "updates": 1800, "fwd_eq": 38700, "diverged": 0}
+{"arm": "iter_s8_g02_lr4", "seed": 0, "event": "done", "probe": "h1", "updates": 1800, "fwd_eq": 38700, "diverged": 0, "wall_s": 84.9}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.4939, "bpc_shakespeare": 5.7124, "bpc_docs": 6.9867, "bpc_code": 7.7871, "updates": 0, "fwd_eq": 0, "diverged": 0}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 0, "loss_bpc": 6.808, "z": 31.104}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 100, "loss_bpc": 5.9992, "z": 0.978}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 200, "loss_bpc": 4.7003, "z": -0.155}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 300, "loss_bpc": 5.0467, "z": -0.301}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 400, "loss_bpc": 4.3502, "z": -1.494}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 500, "loss_bpc": 7.5513, "z": 0.438}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 600, "loss_bpc": 8.0481, "z": 0.172}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 700, "loss_bpc": 9.0199, "z": 0.412}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 800, "loss_bpc": 10.324, "z": 0.512}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 900, "loss_bpc": 15.0194, "z": 1.72}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1000, "loss_bpc": 17.3567, "z": 0.978}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1100, "loss_bpc": 31.6365, "z": 1.826}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1200, "loss_bpc": 27.7487, "z": 0.254}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1300, "loss_bpc": 25.3856, "z": -0.471}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "shakespeare", "step": 1400, "loss_bpc": 32.4264, "z": 1.149}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 21.2754, "bpc_shakespeare": 35.8291, "bpc_docs": 43.9267, "bpc_code": 44.6129, "updates": 600, "fwd_eq": 12900, "diverged": 0}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 0, "loss_bpc": 52.9643, "z": 6.423}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 100, "loss_bpc": 36.6761, "z": -0.033}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 200, "loss_bpc": 49.5836, "z": 0.731}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 300, "loss_bpc": 69.9713, "z": 1.748}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 400, "loss_bpc": 60.9829, "z": 0.25}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 500, "loss_bpc": 114.1272, "z": 1.6}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 600, "loss_bpc": 218.7427, "z": 1.428}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 700, "loss_bpc": 238.5072, "z": 0.531}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 800, "loss_bpc": 268.2766, "z": 0.188}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 900, "loss_bpc": 291.6907, "z": 0.245}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1000, "loss_bpc": 435.2238, "z": 1.869}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1100, "loss_bpc": 740.6952, "z": 1.414}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1200, "loss_bpc": 3707.2388, "z": 2.581}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1300, "loss_bpc": 3033.2403, "z": -0.191}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "docs", "step": 1400, "loss_bpc": 1111.6453, "z": -0.972}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 552.6985, "bpc_shakespeare": 807.5336, "bpc_docs": 934.7001, "bpc_code": 896.1025, "updates": 1200, "fwd_eq": 25800, "diverged": 0}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 0, "loss_bpc": 712.4699, "z": -0.745}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 100, "loss_bpc": 1007.5959, "z": -0.249}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 200, "loss_bpc": 710.6687, "z": -0.472}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 300, "loss_bpc": 672.8777, "z": -0.394}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 400, "loss_bpc": 528.6192, "z": -0.807}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 500, "loss_bpc": 746.6891, "z": 0.395}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 600, "loss_bpc": 671.8398, "z": 0.341}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 700, "loss_bpc": 549.8739, "z": -0.3}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 800, "loss_bpc": 367.1479, "z": -2.108}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 900, "loss_bpc": 584.9462, "z": -0.192}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1000, "loss_bpc": 550.8974, "z": -0.994}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1100, "loss_bpc": 585.9147, "z": -0.728}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1200, "loss_bpc": 469.7682, "z": -1.493}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1300, "loss_bpc": 554.2591, "z": -0.367}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "stream", "phase": "code", "step": 1400, "loss_bpc": 607.7776, "z": 0.159}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 398.9943, "bpc_shakespeare": 571.0169, "bpc_docs": 657.6271, "bpc_code": 580.3786, "updates": 1800, "fwd_eq": 38700, "diverged": 0}
+{"arm": "iter_s8_g01_lr4", "seed": 0, "event": "done", "probe": "h1", "updates": 1800, "fwd_eq": 38700, "diverged": 0, "wall_s": 82.1}

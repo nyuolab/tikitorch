@@ -1,0 +1,33 @@
+[xfmpshard] BF16-MP 2-block transformer MODEL-PARALLEL across 2 FPGAs (slots 0 1)
+[xfmpshard] 1003854 train tokens | D=64 H=2 FFN=256 SEQ=64 VOCAB=64 | LR=1.0e-03 warmup=120 ACCUM=1 seed=0
+[xfmpshard] step     0  bpb=6.876 bpb_ema=6.876  acc=0.000 acc_ema=0.000  lr=8.3e-06  (3.29 steps/s)
+[xfmpshard] step    50  bpb=14.758 bpb_ema=8.887  acc=0.000 acc_ema=0.002  lr=4.2e-04  (3.29 steps/s)
+[xfmpshard] step   100  bpb=22.402 bpb_ema=12.796  acc=0.000 acc_ema=0.001  lr=8.4e-04  (3.29 steps/s)
+[xfmpshard] step   150  bpb=39.744 bpb_ema=20.328  acc=0.000 acc_ema=0.002  lr=1.0e-03  (3.29 steps/s)
+[xfmpshard] step   200  bpb=39.863 bpb_ema=28.012  acc=0.000 acc_ema=0.002  lr=1.0e-03  (3.29 steps/s)
+[kicktime] FWD chip 0: 53.5 ms/kick (n=201)
+[kicktime] FWD chip 1: 57.6 ms/kick (n=201)
+[kicktime] BWD chip 0: 91.5 ms/kick (n=201)
+[kicktime] BWD chip 1: 99.1 ms/kick (n=201)
+[xfmpshard] step   250  bpb=39.863 bpb_ema=32.671  acc=0.000 acc_ema=0.002  lr=1.0e-03  (3.29 steps/s)
+[xfmpshard] step   300  bpb=39.240 bpb_ema=35.471  acc=0.016 acc_ema=0.002  lr=1.0e-03  (3.29 steps/s)
+[xfmpshard] step   350  bpb=39.863 bpb_ema=37.189  acc=0.000 acc_ema=0.002  lr=1.0e-03  (3.29 steps/s)
+[xfmpshard] step   400  bpb=39.863 bpb_ema=38.218  acc=0.000 acc_ema=0.002  lr=1.0e-03  (3.29 steps/s)
+[kicktime] FWD chip 0: 53.5 ms/kick (n=401)
+[kicktime] FWD chip 1: 57.6 ms/kick (n=401)
+[kicktime] BWD chip 0: 91.5 ms/kick (n=401)
+[kicktime] BWD chip 1: 99.1 ms/kick (n=401)
+[xfmpshard] step   450  bpb=39.863 bpb_ema=38.845  acc=0.000 acc_ema=0.002  lr=1.0e-03  (3.29 steps/s)
+[xfmpshard] step   499  bpb=39.863 bpb_ema=39.227  acc=0.000 acc_ema=0.001  lr=1.0e-03  (3.29 steps/s)
+[kicktime] FWD chip 0: 53.5 ms/kick (n=500)
+[kicktime] FWD chip 1: 57.6 ms/kick (n=500)
+[kicktime] BWD chip 0: 91.5 ms/kick (n=500)
+[kicktime] BWD chip 1: 99.1 ms/kick (n=500)
+
+========== DISTRIBUTED BF16-MP PC TRANSFORMER on 2 FPGAs ==========
+[throughput] 500 steps (ACCUM=1), 151.9s, 3.29 steps/s | 211 tok/s | final bpb_ema=39.227 acc_ema=0.001
+[comms] cross-chip WIDE messages: 4096000 floats = 16.38 MB | per fwd/bwd pass 1 hidden(down)+1 error(up), each N*D=4096 floats
+[gateC] WEIGHTS crossed chips=0 | GRADIENTS crossed=0 | only neighbour wide hidden-states + errors crossed (no global model/gradient)
+[xfmpshard] chip 0: trained float master -> /tmp/ctl/xfmp_master0.f32
+[xfmpshard] chip 1: trained float master -> /tmp/ctl/xfmp_master1.f32
+EXIT=0
