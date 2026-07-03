@@ -1,0 +1,276 @@
++ export HOME=/root
++ HOME=/root
++ S3_RESULTS=s3://tiki-sweep-739966866637/ddrprobe-20260615T162712Z/results
++ trap up EXIT
++ command -v git-lfs
++ apt-get update -y
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Get:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease [128 kB]
+Get:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease [128 kB]
+Get:4 http://security.ubuntu.com/ubuntu focal-security InRelease [128 kB]
+Get:5 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/main amd64 Packages [4004 kB]
+Get:6 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/main Translation-en [601 kB]
+Get:7 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/restricted amd64 Packages [3983 kB]
+Get:8 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/restricted Translation-en [548 kB]
+Get:9 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/universe amd64 Packages [1275 kB]
+Get:10 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/universe Translation-en [302 kB]
+Get:11 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/multiverse amd64 Packages [29.8 kB]
+Get:12 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports/main amd64 Packages [46.1 kB]
+Get:13 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports/main Translation-en [16.2 kB]
+Get:14 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports/universe amd64 Packages [25.0 kB]
+Get:15 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports/universe Translation-en [16.3 kB]
+Get:16 http://security.ubuntu.com/ubuntu focal-security/main amd64 Packages [3610 kB]
+Get:17 http://security.ubuntu.com/ubuntu focal-security/main Translation-en [518 kB]
+Get:18 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages [3828 kB]
+Get:19 http://security.ubuntu.com/ubuntu focal-security/restricted Translation-en [527 kB]
+Get:20 http://security.ubuntu.com/ubuntu focal-security/universe amd64 Packages [1052 kB]
+Get:21 http://security.ubuntu.com/ubuntu focal-security/universe Translation-en [220 kB]
+Get:22 http://security.ubuntu.com/ubuntu focal-security/multiverse amd64 Packages [26.7 kB]
+Fetched 21.0 MB in 3s (6890 kB/s)
+Reading package lists...
++ apt-get install -y git-lfs
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following NEW packages will be installed:
+  git-lfs
+0 upgraded, 1 newly installed, 0 to remove and 104 not upgraded.
+Need to get 3316 kB of archives.
+After this operation, 11.1 MB of additional disk space will be used.
+Get:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal/universe amd64 git-lfs amd64 2.9.2-1 [3316 kB]
+dpkg-preconfigure: unable to re-open stdin: No such file or directory
+Fetched 3316 kB in 0s (72.6 MB/s)
+Selecting previously unselected package git-lfs.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 100548 files and directories currently installed.)
+Preparing to unpack .../git-lfs_2.9.2-1_amd64.deb ...
+Unpacking git-lfs (2.9.2-1) ...
+Setting up git-lfs (2.9.2-1) ...
+Processing triggers for man-db (2.9.1-1) ...
++ AF=
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /opt/aws-fpga
++ '[' -d /root/aws-fpga/hdk ']'
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /opt/aws-fpga
++ '[' -d '/home/*/src/project_data/aws-fpga/hdk' ']'
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /opt/aws-fpga
++ '[' -d /opt/aws-fpga/hdk ']'
++ '[' -z '' ']'
++ AF=/opt/aws-fpga
++ git clone https://github.com/aws/aws-fpga.git /opt/aws-fpga
+Cloning into '/opt/aws-fpga'...
++ cd /opt/aws-fpga
++ git lfs install
+Updated git hooks.
+Git LFS initialized.
++ git lfs pull
++ source hdk_setup.sh
+++ script=hdk_setup.sh
+++ '[' hdk_setup.sh == /var/lib/cloud/instance/scripts/part-001 ']'
++++ readlink -f hdk_setup.sh
+++ full_script=/opt/aws-fpga/hdk_setup.sh
++++ basename /opt/aws-fpga/hdk_setup.sh
+++ script_name=hdk_setup.sh
++++ dirname /opt/aws-fpga/hdk_setup.sh
+++ script_dir=/opt/aws-fpga
++++ pwd
+++ current_dir=/opt/aws-fpga
+++ debug=0
+++ skip_downloads=0
+++ source /opt/aws-fpga/shared/bin/set_common_functions.sh
++++ export -f get_tools_dst_dir
++++ export -f get_tools_lib_dir
+++ args=("$@")
+++ (( i = 0 ))
+++ (( i < 0 ))
+++ source /opt/aws-fpga/shared/bin/set_common_env_vars.sh
++++ info_msg 'Setting up environment variables'
++++ echo -e 'INFO: Setting up environment variables'
+INFO: Setting up environment variables
+++++ git rev-parse --show-toplevel
++++ repo_root=/opt/aws-fpga
++++ [[ -z '' ]]
++++ debug_msg 'AWS_FPGA_REPO_DIR not set so setting to /opt/aws-fpga'
++++ [[ 0 == 0 ]]
++++ return
++++ export AWS_FPGA_REPO_DIR=/opt/aws-fpga
++++ AWS_FPGA_REPO_DIR=/opt/aws-fpga
++++ unset HDK_DIR
++++ unset HDK_COMMON_DIR
++++ unset HDK_SHELL_DIR
++++ unset HDK_SHELL_DESIGN_DIR
++++ export HDK_DIR=/opt/aws-fpga/hdk
++++ HDK_DIR=/opt/aws-fpga/hdk
++++ export HDK_COMMON_DIR=/opt/aws-fpga/hdk/common
++++ HDK_COMMON_DIR=/opt/aws-fpga/hdk/common
+++++ realpath -s /opt/aws-fpga/hdk/common/shell_stable
++++ export HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
++++ HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
++++ export HDK_SHELL_DESIGN_DIR=/opt/aws-fpga/hdk/common/shell_stable/design
++++ HDK_SHELL_DESIGN_DIR=/opt/aws-fpga/hdk/common/shell_stable/design
++++ unset SDK_DIR
++++ export SDK_DIR=/opt/aws-fpga/sdk
++++ SDK_DIR=/opt/aws-fpga/sdk
++++ export VITIS_DIR=/opt/aws-fpga/vitis
++++ VITIS_DIR=/opt/aws-fpga/vitis
++++ python_lib=/opt/aws-fpga/shared/lib
++++ export PYTHONPATH=/opt/aws-fpga/shared/lib:
++++ PYTHONPATH=/opt/aws-fpga/shared/lib:
+++++ echo /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++++ sed -e 's/\(^\|:\)[^:]\+\/shared\/bin\/scripts\(:\|$\)/:/g; s/^://; s/:$//'
++++ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/aws-fpga/shared/bin/scripts:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++ debug_msg 'Checking for Vivado install:'
+++ [[ 0 == 0 ]]
+++ return
+++ is_vivado_available
+++ vivado -version
+++ false
+++ err_msg 'Please install/enable Vivado.'
+++ echo -e 'ERROR: Please install/enable Vivado.'
+ERROR: Please install/enable Vivado.
+++ err_msg '  If you are using the FPGA Developer AMI then please open an issue on GitHub.'
+++ echo -e 'ERROR:   If you are using the FPGA Developer AMI then please open an issue on GitHub.'
+ERROR:   If you are using the FPGA Developer AMI then please open an issue on GitHub.
+++ return 1
++ true
++ echo HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
+HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
++ OUT=/tmp/ddr
++ mkdir -p /tmp/ddr
++ grep -niE 'ddr|hbm|cl_sh_ddr|sh_cl_ddr|sh_ddr|stat_' /opt/aws-fpga/hdk/common/shell_stable/design/interfaces/cl_ports.vh
++ ls /opt/aws-fpga/hdk/common/shell_stable/design/interfaces
++ cp /opt/aws-fpga/hdk/common/shell_stable/design/interfaces/unused_ddr_template.inc '/opt/aws-fpga/hdk/common/shell_stable/design/interfaces/*hbm*.inc' /tmp/ddr/
++ true
++ for n in sh_ddr cl_sh_ddr sh_hbm
++ find /opt/aws-fpga/hdk -name sh_ddr.sv -o -name sh_ddr.v
++ head -2
++ read f
+++ basename /opt/aws-fpga/hdk/common/shell_stable/design/sh_ddr/sim/sh_ddr.sv
++ cp /opt/aws-fpga/hdk/common/shell_stable/design/sh_ddr/sim/sh_ddr.sv /tmp/ddr/mod_sh_ddr.sv
++ read f
+++ basename /opt/aws-fpga/hdk/common/shell_stable/design/sh_ddr/synth/sh_ddr.sv
++ cp /opt/aws-fpga/hdk/common/shell_stable/design/sh_ddr/synth/sh_ddr.sv /tmp/ddr/mod_sh_ddr.sv
++ read f
++ for n in sh_ddr cl_sh_ddr sh_hbm
++ find /opt/aws-fpga/hdk -name cl_sh_ddr.sv -o -name cl_sh_ddr.v
++ head -2
++ read f
++ for n in sh_ddr cl_sh_ddr sh_hbm
++ find /opt/aws-fpga/hdk -name sh_hbm.sv -o -name sh_hbm.v
++ head -2
++ read f
++ find /opt/aws-fpga/hdk -iname '*sh_ddr*' -o -iname '*ddr4*sv'
++ head -20
++ for d in cl_dram_hbm_dma cl_mem_perf
++ D=/opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma
++ echo '== cl_dram_hbm_dma design =='
++ ls -R /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design
+++ find /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design -name '*.sv'
+++ head -10
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_hbm_axi4.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_hbm_axi4.sv /tmp/ddr/cl_dram_hbm_dma_cl_hbm_axi4.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_vio.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_vio.sv /tmp/ddr/cl_dram_hbm_dma_cl_vio.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_dram_hbm_dma.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_dram_hbm_dma.sv /tmp/ddr/cl_dram_hbm_dma_cl_dram_hbm_dma.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_ocl_slv.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_ocl_slv.sv /tmp/ddr/cl_dram_hbm_dma_cl_ocl_slv.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_tst_scrb.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_tst_scrb.sv /tmp/ddr/cl_dram_hbm_dma_cl_tst_scrb.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_tst.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_tst.sv /tmp/ddr/cl_dram_hbm_dma_cl_tst.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_int_tst.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_int_tst.sv /tmp/ddr/cl_dram_hbm_dma_cl_int_tst.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_int_slv.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_int_slv.sv /tmp/ddr/cl_dram_hbm_dma_cl_int_slv.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_dram_dma_axi_mstr.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_dram_dma_axi_mstr.sv /tmp/ddr/cl_dram_hbm_dma_cl_dram_dma_axi_mstr.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_dram_dma_pkg.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/design/cl_dram_dma_pkg.sv /tmp/ddr/cl_dram_hbm_dma_cl_dram_dma_pkg.sv
+++ find /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build '(' -name 'gen_ip*.tcl' -o -name '*.xdc' -o -name 'cl_*.vh' ')'
+++ head -12
++ for f in $(find "$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/constraints/cl_timing_user.xdc
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/constraints/cl_timing_user.xdc /tmp/ddr/cl_dram_hbm_dma_build_cl_timing_user.xdc
++ for f in $(find "$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/constraints/cl_synth_user.xdc
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/constraints/cl_synth_user.xdc /tmp/ddr/cl_dram_hbm_dma_build_cl_synth_user.xdc
++ for f in $(find "$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/constraints/xdma_shell_cl_pnr_user.xdc
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/constraints/xdma_shell_cl_pnr_user.xdc /tmp/ddr/cl_dram_hbm_dma_build_xdma_shell_cl_pnr_user.xdc
++ for f in $(find "$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/constraints/small_shell_cl_pnr_user.xdc
++ cp /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/constraints/small_shell_cl_pnr_user.xdc /tmp/ddr/cl_dram_hbm_dma_build_small_shell_cl_pnr_user.xdc
++ for d in cl_dram_hbm_dma cl_mem_perf
++ D=/opt/aws-fpga/hdk/cl/examples/cl_mem_perf
++ echo '== cl_mem_perf design =='
++ ls -R /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design
+++ find /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design -name '*.sv'
+++ head -10
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_ocl_dec.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_ocl_dec.sv /tmp/ddr/cl_mem_perf_cl_mem_ocl_dec.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_hbm_wrapper.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_hbm_wrapper.sv /tmp/ddr/cl_mem_perf_cl_mem_hbm_wrapper.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_hbm_perf_kernel.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_hbm_perf_kernel.sv /tmp/ddr/cl_mem_perf_cl_hbm_perf_kernel.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_axi_ctl.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_axi_ctl.sv /tmp/ddr/cl_mem_perf_cl_axi_ctl.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_pcis_dec.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_pcis_dec.sv /tmp/ddr/cl_mem_perf_cl_mem_pcis_dec.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_clk_freq.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_clk_freq.sv /tmp/ddr/cl_mem_perf_cl_clk_freq.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_hbm_axi4.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_hbm_axi4.sv /tmp/ddr/cl_mem_perf_cl_mem_hbm_axi4.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_kernel_req.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_kernel_req.sv /tmp/ddr/cl_mem_perf_cl_kernel_req.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_kernel_ctl.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_kernel_ctl.sv /tmp/ddr/cl_mem_perf_cl_kernel_ctl.sv
++ for f in $(find "$D/design" -name "*.sv" 2>/dev/null | head -10)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_perf.sv
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/design/cl_mem_perf.sv /tmp/ddr/cl_mem_perf_cl_mem_perf.sv
+++ find /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build '(' -name 'gen_ip*.tcl' -o -name '*.xdc' -o -name 'cl_*.vh' ')'
+++ head -12
++ for f in $(find "$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/constraints/cl_timing_user.xdc
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/constraints/cl_timing_user.xdc /tmp/ddr/cl_mem_perf_build_cl_timing_user.xdc
++ for f in $(find "$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/constraints/cl_synth_user.xdc
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/constraints/cl_synth_user.xdc /tmp/ddr/cl_mem_perf_build_cl_synth_user.xdc
++ for f in $(find "$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/constraints/xdma_shell_cl_pnr_user.xdc
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/constraints/xdma_shell_cl_pnr_user.xdc /tmp/ddr/cl_mem_perf_build_xdma_shell_cl_pnr_user.xdc
++ for f in $(find "$D/build" \( -name "gen_ip*.tcl" -o -name "*.xdc" -o -name "cl_*.vh" \) 2>/dev/null | head -12)
+++ basename /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/constraints/small_shell_cl_pnr_user.xdc
++ cp /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/constraints/small_shell_cl_pnr_user.xdc /tmp/ddr/cl_mem_perf_build_small_shell_cl_pnr_user.xdc
++ grep -rniE 'fpga_dma|0x[0-9a-f]+|XDMA|burst_write|ddr|hbm|init_ddr|sv_map' /opt/aws-fpga/hdk/cl/examples/cl_mem_perf/software
++ grep -iE 'fpga_dma|burst|ddr|hbm|xdma'
++ head -40
++ aws s3 cp /tmp/ddr/ s3://tiki-sweep-739966866637/ddrprobe-20260615T162712Z/results/ --recursive --only-show-errors
++ echo done
++ aws s3 cp - s3://tiki-sweep-739966866637/ddrprobe-20260615T162712Z/results/DONE --only-show-errors
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-ddrprobe.log s3://tiki-sweep-739966866637/ddrprobe-20260615T162712Z/results/boot.log --only-show-errors
++ shutdown -h now
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-ddrprobe.log s3://tiki-sweep-739966866637/ddrprobe-20260615T162712Z/results/boot.log --only-show-errors

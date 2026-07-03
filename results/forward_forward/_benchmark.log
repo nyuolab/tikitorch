@@ -1,0 +1,6 @@
+== Tropical Forward-Forward — MNIST benchmark vs FF paper (0.9864) ==
+train=60000 test=10000 batch=100 k=10 margin=2.0 on=1.0 lr=2^-8 seed=0
+
+config                          acc     secs     params detail
+------------------------------------------------------------------------------
+dyadic_ff (forward-only)     0.9177  18373.9   13576000 w=2000 d=4 ep=25 ntr=60000

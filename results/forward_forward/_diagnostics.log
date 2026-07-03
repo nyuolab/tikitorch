@@ -1,0 +1,18 @@
+== TFF diagnostics ==  train=6000 test=2000 seed=0
+[A] probe_substrate_ceiling ...
+  [A] din=784 adam: acc=0.2875
+  [A] din=784 sign: acc=0.3335
+  [A] din=196 adam: acc=0.3260
+  [A] din=196 sign: acc=0.3135
+  [A] din=49 adam: acc=0.3205
+  [A] din=49 sign: acc=0.3525
+[B] probe_dense_ff_epochs ...
+  [B] dense_ff epochs=6: acc=0.2760
+  [B] dense_ff epochs=20: acc=0.3440
+  [B] dense_ff epochs=40: acc=0.3580
+[C] probe_scramble ...
+  [C] scramble-feature probe=0.1035  raw-pixel probe=0.8795
+[D] probe_softtau ...
+  [D] soft-tau warmup -> hard eval: acc=0.1170
+
+wrote 12 new rows (12 total) -> results/forward_forward/diagnostics.jsonl  (201s)

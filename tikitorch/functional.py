@@ -54,10 +54,14 @@ __all__ = [
     "tropical_softmax_asym_score",
     # l1 / AdderNet (multiply-free, tropical-adjacent)
     "adder_linear",
+    "tropical_l1_score",
     # attention: value pull
     "TropicalValuePullFn",
     "tropical_value_pull",
     "tropical_softmax_value_pull",
+    # attention: argmax-gather (deploy-pure limit of softmax attention)
+    "tropical_value_gather",
+    "tropical_softmax_value_gather",
     # attention: top-k softened value pull
     "TropicalValuePullTopKFn",
     "tropical_value_pull_topk",
@@ -448,6 +452,27 @@ def adder_linear(x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
     return -(x.unsqueeze(-2) - weight).abs().sum(dim=-1)
 
 
+# ---------------------------------------------------------------------------
+# l1 attention SCORE: scores[i, j] = -sum_d |Q[i, d] - K[j, d]|  (sum over ALL
+# dims, the AdderNet/many-to-many analogue of the dot product). Multiplier-free
+# (subtract, abs=max(x,-x), sum). UNLIKE the l_inf score (-max_d|.|, one-dim,
+# sparse gradient) this accumulates over every dimension, so its gradient is
+# DENSE -- measured to be the most robust multiplier-free score for content
+# routing (induction probe, 2026-06-16: l1 matches dot attention at the ceiling).
+# Already smooth (sum, not max), so there is no separate soft relaxation: the
+# hard score IS dense-gradient. Pairs with the argmax-GATHER aggregation.
+# ---------------------------------------------------------------------------
+
+
+def tropical_l1_score(Q: torch.Tensor, K: torch.Tensor) -> torch.Tensor:
+    """l1-distance attention score: ``scores[..., i, j] = -sum_d |Q[i,d] - K[j,d]|``.
+
+    ``Q: (..., L_q, D)``, ``K: (..., L_k, D)`` -> ``(..., L_q, L_k)``. Multiply-free
+    (subtract + abs + sum); dense gradient over all D dims (cf. the one-dim l_inf).
+    """
+    return -(Q.unsqueeze(-2) - K.unsqueeze(-3)).abs().sum(dim=-1)
+
+
 class TropicalValuePullFn(torch.autograd.Function):
     """Hard tropical value pull: out[..., i, d] = max_j(V[..., j, d] + scores[..., i, j]).
 
@@ -511,6 +536,47 @@ def tropical_softmax_value_pull_min(V: torch.Tensor, scores: torch.Tensor,
                                     tau: float = 1.0) -> torch.Tensor:
     """Soft min-plus value pull; approaches the hard min as ``tau -> 0``."""
     return -tropical_softmax_value_pull(-V, -scores, tau=tau)
+
+
+# --- argmax-GATHER aggregation: the deploy-pure limit of softmax ATTENTION -----
+# This is DIFFERENT from tropical_value_pull (the max-plus matmul, which picks a
+# separate argmax_j PER output dim d -> a per-dimension mixture / "chimera").
+# Gather picks ONE key j* per query (shared across all dims) and copies its whole
+# value vector -- i.e. "attend to one position, copy it", the genuine tau->0 hard
+# limit of softmax(scores)@V. Measured (induction probe, 2026-06-16): the max-plus
+# matmul collapses a soft-trained attention to chance, while argmax-gather is
+# LOSSLESS (soft acc == gather acc == softmax ceiling). So gather is the correct
+# multiplier-free deploy op for content routing; the matmul is a different operator.
+#
+#   train (tau>0): out = softmax(scores/tau) @ V   (dense gradient; the @V is the
+#                  only train-time multiply -- deleted at deploy, north-star OK)
+#   deploy (tau=0): out[..., i, :] = V[..., argmax_j scores[..., i, j], :]
+#                  (argmax + gather: ZERO multiply)
+
+def tropical_value_gather(V: torch.Tensor, scores: torch.Tensor) -> torch.Tensor:
+    """Hard argmax-gather: ``out[..., i, :] = V[..., argmax_j scores[..., i, j], :]``.
+
+    ``V: (..., L_v, D)``, ``scores: (..., L_q, L_v)`` -> ``(..., L_q, D)``. One key
+    per query (shared across dims). Multiply-free (argmax + gather). The grad w.r.t.
+    scores is zero (argmax non-differentiable) -- train via the soft variant.
+    """
+    jstar = scores.argmax(dim=-1)                                  # (..., L_q)
+    idx = jstar.unsqueeze(-1).expand(*jstar.shape, V.shape[-1])    # (..., L_q, D)
+    return torch.gather(V, -2, idx)
+
+
+def tropical_softmax_value_gather(V: torch.Tensor, scores: torch.Tensor,
+                                  tau: float = 1.0) -> torch.Tensor:
+    """Soft attention readout (train-time relaxation of :func:`tropical_value_gather`):
+    ``out[..., i, :] = sum_j softmax(scores[..., i, :] / tau)[j] * V[..., j, :]``.
+
+    Convex combination with weights SHARED across output dims (unlike the per-dim
+    softmax value pull). As ``tau -> 0`` the softmax -> one-hot at ``argmax_j`` so
+    this -> :func:`tropical_value_gather`. Contains a multiply (weights @ V): a
+    training-only relaxation, removed at deploy.
+    """
+    w = torch.softmax(scores / tau, dim=-1)                        # (..., L_q, L_v)
+    return torch.einsum("...ij,...jd->...id", w, V)
 
 
 # ---------------------------------------------------------------------------

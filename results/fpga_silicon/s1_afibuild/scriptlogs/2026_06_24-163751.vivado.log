@@ -1,0 +1,522 @@
+#-----------------------------------------------------------
+# Vivado v2024.1 (64-bit)
+# SW Build 5076996 on Wed May 22 18:36:09 MDT 2024
+# IP Build 5075265 on Wed May 22 21:45:21 MDT 2024
+# SharedData Build 5076995 on Wed May 22 18:29:18 MDT 2024
+# Start of session at: Wed Jun 24 16:37:53 2026
+# Process ID: 24672
+# Current directory: /opt/tiki/CL/cl_forge_train_step_s1/build/scripts
+# Command line: vivado -mode batch -source build_all.tcl -log 2026_06_24-163751.vivado.log -tclargs SSI_SpreadLogic_high AggressiveExplore AggressiveExplore A1 B2 C0 H2
+# Log file: /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/2026_06_24-163751.vivado.log
+# Journal file: /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/vivado.jou
+# Running On        :ip-172-31-43-255
+# Platform          :Ubuntu
+# Operating System  :Ubuntu 20.04.6 LTS
+# Processor Detail  :Intel(R) Xeon(R) Platinum 8151 CPU @ 3.40GHz
+# CPU Frequency     :3399.998 MHz
+# CPU Physical cores:4
+# CPU Logical cores :8
+# Host memory       :66585 MB
+# Swap memory       :10737 MB
+# Total Virtual     :77322 MB
+# Available Virtual :76605 MB
+#-----------------------------------------------------------
+source build_all.tcl
+# proc print {message} {
+#     set prefix "\nAWS FPGA: ([clock format [clock seconds] -format %T]): "
+#     append output $prefix $message "\n"
+#     puts $output
+# }
+# proc check_timing_path { {verbose 1} } {
+# 
+#   set setupPaths [get_timing_paths -max_paths 1 -slack_lesser_than 0 -setup]
+#   set holdPaths  [get_timing_paths -max_paths 1 -slack_lesser_than 0 -hold]
+# 
+#   if {$verbose>0} {
+#     print "Checking the negative slack path of the existing design"
+#   }
+# 
+#   if {[llength $setupPaths] == 0 && [llength $holdPaths] == 0} {
+#     if {$verbose>0} {
+#       print "SUCCESS: Design has no negative slack path"
+#     }
+#     return 0
+#   } else {
+#     if {$verbose>0} {
+#       print "CRITICAL WARNING: Found $setupPaths negative setup slack paths and $holdPaths negative hold slack hold paths"
+#     }
+#     return 1
+#   }
+# }
+# proc create_dir {name path {verbose 0}} {
+# 
+#     # Better to use absolute path
+#     set cur [pwd]
+#     # Check if the $path exists
+#     if {![file isdirectory $path]} {
+#         error "$path doesn't exist"
+#     }
+#     cd $path
+#     set path_abs [pwd]
+# 
+#     cd $cur
+#     # Check and create the directory if not exists
+#     if {![file isdirectory $path_abs/$name]} {
+#         file mkdir $path_abs/$name
+#         if {$verbose>0} {
+#             print "Creating new folder $path_abs/$name"
+#         }
+#     } elseif {$verbose>0} {
+#         print "Found existing folder $path_abs/$name. Folder creation skipped"
+#     }
+#     return $path_abs/$name
+# }
+# proc display_proj {} {
+#     global VIVADO_TOOL_VERSION
+#     global CL
+#     global SHELL_MODE
+#     global BUILD_FLOW
+#     global PLACE_DIRECT
+#     global PHY_OPT_DIRECT
+#     global ROUTE_DIRECT
+#     global TAG
+#     global clock_recipe_a
+#     global clock_recipe_b
+#     global clock_recipe_c
+#     global clock_recipe_hbm
+# 
+# 
+#     set rpt "
+#     ==================================================
+#     Running CL builds w/ updated build tag
+#     ==================================================
+#     vivado_tool      : $VIVADO_TOOL_VERSION
+#     cl               : $CL
+#     mode             : $SHELL_MODE
+#     clock_recipe_a   : $clock_recipe_a
+#     clock_recipe_b   : $clock_recipe_b
+#     clock_recipe_c   : $clock_recipe_c
+#     clock_recipe_hbm : $clock_recipe_hbm
+#     flow             : $BUILD_FLOW
+#     place_direct     : $PLACE_DIRECT
+#     phy_opt_direct   : $PHY_OPT_DIRECT
+#     route_direct     : $ROUTE_DIRECT
+#     build_tag        : $TAG
+#     ==================================================
+#     "
+#     puts "$rpt"
+# }
+# set PLACE_DIRECT     [lindex $argv 0]
+# set PHY_OPT_DIRECT   [lindex $argv 1]
+# set ROUTE_DIRECT     [lindex $argv 2]
+# set clock_recipe_a   [lindex $argv 3]
+# set clock_recipe_b   [lindex $argv 4]
+# set clock_recipe_c   [lindex $argv 5]
+# set clock_recipe_hbm [lindex $argv 6]
+# set DEVICE_TYPE "xcvu47p-fsvh2892-2-e"
+# if { [info exists ::env(BUILD_FLOW)] } {
+#   set BUILD_FLOW $::env(BUILD_FLOW)
+# } else {
+#   set BUILD_FLOW "BuildAll"
+# }
+# if { [info exists ::env(CL)] } {
+#   set CL $::env(CL)
+# } else {
+#   set CL "cl_dram_hbm_dma"
+# }
+# if { [info exists ::env(SHELL_MODE)] } {
+#   set SHELL_MODE $::env(SHELL_MODE)
+# } else {
+#   set SHELL_MODE "xdma_shell"
+# }
+# if { [info exists ::env(BUILD_TAG)] } {
+#   set TAG $::env(BUILD_TAG)
+# } else {
+#   set TAG "00_00_0000-999999"
+# }
+# if { [info exists ::env(HDK_SHELL_DIR)] } {
+#     set HDK_SHELL_DIR $::env(HDK_SHELL_DIR)
+# } else {
+#     print "ERROR: HDK_SHELL_DIR not set. Please run hdk_setup.sh to set required env variables."
+#     exit
+# }
+# if { [info exists ::env(HDK_SHELL_DESIGN_DIR)] } {
+#     set HDK_SHELL_DESIGN_DIR $::env(HDK_SHELL_DESIGN_DIR)
+# } else {
+#     print "ERROR: HDK_SHELL_DESIGN_DIR not set. Please run hdk_setup.sh to set required env variables."
+#     exit
+# }
+# if { [info exists ::env(HDK_COMMON_DIR)] } {
+#     set HDK_COMMON_DIR $::env(HDK_COMMON_DIR)
+# } else {
+#     print "ERROR: HDK_COMMON_DIR not set. Please run hdk_setup.sh to set required env variables."
+#     exit
+# }
+# if { [info exists ::env(HDK_IP_SRC_DIR)] } {
+#     set HDK_IP_SRC_DIR $::env(HDK_IP_SRC_DIR)
+# } else {
+#     print "ERROR: HDK_IP_SRC_DIR not set. Please run hdk_setup.sh to set required env variables."
+#     exit
+# }
+# if { [info exists ::env(HDK_BD_SRC_DIR)] } {
+#     set HDK_BD_SRC_DIR $::env(HDK_BD_SRC_DIR)
+# } else {
+#     print "ERROR: HDK_BD_SRC_DIR not set. Please run hdk_setup.sh to set required env variables."
+#     exit
+# }
+# if { [info exists ::env(HDK_BD_GEN_DIR)] } {
+#     set HDK_BD_GEN_DIR $::env(HDK_BD_GEN_DIR)
+# } else {
+#     print "ERROR: HDK_BD_GEN_DIR not set. Please run hdk_setup.sh to set required env variables."
+#     exit
+# }
+# if { [info exists ::env(CL_DIR)] } {
+#     set CL_DIR $::env(CL_DIR)
+# } else {
+#     print "ERROR: CL_DIR not set. Please run hdk_setup.sh to set required env variables."
+#     exit
+# }
+# if { [info exists ::env(VIVADO_TOOL_VERSION)] } {
+#     set VIVADO_TOOL_VERSION $::env(VIVADO_TOOL_VERSION)
+# } else {
+#     print "ERROR: VIVADO_TOOL_VERSION not set. Please run hdk_setup.sh to set required env variables."
+#     exit
+# }
+# if { [info exists ::env(ENCRYPT)] } {
+#     set ENCRYPT $::env(ENCRYPT)
+# } else {
+#     set ENCRYPT 1
+# }
+# display_proj
+
+    ==================================================
+    Running CL builds w/ updated build tag
+    ==================================================
+    vivado_tool      : 2024.1
+    cl               : cl_forge_train_step_s1
+    mode             : small_shell
+    clock_recipe_a   : A1
+    clock_recipe_b   : B2
+    clock_recipe_c   : C0
+    clock_recipe_hbm : H2
+    flow             : BuildAll
+    place_direct     : SSI_SpreadLogic_high
+    phy_opt_direct   : AggressiveExplore
+    route_direct     : AggressiveExplore
+    build_tag        : 2026_06_24-163751
+    ==================================================
+    
+# set scripts_dir [pwd]
+# set build_dir [file dirname $scripts_dir]
+# create_dir "reports"              $build_dir
+# create_dir "checkpoints"          $build_dir
+# create_dir "src_post_encryption"  $build_dir
+# set design_dir       "${CL_DIR}/design"
+# set constraints_dir  "${build_dir}/constraints"
+# set reports_dir      "${build_dir}/reports"
+# set checkpoints_dir  "${build_dir}/checkpoints"
+# set reports_dir      "${build_dir}/reports"
+# set src_post_enc_dir "${build_dir}/src_post_encryption"
+# cd $scripts_dir
+# print "Generating clock contraints for CL source clocks"
+
+AWS FPGA: (16:37:55): Generating clock contraints for CL source clocks
+
+# source $HDK_SHELL_DIR/build/scripts/aws_gen_clk_constraints.tcl
+## switch $clock_recipe_a {
+##     "A0" {
+##         #NOT SUPPORTED# set clk_main_a0_period        8
+##         #NOT SUPPORTED# set clk_main_a0_half_period   4
+##         set clk_main_a0_period        4
+##         set clk_main_a0_half_period   2
+##         set clk_extra_a1_period      16
+##         set clk_extra_a1_half_period  8
+##         set clk_extra_a2_period       5.333
+##         set clk_extra_a2_half_period  2.667
+##         set clk_extra_a3_period       4
+##         set clk_extra_a3_half_period  2
+##     }
+##     "A1" {
+##         set clk_main_a0_period        4
+##         set clk_main_a0_half_period   2
+##         set clk_extra_a1_period       8
+##         set clk_extra_a1_half_period  4
+##         set clk_extra_a2_period       2.667
+##         set clk_extra_a2_half_period  1.333
+##         set clk_extra_a3_period       2
+##         set clk_extra_a3_half_period  1
+##     }
+##     "A2" {
+##         #NOT SUPPORTED# set clk_main_a0_period        64
+##         #NOT SUPPORTED# set clk_main_a0_half_period   32
+##         set clk_main_a0_period         4
+##         set clk_main_a0_half_period    2
+##         set clk_extra_a1_period      128
+##         set clk_extra_a1_half_period  64
+##         set clk_extra_a2_period        8
+##         set clk_extra_a2_half_period   4
+##         set clk_extra_a3_period       16
+##         set clk_extra_a3_half_period   8
+##     }
+##     default {
+##         puts "$clock_recipe_a is NOT a valid clock_recipe_a."
+##     }
+## }
+## switch $clock_recipe_b {
+##     "B0" {
+##         set clk_extra_b0_period       4
+##         set clk_extra_b0_half_period  2
+##         set clk_extra_b1_period       8
+##         set clk_extra_b1_half_period  4
+##     }
+##     "B1" {
+##         set clk_extra_b0_period       8
+##         set clk_extra_b0_half_period  4
+##         set clk_extra_b1_period      16
+##         set clk_extra_b1_half_period  8
+##     }
+##     "B2" {
+##         set clk_extra_b0_period       2.222
+##         set clk_extra_b0_half_period  1.111
+##         set clk_extra_b1_period       4.444
+##         set clk_extra_b1_half_period  2.222
+##     }
+##     "B3" {
+##         set clk_extra_b0_period       4
+##         set clk_extra_b0_half_period  2
+##         set clk_extra_b1_period      16
+##         set clk_extra_b1_half_period  8
+##     }
+##     "B4" {
+##         set clk_extra_b0_period       3.333
+##         set clk_extra_b0_half_period  1.667
+##         set clk_extra_b1_period      13.333
+##         set clk_extra_b1_half_period  6.667
+##     }
+##     "B5" {
+##         set clk_extra_b0_period       2.5
+##         set clk_extra_b0_half_period  1.25
+##         set clk_extra_b1_period      10
+##         set clk_extra_b1_half_period  5
+##     }
+##     default {
+##         puts "$clock_recipe_b is NOT a valid clock_recipe_b."
+##     }
+## }
+## switch $clock_recipe_c {
+##     "C0" {
+##         set clk_extra_c0_period       3.333
+##         set clk_extra_c0_half_period  1.667
+##         set clk_extra_c1_period       2.5
+##         set clk_extra_c1_half_period  1.25
+##     }
+##     "C1" {
+##         set clk_extra_c0_period       6.667
+##         set clk_extra_c0_half_period  3.333
+##         set clk_extra_c1_period       5
+##         set clk_extra_c1_half_period  2.5
+##     }
+##     "C2" {
+##         set clk_extra_c0_period      13.333
+##         set clk_extra_c0_half_period  6.667
+##         set clk_extra_c1_period      10
+##         set clk_extra_c1_half_period  5
+##     }
+##     "C3" {
+##         set clk_extra_c0_period       5
+##         set clk_extra_c0_half_period  2.5
+##         set clk_extra_c1_period       3.75
+##         set clk_extra_c1_half_period  1.875
+##     }
+##     default {
+##         puts "$clock_recipe_c is NOT a valid clock_recipe_c."
+##     }
+## }
+## switch $clock_recipe_hbm {
+##     "H0" {
+##         set clk_hbm_axi_period       4
+##         set clk_hbm_axi_half_period  2
+##     }
+##     "H1" {
+##         set clk_hbm_axi_period       8
+##         set clk_hbm_axi_half_period  4
+##     }
+##     "H2" {
+##         set clk_hbm_axi_period       2.222
+##         set clk_hbm_axi_half_period  1.111
+##     }
+##     "H3" {
+##         set clk_hbm_axi_period       3.333
+##         set clk_hbm_axi_half_period  1.667
+##     }
+##     "H4" {
+##         set clk_hbm_axi_period       2.5
+##         set clk_hbm_axi_half_period  1.25
+##     }
+##     default {
+##         puts "$clock_recipe_hbm is NOT a valid clock_recipe_hbm."
+##     }
+## }
+## set pin_clk_extra_a1 "\[get_pins -of_objects \[get_cells -hierarchical -regexp .*AWS_CLK_GEN/CLK_GRP_A_EN_I.CLK_MMCM_A_I/inst/CLK_CORE_DRP_I/clk_inst/mmcme4_adv_inst\] -filter {NAME=~*CLKOUT0}\]"
+## set pin_clk_extra_a2 "\[get_pins -of_objects \[get_cells -hierarchical -regexp .*AWS_CLK_GEN/CLK_GRP_A_EN_I.CLK_MMCM_A_I/inst/CLK_CORE_DRP_I/clk_inst/mmcme4_adv_inst\] -filter {NAME=~*CLKOUT1}\]"
+## set pin_clk_extra_a3 "\[get_pins -of_objects \[get_cells -hierarchical -regexp .*AWS_CLK_GEN/CLK_GRP_A_EN_I.CLK_MMCM_A_I/inst/CLK_CORE_DRP_I/clk_inst/mmcme4_adv_inst\] -filter {NAME=~*CLKOUT2}\]"
+## set pin_clk_extra_b0 "\[get_pins -of_objects \[get_cells -hierarchical -regexp .*AWS_CLK_GEN/CLK_GRP_B_EN_I.CLK_MMCM_B_I/inst/CLK_CORE_DRP_I/clk_inst/mmcme4_adv_inst\] -filter {NAME=~*CLKOUT0}\]"
+## set pin_clk_extra_b1 "\[get_pins -of_objects \[get_cells -hierarchical -regexp .*AWS_CLK_GEN/CLK_GRP_B_EN_I.CLK_MMCM_B_I/inst/CLK_CORE_DRP_I/clk_inst/mmcme4_adv_inst\] -filter {NAME=~*CLKOUT1}\]"
+## set pin_clk_extra_c0 "\[get_pins -of_objects \[get_cells -hierarchical -regexp .*AWS_CLK_GEN/CLK_GRP_C_EN_I.CLK_MMCM_C_I/inst/CLK_CORE_DRP_I/clk_inst/mmcme4_adv_inst\] -filter {NAME=~*CLKOUT0}\]"
+## set pin_clk_extra_c1 "\[get_pins -of_objects \[get_cells -hierarchical -regexp .*AWS_CLK_GEN/CLK_GRP_C_EN_I.CLK_MMCM_C_I/inst/CLK_CORE_DRP_I/clk_inst/mmcme4_adv_inst\] -filter {NAME=~*CLKOUT1}\]"
+## set pin_clk_hbm_axi  "\[get_pins -of_objects \[get_cells -hierarchical -regexp .*AWS_CLK_GEN/CLK_HBM_EN_I.CLK_MMCM_HBM_I/inst/CLK_CORE_DRP_I/clk_inst/mmcme4_adv_inst\] -filter {NAME=~*CLKOUT0}\]"
+## if { [file exists $CL_DIR/build/constraints/generated_cl_clocks_aws.xdc] } {
+##     puts "Deleting old CL clocks constraints file since it will be replaced.";
+##     file delete -force $CL_DIR/build/constraints/generated_cl_clocks_aws.xdc
+## }
+## set clocks_file [open "$CL_DIR/build/constraints/generated_cl_clocks_aws.xdc" w]
+## puts $clocks_file "#-------------------------------------------------------------------------"
+## puts $clocks_file "# Do not edit this file! It is auto-generated from $argv0."
+## puts $clocks_file "#-------------------------------------------------------------------------"
+## puts $clocks_file "###############################################################################                          "
+## puts $clocks_file "# OOC Source Clocks                                                                                      "
+## puts $clocks_file "###############################################################################                          "
+## puts $clocks_file "#CL HBM reference clock @100MHz                                                                          "
+## puts $clocks_file "create_clock -period 10.000 -name clk_hbm_ref  -waveform {0.000 5.000} \[get_ports clk_hbm_ref\]       \n"
+## puts $clocks_file "# Group A Clocks"
+## puts $clocks_file "create_clock -period $clk_main_a0_period  -name clk_main_a0 -waveform {0.000 $clk_main_a0_half_period}  \[get_ports clk_main_a0\]"
+## close $clocks_file
+# print "Checking for source code encryption"
+
+AWS FPGA: (16:37:55): Checking for source code encryption
+
+# source encrypt.tcl
+## if {[llength [glob -nocomplain -dir ${src_post_enc_dir} *]] != 0} {
+##   eval file delete -force [glob ${src_post_enc_dir}/*]
+## }
+## foreach f [glob -directory ${HDK_SHELL_DESIGN_DIR}/interfaces *.inc] {
+##   file copy -force $f ${src_post_enc_dir}/
+## }
+## foreach f [glob -directory ${design_dir} *.{v,sv,vh,svh,inc}] {
+##   file copy -force $f ${src_post_enc_dir}/
+## }
+## exec chmod +w {*}[glob ${src_post_enc_dir}/*]
+## if {$ENCRYPT} {
+##   print "Encryption enabled. Encrypting HDL files and DCPs."
+##   encrypt -k ${HDK_SHELL_DIR}/build/scripts/vivado_keyfile.txt      -lang verilog -quiet [glob -nocomplain -- ${src_post_enc_dir}/*.{v,sv,vh,inc}]
+##   encrypt -k ${HDK_SHELL_DIR}/build/scripts/vivado_vhdl_keyfile.txt -lang vhdl    -quiet [glob -nocomplain -- ${src_post_enc_dir}/*.vhd?]
+## } else {
+##   print "Encryption disabled."
+## }
+
+AWS FPGA: (16:37:55): Encryption disabled.
+
+# switch $BUILD_FLOW {
+#   "SynthCL" {
+#     source ${scripts_dir}/synth_${CL}.tcl
+#   }
+# 
+#   "ImplCL" {
+#     source ${scripts_dir}/build_level_1_cl.tcl
+#   }
+# 
+#   default {
+#     source ${scripts_dir}/synth_${CL}.tcl
+#     source ${scripts_dir}/build_level_1_cl.tcl
+#   }
+# }
+## source ${HDK_SHELL_DIR}/build/scripts/synth_cl_header.tcl
+### print "Creating in-memory synthesis project"
+
+AWS FPGA: (16:37:55): Creating in-memory synthesis project
+
+### set_param sta.enableAutoGenClkNamePersistence 0
+### create_project -in_memory -part $DEVICE_TYPE -force
+create_project: Time (s): cpu = 00:00:06 ; elapsed = 00:00:06 . Memory (MB): peak = 1345.129 ; gain = 0.023 ; free physical = 57238 ; free virtual = 72748
+### set_property XPM_LIBRARIES {XPM_CDC XPM_MEMORY XPM_FIFO} [current_project]
+### print "Reading common AWS components"
+
+AWS FPGA: (16:38:01): Reading common AWS components
+
+### read_verilog -sv [ list \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/interfaces.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/aws_clk_gen.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/aws_clk_regs.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/axil_to_cfg_cnv.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/axis_flop_fifo.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/lib_pipe.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/bram_1w1r.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/bram_2rw.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/xpm_fifo.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/flop_fifo.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/flop_fifo_in.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/cdc_async_fifo.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/cdc_sync.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/ft_fifo_p.v \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/ft_fifo.v \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/ram_fifo_ft.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/../../lib/rr_arb.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/sh_ddr/synth/sync.v \
+###   ${HDK_SHELL_DESIGN_DIR}/sh_ddr/synth/flop_ccf.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/sh_ddr/synth/ccf_ctl.v \
+###   ${HDK_SHELL_DESIGN_DIR}/sh_ddr/synth/mgt_acc_axl.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/sh_ddr/synth/mgt_gen_axl.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/sh_ddr/synth/sh_ddr.sv \
+###   ${HDK_SHELL_DESIGN_DIR}/interfaces/cl_ports.vh
+### ]
+### print "Reading AWS Constraints"
+
+AWS FPGA: (16:38:01): Reading AWS Constraints
+
+### read_xdc ${HDK_SHELL_DIR}/build/constraints/cl_pins.xdc
+### read_xdc ${CL_DIR}/build/constraints/generated_cl_clocks_aws.xdc
+### read_xdc -ref ${CL} ${HDK_SHELL_DIR}/build/constraints/cl_ddr_timing_aws.xdc
+### set_property USED_IN {synthesis implementation OUT_OF_CONTEXT} [get_files generated_cl_clocks_aws.xdc]
+### set_property PROCESSING_ORDER EARLY [get_files generated_cl_clocks_aws.xdc]
+### set_property USED_IN {synthesis implementation} [get_files cl_ddr_timing_aws.xdc]
+### set_property PROCESSING_ORDER LATE   [get_files cl_ddr_timing_aws.xdc]
+## read_verilog -sv [glob ${src_post_enc_dir}/*.{s,}v]
+## read_ip [list \
+##   ${HDK_IP_SRC_DIR}/cl_ddr4/cl_ddr4.xci \
+##   ${HDK_IP_SRC_DIR}/axi_register_slice/axi_register_slice.xci \
+##   ${HDK_IP_SRC_DIR}/axi_register_slice_light/axi_register_slice_light.xci \
+##   ${HDK_IP_SRC_DIR}/cl_axi3_256b_reg_slice/cl_axi3_256b_reg_slice.xci \
+##   ${HDK_IP_SRC_DIR}/cl_axi_clock_converter/cl_axi_clock_converter.xci \
+##   ${HDK_IP_SRC_DIR}/cl_axi_clock_converter_light/cl_axi_clock_converter_light.xci \
+## ]
+INFO: [IP_Flow 19-234] Refreshing IP repositories
+INFO: [IP_Flow 19-1704] No user IP repositories specified
+INFO: [IP_Flow 19-2313] Loaded Vivado IP repository '/opt/Xilinx/Vivado/2024.1/data/ip'.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+WARNING: [Vivado 12-13650] The IP file '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_ddr4/cl_ddr4.xci' has been moved from its original location, as a result the outputs for this IP will now be generated in '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/ip/cl_ddr4'. Alternatively a copy of the IP can be imported into the project using one of the 'import_ip' or 'import_files' commands.
+WARNING: [Vivado 12-13650] The IP file '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/axi_register_slice/axi_register_slice.xci' has been moved from its original location, as a result the outputs for this IP will now be generated in '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/ip/axi_register_slice'. Alternatively a copy of the IP can be imported into the project using one of the 'import_ip' or 'import_files' commands.
+WARNING: [Vivado 12-13650] The IP file '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/axi_register_slice_light/axi_register_slice_light.xci' has been moved from its original location, as a result the outputs for this IP will now be generated in '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/ip/axi_register_slice_light'. Alternatively a copy of the IP can be imported into the project using one of the 'import_ip' or 'import_files' commands.
+WARNING: [Vivado 12-13650] The IP file '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_axi3_256b_reg_slice/cl_axi3_256b_reg_slice.xci' has been moved from its original location, as a result the outputs for this IP will now be generated in '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/ip/cl_axi3_256b_reg_slice'. Alternatively a copy of the IP can be imported into the project using one of the 'import_ip' or 'import_files' commands.
+WARNING: [Vivado 12-13650] The IP file '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_axi_clock_converter/cl_axi_clock_converter.xci' has been moved from its original location, as a result the outputs for this IP will now be generated in '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/ip/cl_axi_clock_converter'. Alternatively a copy of the IP can be imported into the project using one of the 'import_ip' or 'import_files' commands.
+WARNING: [Vivado 12-13650] The IP file '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_axi_clock_converter_light/cl_axi_clock_converter_light.xci' has been moved from its original location, as a result the outputs for this IP will now be generated in '/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/ip/cl_axi_clock_converter_light'. Alternatively a copy of the IP can be imported into the project using one of the 'import_ip' or 'import_files' commands.
+can't read "HDK_DIR": no such variable
+    while executing
+"list \
+    ${HDK_DIR}/common/lib/aws_clk_gen.sv \
+    ${HDK_DIR}/common/lib/aws_clk_regs.sv \
+  "
+    invoked from within
+"foreach f [list \
+    ${HDK_DIR}/common/lib/aws_clk_gen.sv \
+    ${HDK_DIR}/common/lib/aws_clk_regs.sv \
+  ] {
+  if {[file exists $f]} { read_verilog ..."
+    (file "/opt/tiki/CL/cl_forge_train_step_s1/build/scripts/synth_cl_forge_train_step_s1.tcl" line 35)
+
+    while executing
+"source ${scripts_dir}/synth_${CL}.tcl"
+    ("default" arm line 2)
+    invoked from within
+"switch $BUILD_FLOW {
+  "SynthCL" {
+    source ${scripts_dir}/synth_${CL}.tcl
+  }
+
+  "ImplCL" {
+    source ${scripts_dir}/build_level_1_cl.tcl
+  }
+
+  d..."
+    (file "build_all.tcl" line 265)
+INFO: [Common 17-206] Exiting Vivado at Wed Jun 24 16:38:04 2026...

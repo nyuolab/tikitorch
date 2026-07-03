@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 900" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <rect width="1500" height="900" fill="#0B1120"/>
+  <text x="750" y="48" text-anchor="middle" fill="#FFFFFF" font-size="29" font-weight="700">The ladder to 124M — measured rungs, projected summit</text>
+  <text x="750" y="80" text-anchor="middle" fill="#8FA1BF" font-size="16">every claim labeled: ★ measured on real silicon · ◔ building now · □ csynth-grounded projection</text>
+
+  <!-- legend -->
+  <g font-size="14">
+    <circle cx="60" cy="118" r="8" fill="#58C97D"/>
+    <text x="78" y="123" fill="#B9C6DB">★ MEASURED on silicon</text>
+    <circle cx="300" cy="118" r="8" fill="#F2A93B"/>
+    <text x="318" y="123" fill="#B9C6DB">◔ AFI building now</text>
+    <circle cx="510" cy="118" r="8" fill="none" stroke="#8FA1BF" stroke-width="2" stroke-dasharray="3 3"/>
+    <text x="528" y="123" fill="#B9C6DB">□ PROJECTED (±1.5× band)</text>
+  </g>
+
+  <!-- ladder line -->
+  <polyline points="140,740 310,672 480,604 650,536 820,468" fill="none" stroke="#58C97D" stroke-width="4"/>
+  <polyline points="820,468 990,400" fill="none" stroke="#F2A93B" stroke-width="4"/>
+  <polyline points="990,400 1160,332 1330,264" fill="none" stroke="#8FA1BF" stroke-width="3" stroke-dasharray="10 8"/>
+
+  <!-- nodes -->
+  <circle cx="140" cy="740" r="11" fill="#58C97D"/>
+  <circle cx="310" cy="672" r="11" fill="#58C97D"/>
+  <circle cx="480" cy="604" r="11" fill="#58C97D"/>
+  <circle cx="650" cy="536" r="11" fill="#58C97D"/>
+  <circle cx="820" cy="468" r="11" fill="#58C97D"/>
+  <circle cx="990" cy="400" r="11" fill="#F2A93B"/>
+  <circle cx="1160" cy="332" r="11" fill="#0B1120" stroke="#8FA1BF" stroke-width="2.5" stroke-dasharray="4 3"/>
+  <circle cx="1330" cy="264" r="11" fill="#0B1120" stroke="#8FA1BF" stroke-width="2.5" stroke-dasharray="4 3"/>
+
+  <!-- ===== cards: even rungs above the line, odd rungs below — no overlaps ===== -->
+
+  <!-- rung 1 (above) -->
+  <line x1="140" y1="726" x2="140" y2="706" stroke="#33415C" stroke-width="1.5"/>
+  <rect x="40" y="588" width="210" height="116" rx="10" fill="#111A2E" stroke="#58C97D" stroke-width="1.5"/>
+  <text x="145" y="612" text-anchor="middle" fill="#58C97D" font-size="12.5" font-weight="700">★ PC backward on silicon</text>
+  <g font-size="11" fill="#B9C6DB" text-anchor="middle">
+    <text x="145" y="634">2-layer backward sharded</text>
+    <text x="145" y="652">across 2 physical FPGAs —</text>
+    <text x="145" y="670">bit-exact, neighbour</text>
+    <text x="145" y="688">messages only</text>
+  </g>
+
+  <!-- rung 2 (below) -->
+  <line x1="310" y1="686" x2="310" y2="704" stroke="#33415C" stroke-width="1.5"/>
+  <rect x="225" y="708" width="210" height="116" rx="10" fill="#111A2E" stroke="#58C97D" stroke-width="1.5"/>
+  <text x="330" y="732" text-anchor="middle" fill="#58C97D" font-size="12.5" font-weight="700">★ 8 FPGAs, no global grad</text>
+  <g font-size="11" fill="#B9C6DB" text-anchor="middle">
+    <text x="330" y="754">distributed PC net trains</text>
+    <text x="330" y="772">bit-exact across 8 chips</text>
+    <text x="330" y="790">(Fashion-MNIST) — the</text>
+    <text x="330" y="808">architecture proof</text>
+  </g>
+
+  <!-- rung 3 (above) -->
+  <line x1="480" y1="590" x2="480" y2="572" stroke="#33415C" stroke-width="1.5"/>
+  <rect x="355" y="452" width="210" height="116" rx="10" fill="#111A2E" stroke="#58C97D" stroke-width="1.5"/>
+  <text x="460" y="476" text-anchor="middle" fill="#58C97D" font-size="12.5" font-weight="700">★ PC transformer, 3 chips</text>
+  <g font-size="11" fill="#B9C6DB" text-anchor="middle">
+    <text x="460" y="498">trains bpb 6.9 → 4.0, then</text>
+    <text x="460" y="516">plateau ROOT-CAUSED:</text>
+    <text x="460" y="534">batch=1 · II=80 reductions</text>
+    <text x="460" y="552">· constant-LR noise floor</text>
+  </g>
+
+  <!-- rung 4 (below) -->
+  <line x1="650" y1="550" x2="650" y2="568" stroke="#33415C" stroke-width="1.5"/>
+  <rect x="565" y="572" width="210" height="116" rx="10" fill="#0F2418" stroke="#58C97D" stroke-width="2.5"/>
+  <text x="670" y="596" text-anchor="middle" fill="#58C97D" font-size="12.5" font-weight="700">★ CONVERGED on silicon</text>
+  <g font-size="11" fill="#B9C6DB" text-anchor="middle">
+    <text x="670" y="618">bpb 3.187, Δ0.14 vs CPU twin;</text>
+    <text x="670" y="636">best 3.093 · 258 tok/s piped,</text>
+    <text x="670" y="654">bit-identical to serial · gap =</text>
+    <text x="670" y="672">0.26 bpb grad-noise premium</text>
+  </g>
+
+  <!-- rung 5 (above) -->
+  <line x1="820" y1="454" x2="820" y2="436" stroke="#33415C" stroke-width="1.5"/>
+  <rect x="675" y="316" width="210" height="116" rx="10" fill="#111A2E" stroke="#58C97D" stroke-width="1.5"/>
+  <text x="780" y="340" text-anchor="middle" fill="#58C97D" font-size="12.5" font-weight="700">★ 8 chips × 8 blocks</text>
+  <g font-size="11" fill="#B9C6DB" text-anchor="middle">
+    <text x="780" y="362">8-block PC transformer</text>
+    <text x="780" y="380">trains on 8 physical FPGAs —</text>
+    <text x="780" y="398">bpb 3.675, Gate-C clean</text>
+    <text x="780" y="416">(2.75 GB verified)</text>
+  </g>
+
+  <!-- rung 6 (below) -->
+  <line x1="990" y1="414" x2="990" y2="432" stroke="#33415C" stroke-width="1.5"/>
+  <rect x="905" y="436" width="210" height="116" rx="10" fill="#111A2E" stroke="#F2A93B" stroke-width="1.5"/>
+  <text x="1010" y="460" text-anchor="middle" fill="#F2A93B" font-size="12.5" font-weight="700">◔ throughput rebuild</text>
+  <g font-size="11" fill="#B9C6DB" text-anchor="middle">
+    <text x="1010" y="482">S=8 pipeline slots + 2×</text>
+    <text x="1010" y="500">unrolled backward — BWD</text>
+    <text x="1010" y="518">kick 91 → ~58 ms projected;</text>
+    <text x="1010" y="536">both csynth-gated · in flight</text>
+  </g>
+
+  <!-- rung 7 (above) -->
+  <line x1="1160" y1="318" x2="1160" y2="300" stroke="#33415C" stroke-width="1.5"/>
+  <rect x="1015" y="180" width="210" height="116" rx="10" fill="#111A2E" stroke="#8FA1BF" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="1120" y="204" text-anchor="middle" fill="#DCE6F5" font-size="12.5" font-weight="700">□ 30M rebuild — tier (c)</text>
+  <g font-size="11" fill="#B9C6DB" text-anchor="middle">
+    <text x="1120" y="226">D=256 · SEQ=256 · BPE;</text>
+    <text x="1120" y="244">wide MAC K=8–16 + URAM</text>
+    <text x="1120" y="262">banking + DDR weight</text>
+    <text x="1120" y="280">streaming + PRAW recompute</text>
+  </g>
+
+  <!-- rung 8 (below) -->
+  <line x1="1330" y1="278" x2="1330" y2="296" stroke="#33415C" stroke-width="1.5"/>
+  <rect x="1245" y="300" width="220" height="116" rx="10" fill="#111A2E" stroke="#8FA1BF" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="1355" y="324" text-anchor="middle" fill="#FFFFFF" font-size="12.5" font-weight="700">□ 124M — the north star</text>
+  <g font-size="11" fill="#B9C6DB" text-anchor="middle">
+    <text x="1355" y="346">D=768 · L=12 · vocab ≈50k;</text>
+    <text x="1355" y="364">honest flagship = 10–30M</text>
+    <text x="1355" y="382">converged on fabric + 124M</text>
+    <text x="1355" y="400">datapath measured one-step</text>
+  </g>
+
+  <!-- summit flag -->
+  <line x1="1330" y1="253" x2="1330" y2="186" stroke="#8FA1BF" stroke-width="2"/>
+  <path d="M1330,186 L1392,202 L1330,218 Z" fill="#B48CFF"/>
+
+  <!-- ===== throughput inset ===== -->
+  <rect x="1145" y="560" width="330" height="280" rx="12" fill="#111A2E" stroke="#33415C" stroke-width="1.5"/>
+  <text x="1310" y="590" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="700">throughput — steps/s @ D=64</text>
+  <line x1="1170" y1="780" x2="1450" y2="780" stroke="#33415C" stroke-width="2"/>
+  <!-- bars: 0.28 M, 0.50 M, 0.65 E, ~1.0 E ; scale 160px = 1.0 -->
+  <rect x="1180" y="735" width="50" height="45" fill="#58C97D"/>
+  <rect x="1250" y="700" width="50" height="80" fill="#58C97D"/>
+  <rect x="1320" y="676" width="50" height="104" fill="none" stroke="#8FA1BF" stroke-width="2" stroke-dasharray="5 4"/>
+  <rect x="1390" y="620" width="50" height="160" fill="none" stroke="#8FA1BF" stroke-width="2" stroke-dasharray="5 4"/>
+  <g font-size="13" text-anchor="middle" font-weight="700">
+    <text x="1205" y="725" fill="#58C97D">0.28</text>
+    <text x="1275" y="690" fill="#58C97D">0.50</text>
+    <text x="1345" y="666" fill="#8FA1BF">0.65</text>
+    <text x="1415" y="610" fill="#8FA1BF">~1.0</text>
+  </g>
+  <g font-size="11" text-anchor="middle" fill="#8FA1BF">
+    <text x="1205" y="800">serial [M]</text>
+    <text x="1275" y="800">PIPE=1 [M]</text>
+    <text x="1345" y="800">S=3 [E]</text>
+    <text x="1415" y="800">+unroll [E]</text>
+  </g>
+  <text x="1310" y="824" text-anchor="middle" fill="#5B6B85" font-size="11">258 tok/s today · ~500 tok/s with queued levers</text>
+
+  <!-- honesty ribbon -->
+  <rect x="460" y="840" width="1015" height="46" rx="10" fill="#111A2E" stroke="#33415C"/>
+  <text x="967" y="869" text-anchor="middle" fill="#B9C6DB" font-size="13.5">Everything left of the amber node is <tspan fill="#58C97D" font-weight="700">measured on real AWS F2 silicon</tspan>; 30M / 124M are csynth-grounded projections — and we say so.</text>
+</svg>

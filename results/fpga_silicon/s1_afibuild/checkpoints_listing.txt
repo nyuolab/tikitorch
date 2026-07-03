@@ -1,0 +1,13 @@
+ls: cannot access '/opt/tiki/CL/cl_forge_train_step_s1/build/checkpoints/to_aws/': No such file or directory
+/opt/tiki/CL/cl_forge_train_step_s1/build/checkpoints/:
+total 857436
+drwxr-xr-x 2 root root      4096 Jun 24 19:24 .
+drwxr-xr-x 7 root root      4096 Jun 24 17:08 ..
+-rw-r--r-- 1 root root 172687360 Jun 24 19:24 2026_06_24-170803.Developer_CL.tar
+-rw-r--r-- 1 root root       200 Jun 24 19:24 2026_06_24-170803.debug_probes.ltx
+-rw-r--r-- 1 root root 100087515 Jun 24 17:35 cl_forge_train_step_s1.2026_06_24-170803.post_link.dcp
+-rw-r--r-- 1 root root  98071769 Jun 24 17:43 cl_forge_train_step_s1.2026_06_24-170803.post_opt.dcp
+-rw-r--r-- 1 root root 134319504 Jun 24 18:30 cl_forge_train_step_s1.2026_06_24-170803.post_phys_opt.dcp
+-rw-r--r-- 1 root root 136089056 Jun 24 18:16 cl_forge_train_step_s1.2026_06_24-170803.post_place.dcp
+-rw-r--r-- 1 root root 172674595 Jun 24 19:24 cl_forge_train_step_s1.2026_06_24-170803.post_route.VIOLATED.dcp
+-rw-r--r-- 1 root root  64063439 Jun 24 17:31 cl_forge_train_step_s1.2026_06_24-170803.post_synth.dcp

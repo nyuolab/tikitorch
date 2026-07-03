@@ -1,0 +1,1535 @@
++ S3_SRC=s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/src.tar.gz
++ S3_RESULTS=s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results
++ CL=cl_forge_train_step_s1
++ PKG_REL=tikitorch/hardware/hdk/cl_forge_train_step_s1
++ KERNEL_TCL=synth_train_step_s1.tcl
++ KERNEL_PROJ=forge_train_step_s1_proj
++ trap up EXIT
++ true
++ sleep 60
+++ date -u
++ echo 'BOOT Wed Jun 24 16:43:29 UTC 2026'
+BOOT Wed Jun 24 16:43:29 UTC 2026
++ hostname
+ip-172-31-44-233
++ nproc
+8
++ free -g
+              total        used        free      shared  buff/cache   available
+Mem:             62           0          61           0           0          61
+Swap:             9           0           9
++ export HOME=/root
++ HOME=/root
++ mkdir -p /root/.oasys /root/.Xilinx
++ command -v git-lfs
++ apt-get update -y
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Get:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease [128 kB]
+Get:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease [128 kB]
+Get:4 http://security.ubuntu.com/ubuntu focal-security InRelease [128 kB]
+Get:5 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/main amd64 Packages [4004 kB]
+Get:6 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/main Translation-en [601 kB]
+Get:7 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/restricted amd64 Packages [3983 kB]
+Get:8 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/restricted Translation-en [548 kB]
+Get:9 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/universe amd64 Packages [1275 kB]
+Get:10 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/universe Translation-en [302 kB]
+Get:11 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/multiverse amd64 Packages [29.8 kB]
+Get:12 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports/main amd64 Packages [46.1 kB]
+Get:13 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports/main Translation-en [16.2 kB]
+Get:14 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports/universe amd64 Packages [25.0 kB]
+Get:15 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports/universe Translation-en [16.3 kB]
+Get:16 http://security.ubuntu.com/ubuntu focal-security/main amd64 Packages [3610 kB]
+Get:17 http://security.ubuntu.com/ubuntu focal-security/main Translation-en [518 kB]
+Get:18 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages [3828 kB]
+Get:19 http://security.ubuntu.com/ubuntu focal-security/restricted Translation-en [527 kB]
+Get:20 http://security.ubuntu.com/ubuntu focal-security/universe amd64 Packages [1052 kB]
+Get:21 http://security.ubuntu.com/ubuntu focal-security/universe Translation-en [220 kB]
+Get:22 http://security.ubuntu.com/ubuntu focal-security/multiverse amd64 Packages [26.7 kB]
+Fetched 21.0 MB in 3s (6593 kB/s)
+Reading package lists...
++ apt-get install -y git-lfs
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following NEW packages will be installed:
+  git-lfs
+0 upgraded, 1 newly installed, 0 to remove and 104 not upgraded.
+Need to get 3316 kB of archives.
+After this operation, 11.1 MB of additional disk space will be used.
+Get:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal/universe amd64 git-lfs amd64 2.9.2-1 [3316 kB]
+dpkg-preconfigure: unable to re-open stdin: No such file or directory
+Fetched 3316 kB in 0s (56.3 MB/s)
+Selecting previously unselected package git-lfs.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 100548 files and directories currently installed.)
+Preparing to unpack .../git-lfs_2.9.2-1_amd64.deb ...
+Unpacking git-lfs (2.9.2-1) ...
+Setting up git-lfs (2.9.2-1) ...
+Processing triggers for man-db (2.9.1-1) ...
++ AF=
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /home/*/aws-fpga /opt/aws-fpga
++ '[' -d /root/aws-fpga/hdk ']'
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /home/*/aws-fpga /opt/aws-fpga
++ '[' -d '/home/*/src/project_data/aws-fpga/hdk' ']'
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /home/*/aws-fpga /opt/aws-fpga
++ '[' -d '/home/*/aws-fpga/hdk' ']'
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /home/*/aws-fpga /opt/aws-fpga
++ '[' -d /opt/aws-fpga/hdk ']'
++ '[' -z '' ']'
++ AF=/opt/aws-fpga
++ git clone https://github.com/aws/aws-fpga.git /opt/aws-fpga
+Cloning into '/opt/aws-fpga'...
++ echo AWS_FPGA=/opt/aws-fpga
+AWS_FPGA=/opt/aws-fpga
++ for s in /opt/Xilinx/Vivado/*/settings64.sh
++ '[' -f /opt/Xilinx/Vivado/2024.1/settings64.sh ']'
++ source /opt/Xilinx/Vivado/2024.1/settings64.sh
+++ source /opt/Xilinx/Vitis/2024.1/.settings64-Vitis.sh
++++ export XILINX_VITIS=/opt/Xilinx/Vitis/2024.1
++++ XILINX_VITIS=/opt/Xilinx/Vitis/2024.1
++++ '[' -n /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin ']'
++++ export PATH=/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++ source /opt/Xilinx/Vivado/2024.1/.settings64-Vivado.sh
++++ export XILINX_VIVADO=/opt/Xilinx/Vivado/2024.1
++++ XILINX_VIVADO=/opt/Xilinx/Vivado/2024.1
++++ '[' -n /opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin ']'
++++ export PATH=/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++ source /opt/Xilinx/Vitis_HLS/2024.1/.settings64-Vitis_HLS.sh
++++ export XILINX_HLS=/opt/Xilinx/Vitis_HLS/2024.1
++++ XILINX_HLS=/opt/Xilinx/Vitis_HLS/2024.1
++++ '[' -n /opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin ']'
++++ export PATH=/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++ for s in /opt/Xilinx/Vitis_HLS/*/settings64.sh
++ '[' -f /opt/Xilinx/Vitis_HLS/2024.1/settings64.sh ']'
++ source /opt/Xilinx/Vitis_HLS/2024.1/settings64.sh
+++ source /opt/Xilinx/Vitis/2024.1/.settings64-Vitis.sh
++++ export XILINX_VITIS=/opt/Xilinx/Vitis/2024.1
++++ XILINX_VITIS=/opt/Xilinx/Vitis/2024.1
++++ '[' -n /opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin ']'
++++ export PATH=/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++ source /opt/Xilinx/Vivado/2024.1/.settings64-Vivado.sh
++++ export XILINX_VIVADO=/opt/Xilinx/Vivado/2024.1
++++ XILINX_VIVADO=/opt/Xilinx/Vivado/2024.1
++++ '[' -n /opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin ']'
++++ export PATH=/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++ source /opt/Xilinx/Vitis_HLS/2024.1/.settings64-Vitis_HLS.sh
++++ export XILINX_HLS=/opt/Xilinx/Vitis_HLS/2024.1
++++ XILINX_HLS=/opt/Xilinx/Vitis_HLS/2024.1
++++ '[' -n /opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin ']'
++++ export PATH=/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++ cd /opt/aws-fpga
++ source hdk_setup.sh
+++ script=hdk_setup.sh
+++ '[' hdk_setup.sh == /var/lib/cloud/instance/scripts/part-001 ']'
++++ readlink -f hdk_setup.sh
+++ full_script=/opt/aws-fpga/hdk_setup.sh
++++ basename /opt/aws-fpga/hdk_setup.sh
+++ script_name=hdk_setup.sh
++++ dirname /opt/aws-fpga/hdk_setup.sh
+++ script_dir=/opt/aws-fpga
++++ pwd
+++ current_dir=/opt/aws-fpga
+++ debug=0
+++ skip_downloads=0
+++ source /opt/aws-fpga/shared/bin/set_common_functions.sh
++++ export -f get_tools_dst_dir
++++ export -f get_tools_lib_dir
+++ args=("$@")
+++ (( i = 0 ))
+++ (( i < 0 ))
+++ source /opt/aws-fpga/shared/bin/set_common_env_vars.sh
++++ info_msg 'Setting up environment variables'
++++ echo -e 'INFO: Setting up environment variables'
+INFO: Setting up environment variables
+++++ git rev-parse --show-toplevel
++++ repo_root=/opt/aws-fpga
++++ [[ -z '' ]]
++++ debug_msg 'AWS_FPGA_REPO_DIR not set so setting to /opt/aws-fpga'
++++ [[ 0 == 0 ]]
++++ return
++++ export AWS_FPGA_REPO_DIR=/opt/aws-fpga
++++ AWS_FPGA_REPO_DIR=/opt/aws-fpga
++++ unset HDK_DIR
++++ unset HDK_COMMON_DIR
++++ unset HDK_SHELL_DIR
++++ unset HDK_SHELL_DESIGN_DIR
++++ export HDK_DIR=/opt/aws-fpga/hdk
++++ HDK_DIR=/opt/aws-fpga/hdk
++++ export HDK_COMMON_DIR=/opt/aws-fpga/hdk/common
++++ HDK_COMMON_DIR=/opt/aws-fpga/hdk/common
+++++ realpath -s /opt/aws-fpga/hdk/common/shell_stable
++++ export HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
++++ HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
++++ export HDK_SHELL_DESIGN_DIR=/opt/aws-fpga/hdk/common/shell_stable/design
++++ HDK_SHELL_DESIGN_DIR=/opt/aws-fpga/hdk/common/shell_stable/design
++++ unset SDK_DIR
++++ export SDK_DIR=/opt/aws-fpga/sdk
++++ SDK_DIR=/opt/aws-fpga/sdk
++++ export VITIS_DIR=/opt/aws-fpga/vitis
++++ VITIS_DIR=/opt/aws-fpga/vitis
++++ python_lib=/opt/aws-fpga/shared/lib
++++ export PYTHONPATH=/opt/aws-fpga/shared/lib:
++++ PYTHONPATH=/opt/aws-fpga/shared/lib:
+++++ echo /opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++++ sed -e 's/\(^\|:\)[^:]\+\/shared\/bin\/scripts\(:\|$\)/:/g; s/^://; s/:$//'
++++ export PATH=/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/aws-fpga/shared/bin/scripts:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/opt/Xilinx/Vitis_HLS/2024.1/bin:/opt/Xilinx/Vivado/2024.1/bin:/opt/Xilinx/Vitis/2024.1/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/arm/lin/bin:/opt/Xilinx/Vitis/2024.1/gnu/microblaze/linux_toolchain/lin64_le/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-linux-gnueabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch32/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-linux/bin:/opt/Xilinx/Vitis/2024.1/gnu/aarch64/lin/aarch64-none/bin:/opt/Xilinx/Vitis/2024.1/gnu/armr5/lin/gcc-arm-none-eabi/bin:/opt/Xilinx/Vitis/2024.1/tps/lnx64/cmake-3.3.2/bin:/opt/Xilinx/Vitis/2024.1/aietools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++ debug_msg 'Checking for Vivado install:'
+++ [[ 0 == 0 ]]
+++ return
+++ is_vivado_available
+++ vivado -version
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
+++ true
++++ vivado -version
++++ grep -i Vivado
++++ head -1
+++ export 'VIVADO_VER=vivado v2024.1 (64-bit)'
+++ VIVADO_VER='vivado v2024.1 (64-bit)'
+++ info_msg 'Using vivado v2024.1 (64-bit)'
+++ echo -e 'INFO: Using vivado v2024.1 (64-bit)'
+INFO: Using vivado v2024.1 (64-bit)
+++ VIVADO_VERSION_CHECK=0
+++ check_vivado_version 'vivado v2024.1 (64-bit)' /opt/aws-fpga/supported_vivado_versions.txt 0
+++ local 'act_version=vivado v2024.1 (64-bit)' exp_version_file=/opt/aws-fpga/supported_vivado_versions.txt compare=0
+++ extract_vivado_version 'vivado v2024.1 (64-bit)'
+++ local 'version=vivado v2024.1 (64-bit)'
+++ [[ -z vivado v2024.1 (64-bit) ]]
+++ parts=($version)
+++ local parts
+++ [[ 3 -lt 3 ]]
+++ version_parts=(${parts[1]//_/ })
+++ local version_parts
+++ EXTRACTED_VIVADO_BASEVER=v2024.1
+++ EXTRACTED_VIVADO_PATCHES=
+++ EXTRACTED_VIVADO_PATCHES_NUM=0
+++ EXTRACTED_VIVADO_OSBITS=64-bit
+++ return 0
+++ local act_base=v2024.1 act_patches=
+++ local act_bits=64-bit act_patch_num=0
+++ [[ -f /opt/aws-fpga/supported_vivado_versions.txt ]]
+++ IFS=
+++ read -r line
+++ [[ -z vivado v2024.1 (64-bit) ]]
+++ [[ vivado v2024.1 (64-bit) =~ ^[[:space:]]*# ]]
+++ extract_vivado_version 'vivado v2024.1 (64-bit)'
+++ local 'version=vivado v2024.1 (64-bit)'
+++ [[ -z vivado v2024.1 (64-bit) ]]
+++ parts=($version)
+++ local parts
+++ [[ 3 -lt 3 ]]
+++ version_parts=(${parts[1]//_/ })
+++ local version_parts
+++ EXTRACTED_VIVADO_BASEVER=v2024.1
+++ EXTRACTED_VIVADO_PATCHES=
+++ EXTRACTED_VIVADO_PATCHES_NUM=0
+++ EXTRACTED_VIVADO_OSBITS=64-bit
+++ return 0
+++ [[ v2024.1 == \v\2\0\2\4\.\1 ]]
+++ [[ 64-bit == \6\4\-\b\i\t ]]
++++ [[ 0 -eq 0 ]]
++++ echo 0
+++ local patch_num=0
+++ [[ 0 -eq 0 ]]
+++ VIVADO_VERSION_CHECK=1
+++ return 0
+++ '[' 1 -eq 1 ']'
+++ debug_msg 'vivado v2024.1 (64-bit) is supported by this HDK release.'
+++ [[ 0 == 0 ]]
+++ return
++++ vivado -version
++++ grep -i Vivado
++++ head -1
++++ sed 's/[Vv]ivado v//'
++++ sed 's/^\(.\{6\}\).*$/\1/'
+++ VIVADO_TOOL_VERSION=2024.1
+++ export VIVADO_TOOL_VERSION
+++ info_msg 'VIVADO_TOOL_VERSION is 2024.1'
+++ echo -e 'INFO: VIVADO_TOOL_VERSION is 2024.1'
+INFO: VIVADO_TOOL_VERSION is 2024.1
+++ debug_msg 'Vivado check succeeded'
+++ [[ 0 == 0 ]]
+++ return
+++ check_git_lfs
+++ command -v git-lfs
+++ return 0
+++ '[' 0 -ne 0 ']'
+++ debug_msg 'Done setting environment variables.'
+++ [[ 0 == 0 ]]
+++ return
+++ shell_ver_file=/opt/aws-fpga/hdk/common/shell_stable/shell_version.txt
+++ s3_hdk_files=("cl_bb_routed.small_shell.dcp")
+++ declare -a s3_hdk_files
+++ '[' 0 -eq 0 ']'
+++ for shell_file in "${s3_hdk_files[@]}"
+++ sub_dir=checkpoints
+++ hdk_shell_dir=/opt/aws-fpga/hdk/common/shell_stable/build/checkpoints
+++ hdk_shell_dir_from_aws=/opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws
+++ hdk_file=/opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp
+++ hdk_file_sha256=/opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp.sha256
+++ shell_file_sha256=cl_bb_routed.small_shell.dcp.sha256
+++ '[' '!' -d /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints ']'
+++ mkdir /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints
+++ '[' '!' -d /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws ']'
+++ mkdir /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws
++++ echo cl_bb_routed.small_shell.dcp
++++ cut -d. -f2
+++ shell_type=small_shell
++++ cat /opt/aws-fpga/hdk/common/shell_stable/shell_version.txt
++++ grep small_shell
++++ cut -d = -f2
+++ shell_ver=0x10212415
+++ s3_hdk_dir_url=https://aws-fpga-hdk-resources.s3.amazonaws.com/hdk
+++ s3_shell_dir=https://aws-fpga-hdk-resources.s3.amazonaws.com/hdk/shell_v10212415
+++ wget https://aws-fpga-hdk-resources.s3.amazonaws.com/hdk/shell_v10212415/cl_bb_routed.small_shell.dcp -O /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp -q
+++ wget https://aws-fpga-hdk-resources.s3.amazonaws.com/hdk/shell_v10212415/cl_bb_routed.small_shell.dcp.sha256 -O /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp.sha256 -q
+++ sha256_check /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp.sha256 /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp
+++ sha_file=/opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp.sha256
+++ xsa_file=/opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp
++++ awk '{print $1}' /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp.sha256
+++ s3_sha=04a5331321e86cffc7ef740fb6132b29f179e68e2d58ccae5031c989403ecca6
++++ sha256sum /opt/aws-fpga/hdk/common/shell_stable/build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp
++++ awk '{print $1}'
+++ local_sha=04a5331321e86cffc7ef740fb6132b29f179e68e2d58ccae5031c989403ecca6
+++ [[ 04a5331321e86cffc7ef740fb6132b29f179e68e2d58ccae5031c989403ecca6 != \0\4\a\5\3\3\1\3\2\1\e\8\6\c\f\f\c\7\e\f\7\4\0\f\b\6\1\3\2\b\2\9\f\1\7\9\e\6\8\e\2\d\5\8\c\c\a\e\5\0\3\1\c\9\8\9\4\0\3\e\c\c\a\6 ]]
+++ return 0
+++ '[' 0 -ne 0 ']'
+++ info_msg 'Setting up CL_IP for Vivado version 2024.1'
+++ echo -e 'INFO: Setting up CL_IP for Vivado version 2024.1'
+INFO: Setting up CL_IP for Vivado version 2024.1
+++ cl_ip_path=hdk/common/ip
+++ cl_ip_branch=Vivado_2024.1-hdk/common/ip
+++ '[' 0 -eq 0 ']'
+++ check_git_lfs
+++ command -v git-lfs
+++ return 0
+++ '[' 0 -ne 0 ']'
+++ git submodule sync --recursive
+++ GIT_LFS_SKIP_SMUDGE=1
+++ git submodule update --init hdk/common/ip
+Submodule 'hdk/common/ip' (https://github.com/aws/aws-fpga-resources.git) registered for path 'hdk/common/ip'
+Cloning into '/opt/aws-fpga/hdk/common/ip'...
+Submodule path 'hdk/common/ip': checked out '6d32be972e6da854e61a8d3d6ec0466ab491c1b3'
+++ GIT_LFS_SKIP_SMUDGE=1
+++ git -C hdk/common/ip checkout Vivado_2024.1-hdk/common/ip
+Previous HEAD position was 6d32be9 Add two ILA IPs for axil and axi4 in Vivado 2025.2 (#3)
+Switched to a new branch 'Vivado_2024.1-hdk/common/ip'
+Branch 'Vivado_2024.1-hdk/common/ip' set up to track remote branch 'Vivado_2024.1-hdk/common/ip' from 'origin'.
+++ GIT_LFS_SKIP_SMUDGE=1
+++ git -C hdk/common/ip pull origin Vivado_2024.1-hdk/common/ip
+From https://github.com/aws/aws-fpga-resources
+ * branch            Vivado_2024.1-hdk/common/ip -> FETCH_HEAD
+Already up to date.
+++ GIT_LFS_USERNAME=
+++ GIT_LFS_PASSWORD=
+++ git -C hdk/common/ip lfs pull
+++ debug_msg 'Checking for CL_IP Vivado version'
+++ [[ 0 == 0 ]]
+++ return
++++ cat /opt/aws-fpga/hdk/common/ip/VIVADO_VERSION
++++ xargs
+++ cl_ip_ver=2024.1
+++ '[' 2024.1 == 2024.1 ']'
+++ debug_msg 'CL_IP was created using the expected Vivado version 2024.1'
+++ [[ 0 == 0 ]]
+++ return
+++ info_msg 'Setting up IP environment variables'
+++ echo -e 'INFO: Setting up IP environment variables'
+INFO: Setting up IP environment variables
+++ unset HDK_IP_SRC_DIR
+++ unset HDK_BD_SRC_DIR
+++ unset HDK_BD_GEN_DIR
++++ realpath -s /opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip
+++ export HDK_IP_SRC_DIR=/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip
+++ HDK_IP_SRC_DIR=/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip
++++ realpath -s /opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/bd
+++ export HDK_BD_SRC_DIR=/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/bd
+++ HDK_BD_SRC_DIR=/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/bd
++++ realpath -s /opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/bd
+++ export HDK_BD_GEN_DIR=/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/bd
+++ HDK_BD_GEN_DIR=/opt/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/bd
+++ info_msg 'HDK shell is up-to-date'
+++ echo -e 'INFO: HDK shell is up-to-date'
+INFO: HDK shell is up-to-date
+++ [[ -z '' ]]
+++ warn_msg 'Don'\''t forget to set the CL_DIR variable for the directory of your Custom Logic.'
+++ echo -e 'WARNING: Don'\''t forget to set the CL_DIR variable for the directory of your Custom Logic.'
+WARNING: Don't forget to set the CL_DIR variable for the directory of your Custom Logic.
+++ info_msg 'Setting up HLx environment'
+++ echo -e 'INFO: Setting up HLx environment'
+INFO: Setting up HLx environment
+++ hlx_path=hdk/common/shell_stable/hlx
+++ hlx_branch=Hlx_1.0-hdk/common/shell_stable/hlx
+++ '[' 0 -eq 0 ']'
+++ check_git_lfs
+++ command -v git-lfs
+++ return 0
+++ '[' 0 -ne 0 ']'
+++ git submodule sync --recursive
+Synchronizing submodule url for 'hdk/common/ip'
+++ GIT_LFS_SKIP_SMUDGE=1
+++ git submodule update --init hdk/common/shell_stable/hlx
+Submodule 'hdk/common/shell_stable/hlx' (https://github.com/aws/aws-fpga-resources.git) registered for path 'hdk/common/shell_stable/hlx'
+Cloning into '/opt/aws-fpga/hdk/common/shell_stable/hlx'...
+Submodule path 'hdk/common/shell_stable/hlx': checked out '2383c2b64572c75163b1b60fbd0abea482c637e6'
+++ GIT_LFS_SKIP_SMUDGE=1
+++ git -C hdk/common/shell_stable/hlx checkout Hlx_1.0-hdk/common/shell_stable/hlx
+Switched to a new branch 'Hlx_1.0-hdk/common/shell_stable/hlx'
+Branch 'Hlx_1.0-hdk/common/shell_stable/hlx' set up to track remote branch 'Hlx_1.0-hdk/common/shell_stable/hlx' from 'origin'.
+++ GIT_LFS_SKIP_SMUDGE=1
+++ git -C hdk/common/shell_stable/hlx pull origin Hlx_1.0-hdk/common/shell_stable/hlx
+From https://github.com/aws/aws-fpga-resources
+ * branch            Hlx_1.0-hdk/common/shell_stable/hlx -> FETCH_HEAD
+Already up to date.
+++ GIT_LFS_USERNAME=
+++ GIT_LFS_PASSWORD=
+++ git -C hdk/common/shell_stable/hlx lfs pull
+++ cd /opt/aws-fpga
+++ info_msg 'AWS HDK setup PASSED.'
+++ echo -e 'INFO: AWS HDK setup PASSED.'
+INFO: AWS HDK setup PASSED.
++ echo 'HDK_DIR=/opt/aws-fpga/hdk HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable'
+HDK_DIR=/opt/aws-fpga/hdk HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
++ aws s3 cp /tmp/diag.txt s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/diag.txt --only-show-errors
++ mkdir -p /opt/tiki
++ cd /opt/tiki
++ for i in 1 2 3
++ aws s3 cp s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/src.tar.gz src.tar.gz
+Completed 256.0 KiB/3.2 MiB (1.4 MiB/s) with 1 file(s) remainingCompleted 512.0 KiB/3.2 MiB (2.8 MiB/s) with 1 file(s) remainingCompleted 768.0 KiB/3.2 MiB (4.2 MiB/s) with 1 file(s) remainingCompleted 1.0 MiB/3.2 MiB (5.6 MiB/s) with 1 file(s) remaining  Completed 1.2 MiB/3.2 MiB (7.0 MiB/s) with 1 file(s) remaining  Completed 1.5 MiB/3.2 MiB (8.3 MiB/s) with 1 file(s) remaining  Completed 1.8 MiB/3.2 MiB (9.7 MiB/s) with 1 file(s) remaining  Completed 2.0 MiB/3.2 MiB (11.0 MiB/s) with 1 file(s) remaining Completed 2.2 MiB/3.2 MiB (12.1 MiB/s) with 1 file(s) remaining Completed 2.5 MiB/3.2 MiB (13.4 MiB/s) with 1 file(s) remaining Completed 2.8 MiB/3.2 MiB (14.2 MiB/s) with 1 file(s) remaining Completed 3.0 MiB/3.2 MiB (15.5 MiB/s) with 1 file(s) remaining Completed 3.2 MiB/3.2 MiB (15.9 MiB/s) with 1 file(s) remaining download: s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/src.tar.gz to ./src.tar.gz
++ break
++ tar xzf src.tar.gz
++ cd /opt/tiki/tikitorch/hardware/hls/forge_kernels
+++ command -v vitis_hls
++ VHLS=/opt/Xilinx/Vitis_HLS/2024.1/bin/vitis_hls
+++ date -u
++ echo '=== HLS synth_train_step_s1.tcl START Wed Jun 24 16:45:19 UTC 2026 ==='
+=== HLS synth_train_step_s1.tcl START Wed Jun 24 16:45:19 UTC 2026 ===
++ /opt/Xilinx/Vitis_HLS/2024.1/bin/vitis_hls -f synth_train_step_s1.tcl
++ tail -25
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_do_bwd_int_embed_oc_RAM_AUTO_0R0W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_do_bwd_int_ln1b_oc_7_RAM_AUTO_0R0W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_do_bwd_int_ln1st_oc_7_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_do_bwd_int_gEMBED_oc_7_RAM_2P_BRAM_1R1W' using block RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_do_bwd_int_gWUP_oc_7_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_gRn_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_gR_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_gHd_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_Hdm_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_gU_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_gX2v_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_dyadic_adam_region_int_s1_opt_region_t_const_bool_wfp_t_RAM_2P_BRAM_1R1W' using block RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_s1_dyadic_adam_region_int_s1_opt_region_t_const_bool_g_t_RAM_2P_BRAM_1R1W' using block RAMs.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 5.39 seconds. CPU system time: 0.18 seconds. Elapsed time: 6.1 seconds; current allocated memory: 2.876 GB.
+INFO: [HLS 200-111] Finished Generating all RTL models: CPU user time: 4.77 seconds. CPU system time: 0.21 seconds. Elapsed time: 5.05 seconds; current allocated memory: 2.940 GB.
+INFO: [HLS 200-1603] Design has inferred MAXI bursts and missed bursts, see Vitis HLS GUI synthesis summary report for detailed information.
+INFO: [HLS 200-111] Finished Updating report files: CPU user time: 22.68 seconds. CPU system time: 0.13 seconds. Elapsed time: 23.15 seconds; current allocated memory: 3.099 GB.
+INFO: [VHDL 208-304] Generating VHDL RTL for forge_train_step_s1.
+INFO: [VLOG 209-307] Generating Verilog RTL for forge_train_step_s1.
+INFO: [HLS 200-790] **** Loop Constraint Status: All loop constraints were NOT satisfied.
+INFO: [HLS 200-789] **** Estimated Fmax: 294.55 MHz
+INFO: [HLS 200-2161] Finished Command csynth_design Elapsed time: 00:04:06; Allocated memory: 2.881 GB.
+==== Synthesis report ====
+  forge_train_step_s1_proj/solution1/syn/report/forge_train_step_s1_csynth.rpt
+INFO: [HLS 200-112] Total CPU user time: 929.94 seconds. Total CPU system time: 6.58 seconds. Total elapsed time: 1096.66 seconds; peak allocated memory: 3.099 GB.
++ KVDIR=/opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog
++ ls -la /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog
++ head
+total 24116
+drwxr-xr-x 2 root root   28672 Jun 24 17:03 .
+drwxr-xr-x 5 root root    4096 Jun 24 17:02 ..
+-rw-r--r-- 1 root root 6609239 Jun 24 17:03 forge_train_step_s1.v
+-rw-r--r-- 1 root root    4096 Jun 24 17:03 forge_train_step_s1_Ah_RAM_AUTO_1R1W.dat
+-rw-r--r-- 1 root root    1000 Jun 24 17:03 forge_train_step_s1_Ah_RAM_AUTO_1R1W.v
+-rw-r--r-- 1 root root   32768 Jun 24 17:03 forge_train_step_s1_Hd_RAM_AUTO_1R1W.dat
+-rw-r--r-- 1 root root    1001 Jun 24 17:03 forge_train_step_s1_Hd_RAM_AUTO_1R1W.v
+-rw-r--r-- 1 root root   32768 Jun 24 17:03 forge_train_step_s1_Hdm_RAM_AUTO_1R1W.dat
+-rw-r--r-- 1 root root    1003 Jun 24 17:03 forge_train_step_s1_Hdm_RAM_AUTO_1R1W.v
++ ls /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog
++ wc -l
+274
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ TPL=
++ for cand in CL_TEMPLATE cl_template cl_dram_hbm_dma cl_dram_dma cl_mem_perf
+++ find /opt/aws-fpga -path '*/CL_TEMPLATE/build/scripts/aws_build_dcp_from_cl.py'
+++ head -1
++ hit=/opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE/build/scripts/aws_build_dcp_from_cl.py
++ '[' -n /opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE/build/scripts/aws_build_dcp_from_cl.py ']'
++++ dirname /opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE/build/scripts/aws_build_dcp_from_cl.py
+++ cd /opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE/build/scripts/../..
+++ pwd
++ TPL=/opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE
++ break
++ '[' -z /opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE ']'
++ echo TEMPLATE=/opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE
+TEMPLATE=/opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE
++ CLROOT=/opt/tiki/CL/cl_forge_train_step_s1
++ mkdir -p /opt/tiki/CL/cl_forge_train_step_s1
++ cp -r /opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE/. /opt/tiki/CL/cl_forge_train_step_s1/
++ rm -rf /opt/tiki/CL/cl_forge_train_step_s1/build
++ cp -rL /opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE/build /opt/tiki/CL/cl_forge_train_step_s1/build
++ rm -rf /opt/tiki/CL/cl_forge_train_step_s1/design
++ cp -r /opt/tiki/tikitorch/hardware/hdk/cl_forge_train_step_s1/design /opt/tiki/CL/cl_forge_train_step_s1/design
++ mkdir -p /opt/tiki/CL/cl_forge_train_step_s1/design/ip
++ cp -f /opt/tiki/tikitorch/hardware/hdk/cl_forge_train_step_s1/build/scripts/gen_ip.tcl /opt/tiki/tikitorch/hardware/hdk/cl_forge_train_step_s1/build/scripts/synth_cl_forge_train_step_s1.tcl /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/
++ mkdir -p /opt/tiki/CL/cl_forge_train_step_s1/build/constraints
++ cp -f /opt/tiki/tikitorch/hardware/hdk/cl_forge_train_step_s1/build/constraints/cl_synth_user.xdc /opt/tiki/tikitorch/hardware/hdk/cl_forge_train_step_s1/build/constraints/cl_timing_user.xdc /opt/tiki/CL/cl_forge_train_step_s1/build/constraints/
++ cp /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_Ah_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_Hd_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_Hdm_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_Qm_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_R_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_U_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_X1_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_ad_head_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_15.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_15_Pipeline_BINIT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_15_Pipeline_BLEND.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_15_Pipeline_EXP.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_15_Pipeline_NRM.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_15_Pipeline_SAVEP.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_15_Pipeline_SCORE.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_15_Pipeline_WOUT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_Pipeline_BINIT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_Pipeline_BLEND.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_Pipeline_EXP.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_Pipeline_NRM.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_Pipeline_SAVEP.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_Pipeline_SCORE.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_Pipeline_WOUT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_ap_int_const_32_ap_int_const_32_ap_int_const_32_int_con_8_RAM_AUTO_Hfu.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_bwd.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_bwd_Pipeline_AB_EXP.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_bwd_Pipeline_AB_GP.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_bwd_Pipeline_AB_GS.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_bwd_Pipeline_AB_GV.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_bwd_Pipeline_AB_NRM.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_bwd_Pipeline_AB_SCORE.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_attn_head_bwd_Pipeline_AB_SUBG.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_codes.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_codes_7.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_codes_7_Pipeline_LC_W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_codes_8.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_codes_8_Pipeline_LC_W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_codes_Pipeline_LC_W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_half.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_half_9.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_half_9_Pipeline_LH_W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_half_Pipeline_LH_W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_i32.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_i32_10.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_i32_11.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_i32_18.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_i32_18_Pipeline_LL_W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_load_i32_18_Pipeline_VITIS_LOOP_101_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_12.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_13.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_14.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_16.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_17.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_19.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_19_Pipeline_SS_W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_19_Pipeline_VITIS_LOOP_173_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_Pipeline_SS_W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_burst_store_i32_Pipeline_VITIS_LOOP_173_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_c_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_control_s_axi.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_ACC_GX1_VITIS_LOOP_1661_19.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_EMB_BWD_VITIS_LOOP_1709_21.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_GRN_ZERO_VITIS_LOOP_1396_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_LN1_GSTE.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_LN1_GSUB.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_LN2_GSTE.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_LN2_GSUB.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_LNF_GSTE.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_LNF_GSUB.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_RES1_BWD_VITIS_LOOP_1619_14.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_RES2_BWD_VITIS_LOOP_1541_10.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_SV_GX2_VITIS_LOOP_1564_12.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1405_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1423_3.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1501_4.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1513_5_VITIS_LOOP_1514_6.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1521_7_VITIS_LOOP_1522_8.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1533_9.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1554_11.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1609_13.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1630_15_VITIS_LOOP_1631_16.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1640_17_VITIS_LOOP_1641_18.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1695_20.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_ZG_D.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_ZG_E.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_ZG_F.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_ZG_L.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_ZG_P.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_Pipeline_ZG_U.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_g_c_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_int_embed_oc_RAM_AUTO_0R0W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_int_gEMBED_oc_7_RAM_2P_BRAM_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_int_gWUP_oc_7_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_int_ln1b_oc_7_RAM_AUTO_0R0W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_bwd_int_ln1st_oc_7_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_ARGV.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_CE_E.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_CE_G.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_CE_P.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_HEAD_V_HEAD_D.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_RES1_VITIS_LOOP_768_8.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_RES2_VITIS_LOOP_807_12.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_SAVEH.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_693_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_723_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_731_3.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_747_4_VITIS_LOOP_748_5.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_757_6_VITIS_LOOP_758_7.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_776_9.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_784_10.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_796_11.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_814_13.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_831_14.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_839_15.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_Vh_3_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_ce_lut_9_RAM_2P_BRAM_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_embed_oc_7_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_ln1b_oc_7_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_ln1g_oc_7_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_ln1st_oc_7_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_relu_t_7_RAM_2P_BRAM_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_rsnap_t_7_RAM_2P_BRAM_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_toks_9_RAM_2P_BRAM_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_wq_oc_7_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_int_wup_oc_7_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_fwd_loss_row_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_opt.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_opt_S1_OPT_REGIONS_dst_off_ROM_AUTO_1R.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_opt_S1_OPT_REGIONS_g_off_ROM_AUTO_1R.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_opt_S1_OPT_REGIONS_is_code_ROM_AUTO_1R.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_opt_S1_OPT_REGIONS_m_off_ROM_AUTO_1R.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_opt_S1_OPT_REGIONS_n_ROM_AUTO_1R.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_opt_S1_OPT_REGIONS_v_off_ROM_AUTO_1R.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_opt_S1_OPT_REGIONS_wfp_off_ROM_AUTO_1R.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_do_train_run.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_dyadic_adam_region.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_dyadic_adam_region_Pipeline_ADAM_Q.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_dyadic_adam_region_Pipeline_ADAM_R.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_dyadic_adam_region_int_s1_opt_region_t_const_bool_g_t_RAM_2P_BRAM_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_dyadic_adam_region_int_s1_opt_region_t_const_bool_wfp_t_RAM_2P_BRAM_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_e_row_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_flow_control_loop_pipe_sequential_init.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_3.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_3_Pipeline_IRED_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_3_Pipeline_QX_VITIS_LOOP_389_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_3_Pipeline_VITIS_LOOP_401_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_3_Pipeline_VITIS_LOOP_425_4.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_3_acc_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_4.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_4_Pipeline_IRED_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_4_Pipeline_QX_VITIS_LOOP_389_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_4_Pipeline_VITIS_LOOP_401_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_4_Pipeline_VITIS_LOOP_425_4.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_4_acc_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_Pipeline_IRED_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_Pipeline_QX_VITIS_LOOP_389_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_Pipeline_VITIS_LOOP_401_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_Pipeline_VITIS_LOOP_425_4.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_acc_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_ap_int_const_signed_char_const_int_ap_int_16_int_int_int_xE_RAM_AUTOjbC.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_fwd_gemm_ap_int_const_signed_char_const_int_ap_int_16_int_int_int_xS_RAM_AUTOkbM.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_gHd_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_gR_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_gRn_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_gU_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_gX2v_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_gmem_m_axi.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_layernorm_tok.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_layernorm_tok_Pipeline_CEN.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_layernorm_tok_Pipeline_RESC.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_layernorm_tok_Pipeline_SUMX.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_ln_gamma_grad.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_ln_gamma_grad_Pipeline_LNG_D.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_ln_gamma_grad_Pipeline_LNG_SUM.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_mul_32s_16s_32_2_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_mul_32s_16s_48_2_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_mul_32s_32s_48_2_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_p_1_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_s_1_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_17_3_16_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_17_3_32_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_17_3_48_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_17_3_8_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_33_4_16_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_33_4_32_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_33_4_6_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_65_5_32_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_7_2_5_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_9_2_32_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_sparsemux_9_3_32_1_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_2_Pipeline_QGO_VITIS_LOOP_1060_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_2_Pipeline_QXW_VITIS_LOOP_1066_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_2_Pipeline_WG_O_WG_I_WG_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_6.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_6_Pipeline_QGO_VITIS_LOOP_1060_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_6_Pipeline_QXW_VITIS_LOOP_1066_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_6_Pipeline_WG_O_WG_I_WG_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_Pipeline_QGO_VITIS_LOOP_1060_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_Pipeline_QXW_VITIS_LOOP_1066_2.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_wgrad_gemm_Pipeline_WG_O_WG_I_WG_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_1_Pipeline_VITIS_LOOP_1010_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_1_Pipeline_VITIS_LOOP_1033_3.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_1_Pipeline_XG_O_XG_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_1_acc_5_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_1_acc_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_5.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_5_Pipeline_VITIS_LOOP_1010_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_5_Pipeline_VITIS_LOOP_1033_3.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_5_Pipeline_XG_O_XG_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_5_acc_4_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_5_acc_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_Pipeline_VITIS_LOOP_1010_1.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_Pipeline_VITIS_LOOP_1033_3.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_Pipeline_XG_O_XG_TT.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_acc_4_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_xgrad_gemm_acc_RAM_AUTO_1R1W.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_zero_grad_region.v /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_train_step_s1_proj/solution1/syn/verilog/forge_train_step_s1_zero_grad_region_zero_grad_region_int_s1_opt_region_t_const_zero_t_RAM_2P_BRAbkb.v /opt/tiki/CL/cl_forge_train_step_s1/design/
++ echo '== aws_build entry (shebang/type) =='
+== aws_build entry (shebang/type) ==
++ head -3 /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py
+#!/usr/bin/env python3
+
+# =============================================================================
++ file /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py
+/opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py: ReStructuredText file, ASCII text
++ echo '== CL design dir =='
+== CL design dir ==
++ ls /opt/tiki/CL/cl_forge_train_step_s1/design
++ head -40
+cl_forge_train_step_s1.sv
+cl_forge_train_step_s1_defines.vh
+cl_id_defines.vh
+forge_train_step_s1.v
+forge_train_step_s1_Ah_RAM_AUTO_1R1W.v
+forge_train_step_s1_Hd_RAM_AUTO_1R1W.v
+forge_train_step_s1_Hdm_RAM_AUTO_1R1W.v
+forge_train_step_s1_Qm_RAM_AUTO_1R1W.v
+forge_train_step_s1_R_RAM_AUTO_1R1W.v
+forge_train_step_s1_U_RAM_AUTO_1R1W.v
+forge_train_step_s1_X1_RAM_AUTO_1R1W.v
+forge_train_step_s1_ad_head_RAM_AUTO_1R1W.v
+forge_train_step_s1_attn_head.v
+forge_train_step_s1_attn_head_15.v
+forge_train_step_s1_attn_head_15_Pipeline_BINIT.v
+forge_train_step_s1_attn_head_15_Pipeline_BLEND.v
+forge_train_step_s1_attn_head_15_Pipeline_EXP.v
+forge_train_step_s1_attn_head_15_Pipeline_NRM.v
+forge_train_step_s1_attn_head_15_Pipeline_SAVEP.v
+forge_train_step_s1_attn_head_15_Pipeline_SCORE.v
+forge_train_step_s1_attn_head_15_Pipeline_WOUT.v
+forge_train_step_s1_attn_head_Pipeline_BINIT.v
+forge_train_step_s1_attn_head_Pipeline_BLEND.v
+forge_train_step_s1_attn_head_Pipeline_EXP.v
+forge_train_step_s1_attn_head_Pipeline_NRM.v
+forge_train_step_s1_attn_head_Pipeline_SAVEP.v
+forge_train_step_s1_attn_head_Pipeline_SCORE.v
+forge_train_step_s1_attn_head_Pipeline_WOUT.v
+forge_train_step_s1_attn_head_ap_int_const_32_ap_int_const_32_ap_int_const_32_int_con_8_RAM_AUTO_Hfu.v
+forge_train_step_s1_attn_head_bwd.v
+forge_train_step_s1_attn_head_bwd_Pipeline_AB_EXP.v
+forge_train_step_s1_attn_head_bwd_Pipeline_AB_GP.v
+forge_train_step_s1_attn_head_bwd_Pipeline_AB_GS.v
+forge_train_step_s1_attn_head_bwd_Pipeline_AB_GV.v
+forge_train_step_s1_attn_head_bwd_Pipeline_AB_NRM.v
+forge_train_step_s1_attn_head_bwd_Pipeline_AB_SCORE.v
+forge_train_step_s1_attn_head_bwd_Pipeline_AB_SUBG.v
+forge_train_step_s1_burst_load_codes.v
+forge_train_step_s1_burst_load_codes_7.v
+forge_train_step_s1_burst_load_codes_7_Pipeline_LC_W.v
++ wc -l
++ ls /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_Ah_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_Hd_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_Hdm_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_Qm_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_R_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_U_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_X1_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_ad_head_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_15.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_15_Pipeline_BINIT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_15_Pipeline_BLEND.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_15_Pipeline_EXP.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_15_Pipeline_NRM.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_15_Pipeline_SAVEP.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_15_Pipeline_SCORE.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_15_Pipeline_WOUT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_Pipeline_BINIT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_Pipeline_BLEND.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_Pipeline_EXP.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_Pipeline_NRM.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_Pipeline_SAVEP.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_Pipeline_SCORE.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_Pipeline_WOUT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_ap_int_const_32_ap_int_const_32_ap_int_const_32_int_con_8_RAM_AUTO_Hfu.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_bwd.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_bwd_Pipeline_AB_EXP.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_bwd_Pipeline_AB_GP.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_bwd_Pipeline_AB_GS.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_bwd_Pipeline_AB_GV.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_bwd_Pipeline_AB_NRM.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_bwd_Pipeline_AB_SCORE.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_attn_head_bwd_Pipeline_AB_SUBG.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_codes.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_codes_7.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_codes_7_Pipeline_LC_W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_codes_8.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_codes_8_Pipeline_LC_W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_codes_Pipeline_LC_W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_half.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_half_9.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_half_9_Pipeline_LH_W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_half_Pipeline_LH_W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_i32.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_i32_10.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_i32_11.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_i32_18.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_i32_18_Pipeline_LL_W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_load_i32_18_Pipeline_VITIS_LOOP_101_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_12.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_13.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_14.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_16.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_17.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_19.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_19_Pipeline_SS_W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_19_Pipeline_VITIS_LOOP_173_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_Pipeline_SS_W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_burst_store_i32_Pipeline_VITIS_LOOP_173_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_c_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_control_s_axi.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_ACC_GX1_VITIS_LOOP_1661_19.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_EMB_BWD_VITIS_LOOP_1709_21.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_GRN_ZERO_VITIS_LOOP_1396_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_LN1_GSTE.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_LN1_GSUB.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_LN2_GSTE.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_LN2_GSUB.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_LNF_GSTE.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_LNF_GSUB.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_RES1_BWD_VITIS_LOOP_1619_14.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_RES2_BWD_VITIS_LOOP_1541_10.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_SV_GX2_VITIS_LOOP_1564_12.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1405_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1423_3.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1501_4.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1513_5_VITIS_LOOP_1514_6.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1521_7_VITIS_LOOP_1522_8.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1533_9.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1554_11.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1609_13.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1630_15_VITIS_LOOP_1631_16.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1640_17_VITIS_LOOP_1641_18.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_VITIS_LOOP_1695_20.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_ZG_D.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_ZG_E.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_ZG_F.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_ZG_L.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_ZG_P.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_Pipeline_ZG_U.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_g_c_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_int_embed_oc_RAM_AUTO_0R0W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_int_gEMBED_oc_7_RAM_2P_BRAM_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_int_gWUP_oc_7_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_int_ln1b_oc_7_RAM_AUTO_0R0W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_bwd_int_ln1st_oc_7_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_ARGV.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_CE_E.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_CE_G.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_CE_P.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_HEAD_V_HEAD_D.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_RES1_VITIS_LOOP_768_8.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_RES2_VITIS_LOOP_807_12.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_SAVEH.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_693_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_723_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_731_3.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_747_4_VITIS_LOOP_748_5.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_757_6_VITIS_LOOP_758_7.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_776_9.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_784_10.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_796_11.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_814_13.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_831_14.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_Pipeline_VITIS_LOOP_839_15.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_Vh_3_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_ce_lut_9_RAM_2P_BRAM_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_embed_oc_7_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_ln1b_oc_7_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_ln1g_oc_7_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_ln1st_oc_7_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_relu_t_7_RAM_2P_BRAM_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_rsnap_t_7_RAM_2P_BRAM_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_toks_9_RAM_2P_BRAM_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_wq_oc_7_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_int_wup_oc_7_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_fwd_loss_row_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_opt.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_opt_S1_OPT_REGIONS_dst_off_ROM_AUTO_1R.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_opt_S1_OPT_REGIONS_g_off_ROM_AUTO_1R.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_opt_S1_OPT_REGIONS_is_code_ROM_AUTO_1R.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_opt_S1_OPT_REGIONS_m_off_ROM_AUTO_1R.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_opt_S1_OPT_REGIONS_n_ROM_AUTO_1R.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_opt_S1_OPT_REGIONS_v_off_ROM_AUTO_1R.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_opt_S1_OPT_REGIONS_wfp_off_ROM_AUTO_1R.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_do_train_run.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_dyadic_adam_region.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_dyadic_adam_region_Pipeline_ADAM_Q.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_dyadic_adam_region_Pipeline_ADAM_R.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_dyadic_adam_region_int_s1_opt_region_t_const_bool_g_t_RAM_2P_BRAM_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_dyadic_adam_region_int_s1_opt_region_t_const_bool_wfp_t_RAM_2P_BRAM_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_e_row_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_flow_control_loop_pipe_sequential_init.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_3.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_3_Pipeline_IRED_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_3_Pipeline_QX_VITIS_LOOP_389_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_3_Pipeline_VITIS_LOOP_401_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_3_Pipeline_VITIS_LOOP_425_4.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_3_acc_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_4.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_4_Pipeline_IRED_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_4_Pipeline_QX_VITIS_LOOP_389_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_4_Pipeline_VITIS_LOOP_401_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_4_Pipeline_VITIS_LOOP_425_4.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_4_acc_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_Pipeline_IRED_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_Pipeline_QX_VITIS_LOOP_389_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_Pipeline_VITIS_LOOP_401_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_Pipeline_VITIS_LOOP_425_4.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_acc_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_ap_int_const_signed_char_const_int_ap_int_16_int_int_int_xE_RAM_AUTOjbC.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_fwd_gemm_ap_int_const_signed_char_const_int_ap_int_16_int_int_int_xS_RAM_AUTOkbM.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_gHd_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_gR_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_gRn_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_gU_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_gX2v_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_gmem_m_axi.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_layernorm_tok.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_layernorm_tok_Pipeline_CEN.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_layernorm_tok_Pipeline_RESC.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_layernorm_tok_Pipeline_SUMX.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_ln_gamma_grad.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_ln_gamma_grad_Pipeline_LNG_D.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_ln_gamma_grad_Pipeline_LNG_SUM.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_mul_32s_16s_32_2_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_mul_32s_16s_48_2_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_mul_32s_32s_48_2_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_p_1_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_s_1_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_17_3_16_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_17_3_32_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_17_3_48_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_17_3_8_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_33_4_16_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_33_4_32_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_33_4_6_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_65_5_32_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_7_2_5_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_9_2_32_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_sparsemux_9_3_32_1_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_2_Pipeline_QGO_VITIS_LOOP_1060_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_2_Pipeline_QXW_VITIS_LOOP_1066_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_2_Pipeline_WG_O_WG_I_WG_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_6.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_6_Pipeline_QGO_VITIS_LOOP_1060_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_6_Pipeline_QXW_VITIS_LOOP_1066_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_6_Pipeline_WG_O_WG_I_WG_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_Pipeline_QGO_VITIS_LOOP_1060_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_Pipeline_QXW_VITIS_LOOP_1066_2.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_wgrad_gemm_Pipeline_WG_O_WG_I_WG_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_1_Pipeline_VITIS_LOOP_1010_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_1_Pipeline_VITIS_LOOP_1033_3.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_1_Pipeline_XG_O_XG_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_1_acc_5_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_1_acc_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_5.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_5_Pipeline_VITIS_LOOP_1010_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_5_Pipeline_VITIS_LOOP_1033_3.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_5_Pipeline_XG_O_XG_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_5_acc_4_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_5_acc_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_Pipeline_VITIS_LOOP_1010_1.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_Pipeline_VITIS_LOOP_1033_3.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_Pipeline_XG_O_XG_TT.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_acc_4_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_xgrad_gemm_acc_RAM_AUTO_1R1W.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_zero_grad_region.v /opt/tiki/CL/cl_forge_train_step_s1/design/forge_train_step_s1_zero_grad_region_zero_grad_region_int_s1_opt_region_t_const_zero_t_RAM_2P_BRAbkb.v
+228
++ aws s3 cp /tmp/diag.txt s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/diag.txt --only-show-errors
++ echo '== CLROOT design listing =='
++ ls -la /opt/tiki/CL/cl_forge_train_step_s1/design
++ aws s3 cp - s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/cl_layout.txt --only-show-errors
++ echo '== build/scripts =='
++ ls -la /opt/tiki/CL/cl_forge_train_step_s1/build/scripts
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
+++ date -u
++ echo '=== gen_ip START Wed Jun 24 17:04:11 UTC 2026 ==='
+=== gen_ip START Wed Jun 24 17:04:11 UTC 2026 ===
++ vivado -mode batch -source /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/gen_ip.tcl -tclargs /opt/tiki/CL/cl_forge_train_step_s1/design/ip
++ tail -30
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
+# create_ip -name axi_clock_converter -vendor xilinx.com -library ip -module_name s1_axi_cdc -dir $ipdir
+# set_property -dict [list \
+#   CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ADDR_WIDTH {64} \
+#   CONFIG.ID_WIDTH {1} CONFIG.SYNCHRONIZATION_STAGES {3} CONFIG.ACLK_RATIO {2:1} \
+# ] [get_ips s1_axi_cdc]
+WARNING: [IP_Flow 19-3374] An attempt to modify the value of disabled parameter 'ACLK_RATIO' from '1:2' to '2:1' has been ignored for IP 's1_axi_cdc'
+# generate_target all [get_ips]
+INFO: [IP_Flow 19-1686] Generating 'Instantiation Template' target for IP 'axi_crossbar_ddr'...
+INFO: [IP_Flow 19-1686] Generating 'Synthesis' target for IP 'axi_crossbar_ddr'...
+INFO: [IP_Flow 19-1686] Generating 'Simulation' target for IP 'axi_crossbar_ddr'...
+INFO: [IP_Flow 19-1686] Generating 'Change Log' target for IP 'axi_crossbar_ddr'...
+INFO: [IP_Flow 19-1686] Generating 'Instantiation Template' target for IP 's1_axi_cdc'...
+INFO: [IP_Flow 19-1686] Generating 'Synthesis' target for IP 's1_axi_cdc'...
+WARNING: [IP_Flow 19-4994] Overwriting existing constraint file '/opt/tiki/CL/cl_forge_train_step_s1/design/ip/s1_axi_cdc/s1_axi_cdc_ooc.xdc'
+INFO: [IP_Flow 19-1686] Generating 'Simulation' target for IP 's1_axi_cdc'...
+INFO: [IP_Flow 19-1686] Generating 'Implementation' target for IP 's1_axi_cdc'...
+INFO: [IP_Flow 19-1686] Generating 'Change Log' target for IP 's1_axi_cdc'...
+INFO: [IP_Flow 19-1686] Generating 'Instantiation Template' target for IP 's1_axil_cdc'...
+INFO: [IP_Flow 19-1686] Generating 'Synthesis' target for IP 's1_axil_cdc'...
+WARNING: [IP_Flow 19-4994] Overwriting existing constraint file '/opt/tiki/CL/cl_forge_train_step_s1/design/ip/s1_axil_cdc/s1_axil_cdc_ooc.xdc'
+INFO: [IP_Flow 19-1686] Generating 'Simulation' target for IP 's1_axil_cdc'...
+INFO: [IP_Flow 19-1686] Generating 'Implementation' target for IP 's1_axil_cdc'...
+INFO: [IP_Flow 19-1686] Generating 'Change Log' target for IP 's1_axil_cdc'...
+INFO: [IP_Flow 19-1686] Generating 'Instantiation Template' target for IP 's1_ocl_slice'...
+INFO: [IP_Flow 19-1686] Generating 'Synthesis' target for IP 's1_ocl_slice'...
+INFO: [IP_Flow 19-1686] Generating 'Simulation' target for IP 's1_ocl_slice'...
+INFO: [IP_Flow 19-1686] Generating 'Implementation' target for IP 's1_ocl_slice'...
+INFO: [IP_Flow 19-1686] Generating 'Change Log' target for IP 's1_ocl_slice'...
+generate_target: Time (s): cpu = 00:00:00.3 ; elapsed = 00:00:12 . Memory (MB): peak = 1521.629 ; gain = 6.938 ; free physical = 57212 ; free virtual = 72693
+INFO: [Common 17-206] Exiting Vivado at Wed Jun 24 17:08:01 2026...
++ echo '== gen_ip produced =='
+== gen_ip produced ==
++ ls -la /opt/tiki/CL/cl_forge_train_step_s1/design/ip
++ head -20
+total 44
+drwxr-xr-x 6 root root  4096 Jun 24 17:07 .
+drwxr-xr-x 3 root root 24576 Jun 24 17:04 ..
+drwxr-xr-x 8 root root  4096 Jun 24 17:07 axi_crossbar_ddr
+drwxr-xr-x 8 root root  4096 Jun 24 17:08 s1_axi_cdc
+drwxr-xr-x 8 root root  4096 Jun 24 17:08 s1_axil_cdc
+drwxr-xr-x 7 root root  4096 Jun 24 17:08 s1_ocl_slice
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ export CL_DIR=/opt/tiki/CL/cl_forge_train_step_s1
++ CL_DIR=/opt/tiki/CL/cl_forge_train_step_s1
+++ find /opt/tiki/CL/cl_forge_train_step_s1/build -name aws_build_dcp_from_cl.py
+++ head -1
++ BUILD_PY=/opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py
++ echo BUILD_PY=/opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py
+BUILD_PY=/opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py
++ '[' -z /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py ']'
++ chmod +x /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py
+++ dirname /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/aws_build_dcp_from_cl.py
++ cd /opt/tiki/CL/cl_forge_train_step_s1/build/scripts
+++ date -u
++ echo '=== aws_build_dcp_from_cl START Wed Jun 24 17:08:03 UTC 2026 ==='
+=== aws_build_dcp_from_cl START Wed Jun 24 17:08:03 UTC 2026 ===
++ ./aws_build_dcp_from_cl.py --cl cl_forge_train_step_s1 --aws_clk_gen --clock_recipe_a A1 --no-encrypt
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ true
++ sleep 60
++ echo BUILD_RC=0
+BUILD_RC=0
++ tail -100 /tmp/aws_build.full.log
+INFO: [Physopt 32-953] Path group WNS did not improve. Path group: clk_main_a0. Processed net: WRAPPER/CL/SH_DDR/genblk1.IS_DDR_PRESENT.AXI_CCF/inst/gen_clock_conv.gen_async_conv.asyncfifo_axi/inst_fifo_gen/gaxi_full_lite.gwrite_ch.gwdch2.axi_wdch/grf.rf/gntv_or_sync_fifo.gl0.wr/gwas.wsts/ram_full_i.
+INFO: [Physopt 32-953] Path group WNS did not improve. Path group: clk_main_a0. Processed net: WRAPPER/CL/XBAR_DDR/inst/gen_samd.crossbar_samd/gen_master_slots[1].gen_mi_write.wdata_mux_w/gen_wmux.wmux_aw_fifo/s_axi_wready[0].
+INFO: [Physopt 32-668] Current Timing Summary | WNS=-0.409 | TNS=-89.181 | WHS=0.009 | THS=0.000 |
+Netlist sorting complete. Time (s): cpu = 00:00:00.1 ; elapsed = 00:00:00.1 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 44181 ; free virtual = 61058
+Phase 26.2 Critical Path Optimization | Checksum: 22a73f74b
+
+Time (s): cpu = 03:20:59 ; elapsed = 00:50:32 . Memory (MB): peak = 13522.141 ; gain = 2273.902 ; free physical = 44181 ; free virtual = 61058
+Netlist sorting complete. Time (s): cpu = 00:00:00.1 ; elapsed = 00:00:00.1 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 44179 ; free virtual = 61056
+INFO: [Physopt 32-669] Post Physical Optimization Timing Summary | WNS=-0.409 | TNS=-89.181 | WHS=0.009 | THS=0.000 |
+Netlist sorting complete. Time (s): cpu = 00:00:00.1 ; elapsed = 00:00:00.1 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 44179 ; free virtual = 61056
+Phase 26 Physical Synthesis in Router | Checksum: 16eb8b3bf
+
+Time (s): cpu = 03:21:39 ; elapsed = 00:50:54 . Memory (MB): peak = 13522.141 ; gain = 2273.902 ; free physical = 44179 ; free virtual = 61056
+
+Phase 27 Route finalize
+Phase 27 Route finalize | Checksum: 16eb8b3bf
+
+Time (s): cpu = 03:21:52 ; elapsed = 00:50:56 . Memory (MB): peak = 13522.141 ; gain = 2273.902 ; free physical = 44179 ; free virtual = 61056
+CRITICAL WARNING: [Route 35-39] The design did not meet timing requirements. Please run report_timing_summary for detailed reports.
+Resolution: Verify that the timing was met or had small violations at all previous steps (synthesis, placement, power_opt, and phys_opt). Run report_timing_summary and analyze individual timing paths.
+INFO: [Route 35-253] TNS is the sum of the worst slack violation on every endpoint in the design. Review the paths with the biggest WNS violations in the timing reports and modify your constraints or your design to improve both WNS and TNS.
+Total Elapsed time in route_design: 3056.09 secs
+
+Phase 28 Post-Route Event Processing
+INFO: [Constraints 18-12546] INFO: Running DFX DRC before completing route_design
+INFO: [Constraints 18-12545] INFO: DFX DRC finished with 0 Errors
+Phase 28 Post-Route Event Processing | Checksum: beb9d2e3
+
+Time (s): cpu = 03:23:10 ; elapsed = 00:51:47 . Memory (MB): peak = 13522.141 ; gain = 2273.902 ; free physical = 44181 ; free virtual = 61058
+INFO: [Route 35-16] Router Completed Successfully
+Ending Routing Task | Checksum: beb9d2e3
+
+Time (s): cpu = 03:23:16 ; elapsed = 00:51:52 . Memory (MB): peak = 13522.141 ; gain = 2273.902 ; free physical = 44181 ; free virtual = 61058
+
+Routing Is Done.
+INFO: [Common 17-83] Releasing license: Implementation
+161 Infos, 2 Warnings, 1 Critical Warnings and 0 Errors encountered.
+route_design completed successfully
+route_design: Time (s): cpu = 03:25:03 ; elapsed = 00:52:40 . Memory (MB): peak = 13522.141 ; gain = 2281.906 ; free physical = 44176 ; free virtual = 61053
+## print "Writing post-route design checkpoint and report"
+
+AWS FPGA: (19:23:13): Writing post-route design checkpoint and report
+
+get_timing_paths: Time (s): cpu = 00:01:50 ; elapsed = 00:00:19 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 44176 ; free virtual = 61053
+WARNING: [Timing 38-164] This design has multiple clocks. Inter clock paths are considered valid unless explicitly excluded by timing constraints such as set_clock_groups or set_false_path.
+WARNING: [Vivado 12-975] No timing paths matched 'get_timing_paths -max_paths 1 -slack_lesser_than 0 -hold'.
+get_timing_paths: Time (s): cpu = 00:00:44 ; elapsed = 00:00:06 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 44176 ; free virtual = 61053
+
+AWS FPGA: (19:23:38): Checking the negative slack path of the existing design
+
+
+AWS FPGA: (19:23:38): CRITICAL WARNING: Found {WRAPPER/CL/SH_DDR/genblk1.IS_DDR_PRESENT.AXI_CCF/inst/gen_clock_conv.gen_async_conv.asyncfifo_axi/inst_fifo_gen/gaxi_full_lite.gwrite_ch.gwdch2.axi_wdch/grf.rf/gntv_or_sync_fifo.gl0.wr/gwas.wsts/ram_full_i_reg/C --> WRAPPER/RL_SHIM/DMA_PCIS_AXI_REG_SLC/AXI_REGISTER_SLICE/inst/w.w_pipe/m_payload_i_reg[542]/CE} negative setup slack paths and  negative hold slack hold paths
+
+## set failPath [check_timing_path]
+## if {$failPath>0} {
+##     write_checkpoint -force ${checkpoints_dir}/${CL}.${TAG}.post_route.VIOLATED.dcp
+## } else {
+##     write_checkpoint -force ${checkpoints_dir}/${CL}.${TAG}.post_route.dcp
+## }
+INFO: [Timing 38-480] Writing timing data to binary archive.
+Write ShapeDB Complete: Time (s): cpu = 00:00:03 ; elapsed = 00:00:00.56 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 44116 ; free virtual = 61064
+Wrote PlaceDB: Time (s): cpu = 00:00:50 ; elapsed = 00:00:17 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 43657 ; free virtual = 61023
+Wrote PulsedLatchDB: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 43656 ; free virtual = 61022
+Writing XDEF routing.
+Writing XDEF routing logical nets.
+Writing XDEF routing special nets.
+Wrote RouteStorage: Time (s): cpu = 00:00:10 ; elapsed = 00:00:04 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 43608 ; free virtual = 61064
+Wrote Netlist Cache: Time (s): cpu = 00:00:00.49 ; elapsed = 00:00:00.52 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 43562 ; free virtual = 61062
+Wrote Device Cache: Time (s): cpu = 00:00:00.01 ; elapsed = 00:00:00.01 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 43560 ; free virtual = 61062
+Write Physdb Complete: Time (s): cpu = 00:01:01 ; elapsed = 00:00:21 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 43560 ; free virtual = 61062
+INFO: [Common 17-1381] The checkpoint '/opt/tiki/CL/cl_forge_train_step_s1/build/checkpoints/cl_forge_train_step_s1.2026_06_24-170803.post_route.VIOLATED.dcp' has been generated.
+write_checkpoint: Time (s): cpu = 00:01:14 ; elapsed = 00:00:35 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 44010 ; free virtual = 61052
+## report_timing -delay_type max \
+##               -path_type full_clock_expanded \
+##               -max_paths 10 \
+##               -nworst 1 \
+##               -input_pins \
+##               -slice_pins \
+##               -sort_by group \
+##               -significant_digits 3 \
+##               -file ${reports_dir}/${CL}.${TAG}.post_route_timing.rpt
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 10 -nworst 1 -delay_type max -sort_by group.
+## write_debug_probes -no_partial_ltxfile -force ${checkpoints_dir}/${TAG}.debug_probes.ltx
+## print "Finished building design checkpoints for customer design ${CL}"
+
+AWS FPGA: (19:24:18): Finished building design checkpoints for customer design cl_forge_train_step_s1
+
+## close_design
+close_design: Time (s): cpu = 00:00:08 ; elapsed = 00:00:08 . Memory (MB): peak = 13522.141 ; gain = 0.000 ; free physical = 43993 ; free virtual = 61036
+INFO: [Common 17-206] Exiting Vivado at Wed Jun 24 19:24:26 2026...
+WARNING: 
+Detected a post-route DCP with timing failure for AFI creation. Design functionalities are NOT guranteed.
+
+
+
+AWS FPGA: 2026-06-24 19:24:29 - Build completes
+
+
+AWS FPGA: Build Time = 2:16:26.017341. 
+
++ aws s3 cp /tmp/aws_build.full.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/aws_build.full.log --only-show-errors
+++ date -u
++ echo '=== build done Wed Jun 24 19:24:30 UTC 2026 ==='
+=== build done Wed Jun 24 19:24:30 UTC 2026 ===
++ ls -la /opt/tiki/CL/cl_forge_train_step_s1/build/checkpoints/ /opt/tiki/CL/cl_forge_train_step_s1/build/checkpoints/to_aws/
++ aws s3 cp - s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/checkpoints_listing.txt --only-show-errors
++ aws s3 cp /opt/tiki/CL/cl_forge_train_step_s1/build/checkpoints/ s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/to_aws/ --recursive --exclude '*' --include '*Developer_CL.tar' --include '*.tar' --include '*post_route*.dcp' --only-show-errors
+++ find /opt/tiki/CL/cl_forge_train_step_s1/build -name '*.rpt' -o -name '*timing*summary*'
++ for r in $(find "$CLROOT/build" -name "*.rpt" -o -name "*timing*summary*" 2>/dev/null)
+++ basename /opt/tiki/CL/cl_forge_train_step_s1/build/reports/cl_forge_train_step_s1.2026_06_24-170803.post_opt_timing.rpt
++ aws s3 cp /opt/tiki/CL/cl_forge_train_step_s1/build/reports/cl_forge_train_step_s1.2026_06_24-170803.post_opt_timing.rpt s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/reports/cl_forge_train_step_s1.2026_06_24-170803.post_opt_timing.rpt --only-show-errors
++ for r in $(find "$CLROOT/build" -name "*.rpt" -o -name "*timing*summary*" 2>/dev/null)
+++ basename /opt/tiki/CL/cl_forge_train_step_s1/build/reports/cl_forge_train_step_s1.2026_06_24-170803.post_phy_opt_timing.rpt
++ aws s3 cp /opt/tiki/CL/cl_forge_train_step_s1/build/reports/cl_forge_train_step_s1.2026_06_24-170803.post_phy_opt_timing.rpt s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/reports/cl_forge_train_step_s1.2026_06_24-170803.post_phy_opt_timing.rpt --only-show-errors
++ for r in $(find "$CLROOT/build" -name "*.rpt" -o -name "*timing*summary*" 2>/dev/null)
+++ basename /opt/tiki/CL/cl_forge_train_step_s1/build/reports/cl_forge_train_step_s1.2026_06_24-170803.post_place_timing.rpt
++ aws s3 cp /opt/tiki/CL/cl_forge_train_step_s1/build/reports/cl_forge_train_step_s1.2026_06_24-170803.post_place_timing.rpt s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/reports/cl_forge_train_step_s1.2026_06_24-170803.post_place_timing.rpt --only-show-errors
++ for r in $(find "$CLROOT/build" -name "*.rpt" -o -name "*timing*summary*" 2>/dev/null)
+++ basename /opt/tiki/CL/cl_forge_train_step_s1/build/reports/cl_forge_train_step_s1.2026_06_24-170803.post_route_timing.rpt
++ aws s3 cp /opt/tiki/CL/cl_forge_train_step_s1/build/reports/cl_forge_train_step_s1.2026_06_24-170803.post_route_timing.rpt s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/reports/cl_forge_train_step_s1.2026_06_24-170803.post_route_timing.rpt --only-show-errors
++ aws s3 cp /opt/tiki/CL/cl_forge_train_step_s1/build/scripts/ s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/scriptlogs/ --recursive --exclude '*' --include '*.log' --only-show-errors
++ aws s3 cp - s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/DONE --only-show-errors
+++ date -u
++ echo 'rc done=Wed Jun 24 19:24:37 UTC 2026'
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors
++ shutdown -h now
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-afibuild.log s3://tiki-sweep-739966866637/s1afibuild-20260624T164218Z/results/build.log --only-show-errors

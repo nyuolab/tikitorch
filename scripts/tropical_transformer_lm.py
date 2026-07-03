@@ -36,8 +36,8 @@ class FLin(nn.Module):  # float linear (dense reference)
     def forward(s,x): return s.l(x)
 
 class Block(nn.Module):
-    def __init__(s, D, H, T, tropical):
-        super().__init__(); s.H=H; s.DH=D//H; s.T=T; s.trop=tropical
+    def __init__(s, D, H, T, tropical, topk=1):
+        super().__init__(); s.H=H; s.DH=D//H; s.T=T; s.trop=tropical; s.topk=topk
         Lin = DLin if tropical else FLin
         s.ln1=nn.LayerNorm(D); s.ln2=nn.LayerNorm(D)
         s.q=Lin(D,D); s.k=Lin(D,D); s.v=Lin(D,D); s.o=Lin(D,D)
@@ -57,9 +57,15 @@ class Block(nn.Module):
         else:
             score = (q@k.transpose(-2,-1))/math.sqrt(DH)             # dense dot-product
         score = score.masked_fill(s.cmask[:T,:T], float("-inf"))
-        if s.trop and hard:   # mult-free deploy: argmax-GATHER (copy winning position's whole V vector)
-            j = score.argmax(-1)                                     # B,H,T
-            y = torch.gather(v, 2, j.unsqueeze(-1).expand(-1,-1,-1,DH))
+        if s.trop and hard:   # mult-free deploy: (top-k) argmax-GATHER (copy winning positions' V vectors)
+            if s.topk<=1:
+                j = score.argmax(-1)                                 # B,H,T
+                y = torch.gather(v, 2, j.unsqueeze(-1).expand(-1,-1,-1,DH))
+            else:               # keep the k best keys, AVERAGE their V (mult-free for k=2^m: sum + shift)
+                idx = score.topk(s.topk, dim=-1).indices             # B,H,T,k
+                g = torch.gather(v.unsqueeze(3).expand(-1,-1,-1,s.topk,-1), 2,
+                                 idx.unsqueeze(-1).expand(-1,-1,-1,-1,DH))   # B,H,T,k,DH
+                y = g.mean(3)                                        # uniform blend over the k winners
         elif s.trop:          # tropical warm-train: tau-annealed soft blend (the one train-time multiply)
             w = (score/tau).softmax(-1); y = w@v
         else:                 # dense softmax attention (tau does NOT apply — score already /sqrt(DH))
@@ -72,11 +78,11 @@ class Block(nn.Module):
         return x
 
 class LM(nn.Module):
-    def __init__(s, V, D=128, H=4, L=3, T=128, tropical=False):
+    def __init__(s, V, D=128, H=4, L=3, T=128, tropical=False, topk=1):
         super().__init__(); s.trop=tropical
         Lin = DLin if tropical else FLin
         s.emb=nn.Embedding(V,D); s.pos=nn.Parameter(torch.zeros(1,T,D)); s.lnf=nn.LayerNorm(D)
-        s.blocks=nn.ModuleList([Block(D,H,T,tropical) for _ in range(L)])
+        s.blocks=nn.ModuleList([Block(D,H,T,tropical,topk) for _ in range(L)])
         s.head=Lin(D,V)
     def forward(s, x, tau=1.0, hard=False):
         h=s.emb(x)+s.pos[:,:x.shape[1]]
@@ -87,6 +93,7 @@ def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--D",type=int,default=128); ap.add_argument("--H",type=int,default=4)
     ap.add_argument("--L",type=int,default=3); ap.add_argument("--T",type=int,default=128)
+    ap.add_argument("--topk",type=int,default=1)
     ap.add_argument("--steps",type=int,default=5000); ap.add_argument("--bs",type=int,default=64)
     args=ap.parse_args()
     torch.manual_seed(0)
@@ -107,7 +114,7 @@ def main():
                 tot+=F.nll_loss(lp.reshape(-1,V),y.reshape(-1),reduction="sum").item()/math.log(2); npos+=y.numel()
         m.train(); return tot/npos
     def train(tropical):
-        m=LM(V,args.D,args.H,args.L,args.T,tropical).to(dev)
+        m=LM(V,args.D,args.H,args.L,args.T,tropical,args.topk).to(dev)
         opt=torch.optim.AdamW(m.parameters(),lr=3e-3,weight_decay=1e-4)
         warm=int(0.05*args.steps)
         def lr_at(i):  # linear warmup -> cosine decay (standard; prevents late transformer divergence)

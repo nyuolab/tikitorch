@@ -1,0 +1,12 @@
+{"probe": "substrate_ceiling", "input_dim": 784, "optimizer": "adam", "acc": 0.2875, "arch": "maxplus_dilation_300x3", "epochs": 10, "train_size": 6000, "seed": 0}
+{"probe": "substrate_ceiling", "input_dim": 784, "optimizer": "sign", "acc": 0.3335, "arch": "maxplus_dilation_300x3", "epochs": 10, "train_size": 6000, "seed": 0}
+{"probe": "substrate_ceiling", "input_dim": 196, "optimizer": "adam", "acc": 0.326, "arch": "maxplus_dilation_300x3", "epochs": 10, "train_size": 6000, "seed": 0}
+{"probe": "substrate_ceiling", "input_dim": 196, "optimizer": "sign", "acc": 0.3135, "arch": "maxplus_dilation_300x3", "epochs": 10, "train_size": 6000, "seed": 0}
+{"probe": "substrate_ceiling", "input_dim": 49, "optimizer": "adam", "acc": 0.3205, "arch": "maxplus_dilation_300x3", "epochs": 10, "train_size": 6000, "seed": 0}
+{"probe": "substrate_ceiling", "input_dim": 49, "optimizer": "sign", "acc": 0.3525, "arch": "maxplus_dilation_300x3", "epochs": 10, "train_size": 6000, "seed": 0}
+{"probe": "dense_ff_epochs", "epochs": 6, "acc": 0.276, "arch": "dense_FF_300x2_sumsq_goodness", "train_size": 6000, "seed": 0}
+{"probe": "dense_ff_epochs", "epochs": 20, "acc": 0.344, "arch": "dense_FF_300x2_sumsq_goodness", "train_size": 6000, "seed": 0}
+{"probe": "dense_ff_epochs", "epochs": 40, "acc": 0.358, "arch": "dense_FF_300x2_sumsq_goodness", "train_size": 6000, "seed": 0}
+{"probe": "scramble_linear_probe", "features": "ff_scramble_neg", "acc": 0.1035, "train_size": 6000, "note": "unsupervised real-vs-scramble features, linear probe", "seed": 0}
+{"probe": "scramble_linear_probe", "features": "raw_pixels_control", "acc": 0.8795, "train_size": 6000, "seed": 0}
+{"probe": "softtau_warmup", "acc": 0.117, "arch": "maxplus_TFF_500x2", "epochs": 6, "train_size": 6000, "note": "soft logsumexp anneal -> hard deploy", "seed": 0}

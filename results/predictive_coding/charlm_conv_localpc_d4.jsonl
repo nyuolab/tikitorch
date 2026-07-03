@@ -1,0 +1,4 @@
+{"mode": "bp_float", "val_bpc": 2.7885, "best_epoch": 29, "wall_s": 342.0, "seq": 128, "width": 128, "depth": 4, "lr": 0.0015}
+{"mode": "bp_dyadic", "val_bpc": 2.8586, "best_epoch": 29, "wall_s": 360.7, "seq": 128, "width": 128, "depth": 4, "lr": 0.0015}
+{"mode": "relax", "val_bpc": 2.9486, "best_epoch": 29, "wall_s": 662.7, "seq": 128, "width": 128, "depth": 4, "lr": 0.0005}
+{"mode": "relax_async", "val_bpc": 2.9771, "best_epoch": 27, "wall_s": 515.9, "seq": 128, "width": 128, "depth": 4, "lr": 0.0005}

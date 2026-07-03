@@ -7,6 +7,36 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Loss modules** — `tt.nn.TropicalCrossEntropyLoss` and `tt.nn.TropicalPerceptronLoss`,
+  thin `nn.Module` wrappers over the functional losses (cf. `torch.nn.CrossEntropyLoss`)
+  for users who want the loss in a config / `repr`-able. `softmax="lut"` keeps the CE
+  loss multiplier-free.
+- **`MIGRATION.md`** — side-by-side "your PyTorch loop → closed TikiTorch loop": the swap
+  table, the `set_tau` soft→hard curriculum, `assert_closed` as the new invariant, and
+  what intentionally differs. Canonical copy at `docs/guide/migration.md`.
+- **Guide docs** (`docs/guide/`, wired into the mkdocs nav) — Foundations, Why tropical
+  for ML/DL, Tropical geometry of neural nets, Beyond deep learning, Architecture &
+  diagrams, Choosing a model, Migrating from PyTorch, FAQ & troubleshooting.
+- **Notebooks 05 & 06** — `05_tropical_geometry` (linear regions, decision regions,
+  Newton polytopes via `tikitorch.geometry`) and `06_beyond_deep_learning` (shortest-path
+  DP as min-plus matmul; tropical k-means / SVM / PCA via `tikitorch.classical` /
+  `tikitorch.algorithmic`).
+- `dyadic_quantize` promoted to `tikitorch.nn.__all__` (already public and imported across
+  the codebase); new `tests/test_exports.py` guards `__all__` hygiene.
+- **Tropical Forward-Forward** — Hinton's Forward-Forward adapted to the tropical
+  substrate: a forward-only, backprop-free *local* learner whose whole training
+  step is verified multiplier-free (`tt.assert_no_multiply`). Closure-clean choices:
+  top-k goodness (not sum-of-squares), a hinge/margin local loss with a sign-gated
+  scatter gradient, subtract-the-max normalization, and a sign-only update.
+  Shipped as formal models `tt.models.TropicalForwardForward` (max-plus) and
+  `tt.models.DyadicForwardForward` (dyadic ±2^k — dense/additive, reaches ~0.92 on
+  MNIST vs ~0.23 for max-plus; the bottleneck is the max-plus primitive, not
+  closure). Core in `tikitorch/forward_forward.py` (substrate-pluggable
+  `TropicalFFLayer`, goodness fns, hinge/logistic loss, `TropicalFFTrainer`,
+  negative-data generators, goodness classifier); the models train via
+  `forward_forward_fit`, not `loss.backward()`. Experiments + honest report under
+  `results/forward_forward/` (`scripts/tropical_forward_forward.py`,
+  `tropical_ff_mnist_benchmark.py`, `tropical_ff_diagnostics.py`).
 - `scripts/build_fpga_local.sh` and an upgraded `examples/fpga_quickstart.py`:
   one command builds the LOCAL host-faithful bridge so `model.fpga()` binds and
   runs a real, multiplier-free (dsp=0) training step with no FPGA.

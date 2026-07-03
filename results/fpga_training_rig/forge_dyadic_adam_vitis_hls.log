@@ -1,0 +1,126 @@
+
+****** Vitis HLS - High-Level Synthesis from C, C++ and OpenCL v2024.1 (64-bit)
+  **** SW Build 5069499 on May 21 2024
+  **** IP Build 5075265 on Wed May 22 21:45:21 MDT 2024
+  **** SharedData Build 5076995 on Wed May 22 18:29:18 MDT 2024
+  **** Start of session at: Sat Jun 20 23:21:42 2026
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source /opt/Xilinx/Vitis_HLS/2024.1/scripts/vitis_hls/hls.tcl -notrace
+INFO: [HLS 200-10] For user 'root' on host 'ip-172-31-37-110.ec2.internal' (Linux_x86_64 version 5.15.0-1081-aws) on Sat Jun 20 23:21:57 UTC 2026
+INFO: [HLS 200-10] On os Ubuntu 20.04.6 LTS
+INFO: [HLS 200-10] In directory '/opt/tiki/tikitorch/hardware/hls/forge_kernels'
+WARNING: [HLS 200-2053] The vitis_hls executable is deprecated. Consider using vitis-run --mode hls --tcl
+Sourcing Tcl script 'synth_dyadic_adam.tcl'
+INFO: [HLS 200-1510] Running: open_project -reset forge_dyadic_adam_proj 
+INFO: [HLS 200-10] Creating and opening project '/opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj'.
+INFO: [HLS 200-1510] Running: add_files forge_dyadic_adam.cpp 
+INFO: [HLS 200-10] Adding design file 'forge_dyadic_adam.cpp' to the project
+INFO: [HLS 200-1510] Running: open_solution -reset solution1 
+INFO: [HLS 200-10] Creating and opening solution '/opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1'.
+INFO: [HLS 200-10] Cleaning up the solution database.
+INFO: [HLS 200-1505] Using default flow_target 'vivado'
+Resolution: For help on HLS 200-1505 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-1505.html
+INFO: [HLS 200-1510] Running: set_top forge_dyadic_adam 
+INFO: [HLS 200-1510] Running: set_part xcvu47p-fsvh2892-2L-e 
+INFO: [HLS 200-1611] Setting target device to 'xcvu47p-fsvh2892-2L-e'
+INFO: [HLS 200-1510] Running: create_clock -period 4.0 
+INFO: [SYN 201-201] Setting up clock 'default' with a period of 4ns.
+INFO: [HLS 200-1510] Running: csynth_design 
+INFO: [HLS 200-111] Finished File checks and directory preparation: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.07 seconds; current allocated memory: 222.414 MB.
+INFO: [HLS 200-10] Analyzing design file 'forge_dyadic_adam.cpp' ... 
+INFO: [HLS 200-111] Finished Source Code Analysis and Preprocessing: CPU user time: 2.67 seconds. CPU system time: 0.52 seconds. Elapsed time: 24.56 seconds; current allocated memory: 224.289 MB.
+INFO: [HLS 200-777] Using interface defaults for 'Vivado' flow target.
+INFO: [HLS 200-1995] There were 2,241 instructions in the design after the 'Compile/Link' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,975 instructions in the design after the 'Unroll/Inline (step 1)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,660 instructions in the design after the 'Unroll/Inline (step 2)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,595 instructions in the design after the 'Unroll/Inline (step 3)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,595 instructions in the design after the 'Unroll/Inline (step 4)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,531 instructions in the design after the 'Array/Struct (step 1)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,531 instructions in the design after the 'Array/Struct (step 2)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,531 instructions in the design after the 'Array/Struct (step 3)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,531 instructions in the design after the 'Array/Struct (step 4)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,533 instructions in the design after the 'Array/Struct (step 5)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,533 instructions in the design after the 'Performance (step 1)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,533 instructions in the design after the 'Performance (step 2)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,533 instructions in the design after the 'Performance (step 3)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,533 instructions in the design after the 'Performance (step 4)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,544 instructions in the design after the 'HW Transforms (step 1)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,548 instructions in the design after the 'HW Transforms (step 2)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_dyadic_adam_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 214-131] Inlining function 'dyad_exp(ap_int<32>)' into 'forge_dyadic_adam(int*)' (forge_dyadic_adam.cpp:100:24)
+WARNING: [HLS 214-386] A depth specification is required for MAXI interface port 'buffer' for cosimulation. (forge_dyadic_adam.cpp:62:0)
+INFO: [HLS 214-291] Loop 'LANE' is marked as complete unroll implied by the pipeline pragma (forge_dyadic_adam.cpp:86:7)
+INFO: [HLS 214-291] Loop 'PRIO' is marked as complete unroll implied by the pipeline pragma (forge_dyadic_adam.cpp:50:7)
+INFO: [HLS 214-186] Unrolling loop 'LANE' (forge_dyadic_adam.cpp:86:7) in function 'forge_dyadic_adam' completely with a factor of 16 (forge_dyadic_adam.cpp:62:0)
+INFO: [HLS 214-186] Unrolling loop 'PRIO' (forge_dyadic_adam.cpp:50:7) in function 'forge_dyadic_adam' completely with a factor of 31 (forge_dyadic_adam.cpp:62:0)
+INFO: [HLS 200-111] Finished Compiling Optimization and Transform: CPU user time: 2.88 seconds. CPU system time: 0.39 seconds. Elapsed time: 20.61 seconds; current allocated memory: 234.367 MB.
+INFO: [HLS 200-111] Finished Checking Pragmas: CPU user time: 0 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 234.367 MB.
+INFO: [HLS 200-10] Starting code transformations ...
+INFO: [HLS 200-111] Finished Standard Transforms: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 1.23 seconds; current allocated memory: 238.734 MB.
+INFO: [HLS 200-10] Checking synthesizability ...
+WARNING: [SYNCHK 200-23] forge_dyadic_adam.cpp:58: variable-indexed range selection may cause suboptimal QoR.
+INFO: [SYNCHK 200-10] 0 error(s), 1 warning(s).
+INFO: [HLS 200-111] Finished Checking Synthesizability: CPU user time: 0.09 seconds. CPU system time: 0 seconds. Elapsed time: 0.1 seconds; current allocated memory: 242.219 MB.
+INFO: [HLS 200-111] Finished Loop, function and other optimizations: CPU user time: 0.84 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.86 seconds; current allocated memory: 279.090 MB.
+INFO: [HLS 200-111] Finished Architecture Synthesis: CPU user time: 0.81 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.82 seconds; current allocated memory: 286.648 MB.
+INFO: [HLS 200-10] Starting hardware synthesis ...
+INFO: [HLS 200-10] Synthesizing 'forge_dyadic_adam' ...
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'forge_dyadic_adam_Pipeline_REGION' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'REGION'.
+WARNING: [HLS 200-885] The II Violation in module 'forge_dyadic_adam_Pipeline_REGION' (loop 'REGION'): Unable to schedule bus request operation ('g_word_req', forge_dyadic_adam.cpp:78) on port 'gmem' (forge_dyadic_adam.cpp:78) due to limited memory ports (II = 1). Please consider using a memory core with more ports or partitioning the array.
+Resolution: For help on HLS 200-885 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-885.html
+WARNING: [HLS 200-885] The II Violation in module 'forge_dyadic_adam_Pipeline_REGION' (loop 'REGION'): Unable to schedule bus request operation ('m_word_req', forge_dyadic_adam.cpp:79) on port 'gmem' (forge_dyadic_adam.cpp:79) due to limited memory ports (II = 2). Please consider using a memory core with more ports or partitioning the array.
+Resolution: For help on HLS 200-885 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-885.html
+WARNING: [HLS 200-885] The II Violation in module 'forge_dyadic_adam_Pipeline_REGION' (loop 'REGION'): Unable to schedule bus request operation ('v_word_req', forge_dyadic_adam.cpp:80) on port 'gmem' (forge_dyadic_adam.cpp:80) due to limited memory ports (II = 3). Please consider using a memory core with more ports or partitioning the array.
+Resolution: For help on HLS 200-885 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-885.html
+INFO: [HLS 200-1470] Pipelining result : Target II = 1, Final II = 4, Depth = 26, loop 'REGION'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 2.07 seconds. CPU system time: 0.03 seconds. Elapsed time: 2.38 seconds; current allocated memory: 310.516 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 1.02 seconds. CPU system time: 0.02 seconds. Elapsed time: 1.04 seconds; current allocated memory: 326.516 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'forge_dyadic_adam' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.42 seconds. CPU system time: 0 seconds. Elapsed time: 0.43 seconds; current allocated memory: 326.516 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 326.516 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'forge_dyadic_adam_Pipeline_REGION' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'forge_dyadic_adam_Pipeline_REGION' pipeline 'REGION' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'forge_dyadic_adam_Pipeline_REGION'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.53 seconds. CPU system time: 0 seconds. Elapsed time: 0.52 seconds; current allocated memory: 340.035 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'forge_dyadic_adam' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+WARNING: [RTGEN 206-101] Design contains AXI ports. Reset is fixed to synchronous and active low.
+INFO: [RTGEN 206-500] Setting interface mode on port 'forge_dyadic_adam/gmem' to 'm_axi'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'forge_dyadic_adam/buffer_r' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on function 'forge_dyadic_adam' to 's_axilite & ap_ctrl_hs'.
+INFO: [RTGEN 206-100] Bundling port 'buffer_r' to AXI-Lite port control.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'forge_dyadic_adam'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.9 seconds. CPU system time: 0.06 seconds. Elapsed time: 1.27 seconds; current allocated memory: 376.789 MB.
+INFO: [HLS 200-111] Finished Generating all RTL models: CPU user time: 0.21 seconds. CPU system time: 0 seconds. Elapsed time: 0.25 seconds; current allocated memory: 376.789 MB.
+INFO: [HLS 200-111] Finished Updating report files: CPU user time: 0.45 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.55 seconds; current allocated memory: 379.504 MB.
+INFO: [VHDL 208-304] Generating VHDL RTL for forge_dyadic_adam.
+INFO: [VLOG 209-307] Generating Verilog RTL for forge_dyadic_adam.
+INFO: [HLS 200-790] **** Loop Constraint Status: All loop constraints were NOT satisfied.
+INFO: [HLS 200-789] **** Estimated Fmax: 342.47 MHz
+INFO: [HLS 200-2161] Finished Command csynth_design Elapsed time: 00:00:54; Allocated memory: 157.090 MB.
+==== Synthesis report ====
+  forge_dyadic_adam_proj/solution1/syn/report/forge_dyadic_adam_csynth.rpt
+INFO: [HLS 200-112] Total CPU user time: 15.26 seconds. Total CPU system time: 1.39 seconds. Total elapsed time: 85.47 seconds; peak allocated memory: 379.504 MB.

@@ -633,3 +633,81 @@ def test_min_value_pull_masks_with_plus_inf():
     scores = torch.tensor([[[0., float("inf"), float("inf"), float("inf")]]])  # only key 0 valid
     out = F.tropical_value_pull_min(V, scores)
     torch.testing.assert_close(out[0, 0], V[0, 0])     # min over the single valid key
+
+
+# --- l1 attention score (-sum_d|Q-K|, dense gradient, multiply-free) -----------
+
+def test_l1_score_shape_sign_diag_and_dense_grad():
+    Q = torch.randn(3, 5, 6, requires_grad=True)
+    K = torch.randn(3, 5, 6, requires_grad=True)
+    s = F.tropical_l1_score(Q, K)
+    assert s.shape == (3, 5, 5)
+    assert (s <= 1e-6).all(), "l1 score = -sum|.| must be <= 0"
+    # self-scoring is 0 on the diagonal (Q==K).
+    diag = torch.diagonal(F.tropical_l1_score(Q, Q), dim1=-2, dim2=-1)
+    torch.testing.assert_close(diag, torch.zeros_like(diag))
+    # DENSE gradient: every input dim receives gradient (unlike l_inf's one dim).
+    s.sum().backward()
+    assert (Q.grad.abs() > 0).all() and (K.grad.abs() > 0).all()
+
+
+def test_l1_score_matches_reference():
+    Q = torch.randn(2, 4, 7); K = torch.randn(2, 6, 7)
+    ref = -(Q.unsqueeze(-2) - K.unsqueeze(-3)).abs().sum(-1)
+    torch.testing.assert_close(F.tropical_l1_score(Q, K), ref)
+
+
+# --- argmax-gather aggregation (deploy-pure limit of softmax attention) --------
+
+def test_value_gather_is_argmax_key_copy():
+    torch.manual_seed(0)
+    V = torch.randn(2, 6, 8); scores = torch.randn(2, 5, 6)
+    out = F.tropical_value_gather(V, scores)
+    assert out.shape == (2, 5, 8)
+    jstar = scores.argmax(dim=-1)                       # (2,5)
+    ref = torch.gather(V, -2, jstar.unsqueeze(-1).expand(2, 5, 8))
+    torch.testing.assert_close(out, ref)
+    # ONE key per query: the whole row equals some V row (shared across dims),
+    # unlike the per-dim max-plus matmul value_pull.
+    for b in range(2):
+        for i in range(5):
+            assert torch.equal(out[b, i], V[b, jstar[b, i]])
+
+
+def test_softmax_value_gather_anneals_to_hard_gather():
+    torch.manual_seed(0)
+    V = torch.randn(2, 6, 8); scores = torch.randn(2, 5, 6)
+    hard = F.tropical_value_gather(V, scores)
+    soft = F.tropical_softmax_value_gather(V, scores, tau=1e-4)
+    torch.testing.assert_close(soft, hard, atol=1e-3, rtol=0)
+
+
+def test_value_gather_grad_flows_to_values_only():
+    # Deploy op: gradient passes to the gathered V rows; argmax blocks score grad.
+    V = torch.randn(2, 6, 8, requires_grad=True)
+    scores = torch.randn(2, 5, 6, requires_grad=True)
+    F.tropical_value_gather(V, scores).sum().backward()
+    assert torch.isfinite(V.grad).all() and V.grad.abs().sum() > 0
+    assert scores.grad is None or scores.grad.abs().sum() == 0
+
+
+def test_softmax_value_gather_grad_is_dense():
+    # Train-time relaxation: BOTH V and scores get gradient (the @V softmax path).
+    V = torch.randn(2, 6, 8, requires_grad=True)
+    scores = torch.randn(2, 5, 6, requires_grad=True)
+    F.tropical_softmax_value_gather(V, scores, tau=1.0).sum().backward()
+    assert (scores.grad.abs() > 0).any() and torch.isfinite(V.grad).all()
+
+
+def test_attention_l1_gather_runs_and_closed_at_deploy():
+    # Fully deploy-pure attention: l1 score + argmax-gather at tau=0. Must be
+    # multiplier-free (no nn.Linear projections in the default closure config) and
+    # differentiable end-to-end.
+    from tikitorch.nn import TropicalAttention
+    from tikitorch.audit import find_closure_violations
+    a = TropicalAttention(d_model=16, n_heads=2, tau=0.0,
+                          score_variant="l1", agg_variant="gather")
+    assert find_closure_violations(a) == []
+    x = torch.randn(2, 5, 16, requires_grad=True)
+    a(x, causal_mask=True).sum().backward()
+    assert torch.isfinite(x.grad).all()

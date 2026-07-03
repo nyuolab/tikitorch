@@ -30,5 +30,21 @@ loss.backward(); opt.step(); opt.zero_grad()
 - **Contributing & the closure invariant:**
   [CONTRIBUTING](https://github.com/nyuolab/tikitorch/blob/main/CONTRIBUTING.md).
 
+## Start here
+
+New to TikiTorch or to tropical algebra? The **Guide** in the navigation is the
+teaching path:
+
+- **[Foundations](guide/foundations.md)** — the tropical (min/max-plus) semiring, by hand.
+- **[Why tropical for ML/DL](guide/why-tropical-ml.md)** — multiplier-free hardware, the
+  routing inductive bias, and the honest closure-penalty trade-off.
+- **[Tropical geometry of neural nets](guide/tropical-geometry.md)** — nets as tropical
+  rational maps; linear regions and decision boundaries.
+- **[Beyond deep learning](guide/beyond-deep-learning.md)** — shortest-path DP, k-means,
+  SVM as the *same* min-plus operation.
+- **[Migrating from PyTorch](guide/migration.md)** · **[Choosing a model](guide/choosing-a-model.md)**
+  · **[Architecture](guide/architecture.md)** · **[FAQ](guide/faq.md)**
+- **[Tutorials (notebooks)](guide/notebooks.md)** — six runnable Colab notebooks.
+
 Browse the **API reference** in the navigation — it is generated from the
 in-source docstrings, so it always matches the code.

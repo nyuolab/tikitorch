@@ -1,0 +1,750 @@
+{"arm": "frozen", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.9108, "bpc_shakespeare": 5.4557, "bpc_docs": 6.6438, "bpc_code": 7.3597, "updates": 0, "fwd_eq": 0}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7603, "z": 26.099}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 5.5543, "z": 0.773}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 4.6569, "z": -0.281}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 4.9829, "z": -0.384}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 3.8007, "z": -2.15}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 5.0986, "z": -0.512}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 5.3159, "z": -0.103}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 4.9633, "z": -0.517}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 5.0292, "z": -0.431}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 5.6176, "z": 0.565}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 4.6305, "z": -1.197}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 6.0199, "z": 1.701}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 4.7688, "z": -0.866}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 4.3774, "z": -1.471}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 5.2227, "z": 0.604}
+{"arm": "frozen", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 2.9108, "bpc_shakespeare": 5.4557, "bpc_docs": 6.6438, "bpc_code": 7.3597, "updates": 0, "fwd_eq": 1500}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.1418, "z": 4.94}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 5.4191, "z": -0.382}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 5.9269, "z": -0.304}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 7.0688, "z": 1.025}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 5.1936, "z": -1.113}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 6.5655, "z": 0.381}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 7.3839, "z": 0.823}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 5.5452, "z": -0.726}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 5.6273, "z": -0.532}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 6.1826, "z": -0.177}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 7.9933, "z": 1.301}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 7.0239, "z": 0.59}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 7.1042, "z": 0.549}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 7.1883, "z": 0.266}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 5.7453, "z": -1.029}
+{"arm": "frozen", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 2.9108, "bpc_shakespeare": 5.4557, "bpc_docs": 6.6438, "bpc_code": 7.3597, "updates": 0, "fwd_eq": 3000}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 4.9933, "z": -1.353}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 10.1046, "z": 1.411}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 7.4455, "z": -0.258}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 8.6239, "z": 0.332}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 7.6575, "z": -0.364}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 10.2425, "z": 1.714}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 8.9269, "z": 0.621}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 6.9215, "z": -0.736}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 6.9076, "z": -0.825}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 6.2383, "z": -1.297}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 4.8348, "z": -2.305}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 7.6387, "z": -0.464}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 6.5008, "z": -1.25}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 8.4419, "z": 0.266}
+{"arm": "frozen", "seed": 0, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 7.6875, "z": -0.329}
+{"arm": "frozen", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 2.9108, "bpc_shakespeare": 5.4557, "bpc_docs": 6.6438, "bpc_code": 7.3597, "updates": 0, "fwd_eq": 4500}
+{"arm": "frozen", "seed": 0, "event": "done", "updates": 0, "fwd_eq": 4500, "gate_hits": 0, "gate_total": 0, "wall_s": 15.9}
+{"arm": "cascade", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.9108, "bpc_shakespeare": 5.4557, "bpc_docs": 6.6438, "bpc_code": 7.3597, "updates": 0, "fwd_eq": 0}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7603, "z": 26.099}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.8792, "z": 0.344}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.4091, "z": -0.42}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.1755, "z": -0.956}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.7841, "z": -1.981}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 2.9919, "z": -0.783}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.0782, "z": 0.088}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.0345, "z": -0.011}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.7918, "z": -0.645}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.6171, "z": -1.28}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.8395, "z": 0.267}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.2871, "z": -2.426}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 2.9873, "z": 1.069}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 2.9799, "z": 1.012}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.8266, "z": 0.403}
+{"arm": "cascade", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.2143, "bpc_shakespeare": 2.9845, "bpc_docs": 6.8058, "bpc_code": 7.4799, "updates": 600, "fwd_eq": 3300}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.0625, "z": 26.627}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.7332, "z": -0.089}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.535, "z": -0.611}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 4.1434, "z": 0.54}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.2211, "z": -0.59}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.52, "z": 0.141}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.3443, "z": 1.335}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.6835, "z": 0.268}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.2703, "z": -0.342}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 3.9138, "z": 1.494}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.1255, "z": -0.428}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.716, "z": 1.959}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.3732, "z": -0.012}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.4476, "z": -0.289}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.3518, "z": -0.826}
+{"arm": "cascade", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 3.297, "bpc_shakespeare": 3.5904, "bpc_docs": 3.4397, "bpc_code": 3.5869, "updates": 1200, "fwd_eq": 6600}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.3569, "z": -0.632}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.5481, "z": -0.42}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.0159, "z": -1.063}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.3403, "z": -0.012}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.5098, "z": -1.528}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 4.0902, "z": 2.28}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.2676, "z": 0.767}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 2.8717, "z": -0.194}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 1.9129, "z": -2.322}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.2258, "z": 0.601}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.1069, "z": -0.22}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.5916, "z": -0.9}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 2.8092, "z": -0.063}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.3425, "z": 1.009}
+{"arm": "cascade", "seed": 0, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.1644, "z": 0.661}
+{"arm": "cascade", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 3.5944, "bpc_shakespeare": 3.9117, "bpc_docs": 3.6921, "bpc_code": 2.8942, "updates": 1800, "fwd_eq": 9900}
+{"arm": "cascade", "seed": 0, "event": "done", "updates": 1800, "fwd_eq": 9900, "gate_hits": 0, "gate_total": 0, "wall_s": 47.2}
+{"arm": "rehearsal", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.9108, "bpc_shakespeare": 5.4557, "bpc_docs": 6.6438, "bpc_code": 7.3597, "updates": 0, "fwd_eq": 0}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7603, "z": 26.099}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.8758, "z": 0.327}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.4015, "z": -0.435}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.187, "z": -0.923}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.7713, "z": -2.003}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 2.9913, "z": -0.753}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.062, "z": -0.028}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.0449, "z": -0.031}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.8354, "z": -0.564}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.6729, "z": -1.106}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.8892, "z": 0.374}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.3105, "z": -2.437}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 3.0435, "z": 1.168}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 3.0303, "z": 1.059}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.91, "z": 0.611}
+{"arm": "rehearsal", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.2281, "bpc_shakespeare": 2.9856, "bpc_docs": 6.9781, "bpc_code": 7.6382, "updates": 600, "fwd_eq": 3300}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.4077, "z": 27.743}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.7727, "z": -0.157}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.5864, "z": -0.63}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 4.2863, "z": 0.592}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.2217, "z": -0.682}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.6197, "z": 0.196}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.4104, "z": 1.305}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.6584, "z": 0.054}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.3525, "z": -0.297}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 4.0735, "z": 1.669}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.1513, "z": -0.608}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.7161, "z": 1.627}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.4528, "z": -0.071}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.5506, "z": -0.254}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.4061, "z": -0.886}
+{"arm": "rehearsal", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 3.3304, "bpc_shakespeare": 3.4193, "bpc_docs": 3.5188, "bpc_code": 3.6785, "updates": 1200, "fwd_eq": 6600}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.4322, "z": -0.62}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.7057, "z": -0.25}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.1081, "z": -1.0}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.4225, "z": -0.006}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.6977, "z": -1.248}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 4.0987, "z": 1.981}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.337, "z": 0.723}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 2.9565, "z": -0.2}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 1.9966, "z": -2.266}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.2444, "z": 0.425}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.1451, "z": -0.316}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.6861, "z": -0.907}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 2.9941, "z": 0.086}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.3226, "z": 0.752}
+{"arm": "rehearsal", "seed": 0, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.4089, "z": 0.863}
+{"arm": "rehearsal", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 3.7693, "bpc_shakespeare": 3.9271, "bpc_docs": 3.8222, "bpc_code": 3.05, "updates": 1800, "fwd_eq": 9900}
+{"arm": "rehearsal", "seed": 0, "event": "done", "updates": 1800, "fwd_eq": 9900, "gate_hits": 0, "gate_total": 0, "wall_s": 41.3}
+{"arm": "two_speed_casc", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.9108, "bpc_shakespeare": 5.4557, "bpc_docs": 6.6438, "bpc_code": 7.3597, "updates": 0, "fwd_eq": 0}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7603, "z": 26.099}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.5926, "z": 0.298}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.3145, "z": -0.225}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.1578, "z": -0.775}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.8844, "z": -1.923}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 3.1223, "z": -0.554}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.1838, "z": 0.142}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.0844, "z": -0.4}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.9696, "z": -0.575}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.9365, "z": -0.416}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.9853, "z": 0.325}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.4843, "z": -2.556}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 2.957, "z": 0.584}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 2.973, "z": 0.712}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.8296, "z": -0.02}
+{"arm": "two_speed_casc", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.1712, "bpc_shakespeare": 3.0081, "bpc_docs": 6.4428, "bpc_code": 7.0622, "updates": 572, "fwd_eq": 3216}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 6.405, "z": 28.487}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.5163, "z": -0.125}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.5183, "z": -0.466}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 4.0103, "z": 0.603}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.2753, "z": -0.538}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.6918, "z": 0.57}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.1741, "z": 1.265}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.8085, "z": 0.58}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.4649, "z": -0.168}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 3.9725, "z": 1.841}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.262, "z": -0.611}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.7112, "z": 1.725}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.4433, "z": -0.112}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.4551, "z": -0.394}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.5254, "z": -0.623}
+{"arm": "two_speed_casc", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": 3.2595, "bpc_shakespeare": 3.5084, "bpc_docs": 3.4761, "bpc_code": 3.6565, "updates": 1157, "fwd_eq": 6471}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.3892, "z": -0.849}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.6785, "z": -0.282}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.2296, "z": -1.052}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.3968, "z": -0.221}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.8418, "z": -1.362}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 3.826, "z": 1.415}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.2172, "z": 0.149}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 3.153, "z": 0.043}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 2.1678, "z": -2.495}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.1408, "z": 0.158}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.3166, "z": -0.044}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.7246, "z": -1.276}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 3.002, "z": -0.18}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.1605, "z": 0.414}
+{"arm": "two_speed_casc", "seed": 0, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.2087, "z": 0.539}
+{"arm": "two_speed_casc", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": 3.4754, "bpc_shakespeare": 3.711, "bpc_docs": 3.6181, "bpc_code": 3.0936, "updates": 1742, "fwd_eq": 9726}
+{"arm": "two_speed_casc", "seed": 0, "event": "done", "updates": 1742, "fwd_eq": 9726, "gate_hits": 1337, "gate_total": 4500, "wall_s": 39.6}
+{"arm": "two_speed_iter", "seed": 0, "event": "transfer", "after": "base", "bpc_wiki": 2.9108, "bpc_shakespeare": 5.4557, "bpc_docs": 6.6438, "bpc_code": 7.3597, "updates": 0, "fwd_eq": 0}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7603, "z": 26.099}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.5926, "z": 0.298}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "transfer", "after": "shakespeare", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 237, "fwd_eq": 6531}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "transfer", "after": "docs", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 372, "fwd_eq": 12756}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 0, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 0, "event": "transfer", "after": "code", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 507, "fwd_eq": 18981}
+{"arm": "two_speed_iter", "seed": 0, "event": "done", "updates": 507, "fwd_eq": 18981, "gate_hits": 102, "gate_total": 4500, "wall_s": 60.1}
+{"arm": "frozen", "seed": 1, "event": "transfer", "after": "base", "bpc_wiki": 2.8927, "bpc_shakespeare": 5.4151, "bpc_docs": 6.7379, "bpc_code": 7.5111, "updates": 0, "fwd_eq": 0}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.5294, "z": 23.554}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 5.5362, "z": 0.776}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 4.6373, "z": -0.279}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 4.8922, "z": -0.453}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 3.8399, "z": -2.095}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 5.0194, "z": -0.598}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 5.2696, "z": -0.157}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 4.8044, "z": -0.756}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 5.0626, "z": -0.285}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 5.4859, "z": 0.37}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 4.6958, "z": -1.003}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 5.9294, "z": 1.542}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 4.7871, "z": -0.797}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 4.3328, "z": -1.513}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 5.1115, "z": 0.368}
+{"arm": "frozen", "seed": 1, "event": "transfer", "after": "shakespeare", "bpc_wiki": 2.8927, "bpc_shakespeare": 5.4151, "bpc_docs": 6.7379, "bpc_code": 7.5111, "updates": 0, "fwd_eq": 1500}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.2447, "z": 5.07}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 5.5686, "z": -0.268}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 6.0098, "z": -0.269}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 7.0524, "z": 0.908}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 5.1592, "z": -1.155}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 6.5081, "z": 0.236}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 7.3856, "z": 0.734}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 5.6005, "z": -0.67}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 5.7021, "z": -0.477}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 6.2146, "z": -0.198}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 8.2482, "z": 1.341}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 6.9916, "z": 0.48}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 7.2428, "z": 0.604}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 7.0626, "z": 0.1}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 5.7664, "z": -1.009}
+{"arm": "frozen", "seed": 1, "event": "transfer", "after": "docs", "bpc_wiki": 2.8927, "bpc_shakespeare": 5.4151, "bpc_docs": 6.7379, "bpc_code": 7.5111, "updates": 0, "fwd_eq": 3000}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 5.0245, "z": -1.339}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 10.2155, "z": 1.343}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 7.4157, "z": -0.317}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 8.6519, "z": 0.253}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 8.0717, "z": -0.152}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 10.6863, "z": 1.857}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 9.0769, "z": 0.583}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 7.0115, "z": -0.791}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 7.2316, "z": -0.667}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 6.237, "z": -1.342}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 4.9101, "z": -2.249}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 7.9485, "z": -0.336}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 6.6754, "z": -1.185}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 8.5125, "z": 0.17}
+{"arm": "frozen", "seed": 1, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 7.8088, "z": -0.357}
+{"arm": "frozen", "seed": 1, "event": "transfer", "after": "code", "bpc_wiki": 2.8927, "bpc_shakespeare": 5.4151, "bpc_docs": 6.7379, "bpc_code": 7.5111, "updates": 0, "fwd_eq": 4500}
+{"arm": "frozen", "seed": 1, "event": "done", "updates": 0, "fwd_eq": 4500, "gate_hits": 0, "gate_total": 0, "wall_s": 17.7}
+{"arm": "cascade", "seed": 1, "event": "transfer", "after": "base", "bpc_wiki": 2.8927, "bpc_shakespeare": 5.4151, "bpc_docs": 6.7379, "bpc_code": 7.5111, "updates": 0, "fwd_eq": 0}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.5294, "z": 23.554}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.8241, "z": 0.337}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.4003, "z": -0.371}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.1785, "z": -0.868}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.809, "z": -1.816}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 2.9376, "z": -0.925}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.0426, "z": -0.03}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.0103, "z": -0.104}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.7775, "z": -0.746}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.6417, "z": -1.106}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.8216, "z": 0.173}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.2744, "z": -2.507}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 2.986, "z": 1.054}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 2.9265, "z": 0.733}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.8338, "z": 0.443}
+{"arm": "cascade", "seed": 1, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.2358, "bpc_shakespeare": 3.0086, "bpc_docs": 6.855, "bpc_code": 7.694, "updates": 600, "fwd_eq": 3300}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.0665, "z": 26.021}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.8112, "z": -0.012}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.5336, "z": -0.611}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 4.1263, "z": 0.519}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.1871, "z": -0.604}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.546, "z": 0.228}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.331, "z": 1.305}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.6944, "z": 0.288}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.3071, "z": -0.228}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 3.9798, "z": 1.691}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.056, "z": -0.663}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.6104, "z": 1.57}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.4222, "z": 0.101}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.5107, "z": -0.158}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.3721, "z": -0.816}
+{"arm": "cascade", "seed": 1, "event": "transfer", "after": "docs", "bpc_wiki": 3.3054, "bpc_shakespeare": 3.5821, "bpc_docs": 3.4706, "bpc_code": 3.6723, "updates": 1200, "fwd_eq": 6600}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.3539, "z": -0.687}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.5338, "z": -0.507}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.0129, "z": -1.129}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.3409, "z": -0.024}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.5243, "z": -1.506}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 4.068, "z": 2.263}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.2604, "z": 0.745}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 2.8487, "z": -0.231}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 1.9038, "z": -2.282}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.2561, "z": 0.674}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.0873, "z": -0.246}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.4878, "z": -1.111}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 2.8172, "z": -0.036}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.3926, "z": 1.061}
+{"arm": "cascade", "seed": 1, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.1845, "z": 0.686}
+{"arm": "cascade", "seed": 1, "event": "transfer", "after": "code", "bpc_wiki": 3.6469, "bpc_shakespeare": 4.0062, "bpc_docs": 3.7435, "bpc_code": 2.9362, "updates": 1800, "fwd_eq": 9900}
+{"arm": "cascade", "seed": 1, "event": "done", "updates": 1800, "fwd_eq": 9900, "gate_hits": 0, "gate_total": 0, "wall_s": 43.0}
+{"arm": "rehearsal", "seed": 1, "event": "transfer", "after": "base", "bpc_wiki": 2.8927, "bpc_shakespeare": 5.4151, "bpc_docs": 6.7379, "bpc_code": 7.5111, "updates": 0, "fwd_eq": 0}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.5294, "z": 23.554}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.7948, "z": 0.286}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.4218, "z": -0.33}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.1678, "z": -0.9}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.8534, "z": -1.656}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 2.9465, "z": -0.885}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.0531, "z": -0.002}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.0316, "z": -0.034}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.805, "z": -0.678}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.6782, "z": -1.071}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.9024, "z": 0.461}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.3654, "z": -2.25}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 3.0307, "z": 1.129}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 2.9535, "z": 0.733}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.8812, "z": 0.527}
+{"arm": "rehearsal", "seed": 1, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.254, "bpc_shakespeare": 3.026, "bpc_docs": 7.1945, "bpc_code": 7.9255, "updates": 600, "fwd_eq": 3300}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.3178, "z": 26.785}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.8134, "z": -0.12}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.6085, "z": -0.594}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 4.2341, "z": 0.498}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.2592, "z": -0.641}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.6134, "z": 0.219}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.4466, "z": 1.345}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.7864, "z": 0.333}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.3682, "z": -0.261}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 4.0477, "z": 1.558}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.1859, "z": -0.516}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.7195, "z": 1.523}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.5096, "z": 0.015}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.6622, "z": -0.006}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.437, "z": -0.867}
+{"arm": "rehearsal", "seed": 1, "event": "transfer", "after": "docs", "bpc_wiki": 3.325, "bpc_shakespeare": 3.4774, "bpc_docs": 3.5591, "bpc_code": 3.723, "updates": 1200, "fwd_eq": 6600}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.4883, "z": -0.529}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.5968, "z": -0.504}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.1556, "z": -0.904}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.4135, "z": -0.043}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.562, "z": -1.517}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 4.1254, "z": 2.036}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.3387, "z": 0.69}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 2.9471, "z": -0.227}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 1.9681, "z": -2.359}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.2664, "z": 0.457}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.2326, "z": -0.165}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.6097, "z": -1.055}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 3.0253, "z": 0.131}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.5873, "z": 1.135}
+{"arm": "rehearsal", "seed": 1, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.3539, "z": 0.725}
+{"arm": "rehearsal", "seed": 1, "event": "transfer", "after": "code", "bpc_wiki": 3.8237, "bpc_shakespeare": 4.0356, "bpc_docs": 3.8495, "bpc_code": 3.0715, "updates": 1800, "fwd_eq": 9900}
+{"arm": "rehearsal", "seed": 1, "event": "done", "updates": 1800, "fwd_eq": 9900, "gate_hits": 0, "gate_total": 0, "wall_s": 43.9}
+{"arm": "two_speed_casc", "seed": 1, "event": "transfer", "after": "base", "bpc_wiki": 2.8927, "bpc_shakespeare": 5.4151, "bpc_docs": 6.7379, "bpc_code": 7.5111, "updates": 0, "fwd_eq": 0}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.5294, "z": 23.554}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.5363, "z": 0.282}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.2958, "z": -0.188}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.1468, "z": -0.718}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.9238, "z": -1.691}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 3.0928, "z": -0.67}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.169, "z": 0.149}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.0919, "z": -0.267}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.9778, "z": -0.487}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.8859, "z": -0.74}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.9602, "z": 0.205}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.5231, "z": -2.34}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 2.9665, "z": 0.633}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 2.9208, "z": 0.329}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.8683, "z": 0.218}
+{"arm": "two_speed_casc", "seed": 1, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.1485, "bpc_shakespeare": 3.0237, "bpc_docs": 6.5277, "bpc_code": 7.2851, "updates": 572, "fwd_eq": 3216}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 6.5185, "z": 28.812}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.5993, "z": -0.031}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.5028, "z": -0.502}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 3.9866, "z": 0.548}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.2567, "z": -0.529}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.7475, "z": 0.749}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.1642, "z": 1.238}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.7968, "z": 0.561}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.4915, "z": -0.043}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 4.0264, "z": 2.057}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.2165, "z": -0.821}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.6877, "z": 1.611}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.5082, "z": 0.062}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.4731, "z": -0.431}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.5763, "z": -0.601}
+{"arm": "two_speed_casc", "seed": 1, "event": "transfer", "after": "docs", "bpc_wiki": 3.2679, "bpc_shakespeare": 3.537, "bpc_docs": 3.5263, "bpc_code": 3.7643, "updates": 1157, "fwd_eq": 6471}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.3382, "z": -1.069}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.7272, "z": -0.288}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.3029, "z": -0.934}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.4702, "z": -0.098}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.8796, "z": -1.322}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 3.8441, "z": 1.333}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.3552, "z": 0.442}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 3.0955, "z": -0.198}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 2.2042, "z": -2.551}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.2277, "z": 0.301}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.3917, "z": 0.091}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.7552, "z": -1.218}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 2.9817, "z": -0.241}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.2027, "z": 0.467}
+{"arm": "two_speed_casc", "seed": 1, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.2787, "z": 0.661}
+{"arm": "two_speed_casc", "seed": 1, "event": "transfer", "after": "code", "bpc_wiki": 3.4681, "bpc_shakespeare": 3.7369, "bpc_docs": 3.6483, "bpc_code": 3.1135, "updates": 1742, "fwd_eq": 9726}
+{"arm": "two_speed_casc", "seed": 1, "event": "done", "updates": 1742, "fwd_eq": 9726, "gate_hits": 1337, "gate_total": 4500, "wall_s": 42.1}
+{"arm": "two_speed_iter", "seed": 1, "event": "transfer", "after": "base", "bpc_wiki": 2.8927, "bpc_shakespeare": 5.4151, "bpc_docs": 6.7379, "bpc_code": 7.5111, "updates": 0, "fwd_eq": 0}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.5294, "z": 23.554}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.5363, "z": 0.282}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "transfer", "after": "shakespeare", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 236, "fwd_eq": 6528}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "transfer", "after": "docs", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 371, "fwd_eq": 12753}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 0, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 1, "event": "transfer", "after": "code", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 506, "fwd_eq": 18978}
+{"arm": "two_speed_iter", "seed": 1, "event": "done", "updates": 506, "fwd_eq": 18978, "gate_hits": 101, "gate_total": 4500, "wall_s": 64.2}
+{"arm": "frozen", "seed": 2, "event": "transfer", "after": "base", "bpc_wiki": 2.9, "bpc_shakespeare": 5.503, "bpc_docs": 6.7712, "bpc_code": 7.533, "updates": 0, "fwd_eq": 0}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7389, "z": 25.481}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 5.7779, "z": 0.847}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 4.6495, "z": -0.343}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 4.9945, "z": -0.437}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 3.7819, "z": -2.18}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 5.1644, "z": -0.511}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 5.3427, "z": -0.179}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 4.8938, "z": -0.708}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 5.059, "z": -0.44}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 5.6326, "z": 0.528}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 4.6285, "z": -1.274}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 6.1833, "z": 1.934}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 4.7701, "z": -0.95}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 4.4255, "z": -1.417}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 5.3792, "z": 0.819}
+{"arm": "frozen", "seed": 2, "event": "transfer", "after": "shakespeare", "bpc_wiki": 2.9, "bpc_shakespeare": 5.503, "bpc_docs": 6.7712, "bpc_code": 7.533, "updates": 0, "fwd_eq": 1500}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.2976, "z": 4.944}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 5.494, "z": -0.411}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 6.1457, "z": -0.212}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 7.1445, "z": 0.922}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 5.2187, "z": -1.231}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 6.647, "z": 0.304}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 7.4363, "z": 0.741}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 5.675, "z": -0.71}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 5.6707, "z": -0.594}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 6.28, "z": -0.201}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 8.1645, "z": 1.317}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 6.9907, "z": 0.455}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 7.3304, "z": 0.657}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 7.2015, "z": 0.212}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 5.8199, "z": -1.003}
+{"arm": "frozen", "seed": 2, "event": "transfer", "after": "docs", "bpc_wiki": 2.9, "bpc_shakespeare": 5.503, "bpc_docs": 6.7712, "bpc_code": 7.533, "updates": 0, "fwd_eq": 3000}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 5.192, "z": -1.233}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 10.1884, "z": 1.334}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 7.5229, "z": -0.298}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 8.4803, "z": 0.135}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 7.7129, "z": -0.427}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 10.4114, "z": 1.658}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 9.2957, "z": 0.748}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 7.0378, "z": -0.725}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 6.8631, "z": -0.935}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 6.2902, "z": -1.305}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 5.0476, "z": -2.204}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 7.9187, "z": -0.369}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 6.5353, "z": -1.309}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 8.6085, "z": 0.231}
+{"arm": "frozen", "seed": 2, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 7.947, "z": -0.235}
+{"arm": "frozen", "seed": 2, "event": "transfer", "after": "code", "bpc_wiki": 2.9, "bpc_shakespeare": 5.503, "bpc_docs": 6.7712, "bpc_code": 7.533, "updates": 0, "fwd_eq": 4500}
+{"arm": "frozen", "seed": 2, "event": "done", "updates": 0, "fwd_eq": 4500, "gate_hits": 0, "gate_total": 0, "wall_s": 16.6}
+{"arm": "cascade", "seed": 2, "event": "transfer", "after": "base", "bpc_wiki": 2.9, "bpc_shakespeare": 5.503, "bpc_docs": 6.7712, "bpc_code": 7.533, "updates": 0, "fwd_eq": 0}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7389, "z": 25.481}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.9062, "z": 0.394}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.393, "z": -0.403}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.1538, "z": -0.91}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.7694, "z": -1.884}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 2.9477, "z": -0.788}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.0594, "z": 0.14}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.0232, "z": 0.057}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.7778, "z": -0.649}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.6269, "z": -1.193}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.8681, "z": 0.453}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.2751, "z": -2.442}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 2.9969, "z": 1.097}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 2.9625, "z": 0.89}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.8168, "z": 0.345}
+{"arm": "cascade", "seed": 2, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.2591, "bpc_shakespeare": 3.0019, "bpc_docs": 6.8208, "bpc_code": 7.4242, "updates": 600, "fwd_eq": 3300}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.0923, "z": 26.541}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.7521, "z": -0.068}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.4884, "z": -0.667}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 4.0667, "z": 0.432}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.1648, "z": -0.638}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.4867, "z": 0.101}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.2728, "z": 1.198}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.6472, "z": 0.194}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.2482, "z": -0.363}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 3.9039, "z": 1.383}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.0649, "z": -0.635}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.6983, "z": 1.861}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.4107, "z": 0.053}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.5388, "z": -0.073}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.3668, "z": -0.82}
+{"arm": "cascade", "seed": 2, "event": "transfer", "after": "docs", "bpc_wiki": 3.2958, "bpc_shakespeare": 3.598, "bpc_docs": 3.4494, "bpc_code": 3.6046, "updates": 1200, "fwd_eq": 6600}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.3877, "z": -0.585}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.5707, "z": -0.382}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.0171, "z": -1.057}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.3605, "z": 0.045}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.5089, "z": -1.492}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 4.0283, "z": 2.142}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.215, "z": 0.659}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 2.8399, "z": -0.288}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 1.917, "z": -2.268}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.2464, "z": 0.643}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.1076, "z": -0.233}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.4521, "z": -1.204}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 2.8233, "z": -0.031}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.357, "z": 1.035}
+{"arm": "cascade", "seed": 2, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.2093, "z": 0.742}
+{"arm": "cascade", "seed": 2, "event": "transfer", "after": "code", "bpc_wiki": 3.5978, "bpc_shakespeare": 3.9569, "bpc_docs": 3.703, "bpc_code": 2.9129, "updates": 1800, "fwd_eq": 9900}
+{"arm": "cascade", "seed": 2, "event": "done", "updates": 1800, "fwd_eq": 9900, "gate_hits": 0, "gate_total": 0, "wall_s": 41.2}
+{"arm": "rehearsal", "seed": 2, "event": "transfer", "after": "base", "bpc_wiki": 2.9, "bpc_shakespeare": 5.503, "bpc_docs": 6.7712, "bpc_code": 7.533, "updates": 0, "fwd_eq": 0}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7389, "z": 25.481}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.9084, "z": 0.379}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.3703, "z": -0.443}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.1143, "z": -1.007}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.7666, "z": -1.883}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 2.9461, "z": -0.783}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.071, "z": 0.191}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.0367, "z": 0.092}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.8409, "z": -0.393}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.666, "z": -1.068}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.9021, "z": 0.515}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.3404, "z": -2.296}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 3.0146, "z": 1.063}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 3.0282, "z": 1.031}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.8932, "z": 0.542}
+{"arm": "rehearsal", "seed": 2, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.2995, "bpc_shakespeare": 3.073, "bpc_docs": 7.0469, "bpc_code": 7.6953, "updates": 600, "fwd_eq": 3300}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 7.3694, "z": 28.18}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.7434, "z": -0.174}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.536, "z": -0.674}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 4.1805, "z": 0.443}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.2259, "z": -0.647}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.4962, "z": -0.038}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.3383, "z": 1.149}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.75, "z": 0.255}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.3554, "z": -0.265}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 4.0646, "z": 1.586}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.2694, "z": -0.268}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.7627, "z": 1.716}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.5194, "z": 0.076}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.6419, "z": -0.064}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.3931, "z": -0.944}
+{"arm": "rehearsal", "seed": 2, "event": "transfer", "after": "docs", "bpc_wiki": 3.3116, "bpc_shakespeare": 3.4512, "bpc_docs": 3.5313, "bpc_code": 3.6605, "updates": 1200, "fwd_eq": 6600}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.3889, "z": -0.748}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.6633, "z": -0.321}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.0508, "z": -1.11}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.4429, "z": 0.032}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.6057, "z": -1.462}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 3.9967, "z": 1.761}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.3932, "z": 0.818}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 2.9619, "z": -0.22}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 1.9466, "z": -2.4}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.2757, "z": 0.488}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.2381, "z": -0.165}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.6162, "z": -1.067}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 2.8759, "z": -0.176}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.4988, "z": 1.029}
+{"arm": "rehearsal", "seed": 2, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.4198, "z": 0.889}
+{"arm": "rehearsal", "seed": 2, "event": "transfer", "after": "code", "bpc_wiki": 3.8075, "bpc_shakespeare": 3.9809, "bpc_docs": 3.8254, "bpc_code": 3.0454, "updates": 1800, "fwd_eq": 9900}
+{"arm": "rehearsal", "seed": 2, "event": "done", "updates": 1800, "fwd_eq": 9900, "gate_hits": 0, "gate_total": 0, "wall_s": 43.0}
+{"arm": "two_speed_casc", "seed": 2, "event": "transfer", "after": "base", "bpc_wiki": 2.9, "bpc_shakespeare": 5.503, "bpc_docs": 6.7712, "bpc_code": 7.533, "updates": 0, "fwd_eq": 0}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7389, "z": 25.481}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.5929, "z": 0.336}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": 3.2777, "z": -0.247}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": 3.1536, "z": -0.687}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": 2.8873, "z": -1.806}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": 3.0606, "z": -0.675}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": 3.1289, "z": 0.059}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": 3.1247, "z": 0.135}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": 2.9565, "z": -0.473}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": 2.8228, "z": -1.023}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": 2.9274, "z": 0.118}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": 2.492, "z": -2.361}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": 2.909, "z": 0.358}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": 2.9811, "z": 0.794}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": 2.8328, "z": 0.086}
+{"arm": "two_speed_casc", "seed": 2, "event": "transfer", "after": "shakespeare", "bpc_wiki": 3.1991, "bpc_shakespeare": 3.0356, "bpc_docs": 6.3837, "bpc_code": 6.925, "updates": 585, "fwd_eq": 3255}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": 6.4328, "z": 28.144}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": 3.5208, "z": -0.096}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": 3.4687, "z": -0.516}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": 3.9675, "z": 0.558}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": 3.2463, "z": -0.545}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": 3.6354, "z": 0.501}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": 4.1093, "z": 1.15}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": 3.7676, "z": 0.541}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": 3.4088, "z": -0.213}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": 3.886, "z": 1.646}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": 3.2371, "z": -0.558}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": 3.7234, "z": 1.972}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": 3.4197, "z": -0.104}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": 3.5384, "z": -0.18}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": 3.5826, "z": -0.593}
+{"arm": "two_speed_casc", "seed": 2, "event": "transfer", "after": "docs", "bpc_wiki": 3.2577, "bpc_shakespeare": 3.5399, "bpc_docs": 3.4983, "bpc_code": 3.7301, "updates": 1170, "fwd_eq": 6510}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 0, "loss_bpc": 3.3815, "z": -0.897}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 100, "loss_bpc": 3.6818, "z": -0.331}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 200, "loss_bpc": 3.2859, "z": -0.881}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 300, "loss_bpc": 3.404, "z": -0.193}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 400, "loss_bpc": 2.9236, "z": -1.164}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 500, "loss_bpc": 3.8462, "z": 1.449}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 600, "loss_bpc": 3.2743, "z": 0.26}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 700, "loss_bpc": 3.087, "z": -0.183}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 800, "loss_bpc": 2.2231, "z": -2.437}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 900, "loss_bpc": 3.1756, "z": 0.232}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": 3.4085, "z": 0.178}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": 2.6092, "z": -1.555}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": 2.8874, "z": -0.419}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": 3.2386, "z": 0.616}
+{"arm": "two_speed_casc", "seed": 2, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": 3.2394, "z": 0.656}
+{"arm": "two_speed_casc", "seed": 2, "event": "transfer", "after": "code", "bpc_wiki": 3.4872, "bpc_shakespeare": 3.7578, "bpc_docs": 3.6078, "bpc_code": 3.0789, "updates": 1755, "fwd_eq": 9765}
+{"arm": "two_speed_casc", "seed": 2, "event": "done", "updates": 1755, "fwd_eq": 9765, "gate_hits": 1350, "gate_total": 4500, "wall_s": 41.0}
+{"arm": "two_speed_iter", "seed": 2, "event": "transfer", "after": "base", "bpc_wiki": 2.9, "bpc_shakespeare": 5.503, "bpc_docs": 6.7712, "bpc_code": 7.533, "updates": 0, "fwd_eq": 0}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 0, "loss_bpc": 6.7389, "z": 25.481}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 100, "loss_bpc": 3.5929, "z": 0.336}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "shakespeare", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "transfer", "after": "shakespeare", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 235, "fwd_eq": 6525}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 0, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "docs", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "transfer", "after": "docs", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 370, "fwd_eq": 12750}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 0, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 500, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 600, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 700, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 800, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 900, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 1000, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 1100, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 1200, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 1300, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "stream", "domain": "code", "step": 1400, "loss_bpc": NaN, "z": NaN}
+{"arm": "two_speed_iter", "seed": 2, "event": "transfer", "after": "code", "bpc_wiki": NaN, "bpc_shakespeare": NaN, "bpc_docs": NaN, "bpc_code": NaN, "updates": 505, "fwd_eq": 18975}
+{"arm": "two_speed_iter", "seed": 2, "event": "done", "updates": 505, "fwd_eq": 18975, "gate_hits": 100, "gate_total": 4500, "wall_s": 59.8}

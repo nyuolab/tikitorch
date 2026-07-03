@@ -136,11 +136,19 @@ def enc_vals(W_float, scale):
     return np.array([i16(v * scale) for v in flat], dtype=np.int32)
 
 
-def build_buffer(ckpt_path, SA, SW, SGAM, SH, GCOMP):
+def build_buffer(ckpt_path, SA, SW, SGAM, SH, GCOMP, faithful=False):
     ck = torch.load(ckpt_path, map_location='cpu')
     sd = ck['model']
     o = compute_offsets()
     buf = np.zeros(BUFLEN, dtype=np.int32)
+
+    # LN key names differ by model. The STD-LN model (tropical_llm_d64.pt) used nn.LayerNorm -> keys
+    # .weight/.bias. The KERNEL-FAITHFUL model (tropical_llm_d64_faithful.pt) uses MADLN(g,b): mean-abs-
+    # deviation norm with a pow2-snapped (dyad) gamma -> keys .g/.b. The kernel ITSELF normalizes by MAD,
+    # so the faithful model + kernel agree on the LN op (the std-LN 4.05 deploy gap was exactly this LN
+    # mismatch; it is GONE for the faithful model). The encoding is otherwise identical: gamma -> dyadic
+    # code (gamma*GCOMP*SGAM), beta -> int16 value at the LN-output scale SGAM.
+    GW, GB = ('g', 'b') if faithful else ('weight', 'bias')
 
     # EMBED [V*D] int16 (rows VREAL..V-1 left 0; padded vocab never a target)
     emb = sd['emb.weight'].numpy()
@@ -169,16 +177,16 @@ def build_buffer(ckpt_path, SA, SW, SGAM, SH, GCOMP):
     for region_g, region_b, ln in [('LN1_G', 'LN1_B', 'ln1'), ('LN2_G', 'LN2_B', 'ln2')]:
         gc, bc = [], []
         for L in range(NL):
-            g = sd[f'blocks.{L}.{ln}.weight'].numpy()
-            b = sd[f'blocks.{L}.{ln}.bias'].numpy()
+            g = sd[f'blocks.{L}.{ln}.{GW}'].numpy()
+            b = sd[f'blocks.{L}.{ln}.{GB}'].numpy()
             gc.append(enc_codes(g * GCOMP, SGAM))
             bc.append(enc_vals(b, SGAM))
         buf[o[region_g]:o[region_g] + NL * D] = np.concatenate(gc)
         buf[o[region_b]:o[region_b] + NL * D] = np.concatenate(bc)
 
     # LN_F (single)
-    g = sd['lnf.weight'].numpy()
-    b = sd['lnf.bias'].numpy()
+    g = sd[f'lnf.{GW}'].numpy()
+    b = sd[f'lnf.{GB}'].numpy()
     buf[o['LNF_G']:o['LNF_G'] + D] = enc_codes(g * GCOMP, SGAM)
     buf[o['LNF_B']:o['LNF_B'] + D] = enc_vals(b, SGAM)
 
@@ -218,19 +226,31 @@ def main():
     ap.add_argument('--SW_PM', type=str, default='', help='per-matrix scales "q:4,k:4,v:8,o:8,up:6,dn:6"')
     ap.add_argument('--SGAM', type=int, default=3)
     ap.add_argument('--SH', type=int, default=24)
-    ap.add_argument('--GCOMP', type=float, default=0.8)
+    ap.add_argument('--GCOMP', type=float, default=-1.0,
+                    help='LN gamma std/MAD compensation; -1 => auto (1.0 for --faithful MAD-LN model, 0.8 std-LN)')
+    # --faithful: export the KERNEL-FAITHFUL model (MADLN g/b keys + dyadic head). The kernel uses MAD-LN, so
+    # the faithful model + kernel agree on LN -> GCOMP defaults to 1.0 (no std/MAD compensation; the std-LN
+    # 4.05 deploy gap was exactly that mismatch and is gone here). Defaults the ckpt to the faithful .pt too.
+    ap.add_argument('--faithful', action='store_true',
+                    help='export the MAD-LN kernel-faithful model (ln*.g/.b keys); GCOMP auto=1.0')
     a = ap.parse_args()
+    if a.faithful and a.ckpt == str(REPO / 'results' / 'lm_shakespeare' / 'tropical_llm_d64.pt'):
+        a.ckpt = str(REPO / 'results' / 'lm_shakespeare' / 'tropical_llm_d64_faithful.pt')
+    gcomp = a.GCOMP if a.GCOMP >= 0 else (1.0 if a.faithful else 0.8)
     SW = a.SW
     if a.SW_PM:
         SW = {k: int(v) for k, v in (kv.split(':') for kv in a.SW_PM.split(','))}
-    buf, o = build_buffer(a.ckpt, a.SA, SW, a.SGAM, a.SH, a.GCOMP)
+    buf, o = build_buffer(a.ckpt, a.SA, SW, a.SGAM, a.SH, gcomp, faithful=a.faithful)
     np.save(a.out, buf)
     meta = dict(D=D, H=H, DH=DH, FFN=FFN, T=T, V=V, VREAL=VREAL, NL=NL, BUFLEN=BUFLEN,
-                OFF_POS=OFF_POS, OFF_LOGITS=OFF_LOGITS, offsets=o,
-                SA=a.SA, SW=SW, SGAM=a.SGAM, SH=a.SH, GCOMP=a.GCOMP)
+                OFF_POS=OFF_POS, OFF_LOGITS=OFF_LOGITS, OFF_TOKENS=107648, OFF_TARGETS=107712,
+                OFF_W_HEAD=103040, OFF_CE_LUT=107136, OFF_ATTN_LUT=107392, offsets=o,
+                faithful=bool(a.faithful), ckpt=a.ckpt,
+                SA=a.SA, SW=SW, SGAM=a.SGAM, SH=a.SH, GCOMP=gcomp)
     Path(a.out + '.json').write_text(json.dumps(meta, indent=2))
     print(f'[export] wrote {a.out} (len {buf.size}, nonzero {int(np.count_nonzero(buf))})')
-    print(f'[export] scales SA={a.SA} SW={SW} SGAM={a.SGAM} SH={a.SH} GCOMP={a.GCOMP}')
+    print(f'[export] faithful={a.faithful} ckpt={a.ckpt}')
+    print(f'[export] scales SA={a.SA} SW={SW} SGAM={a.SGAM} SH={a.SH} GCOMP={gcomp}')
 
 
 if __name__ == '__main__':

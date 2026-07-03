@@ -1,0 +1,40 @@
+{
+  "config": {
+    "latent": 64,
+    "sims": 12,
+    "iters": 8,
+    "games_per_iter": 10,
+    "eval_games": 14
+  },
+  "loss_curve": [
+    27.5462,
+    23.1972,
+    20.2098,
+    18.7021,
+    16.6047,
+    14.6859,
+    13.1631,
+    11.9995
+  ],
+  "vs_random": {
+    "opponent": "random",
+    "win": 0.0,
+    "draw": 0.14285714285714285,
+    "loss": 0.8571428571428571,
+    "score": 0.07142857142857142
+  },
+  "vs_material": {
+    "opponent": "material(1-ply)",
+    "win": 0.0,
+    "draw": 1.0,
+    "loss": 0.0,
+    "score": 0.5
+  },
+  "untrained_vs_random": {
+    "opponent": "random (untrained control)",
+    "win": 0.0,
+    "draw": 0.7857142857142857,
+    "loss": 0.21428571428571427,
+    "score": 0.39285714285714285
+  }
+}

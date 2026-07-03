@@ -1,0 +1,10 @@
+[ce_ent0.1_lr1e3] closure audit (empty for fully multiply-free): NONE
+[ce_ent0.1_lr1e3] recipe: policy_loss=ce entropy=0.1 temp=1.0 lr=0.001 | 256 sims, 40x48 games, 4 workers...
+[ce_ent0.1_lr1e3]  trained   @ 100 sims:  d2=0.825  d3=0.725
+[ce_ent0.1_lr1e3]  trained   @ 200 sims:  d2=0.9  d3=0.8
+[ce_ent0.1_lr1e3]  trained   @ 400 sims:  d2=0.863  d3=0.838
+[ce_ent0.1_lr1e3]  untrained @ 100 sims:  d2=0.8  d3=0.812
+[ce_ent0.1_lr1e3]  untrained @ 200 sims:  d2=0.85  d3=0.787
+[ce_ent0.1_lr1e3]  untrained @ 400 sims:  d2=0.9  d3=0.85
+[ce_ent0.1_lr1e3] [saved] /opt/tiki/results/board_scaling/connect4_fully_tropical_ce_ent0.1_lr1e3.json
+DONE_FT_ce_ent0.1_lr1e3

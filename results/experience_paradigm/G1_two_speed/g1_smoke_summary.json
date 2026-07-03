@@ -1,0 +1,65 @@
+{
+ "summary": {
+  "frozen": {
+   "final_avg_bpc": 5.3584,
+   "mean_forgetting_bpc": 0.0,
+   "base_drift_bpc": 0.0,
+   "mean_plasticity_frac": 0.0
+  },
+  "cascade": {
+   "final_avg_bpc": 4.3059,
+   "mean_forgetting_bpc": 0.0897,
+   "base_drift_bpc": 0.1153,
+   "mean_plasticity_frac": 1.0
+  },
+  "rehearsal": {
+   "final_avg_bpc": 4.2489,
+   "mean_forgetting_bpc": -0.0157,
+   "base_drift_bpc": 0.029,
+   "mean_plasticity_frac": 0.987
+  },
+  "two_speed_casc": {
+   "final_avg_bpc": 4.3789,
+   "mean_forgetting_bpc": 0.0217,
+   "base_drift_bpc": 0.2055,
+   "mean_plasticity_frac": 0.8956
+  },
+  "two_speed_iter": {
+   "final_avg_bpc": 4.402,
+   "mean_forgetting_bpc": 0.0122,
+   "base_drift_bpc": 0.2586,
+   "mean_plasticity_frac": 0.8657
+  }
+ },
+ "verdict": "NO-GO (or PARTIAL \u2014 check energy column)",
+ "args": {
+  "context": 12,
+  "hidden": 256,
+  "depth": 4,
+  "batch": 256,
+  "lr": 0.001,
+  "lr_slow": 0.0003,
+  "base_steps": 100,
+  "stream_batches": 150,
+  "budget": 60,
+  "fast_budget": 45,
+  "sleep_every": 50,
+  "sleep_updates": 5,
+  "settle": 16,
+  "gate_z": 0.25,
+  "reservoir": 4096,
+  "val_windows": 1024,
+  "eval_every": 100,
+  "seeds": [
+   0
+  ],
+  "arms": [
+   "frozen",
+   "cascade",
+   "rehearsal",
+   "two_speed_casc",
+   "two_speed_iter"
+  ],
+  "smoke": true
+ }
+}

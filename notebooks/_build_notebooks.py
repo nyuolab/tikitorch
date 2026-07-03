@@ -2,7 +2,8 @@
 
 Run:  python notebooks/_build_notebooks.py
 Produces: 01_intro.ipynb, 02_tropical_math.ipynb, 03_vision_cnn.ipynb,
-          04_sequence.ipynb  (in this directory).
+          04_sequence.ipynb, 05_tropical_geometry.ipynb,
+          06_beyond_deep_learning.ipynb  (in this directory).
 
 Keeping the notebooks as code here (rather than hand-written JSON) makes them
 diffable and regenerable. Each notebook is self-contained and runnable in Google
@@ -502,9 +503,203 @@ print("Swap in TropicalLayerNorm + a tropical head for a fully-closed sequence m
 ]
 
 
+# ===========================================================================
+# 05 — Tropical geometry of neural networks
+# ===========================================================================
+geometry = [
+    md(r"""
+# Tropical geometry: a network *is* a piecewise-linear map
+
+A feed-forward net with ReLU / max-pool / morphological layers computes a **tropical
+rational map** — a difference of two tropical polynomials, so convex-piecewise-linear
+per piece. Its input space splits into **linear regions** (affine inside each), its
+**decision boundary** is a tropical hypersurface, and its expressivity is measured by
+how many regions it can carve. `tikitorch.geometry` measures all three on a real model.
+"""),
+    SETUP,
+    md(r"""
+## Linear regions = distinct local Jacobians
+
+Inside one linear region the map is affine, so its input→output Jacobian is constant;
+crossing into another region changes it. `jacobian_signature` returns that (normalized)
+gradient as a region fingerprint, and `count_linear_regions` counts the uniques over a
+sample. We use a **hard** tropical net (`use_softmin=False`) — the genuinely
+piecewise-linear regime (a smooth/soft net has a single, ever-changing Jacobian).
+"""),
+    code(r"""
+import torch, tikitorch as tt
+from tikitorch.geometry import count_linear_regions, jacobian_signature
+
+torch.manual_seed(0)
+net = tt.models.TropicalMLP(input_dim=2, d_model=32, n_layers=1, num_classes=3,
+                            use_softmin=False)            # hard => piecewise-linear
+pts = torch.randn(800, 2)
+print("distinct linear regions over 800 samples:", count_linear_regions(net, pts))
+print("region fingerprint at a point:", jacobian_signature(net, torch.tensor([0.3, -1.1])))
+"""),
+    md(r"""
+## More units → more pieces (then random init saturates)
+
+Width buys linear regions — each tropical unit can add a fold. At *random* init this
+saturates, and very deep stacks can even **collapse** (routing funnels through a few
+cells) — which is why identity/residual init matters at depth, and why *training* carves
+far more regions than random init does.
+"""),
+    code(r"""
+for W in [4, 8, 16, 32]:
+    m = tt.models.TropicalMLP(input_dim=2, d_model=W, n_layers=1, num_classes=3,
+                              use_softmin=False)
+    print(f"  width={W:3d}  ->  {count_linear_regions(m, pts):4d} regions")
+"""),
+    md(r"""
+## See the decision regions (the tropical hypersurface)
+
+`decision_regions_2d` returns `(preds[n,n], xs, ys)` — the predicted class over a grid.
+The borders between classes are the network's decision boundary: straight polytope
+faces, not smooth curves.
+"""),
+    code(r"""
+from tikitorch.geometry import decision_regions_2d
+preds, xs, ys = decision_regions_2d(net, xrange=(-3, 3), yrange=(-3, 3), n=120)
+print("grid:", tuple(preds.shape), "classes:", sorted(set(preds.flatten().tolist())))
+try:
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(4, 4))
+    plt.imshow(preds, origin="lower", extent=[-3, 3, -3, 3], cmap="tab10", aspect="auto")
+    plt.title("TropicalMLP decision regions (polytope arrangement)")
+    plt.xlabel("x0"); plt.ylabel("x1"); plt.show()
+except ImportError:
+    print("(install matplotlib to see the region map)")
+"""),
+    md(r"""
+## Newton polytopes
+
+A tropical polynomial `max_k (c_k + <a_k, x>)` has Newton polytope `conv{a_k}`; its
+**vertices are the monomials active somewhere** — i.e. the linear pieces. `newton_polytope`
+returns those vertices (uses SciPy's ConvexHull when available; interior monomials are
+dropped because they never become a separate linear piece).
+"""),
+    code(r"""
+from tikitorch.geometry import newton_polytope
+exps = torch.tensor([[0., 0.], [2., 0.], [0., 2.], [1., 1.]])   # (1,1) is interior
+verts = newton_polytope(exps)
+print("monomial exponents:", exps.tolist())
+print("Newton-polytope vertices:", [v for v in verts.tolist()])
+"""),
+    md(r"""
+## Why it matters
+
+- **Expressivity** — counting regions is the standard "how complex can this be" yardstick;
+  tropical geometry gives the cleanest bounds and `count_linear_regions` checks them.
+- **Certification** — affine-per-region means monotonicity / Lipschitz / robustness can be
+  reasoned about *exactly* per region.
+- **Pruning** — interior monomials (no new vertex) are redundant; see `tikitorch.prune`.
+
+Concept companion: **Guide → Tropical geometry of neural nets**.
+"""),
+]
+
+
+# ===========================================================================
+# 06 — Tropical algebra beyond deep learning
+# ===========================================================================
+beyond = [
+    md(r"""
+# Beyond deep learning: the same algebra as shortest paths
+
+The min-plus semiring is the native algebra of **dynamic programming**. Tropical matmul
+`C_ij = min_k (A_ik + B_kj)` is exactly "best one-hop-extended path" — so the *same*
+operation that is a tropical NN layer is the Floyd–Warshall update. `tikitorch.algorithmic`
+ships the DP algorithms; `tikitorch.classical` ships order-based classical-ML methods.
+"""),
+    SETUP,
+    md(r"""
+## Shortest paths = repeated min-plus matmul
+
+`floyd_warshall` (all-pairs) is the min-plus matrix closure; `bellman_ford` is
+single-source relaxation. Inputs are batched edge-weight matrices `(B, N, N)`, with
+`inf` for an absent edge.
+"""),
+    code(r"""
+import torch
+from tikitorch.algorithmic import floyd_warshall, bellman_ford
+INF = float("inf")
+W = torch.tensor([[[0., 2, INF, 1],
+                   [INF, 0, 3, INF],
+                   [INF, INF, 0, 1],
+                   [INF, 4, INF, 0]]])              # one graph, 4 nodes
+print("all-pairs shortest paths:\n", floyd_warshall(W)[0])
+print("single-source (from node 0):", bellman_ford(W, src=0)[0].tolist())
+"""),
+    md(r"""
+## More DP, same primitive
+
+Longest-increasing-subsequence (max-plus), min-coin change, and 0/1 knapsack are all
+tropical DP. The `*_selection` variants walk the DP table back through its argmin/argmax
+to recover the actual solution — the same argmin routing that carries gradients in a
+tropical layer.
+"""),
+    code(r"""
+from tikitorch.algorithmic import lis_lengths, min_coin_selection, knapsack_selection
+print("LIS DP lengths:", lis_lengths(torch.tensor([[3, 1, 4, 1, 5, 9, 2, 6]]))[0].tolist())
+print("min coins for 6 from {1,3,4}:",
+      min_coin_selection(torch.tensor([[1, 3, 4]]), torch.tensor([6]))[0].tolist())
+print("knapsack pick (cap 4, w={1,3,4}, v={15,20,30}):",
+      knapsack_selection(torch.tensor([[1, 3, 4]]), torch.tensor([[15, 20, 30]]),
+                         torch.tensor([4]))[0].tolist())
+"""),
+    md(r"""
+Because the layer and the algorithm share a primitive, a tropical net has the right
+inductive bias to **learn** these algorithms from examples — see
+`tikitorch.algorithmic.build_reasoner` / `evaluate_task` and the README's algorithmic
+reasoning benchmarks.
+"""),
+    md(r"""
+## Classical tropical machine learning
+
+`tikitorch.classical` gives order-based analogues built on the tropical metric
+`tropical_distance`: clustering, nearest-centroid, a max-margin SVM, and PCA.
+"""),
+    code(r"""
+import torch
+from tikitorch.classical import (tropical_kmeans, TropicalNearestCentroid,
+                                  TropicalSVM, tropical_pca)
+torch.manual_seed(0)
+# The tropical metric is PROJECTIVE (it quotients out the all-ones direction), so the
+# classes must differ in a *direction*, not by a global shift the metric would ignore.
+mA = torch.tensor([4., 0, 0, 0]); mB = torch.tensor([0., 0, 4, 0])
+X = torch.cat([torch.randn(40, 4) * 0.5 + mA, torch.randn(40, 4) * 0.5 + mB])
+y = torch.cat([torch.zeros(40), torch.ones(40)]).long()
+
+labels, centroids = tropical_kmeans(X, k=2)
+print("k-means cluster sizes:", torch.bincount(labels.long()).tolist())
+
+nc = TropicalNearestCentroid().fit(X, y)
+print("nearest-centroid train accuracy:", round(float(nc.score(X, y)), 3))
+
+svm = TropicalSVM().fit(X, y)
+print("tropical-SVM train accuracy:    ", round(float(svm.score(X, y)), 3))
+
+Z = tropical_pca(X, k=2)
+print("tropical PCA embedding shape:   ", tuple(Z.shape))
+"""),
+    md(r"""
+## The through-line
+
+A tropical NN layer, a shortest-path relaxation, a DP table, and a max-plus schedule are
+**one operation** — `min`/`max` of sums — wearing different hats. That is why this
+substrate suits both multiplier-free hardware *and* combinatorial reasoning.
+
+Concept companion: **Guide → Beyond deep learning**.
+"""),
+]
+
+
 if __name__ == "__main__":
     write_nb("01_intro.ipynb", intro)
     write_nb("02_tropical_math.ipynb", math_nb)
     write_nb("03_vision_cnn.ipynb", vision)
     write_nb("04_sequence.ipynb", sequence)
+    write_nb("05_tropical_geometry.ipynb", geometry)
+    write_nb("06_beyond_deep_learning.ipynb", beyond)
     print("done.")

@@ -1,0 +1,51 @@
+26:  input  logic          clk_hbm_ref,           // 100MHz HBM reference clock
+63:  output logic  [63:0]  cl_sh_pcim_awaddr,
+89:  output logic  [63:0]  cl_sh_pcim_araddr,
+114:  // DDR-4 Interface
+116:  //    DDR is instantiated in CL.  This is the physical interface.
+117:  //    These interfaces must be connected to an instantiated sh_ddr in the CL logic.
+118:  //    Note even if DDR interface is not used, sh_ddr must be instantiated and connected
+119:  //    to these interface ports. The sh_ddr block has parameters to control whether the DDR
+120:  //    controller is instantiated.  If the DDR controller is not instantiated it will not
+125:  // ------------------- DDR4 x72 RDIMM Interface  ----------------------------------
+145:  // DDR Stats interfaces for DDR controllers in the CL.  This must be hooked up
+146:  // to the sh_ddr.sv for the DDR interfaces to function.  If the DDR controller is
+147:  // not used (removed through parameter on the sh_ddr instantiated), then the
+148:  // associated stats interface should not be hooked up and the ddr_sh_stat_ackX signal
+151:  input  logic   [7:0]  sh_cl_ddr_stat_addr,
+152:  input  logic  [31:0]  sh_cl_ddr_stat_wdata,
+153:  input  logic          sh_cl_ddr_stat_wr,
+154:  input  logic          sh_cl_ddr_stat_rd,
+155:  input  logic   [2:0]  sh_cl_ddr_stat_user,
+156:  output logic          cl_sh_ddr_stat_ack,
+157:  output logic  [31:0]  cl_sh_ddr_stat_rdata,
+159:  output logic   [7:0]  cl_sh_ddr_stat_int,
+175:  input  logic  [63:0]  sh_cl_dma_pcis_awaddr,
+201:  input  logic  [63:0]  sh_cl_dma_pcis_araddr,
+228:  input  logic  [31:0]  ocl_cl_awaddr,
+242:  input  logic  [31:0]  ocl_cl_araddr,
+258:  input  logic  [31:0]  sda_cl_awaddr,
+271:  input  logic  [31:0]  sda_cl_araddr,
+308:  // HBM Monitor I/O. These signals are sychronized to clk_hbm_ref.
+310:  input  logic          hbm_apb_preset_n_1,
+311:  output logic  [21:0]  hbm_apb_paddr_1,
+312:  output logic   [2:0]  hbm_apb_pprot_1,
+313:  output logic          hbm_apb_psel_1,
+314:  output logic          hbm_apb_penable_1,
+315:  output logic          hbm_apb_pwrite_1,
+316:  output logic  [31:0]  hbm_apb_pwdata_1,
+317:  output logic   [3:0]  hbm_apb_pstrb_1,
+318:  output logic          hbm_apb_pready_1,
+319:  output logic  [31:0]  hbm_apb_prdata_1,
+320:  output logic          hbm_apb_pslverr_1,
+322:  input  logic          hbm_apb_preset_n_0,
+323:  output logic  [21:0]  hbm_apb_paddr_0,
+324:  output logic   [2:0]  hbm_apb_pprot_0,
+325:  output logic          hbm_apb_psel_0,
+326:  output logic          hbm_apb_penable_0,
+327:  output logic          hbm_apb_pwrite_0,
+328:  output logic  [31:0]  hbm_apb_pwdata_0,
+329:  output logic   [3:0]  hbm_apb_pstrb_0,
+330:  output logic          hbm_apb_pready_0,
+331:  output logic  [31:0]  hbm_apb_prdata_0,
+332:  output logic          hbm_apb_pslverr_0,

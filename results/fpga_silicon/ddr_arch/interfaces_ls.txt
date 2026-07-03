@@ -1,0 +1,8 @@
+cl_ports.vh
+unused_apppf_irq_template.inc
+unused_cl_sda_template.inc
+unused_ddr_template.inc
+unused_dma_pcis_template.inc
+unused_flr_template.inc
+unused_pcim_template.inc
+unused_sh_ocl_template.inc

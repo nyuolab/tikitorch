@@ -1,0 +1,27 @@
+== Tropical Forward-Forward experiment ==  device=cpu seed=0
+train=6000 test=2000 width=300 epochs=6 goodness=topk k=10 margin=2.0 on=1.0 lr=2^-4 momentum_bits=0 skip_first=False
+closure receipt: full TFF train step multiplier-free = True  (verified by tt.assert_no_multiply on a batch of 13)
+
+config                depth      acc     secs params
+------------------------------------------------------------
+tff                       2   0.2000      8.0 325800  sep(gp-gn)/layer=[0.3224, 0.4347]
+backprop_tropical         2   0.2225     11.1 328810
+dense_ff                  2   0.2760      0.9 325800
+dense_backprop            2   0.9110      0.6 328810
+tff                       4   0.2255     11.6 506400  sep(gp-gn)/layer=[0.495, 0.126, 0.23, -0.0806]
+backprop_tropical         4   0.2030     17.1 509410
+dense_ff                  4   0.2225      1.5 506400
+dense_backprop            4   0.9160      1.0 509410
+tff                       8   0.2300     23.9 867600  sep(gp-gn)/layer=[0.4244, 0.0844, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+backprop_tropical         8   0.1025     32.2 870610
+dense_ff                  8   0.2020      2.8 867600
+dense_backprop            8   0.8810      1.6 870610
+
+wrote 12 rows -> results/forward_forward/mnist_results.jsonl
+
+depth-scaling (test acc):
+config               d2  d4  d8
+tff                  0.200  0.226  0.230
+backprop_tropical    0.222  0.203  0.102
+dense_ff             0.276  0.222  0.202
+dense_backprop       0.911  0.916  0.881

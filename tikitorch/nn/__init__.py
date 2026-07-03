@@ -24,13 +24,16 @@ from tikitorch.functional import (
     adder_linear,
     tropical_asym_score,
     tropical_conv2d,
+    tropical_cross_entropy,
     tropical_dilation,
     tropical_dot_product,
     tropical_hardtanh,
     tropical_hilbert_score,
+    tropical_l1_score,
     tropical_l_inf_score,
     tropical_leaky_relu,
     tropical_linear,
+    tropical_perceptron_loss,
     tropical_relu,
     tropical_softmax,
     tropical_softmax_asym_score,
@@ -43,6 +46,8 @@ from tikitorch.functional import (
     tropical_softmax_value_pull_iter_topk,
     tropical_value_pull_min,
     tropical_softmax_value_pull_min,
+    tropical_value_gather,
+    tropical_softmax_value_gather,
     tropical_softmin,
     tropical_value_pull,
 )
@@ -72,7 +77,7 @@ def _make_norm(norm_type: str, d_model: int):
                      "or 'layernorm'")
 
 
-_SCORE_VARIANTS = ("dot_product", "l_inf", "hilbert", "hilbert_asym")
+_SCORE_VARIANTS = ("dot_product", "l_inf", "hilbert", "hilbert_asym", "l1")
 
 
 def _tropical_score(q, k, variant, tau):
@@ -96,10 +101,14 @@ def _tropical_score(q, k, variant, tau):
     if variant == "hilbert_asym":
         return (tropical_softmax_asym_score(q, k, tau=tau) if tau > 0
                 else tropical_asym_score(q, k))
+    if variant == "l1":
+        # -sum_d|Q-K| is already smooth + dense-gradient, so soft == hard (no
+        # logsumexp relaxation needed); the same op for any tau.
+        return tropical_l1_score(q, k)
     raise ValueError(f"unknown score_variant {variant!r}; expected one of {_SCORE_VARIANTS}")
 
 
-_AGG_VARIANTS = ("argmax", "iter_topk", "min", "maxmin", "sinkhorn")
+_AGG_VARIANTS = ("argmax", "iter_topk", "min", "maxmin", "sinkhorn", "gather")
 
 
 def _max_pull(v, scores, tau, topk_k, rank_bias, value_topk_k):
@@ -197,6 +206,15 @@ def _tropical_aggregate(v, scores, variant, tau, topk_k, rank_bias, value_topk_k
         return torch.cat([hi, lo], dim=-1)
     if variant == "sinkhorn":
         return _sinkhorn_aggregate(v, s_max, tau, sink_eps, sink_iters)
+    if variant == "gather":
+        # argmax-GATHER: the deploy-pure limit of softmax ATTENTION (ONE key per
+        # query, shared across dims) -- NOT the per-dim max-plus matmul below.
+        # train (tau>0): softmax(scores)@V dense-gradient relaxation; deploy
+        # (tau=0): V[argmax_j scores] (zero multiply). s_max already has future
+        # keys at -inf, correct for both softmax (->0 weight) and argmax.
+        if tau > 0:
+            return tropical_softmax_value_gather(v, s_max, tau=tau)
+        return tropical_value_gather(v, s_max)
     # "argmax" (default)
     if tau > 0:
         return tropical_softmax_value_pull(v, s_max, tau=tau)
@@ -228,9 +246,13 @@ __all__ = [
     "TropicalLeakyReLU",
     "TropicalHardtanh",
     "TropicalDropout",
+    # loss modules (nn.Module wrappers over functional losses)
+    "TropicalCrossEntropyLoss",
+    "TropicalPerceptronLoss",
     # dyadic (power-of-two) multiplier-free oblique layers
     "DyadicLinear",
     "DyadicTropicalProjection",
+    "dyadic_quantize",   # public weight-quantizer util (used by fpga export + PC layers)
     # --- higher-level layers ---
     # normalization
     "TropicalBatchShift",
@@ -276,6 +298,30 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Soft-min / soft-max relaxation modules
 # ---------------------------------------------------------------------------
+
+
+# Max-plus / min-plus linears materialize a (batch, out, in) intermediate (there is
+# no GEMM equivalent for the (max,+) semiring). For a large layer -- e.g. an LM FFN
+# d->4d at long sequence -- that tensor is many GB and OOMs in eager PyTorch. We tile
+# over the OUTPUT dim so peak memory is bounded, reusing the SAME (tested) ops on
+# weight-row slices: identical math, just chunked, and autograd flows through the
+# slices. Small layers (under the threshold) take the original single-shot path with
+# zero overhead. This is purely an eager-mode fix -- on FPGA/ASIC the max-plus
+# reduction streams with no materialization (the whole point of being multiplier-free).
+_MAXPLUS_CHUNK_ELEMS = 32_000_000   # (batch*out*in) above this -> tile over out
+
+
+def _chunked_linear(op, x, weight, bias):
+    """``op(x, weight_rows) -> (..., out_rows)``, tiled over output features when the
+    (batch, out, in) intermediate would exceed ``_MAXPLUS_CHUNK_ELEMS``. ``x`` is
+    (..., in); ``weight`` is (out, in); ``bias`` is (out,)."""
+    O, I = weight.shape
+    batch = x.numel() // I
+    if batch * O * I <= _MAXPLUS_CHUNK_ELEMS:
+        return op(x, weight) + bias
+    chunk = max(1, _MAXPLUS_CHUNK_ELEMS // max(1, batch * I))
+    return torch.cat([op(x, weight[s:s + chunk]) + bias[s:s + chunk]
+                      for s in range(0, O, chunk)], dim=-1)
 
 
 class TropicalSoftMin(nn.Module):
@@ -356,11 +402,8 @@ class TropicalDilationModule(nn.Module):
         self._softmax.tau = tau
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.use_softmax:
-            out = self._softmax(x, self.weight)
-        else:
-            out = tropical_dilation(x, self.weight)
-        return out + self.bias
+        op = self._softmax if self.use_softmax else tropical_dilation
+        return _chunked_linear(op, x, self.weight, self.bias)
 
     @torch.no_grad()
     def forward_with_indices(self, x: torch.Tensor):
@@ -425,11 +468,8 @@ class TropicalLinearModule(nn.Module):
         self._softmin.tau = tau
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.use_softmin:
-            out = self._softmin(x, self.weight)
-        else:
-            out = tropical_linear(x, self.weight)
-        return out + self.bias
+        op = self._softmin if self.use_softmin else tropical_linear
+        return _chunked_linear(op, x, self.weight, self.bias)
 
     def extra_repr(self) -> str:
         return (
@@ -774,6 +814,67 @@ class TropicalDropout(nn.Module):
 
     def extra_repr(self):
         return f"p={self.p}"
+
+
+# ---------------------------------------------------------------------------
+# Loss modules (``nn.Module`` wrappers around the functional losses)
+#
+# PyTorch ships its losses both as functions (``F.cross_entropy``) and as
+# Modules (``nn.CrossEntropyLoss``); a Module is convenient when you want the
+# loss to live in a config / be moved with ``.to()`` / be ``repr``-able. These
+# are thin, stateless wrappers over :mod:`tikitorch.functional` — they hold the
+# closure-relevant config and forward ``(logits, target)``.
+# ---------------------------------------------------------------------------
+
+
+class TropicalCrossEntropyLoss(nn.Module):
+    """Closure-faithful cross-entropy loss, as a Module (cf. ``nn.CrossEntropyLoss``).
+
+    Wraps :func:`tikitorch.functional.tropical_cross_entropy`. The CE gradient is
+    ``softmax(logits) - onehot(target)``; ``softmax="exact"`` conditions it with a
+    host softmax (the silicon-validated path) while ``softmax="lut"`` computes the
+    softmax from a subtract-max + power-of-2-addressed exp lookup + shift-normalize,
+    so the *whole* loop stays multiplier-free. Extra keyword args (``lut_size``,
+    ``z_range``, ``normalize``) pass through to
+    :func:`tikitorch.functional.shift_softmax`.
+
+    Args:
+        softmax: ``"exact"`` (default) or ``"lut"`` (fully multiplier-free).
+        **lut_kwargs: forwarded to ``shift_softmax`` when ``softmax="lut"``.
+    """
+
+    def __init__(self, softmax: str = "exact", **lut_kwargs):
+        super().__init__()
+        self.softmax = softmax
+        self.lut_kwargs = lut_kwargs
+
+    def forward(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        return tropical_cross_entropy(logits, target, softmax=self.softmax, **self.lut_kwargs)
+
+    def set_tau(self, tau):
+        pass
+
+    def extra_repr(self) -> str:
+        extra = "".join(f", {k}={v}" for k, v in self.lut_kwargs.items())
+        return f"softmax={self.softmax!r}{extra}"
+
+
+class TropicalPerceptronLoss(nn.Module):
+    """Sign-only perceptron loss, as a Module (cf. ``nn.MultiMarginLoss``).
+
+    Wraps :func:`tikitorch.functional.tropical_perceptron_loss`: the gradient is a
+    2-hot ``+/-1`` vector (push the target logit up, the argmax distractor down), so
+    it is multiplier-free without any softmax. It is the cheapest closed loss but
+    also the single biggest accuracy cost in the closure penalty (~-17pp on a hard
+    char-LM vs cross-entropy); prefer :class:`TropicalCrossEntropyLoss` unless you
+    specifically want the silicon perceptron baseline.
+    """
+
+    def forward(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        return tropical_perceptron_loss(logits, target)
+
+    def set_tau(self, tau):
+        pass
 
 
 # --- higher-level layers ---

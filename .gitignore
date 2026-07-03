@@ -15,14 +15,22 @@ results/closed_benchmarks/
 results/capacity_probe/
 # per-run console logs created by the run_* scripts
 logs/
-# compiled LOCAL FPGA bridge (scripts/build_fpga_local.sh)
-_libtikifpga.*
+# compiled LOCAL FPGA bridge (scripts/build_fpga_local.sh) — incl. _libtikifpga_morphlm.*
+_libtikifpga*
 # mkdocs build output
 site/
 
-# local EC2 prior-sweep runner state (tarball, user-data, launch.err)
-.tiki_sweep_state/
+# FPGA workflow/build/probe/csynth scratch dropped at the repo root by the run_* and
+# forge tooling (state dirs + *_wf.js); regenerable, never committed. Covers the old
+# .tiki_sweep_state/ too.
+.tiki_*
+# root-level scratch HLS kernel dirs (anchored: does NOT touch packaged
+# tikitorch/hardware/.../cl_forge_* kernels or results/*forge* logs)
+/forge_*/
 
 # FPGA build/probe fetch scratch (large regenerable DCP/tar/logs)
 results/fpga_silicon/afibuild/
 results/fpga_silicon/hdk_probe/
+
+# local API keys (results/graphics/.env etc.)
+**/.env

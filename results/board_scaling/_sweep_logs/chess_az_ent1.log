@@ -1,0 +1,25 @@
+[az_ent1] closure audit (empty = fully multiply-free): NONE
+[az_ent1] chess strength: tree=alphazero loss=ce entropy=0.1 temp=1.5 | 48 sims, 12x16 games, 8 workers
+[az_ent1]   vs random (track)          : win 17% draw 67% loss 17% | score 0.50
+[az_ent1] iter   0: games=16 loss=25.8550 mode_frac=0.015 best_track=0.50
+[az_ent1] iter   1: games=32 loss=23.1656 mode_frac=0.023 best_track=0.50
+[az_ent1] iter   2: games=48 loss=22.3741 mode_frac=0.028 best_track=0.50
+[az_ent1] iter   3: games=64 loss=22.0371 mode_frac=0.034 best_track=0.50
+[az_ent1] iter   4: games=80 loss=21.3525 mode_frac=0.041 best_track=0.50
+[az_ent1] iter   5: games=96 loss=20.6922 mode_frac=0.050 best_track=0.50
+[az_ent1]   vs random (track)          : win 0% draw 67% loss 33% | score 0.33
+[az_ent1] iter   6: games=112 loss=20.1911 mode_frac=0.062 best_track=0.50
+[az_ent1] iter   7: games=128 loss=19.8299 mode_frac=0.039 best_track=0.50
+[az_ent1] iter   8: games=144 loss=19.2048 mode_frac=0.053 best_track=0.50
+[az_ent1] iter   9: games=160 loss=18.9876 mode_frac=0.081 best_track=0.50
+[az_ent1] iter  10: games=176 loss=18.3846 mode_frac=0.076 best_track=0.50
+[az_ent1]   vs random (track)          : win 17% draw 33% loss 50% | score 0.33
+[az_ent1] iter  11: games=192 loss=18.2538 mode_frac=0.069 best_track=0.50
+[az_ent1] === TRAINED (best snapshot, tree=alphazero) ===
+[az_ent1]   vs random                  : win 8% draw 75% loss 17% | score 0.46
+[az_ent1]   vs material(1-ply)         : win 0% draw 100% loss 0% | score 0.50
+[az_ent1] === UNTRAINED control (same tree=alphazero) ===
+[az_ent1]   vs random                  : win 8% draw 75% loss 17% | score 0.46
+[az_ent1]   vs material(1-ply)         : win 0% draw 50% loss 50% | score 0.25
+[az_ent1] trained-vs-untrained Δ(random) = +0.000  [saved] /opt/tiki/results/board_scaling/chess_strength_az_ent1.json
+DONE_CHESS_az_ent1

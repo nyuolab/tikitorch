@@ -1,0 +1,62 @@
+{
+ "summary": {
+  "frozen": {
+   "final_avg_bpc": 6.5478,
+   "mean_forgetting_bpc": 0.0,
+   "base_drift_bpc": 0.0,
+   "mean_plasticity_frac": 0.0
+  },
+  "cascade": {
+   "final_avg_bpc": 3.5285,
+   "mean_forgetting_bpc": 0.6098,
+   "base_drift_bpc": 0.7119,
+   "mean_plasticity_frac": 1.0
+  },
+  "rehearsal": {
+   "final_avg_bpc": 3.5935,
+   "mean_forgetting_bpc": 0.5752,
+   "base_drift_bpc": 0.8723,
+   "mean_plasticity_frac": 0.9758
+  },
+  "two_speed_iter": {
+   "final_avg_bpc": 3.5215,
+   "mean_forgetting_bpc": 0.4583,
+   "base_drift_bpc": 0.5778,
+   "mean_plasticity_frac": 0.9749
+  }
+ },
+ "verdict": "GO",
+ "args": {
+  "context": 12,
+  "hidden": 256,
+  "depth": 4,
+  "batch": 256,
+  "lr": 0.001,
+  "lr_slow": 0.0001,
+  "base_steps": 1200,
+  "stream_batches": 1500,
+  "budget": 600,
+  "fast_budget": 450,
+  "sleep_every": 150,
+  "sleep_updates": 15,
+  "settle": 8,
+  "gamma": 0.0625,
+  "tag": "_iterfix",
+  "gate_z": 0.25,
+  "reservoir": 4096,
+  "val_windows": 4096,
+  "eval_every": 100,
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "arms": [
+   "frozen",
+   "cascade",
+   "rehearsal",
+   "two_speed_iter"
+  ],
+  "smoke": false
+ }
+}

@@ -23,9 +23,12 @@ FPGA path. So the gaps that matter are *ergonomics + the moat*, not core-framewo
       rescale is a non-pow2 multiply at most `p` (it's fine only when `1/(1-p)` is a power of two, e.g.
       `p=0.5`); `TropicalDropout` is a `{0,1}` gate (no rescale) — closure-clean for **all** `p`. Swapped
       into the 7 `nn.Dropout` sites across `nn`/`models`. **Done.**
-- [ ] **MIGRATION.md** — side-by-side "your PyTorch loop vs the closed TikiTorch loop" teaching the 4
-      non-obvious closure idioms (`lr_shift` not `lr=`, tropical losses, soft→hard `tau` anneal,
-      power-of-2 dims). The namespace is already 1:1; the *idioms* are the adoption blocker.
+- [x] **MIGRATION.md** — side-by-side "your PyTorch loop vs the closed TikiTorch loop" teaching the
+      non-obvious closure idioms (sign/shift optimizers, tropical losses, soft→hard `tau` anneal,
+      declared-DSP-boundary heads). The namespace is already 1:1; the *idioms* are the adoption
+      blocker. **Done** — root `MIGRATION.md` + canonical `docs/guide/migration.md`, plus a full
+      **Guide** section in the docs (foundations, why-tropical, geometry, beyond-DL, architecture,
+      choosing-a-model, FAQ) and tutorial notebooks 05/06.
 - [ ] **`tt-closure` CLI** (`[project.scripts]`) — point at any `model.py:factory`, print
       `multiplications: 0` / nonzero-exit. Generalizes the `__main__` demo; the CI-gate primitive.
 - [x] **Promote `fpga.dyadic_export`** to first-class — `export_net`/`verify_schedule`/`export_layer`/
@@ -33,7 +36,8 @@ FPGA path. So the gaps that matter are *ergonomics + the moat*, not core-framewo
       (bit-exact shift-schedule round-trip). **Done.** _(Follow-ons: save/load the schedule to disk; embed
       the `verify_schedule` result in the checkpoint as a "closure passport".)_
 - [ ] Cheap credibility: `git tag v0.1.0` + release (CHANGELOG links a missing tag); fix `examples/README`;
-      publish the docs site (the mkdocs site itself now **exists** — added alongside this work).
+      publish the docs site (the mkdocs site itself now **exists** and now carries a full **Guide** +
+      6 notebooks — just needs publishing).
 
 ## NEXT (medium)
 

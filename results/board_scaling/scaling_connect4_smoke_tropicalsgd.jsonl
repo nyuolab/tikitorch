@@ -1,0 +1,1 @@
+{"arm": "tropical-dyadic", "seed": 0, "game": "connect4", "optimizer": "tropicalsgd", "iters": 4, "best_score": 0.5, "gauntlet": {"1": 0.5, "2": 0.5}, "score_curve": [0.0, 0.5]}

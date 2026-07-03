@@ -1,0 +1,1149 @@
+
+****** Vitis HLS - High-Level Synthesis from C, C++ and OpenCL v2024.1 (64-bit)
+  **** SW Build 5069499 on May 21 2024
+  **** IP Build 5075265 on Wed May 22 21:45:21 MDT 2024
+  **** SharedData Build 5076995 on Wed May 22 18:29:18 MDT 2024
+  **** Start of session at: Mon Jun 15 00:55:11 2026
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source /opt/Xilinx/Vitis_HLS/2024.1/scripts/vitis_hls/hls.tcl -notrace
+INFO: [HLS 200-10] For user 'root' on host 'ip-172-31-38-84.ec2.internal' (Linux_x86_64 version 5.15.0-1081-aws) on Mon Jun 15 00:55:13 UTC 2026
+INFO: [HLS 200-10] On os Ubuntu 20.04.6 LTS
+INFO: [HLS 200-10] In directory '/opt/tiki/tikitorch/hardware/hls/forge_kernels'
+WARNING: [HLS 200-2053] The vitis_hls executable is deprecated. Consider using vitis-run --mode hls --tcl
+Sourcing Tcl script 'synth_muzero_train_chess.tcl'
+INFO: [HLS 200-1510] Running: open_project -reset forge_muzero_train_chess_proj 
+INFO: [HLS 200-10] Creating and opening project '/opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj'.
+INFO: [HLS 200-1510] Running: add_files forge_train_step_muzero_train.cpp -cflags -I.. -DMZ_OBS_OVERRIDE=769 -DMZ_L_OVERRIDE=64 -DMZ_A_OVERRIDE=4096 
+INFO: [HLS 200-10] Adding design file 'forge_train_step_muzero_train.cpp' to the project
+INFO: [HLS 200-1510] Running: open_solution -reset solution1 
+INFO: [HLS 200-10] Creating and opening solution '/opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1'.
+INFO: [HLS 200-10] Cleaning up the solution database.
+INFO: [HLS 200-1505] Using default flow_target 'vivado'
+Resolution: For help on HLS 200-1505 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-1505.html
+INFO: [HLS 200-1510] Running: set_top forge_train_step_muzero_train 
+INFO: [HLS 200-1510] Running: set_part xcvu47p-fsvh2892-2L-e 
+INFO: [HLS 200-1611] Setting target device to 'xcvu47p-fsvh2892-2L-e'
+INFO: [HLS 200-1510] Running: create_clock -period 4.0 
+INFO: [SYN 201-201] Setting up clock 'default' with a period of 4ns.
+INFO: [HLS 200-1510] Running: csynth_design 
+INFO: [HLS 200-111] Finished File checks and directory preparation: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 222.402 MB.
+INFO: [HLS 200-10] Analyzing design file 'forge_train_step_muzero_train.cpp' ... 
+INFO: [HLS 200-111] Finished Source Code Analysis and Preprocessing: CPU user time: 2.82 seconds. CPU system time: 0.47 seconds. Elapsed time: 3.3 seconds; current allocated memory: 224.773 MB.
+INFO: [HLS 200-777] Using interface defaults for 'Vivado' flow target.
+INFO: [HLS 200-1995] There were 13,152 instructions in the design after the 'Compile/Link' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,854 instructions in the design after the 'Unroll/Inline (step 1)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 2,028 instructions in the design after the 'Unroll/Inline (step 2)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,849 instructions in the design after the 'Unroll/Inline (step 3)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,526 instructions in the design after the 'Unroll/Inline (step 4)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,261 instructions in the design after the 'Array/Struct (step 1)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,261 instructions in the design after the 'Array/Struct (step 2)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,261 instructions in the design after the 'Array/Struct (step 3)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,261 instructions in the design after the 'Array/Struct (step 4)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,278 instructions in the design after the 'Array/Struct (step 5)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 1,278 instructions in the design after the 'Performance (step 1)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 4,858 instructions in the design after the 'Performance (step 2)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 4,856 instructions in the design after the 'Performance (step 3)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 4,856 instructions in the design after the 'Performance (step 4)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 5,216 instructions in the design after the 'HW Transforms (step 1)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+INFO: [HLS 200-1995] There were 5,297 instructions in the design after the 'HW Transforms (step 2)' phase of compilation. See the Design Size Report for more details: /opt/tiki/tikitorch/hardware/hls/forge_kernels/forge_muzero_train_chess_proj/solution1/syn/report/csynth_design_size.rpt
+WARNING: [HLS 214-386] A depth specification is required for MAXI interface port 'buffer' for cosimulation. (forge_train_step_muzero_train.cpp:189:0)
+INFO: [HLS 214-178] Inlining function 'nearest_pow2(int, int&, int&)' into 'fwd_linear(int const*, int const*, ap_int<16> const*, ap_int<16>*, int, int)' (forge_train_step_muzero_train.cpp:80:0)
+INFO: [HLS 214-178] Inlining function 'dyq_apply(int, int, ap_int<32>)' into 'fwd_linear(int const*, int const*, ap_int<16> const*, ap_int<16>*, int, int)' (forge_train_step_muzero_train.cpp:80:0)
+INFO: [HLS 214-178] Inlining function 'sat16(ap_int<32>)' into 'fwd_linear(int const*, int const*, ap_int<16> const*, ap_int<16>*, int, int)' (forge_train_step_muzero_train.cpp:80:0)
+INFO: [HLS 214-178] Inlining function 'isign(ap_int<32>)' into 'sgnprod(ap_int<32>, ap_int<32>)' (forge_train_step_muzero_train.cpp:31:0)
+INFO: [HLS 214-178] Inlining function 'isign(ap_int<32>)' into 'sgd_layer(int*, int*, ap_int<32> const*, ap_int<16> const*, int, int, int)' (forge_train_step_muzero_train.cpp:105:0)
+INFO: [HLS 214-178] Inlining function 'sgnprod(ap_int<32>, ap_int<32>)' into 'sgd_layer(int*, int*, ap_int<32> const*, ap_int<16> const*, int, int, int)' (forge_train_step_muzero_train.cpp:105:0)
+INFO: [HLS 214-178] Inlining function 'lrstep(int, int)' into 'sgd_layer(int*, int*, ap_int<32> const*, ap_int<16> const*, int, int, int)' (forge_train_step_muzero_train.cpp:105:0)
+INFO: [HLS 214-178] Inlining function 'sgd_update(int*, int)' into 'sgd_layer(int*, int*, ap_int<32> const*, ap_int<16> const*, int, int, int)' (forge_train_step_muzero_train.cpp:105:0)
+INFO: [HLS 214-178] Inlining function 'nearest_pow2(int, int&, int&)' into 'bwd_input(int const*, ap_int<32> const*, ap_int<32>*, int, int)' (forge_train_step_muzero_train.cpp:92:0)
+INFO: [HLS 214-178] Inlining function 'dyq_apply(int, int, ap_int<32>)' into 'bwd_input(int const*, ap_int<32> const*, ap_int<32>*, int, int)' (forge_train_step_muzero_train.cpp:92:0)
+INFO: [HLS 214-178] Inlining function 'sat16(ap_int<32>)' into 'train_step(int*, int)' (forge_train_step_muzero_train.cpp:114:0)
+INFO: [HLS 214-178] Inlining function 'isign(ap_int<32>)' into 'train_step(int*, int)' (forge_train_step_muzero_train.cpp:114:0)
+INFO: [HLS 214-178] Inlining function 'nearest_pow2(int, int&, int&)' into 'train_step(int*, int)' (forge_train_step_muzero_train.cpp:114:0)
+INFO: [HLS 214-178] Inlining function 'dyq_apply(int, int, ap_int<32>)' into 'train_step(int*, int)' (forge_train_step_muzero_train.cpp:114:0)
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_108_2> at forge_train_step_muzero_train.cpp:108:27 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_95_2> at forge_train_step_muzero_train.cpp:95:26 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_106_1> at forge_train_step_muzero_train.cpp:106:23 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_83_2> at forge_train_step_muzero_train.cpp:83:26 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_123_1> at forge_train_step_muzero_train.cpp:123:23 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_130_2> at forge_train_step_muzero_train.cpp:130:23 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_132_3> at forge_train_step_muzero_train.cpp:132:37 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_134_4> at forge_train_step_muzero_train.cpp:134:23 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_137_5> at forge_train_step_muzero_train.cpp:137:23 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_142_6> at forge_train_step_muzero_train.cpp:142:23 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_147_7> at forge_train_step_muzero_train.cpp:147:23 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_159_9> at forge_train_step_muzero_train.cpp:159:27 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_50_1> at forge_train_step_muzero_train.cpp:50:22 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_169_10> at forge_train_step_muzero_train.cpp:169:24 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_175_11> at forge_train_step_muzero_train.cpp:175:40 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_177_12> at forge_train_step_muzero_train.cpp:177:43 
+INFO: [HLS 214-376] automatically set the pipeline for Loop< VITIS_LOOP_182_13> at forge_train_step_muzero_train.cpp:182:24 
+INFO: [HLS 214-291] Loop 'VITIS_LOOP_50_1' is marked as complete unroll implied by the pipeline pragma (forge_train_step_muzero_train.cpp:50:22)
+INFO: [HLS 214-291] Loop 'VITIS_LOOP_108_2' is marked as complete unroll implied by the pipeline pragma (forge_train_step_muzero_train.cpp:108:27)
+INFO: [HLS 214-186] Unrolling loop 'VITIS_LOOP_50_1' (forge_train_step_muzero_train.cpp:50:22) in function 'train_step' completely with a factor of 15 (forge_train_step_muzero_train.cpp:114:0)
+INFO: [HLS 214-186] Unrolling loop 'VITIS_LOOP_50_1' (forge_train_step_muzero_train.cpp:50:22) in function 'bwd_input' completely with a factor of 15 (forge_train_step_muzero_train.cpp:92:0)
+INFO: [HLS 214-186] Unrolling loop 'VITIS_LOOP_108_2' (forge_train_step_muzero_train.cpp:108:27) in function 'sgd_layer' completely with a factor of 64 (forge_train_step_muzero_train.cpp:105:0)
+INFO: [HLS 214-186] Unrolling loop 'VITIS_LOOP_50_1' (forge_train_step_muzero_train.cpp:50:22) in function 'fwd_linear' completely with a factor of 15 (forge_train_step_muzero_train.cpp:80:0)
+INFO: [HLS 214-437] Automatically disabling loop flattening for loop 'VITIS_LOOP_81_1'. (forge_train_step_muzero_train.cpp:81:22)
+INFO: [HLS 214-437] Automatically disabling loop flattening for loop 'VITIS_LOOP_106_1'. (forge_train_step_muzero_train.cpp:106:23)
+INFO: [HLS 214-421] Automatically partitioning small array 'val' completely based on array size. (forge_train_step_muzero_train.cpp:126:65)
+INFO: [HLS 214-270] Inferring pragma 'array_partition type=complete dim=1' for array 'val' due to pipeline pragma (forge_train_step_muzero_train.cpp:126:65)
+INFO: [HLS 214-248] Applying array_partition to 'val': Complete partitioning on dimension 1. (forge_train_step_muzero_train.cpp:126:65)
+INFO: [HLS 214-115] Multiple burst reads of length 769 and bit width 32 in loop 'VITIS_LOOP_83_2'(forge_train_step_muzero_train.cpp:83:26) has been inferred on bundle 'gmem'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (forge_train_step_muzero_train.cpp:83:26)
+INFO: [HLS 214-115] Multiple burst reads of length 1538 and bit width 32 in loop 'VITIS_LOOP_83_2'(forge_train_step_muzero_train.cpp:83:26) has been inferred on bundle 'gmem'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (forge_train_step_muzero_train.cpp:83:26)
+INFO: [HLS 214-115] Multiple burst reads of length 64 and bit width 32 in loop 'VITIS_LOOP_83_2'(forge_train_step_muzero_train.cpp:83:26) has been inferred on bundle 'gmem'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (forge_train_step_muzero_train.cpp:83:26)
+INFO: [HLS 214-115] Multiple burst reads of length 128 and bit width 32 in loop 'VITIS_LOOP_83_2'(forge_train_step_muzero_train.cpp:83:26) has been inferred on bundle 'gmem'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (forge_train_step_muzero_train.cpp:83:26)
+INFO: [HLS 214-115] Multiple burst reads of length 769 and bit width 32 in loop 'VITIS_LOOP_123_1'(forge_train_step_muzero_train.cpp:123:23) has been inferred on bundle 'gmem'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (forge_train_step_muzero_train.cpp:123:23)
+INFO: [HLS 214-115] Multiple burst writes of length 4096 and bit width 32 in loop 'VITIS_LOOP_142_6'(forge_train_step_muzero_train.cpp:142:23) has been inferred on bundle 'gmem'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (forge_train_step_muzero_train.cpp:142:23)
+INFO: [HLS 214-115] Multiple burst reads of length 4096 and bit width 32 in loop 'VITIS_LOOP_147_7'(forge_train_step_muzero_train.cpp:147:23) has been inferred on bundle 'gmem'. These burst requests might be further partitioned into multiple requests during RTL generation, based on max_read_burst_length or max_write_burst_length settings. (forge_train_step_muzero_train.cpp:147:23)
+INFO: [HLS 200-111] Finished Compiling Optimization and Transform: CPU user time: 4.49 seconds. CPU system time: 0.45 seconds. Elapsed time: 8.28 seconds; current allocated memory: 236.078 MB.
+INFO: [HLS 200-111] Finished Checking Pragmas: CPU user time: 0 seconds. CPU system time: 0 seconds. Elapsed time: 0 seconds; current allocated memory: 236.078 MB.
+INFO: [HLS 200-10] Starting code transformations ...
+INFO: [HLS 200-111] Finished Standard Transforms: CPU user time: 0.15 seconds. CPU system time: 0 seconds. Elapsed time: 0.16 seconds; current allocated memory: 239.453 MB.
+INFO: [HLS 200-10] Checking synthesizability ...
+INFO: [HLS 200-111] Finished Checking Synthesizability: CPU user time: 0.21 seconds. CPU system time: 0 seconds. Elapsed time: 0.21 seconds; current allocated memory: 245.340 MB.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:158:25) to (forge_train_step_muzero_train.cpp:159:27) in function 'train_step'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:53:16) in function 'train_step'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:82:15) to (forge_train_step_muzero_train.cpp:83:26) in function 'fwd_linear.5'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:82:15) to (forge_train_step_muzero_train.cpp:83:26) in function 'fwd_linear.4'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:82:15) to (forge_train_step_muzero_train.cpp:83:26) in function 'fwd_linear.3'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:82:15) to (forge_train_step_muzero_train.cpp:83:26) in function 'fwd_linear.2'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:82:15) to (forge_train_step_muzero_train.cpp:83:26) in function 'fwd_linear.1'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:82:15) to (forge_train_step_muzero_train.cpp:83:26) in function 'fwd_linear'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:94:15) to (forge_train_step_muzero_train.cpp:95:26) in function 'bwd_input.8'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:94:15) to (forge_train_step_muzero_train.cpp:95:26) in function 'bwd_input.10'... converting 3 basic blocks.
+INFO: [XFORM 203-401] Performing if-conversion on hyperblock from (forge_train_step_muzero_train.cpp:94:15) to (forge_train_step_muzero_train.cpp:95:26) in function 'bwd_input'... converting 3 basic blocks.
+INFO: [HLS 200-111] Finished Loop, function and other optimizations: CPU user time: 1.26 seconds. CPU system time: 0.02 seconds. Elapsed time: 1.28 seconds; current allocated memory: 278.133 MB.
+INFO: [HLS 200-2061] Successfully converted nested loops 'VITIS_LOOP_93_1'(forge_train_step_muzero_train.cpp:93:22) and 'VITIS_LOOP_95_2'(forge_train_step_muzero_train.cpp:95:26) in function 'bwd_input.8' into perfectly nested loops.
+INFO: [HLS 200-2061] Successfully converted nested loops 'VITIS_LOOP_93_1'(forge_train_step_muzero_train.cpp:93:22) and 'VITIS_LOOP_95_2'(forge_train_step_muzero_train.cpp:95:26) in function 'bwd_input.10' into perfectly nested loops.
+INFO: [HLS 200-2061] Successfully converted nested loops 'VITIS_LOOP_93_1'(forge_train_step_muzero_train.cpp:93:22) and 'VITIS_LOOP_95_2'(forge_train_step_muzero_train.cpp:95:26) in function 'bwd_input' into perfectly nested loops.
+INFO: [XFORM 203-541] Flattening a loop nest 'VITIS_LOOP_93_1' (forge_train_step_muzero_train.cpp:93:22) in function 'bwd_input.8'.
+INFO: [XFORM 203-541] Flattening a loop nest 'VITIS_LOOP_93_1' (forge_train_step_muzero_train.cpp:93:22) in function 'bwd_input.10'.
+INFO: [XFORM 203-541] Flattening a loop nest 'VITIS_LOOP_93_1' (forge_train_step_muzero_train.cpp:93:22) in function 'bwd_input'.
+INFO: [HLS 200-111] Finished Architecture Synthesis: CPU user time: 4.02 seconds. CPU system time: 0.16 seconds. Elapsed time: 4.19 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] Starting hardware synthesis ...
+INFO: [HLS 200-10] Synthesizing 'forge_train_step_muzero_train' ...
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.1_Pipeline_VITIS_LOOP_83_2' to 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.1' to 'fwd_linear_1'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.2_Pipeline_VITIS_LOOP_83_2' to 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.2' to 'fwd_linear_2'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.3_Pipeline_VITIS_LOOP_83_2' to 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.3' to 'fwd_linear_3'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.4_Pipeline_VITIS_LOOP_83_2' to 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.4' to 'fwd_linear_4'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.5_Pipeline_VITIS_LOOP_83_2' to 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2'.
+WARNING: [SYN 201-103] Legalizing function name 'fwd_linear.5' to 'fwd_linear_5'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.6_Pipeline_VITIS_LOOP_108_2' to 'sgd_layer_6_Pipeline_VITIS_LOOP_108_2'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.6' to 'sgd_layer_6'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.7_Pipeline_VITIS_LOOP_108_2' to 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.7' to 'sgd_layer_7'.
+WARNING: [SYN 201-103] Legalizing function name 'bwd_input.8' to 'bwd_input_8'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.9_Pipeline_VITIS_LOOP_106_1' to 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.9' to 'sgd_layer_9'.
+WARNING: [SYN 201-103] Legalizing function name 'bwd_input.10' to 'bwd_input_10'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.11_Pipeline_VITIS_LOOP_108_2' to 'sgd_layer_11_Pipeline_VITIS_LOOP_108_2'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.11' to 'sgd_layer_11'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.12_Pipeline_VITIS_LOOP_108_2' to 'sgd_layer_12_Pipeline_VITIS_LOOP_108_2'.
+WARNING: [SYN 201-103] Legalizing function name 'sgd_layer.12' to 'sgd_layer_12'.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_123_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_123_1'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_123_1'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.15 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.19 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_83_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 12, loop 'VITIS_LOOP_83_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.11 seconds. CPU system time: 0 seconds. Elapsed time: 0.11 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_130_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_130_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_130_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_83_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 12, loop 'VITIS_LOOP_83_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.06 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_132_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_132_3'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 2, loop 'VITIS_LOOP_132_3'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_134_4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_134_4'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_134_4'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_83_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 12, loop 'VITIS_LOOP_83_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_137_5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_137_5'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 2, loop 'VITIS_LOOP_137_5'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.01 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_83_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 12, loop 'VITIS_LOOP_83_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_83_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 12, loop 'VITIS_LOOP_83_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_83_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 12, loop 'VITIS_LOOP_83_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'fwd_linear_5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_142_6' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_142_6'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_142_6'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.01 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_147_7' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_147_7'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 4, loop 'VITIS_LOOP_147_7'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_159_9' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_159_9'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 20, loop 'VITIS_LOOP_159_9'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.09 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.09 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_50_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_50_1'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 2, loop 'VITIS_LOOP_50_1'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 722.582 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 722.582 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_106_1'.
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 130, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 193, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 225, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 241, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 249, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 253, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 255, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 256, distance = 1, offset = 1) between bus read operation ('gmem_addr_71_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [SCHED 204-61] Unable to satisfy pipeline directive for loop 'VITIS_LOOP_106_1': unable to pipeline.
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 11.08 seconds. CPU system time: 0.01 seconds. Elapsed time: 11.1 seconds; current allocated memory: 727.762 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 1.44 seconds. CPU system time: 0.03 seconds. Elapsed time: 1.46 seconds; current allocated memory: 729.074 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.43 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.43 seconds; current allocated memory: 734.191 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 734.926 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_6_Pipeline_VITIS_LOOP_108_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_108_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 18, loop 'VITIS_LOOP_108_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.09 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.09 seconds; current allocated memory: 736.168 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 736.168 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_6' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 736.695 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 736.695 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'bwd_input' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_93_1_VITIS_LOOP_95_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 20, loop 'VITIS_LOOP_93_1_VITIS_LOOP_95_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.11 seconds. CPU system time: 0 seconds. Elapsed time: 0.11 seconds; current allocated memory: 738.566 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 738.566 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_108_2'.
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' (loop 'VITIS_LOOP_108_2'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 1) between bus response operation ('gmem_addr_73_resp', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) and bus request operation ('gmem_load_68_req', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' (loop 'VITIS_LOOP_108_2'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 1) between bus response operation ('gmem_addr_73_resp', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) and bus request operation ('gmem_load_68_req', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' (loop 'VITIS_LOOP_108_2'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 1) between bus response operation ('gmem_addr_73_resp', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) and bus request operation ('gmem_load_68_req', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' (loop 'VITIS_LOOP_108_2'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 1) between bus response operation ('gmem_addr_73_resp', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) and bus request operation ('gmem_load_68_req', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' (loop 'VITIS_LOOP_108_2'): Unable to enforce a carried dependence constraint (II = 11, distance = 1, offset = 1) between bus response operation ('gmem_addr_73_resp', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) and bus request operation ('gmem_load_68_req', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' (loop 'VITIS_LOOP_108_2'): Unable to enforce a carried dependence constraint (II = 15, distance = 1, offset = 1) between bus response operation ('gmem_addr_73_resp', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) and bus request operation ('gmem_load_68_req', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' (loop 'VITIS_LOOP_108_2'): Unable to enforce a carried dependence constraint (II = 16, distance = 1, offset = 1) between bus response operation ('gmem_addr_73_resp', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) and bus request operation ('gmem_load_68_req', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 17, Depth = 18, loop 'VITIS_LOOP_108_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.09 seconds. CPU system time: 0 seconds. Elapsed time: 0.08 seconds; current allocated memory: 739.336 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 739.336 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_7' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.04 seconds; current allocated memory: 739.527 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 739.527 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_169_10' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_169_10'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 2, loop 'VITIS_LOOP_169_10'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 740.078 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 740.078 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'bwd_input_8' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_93_1_VITIS_LOOP_95_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 20, loop 'VITIS_LOOP_93_1_VITIS_LOOP_95_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.07 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.09 seconds; current allocated memory: 741.645 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 741.645 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_106_1'.
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 2, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 3, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 4, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 130, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 193, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 225, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 241, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 249, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 253, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 255, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+WARNING: [HLS 200-880] The II Violation in module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' (loop 'VITIS_LOOP_106_1'): Unable to enforce a carried dependence constraint (II = 256, distance = 1, offset = 1) between bus read operation ('gmem_addr_72_read', forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) on port 'gmem' (forge_train_step_muzero_train.cpp:72->forge_train_step_muzero_train.cpp:110) and bus request operation ('gmem_addr_req', forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109) on port 'gmem' (forge_train_step_muzero_train.cpp:75->forge_train_step_muzero_train.cpp:109).
+Resolution: For help on HLS 200-880 see docs.xilinx.com/access/sources/dita/topic?Doc_Version=2024.1%20English&url=ug1448-hls-guidance&resourceid=200-880.html
+INFO: [SCHED 204-61] Unable to satisfy pipeline directive for loop 'VITIS_LOOP_106_1': unable to pipeline.
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 11.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 11.04 seconds; current allocated memory: 763.820 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 1.44 seconds. CPU system time: 0.01 seconds. Elapsed time: 1.46 seconds; current allocated memory: 766.973 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_9' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.42 seconds. CPU system time: 0.03 seconds. Elapsed time: 0.44 seconds; current allocated memory: 771.969 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.07 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 772.961 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_175_11' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_175_11'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 2, loop 'VITIS_LOOP_175_11'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.09 seconds. CPU system time: 0 seconds. Elapsed time: 0.08 seconds; current allocated memory: 773.438 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.02 seconds; current allocated memory: 773.652 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_177_12' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_177_12'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 2, loop 'VITIS_LOOP_177_12'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.04 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 774.184 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 774.184 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'bwd_input_10' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [HLS 200-486] Changing DSP latency (root=add_ln96) to 3 in order to utilize available DSP registers.
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_93_1_VITIS_LOOP_95_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 24, loop 'VITIS_LOOP_93_1_VITIS_LOOP_95_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.11 seconds. CPU system time: 0 seconds. Elapsed time: 0.11 seconds; current allocated memory: 775.625 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 775.625 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_11_Pipeline_VITIS_LOOP_108_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_108_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 18, loop 'VITIS_LOOP_108_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.07 seconds; current allocated memory: 776.270 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.03 seconds; current allocated memory: 776.270 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_11' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 776.676 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 776.719 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step_Pipeline_VITIS_LOOP_182_13' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_182_13'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 3, loop 'VITIS_LOOP_182_13'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 777.254 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 777.254 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_12_Pipeline_VITIS_LOOP_108_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-61] Pipelining loop 'VITIS_LOOP_108_2'.
+INFO: [HLS 200-1470] Pipelining result : Target II = NA, Final II = 1, Depth = 18, loop 'VITIS_LOOP_108_2'
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 777.730 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.04 seconds; current allocated memory: 777.730 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'sgd_layer_12' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.05 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 778.555 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.03 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.03 seconds; current allocated memory: 778.555 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'train_step' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.12 seconds. CPU system time: 0 seconds. Elapsed time: 0.11 seconds; current allocated memory: 780.527 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.1 seconds. CPU system time: 0 seconds. Elapsed time: 0.09 seconds; current allocated memory: 780.527 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-42] -- Implementing module 'forge_train_step_muzero_train' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [SCHED 204-11] Starting scheduling ...
+INFO: [SCHED 204-11] Finished scheduling.
+INFO: [HLS 200-111] Finished Scheduling: CPU user time: 0.13 seconds. CPU system time: 0 seconds. Elapsed time: 0.14 seconds; current allocated memory: 781.004 MB.
+INFO: [BIND 205-100] Starting micro-architecture generation ...
+INFO: [BIND 205-101] Performing variable lifetime analysis.
+INFO: [BIND 205-101] Exploring resource sharing.
+INFO: [BIND 205-101] Binding ...
+INFO: [BIND 205-100] Finished micro-architecture generation.
+INFO: [HLS 200-111] Finished Binding: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 781.090 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_123_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_123_1' pipeline 'VITIS_LOOP_123_1' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_123_1/m_axi_gmem_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_123_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.18 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.19 seconds; current allocated memory: 781.336 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'fwd_linear_Pipeline_VITIS_LOOP_83_2' pipeline 'VITIS_LOOP_83_2' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_Pipeline_VITIS_LOOP_83_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.11 seconds; current allocated memory: 783.059 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.09 seconds; current allocated memory: 786.367 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_130_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_130_2' pipeline 'VITIS_LOOP_130_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_130_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.05 seconds; current allocated memory: 787.637 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2' pipeline 'VITIS_LOOP_83_2' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_1_Pipeline_VITIS_LOOP_83_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.1 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.11 seconds; current allocated memory: 789.520 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0 seconds. Elapsed time: 0.1 seconds; current allocated memory: 792.883 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_132_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_132_3' pipeline 'VITIS_LOOP_132_3' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_132_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 794.102 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_134_4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_134_4' pipeline 'VITIS_LOOP_134_4' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_134_4'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.04 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.05 seconds; current allocated memory: 794.918 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2' pipeline 'VITIS_LOOP_83_2' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_2_Pipeline_VITIS_LOOP_83_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.1 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.12 seconds; current allocated memory: 796.844 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.08 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.1 seconds; current allocated memory: 800.207 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_137_5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_137_5' pipeline 'VITIS_LOOP_137_5' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_137_5'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.06 seconds. CPU system time: 0 seconds. Elapsed time: 0.06 seconds; current allocated memory: 801.406 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2' pipeline 'VITIS_LOOP_83_2' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_3_Pipeline_VITIS_LOOP_83_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.12 seconds. CPU system time: 0 seconds. Elapsed time: 0.11 seconds; current allocated memory: 803.273 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_3' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_3'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.1 seconds; current allocated memory: 806.598 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2' pipeline 'VITIS_LOOP_83_2' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_4_Pipeline_VITIS_LOOP_83_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.12 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.13 seconds; current allocated memory: 808.918 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_4' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_4'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0 seconds. Elapsed time: 0.09 seconds; current allocated memory: 812.309 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2' pipeline 'VITIS_LOOP_83_2' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2/m_axi_gmem_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_5_Pipeline_VITIS_LOOP_83_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.12 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.13 seconds; current allocated memory: 814.598 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'fwd_linear_5' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'fwd_linear_5'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0 seconds. Elapsed time: 0.1 seconds; current allocated memory: 817.816 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_142_6' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_142_6' pipeline 'VITIS_LOOP_142_6' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_AWUSER' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_142_6/m_axi_gmem_BREADY' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_142_6'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.11 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.12 seconds; current allocated memory: 819.129 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_147_7' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_147_7' pipeline 'VITIS_LOOP_147_7' pipeline type 'loop pipeline'
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARVALID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARADDR' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARID' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARLEN' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARSIZE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARBURST' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARLOCK' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARCACHE' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARPROT' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARQOS' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARREGION' to 0.
+WARNING: [RTGEN 206-101] Setting dangling out port 'train_step_Pipeline_VITIS_LOOP_147_7/m_axi_gmem_ARUSER' to 0.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_147_7'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.11 seconds. CPU system time: 0 seconds. Elapsed time: 0.11 seconds; current allocated memory: 820.035 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_159_9' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_159_9' pipeline 'VITIS_LOOP_159_9' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_159_9'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.07 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.09 seconds; current allocated memory: 822.156 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_50_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_50_1' pipeline 'VITIS_LOOP_50_1' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_50_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.1 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.11 seconds; current allocated memory: 825.324 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_Pipeline_VITIS_LOOP_106_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_Pipeline_VITIS_LOOP_106_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.62 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.63 seconds; current allocated memory: 852.855 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 1.14 seconds. CPU system time: 0.07 seconds. Elapsed time: 1.25 seconds; current allocated memory: 894.621 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_6_Pipeline_VITIS_LOOP_108_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'sgd_layer_6_Pipeline_VITIS_LOOP_108_2' pipeline 'VITIS_LOOP_108_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_6_Pipeline_VITIS_LOOP_108_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.24 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.25 seconds; current allocated memory: 902.992 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_6' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_6'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0 seconds. Elapsed time: 0.1 seconds; current allocated memory: 905.730 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'bwd_input' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'bwd_input' pipeline 'VITIS_LOOP_93_1_VITIS_LOOP_95_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'bwd_input'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.12 seconds. CPU system time: 0 seconds. Elapsed time: 0.11 seconds; current allocated memory: 916.332 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2' pipeline 'VITIS_LOOP_108_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_7_Pipeline_VITIS_LOOP_108_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.13 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.14 seconds; current allocated memory: 919.172 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_7' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_7'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.08 seconds. CPU system time: 0 seconds. Elapsed time: 0.09 seconds; current allocated memory: 923.527 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_169_10' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_169_10' pipeline 'VITIS_LOOP_169_10' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_169_10'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.09 seconds; current allocated memory: 925.805 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'bwd_input_8' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'bwd_input_8' pipeline 'VITIS_LOOP_93_1_VITIS_LOOP_95_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'bwd_input_8'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.1 seconds. CPU system time: 0 seconds. Elapsed time: 0.09 seconds; current allocated memory: 927.387 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_9_Pipeline_VITIS_LOOP_106_1'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.69 seconds. CPU system time: 0 seconds. Elapsed time: 0.7 seconds; current allocated memory: 946.867 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_9' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_9'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 1.19 seconds. CPU system time: 0.06 seconds. Elapsed time: 1.25 seconds; current allocated memory: 988.957 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_175_11' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_175_11' pipeline 'VITIS_LOOP_175_11' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_175_11'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.26 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.27 seconds; current allocated memory: 1008.148 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_177_12' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_177_12' pipeline 'VITIS_LOOP_177_12' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_177_12'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.09 seconds. CPU system time: 0 seconds. Elapsed time: 0.1 seconds; current allocated memory: 1019.574 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'bwd_input_10' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'bwd_input_10' pipeline 'VITIS_LOOP_93_1_VITIS_LOOP_95_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Generating core module 'mac_muladd_11ns_7ns_11ns_17_4_1': 1 instance(s).
+INFO: [RTGEN 206-100] Finished creating RTL model for 'bwd_input_10'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.12 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.13 seconds; current allocated memory: 1020.320 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_11_Pipeline_VITIS_LOOP_108_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'sgd_layer_11_Pipeline_VITIS_LOOP_108_2' pipeline 'VITIS_LOOP_108_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_11_Pipeline_VITIS_LOOP_108_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.16 seconds. CPU system time: 0 seconds. Elapsed time: 0.17 seconds; current allocated memory: 1022.766 MB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_11' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_11'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.12 seconds. CPU system time: 0.01 seconds. Elapsed time: 0.12 seconds; current allocated memory: 1.003 GB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step_Pipeline_VITIS_LOOP_182_13' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'train_step_Pipeline_VITIS_LOOP_182_13' pipeline 'VITIS_LOOP_182_13' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step_Pipeline_VITIS_LOOP_182_13'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.12 seconds. CPU system time: 0 seconds. Elapsed time: 0.12 seconds; current allocated memory: 1.005 GB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_12_Pipeline_VITIS_LOOP_108_2' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-1030] Apply Unified Pipeline Control on module 'sgd_layer_12_Pipeline_VITIS_LOOP_108_2' pipeline 'VITIS_LOOP_108_2' pipeline type 'loop pipeline'
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_12_Pipeline_VITIS_LOOP_108_2'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.1 seconds. CPU system time: 0 seconds. Elapsed time: 0.11 seconds; current allocated memory: 1.007 GB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'sgd_layer_12' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'sgd_layer_12'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.13 seconds. CPU system time: 0 seconds. Elapsed time: 0.12 seconds; current allocated memory: 1.008 GB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'train_step' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [RTGEN 206-100] Finished creating RTL model for 'train_step'.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_obs_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_zr1_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_h_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_zp1_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_pol_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_hraw_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_pre_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_gpol_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_gz_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_gzp1_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [RTMG 210-278] Implementing memory 'forge_train_step_muzero_train_train_step_gzr1_RAM_AUTO_1R1W' using auto RAMs.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.25 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.26 seconds; current allocated memory: 1.009 GB.
+INFO: [HLS 200-10] ----------------------------------------------------------------
+INFO: [HLS 200-10] -- Generating RTL for module 'forge_train_step_muzero_train' 
+INFO: [HLS 200-10] ----------------------------------------------------------------
+WARNING: [RTGEN 206-101] Design contains AXI ports. Reset is fixed to synchronous and active low.
+INFO: [RTGEN 206-500] Setting interface mode on port 'forge_train_step_muzero_train/gmem' to 'm_axi'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'forge_train_step_muzero_train/buffer_r' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'forge_train_step_muzero_train/mode' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'forge_train_step_muzero_train/arg1' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'forge_train_step_muzero_train/arg2' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on port 'forge_train_step_muzero_train/arg3' to 's_axilite & ap_none'.
+INFO: [RTGEN 206-500] Setting interface mode on function 'forge_train_step_muzero_train' to 's_axilite & ap_ctrl_hs'.
+INFO: [RTGEN 206-100] Bundling port 'return', 'buffer_r', 'mode', 'arg1', 'arg2' and 'arg3' to AXI-Lite port control.
+INFO: [RTGEN 206-100] Finished creating RTL model for 'forge_train_step_muzero_train'.
+INFO: [HLS 200-111] Finished Creating RTL model: CPU user time: 0.32 seconds. CPU system time: 0.02 seconds. Elapsed time: 0.35 seconds; current allocated memory: 1.009 GB.
+INFO: [HLS 200-111] Finished Generating all RTL models: CPU user time: 0.61 seconds. CPU system time: 0.04 seconds. Elapsed time: 0.65 seconds; current allocated memory: 1.009 GB.
+INFO: [HLS 200-1603] Design has inferred MAXI bursts and missed bursts, see Vitis HLS GUI synthesis summary report for detailed information.
+INFO: [HLS 200-111] Finished Updating report files: CPU user time: 2.88 seconds. CPU system time: 0.04 seconds. Elapsed time: 2.92 seconds; current allocated memory: 1.077 GB.
+INFO: [VHDL 208-304] Generating VHDL RTL for forge_train_step_muzero_train.
+INFO: [VLOG 209-307] Generating Verilog RTL for forge_train_step_muzero_train.
+INFO: [HLS 200-790] **** Loop Constraint Status: All loop constraints were NOT satisfied.
+INFO: [HLS 200-789] **** Estimated Fmax: 342.47 MHz
+INFO: [HLS 200-2161] Finished Command csynth_design Elapsed time: 00:00:59; Allocated memory: 880.066 MB.
+==== chess-scale train csynth report ====
+  forge_muzero_train_chess_proj/solution1/syn/report/forge_train_step_muzero_train_csynth.rpt
+INFO: [HLS 200-112] Total CPU user time: 56.65 seconds. Total CPU system time: 2.02 seconds. Total elapsed time: 61.95 seconds; peak allocated memory: 1.077 GB.
