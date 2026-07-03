@@ -456,7 +456,11 @@ undertrained; the gate is trajectory shape):
 - **Residual BOUNDED + self-regulating at depth 8 / D=512**: peak ~476 @step 225 → declines to ~120–170.
   The depth-blowup risk is REFUTED at this scale.
 - **No dyadic-Adam underflow**: |W|max grows 0.044→0.24; descent continues at LR=3e-4.
-- Float control (MULTFREE=0, same everything) running → the measured mult-free premium at 30M completes G4.
+- **★G4 COMPLETE — float control (MULTFREE=0, same everything): the mult-free recipe WINS at matched HPs.**
+  ema 4.476 vs float 4.753 (batches 3.588 vs 3.866) at 500 steps; float's residual blew to ~1600 (vs the
+  mult-free's stable ~120–170) — the dyadic/qact stack acts as a REGULARIZER at this scale. Honest scope:
+  single seed, 1M tokens, HPs tuned for neither — the claim is "NO early-training quality tax at 30M;
+  ahead at matched HPs", not "beats float at convergence". **PHASE 0 = GO for silicon spend.**
 
 ## 6. Phased execution plan
 
