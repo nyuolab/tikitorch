@@ -492,6 +492,17 @@ Static latency bounds are envelope artifacts (runtime-bound helper loops assume 
 kick time is Phase-1.5's silicon measurement. PLAN CHANGE: skip the D=256 AFI — the kernel fits at D=512,
 so ONE D=512 AFI serves both the single-chip roofline (1.5) and the 30M 8-chip run (Phase 2).
 
+### ★ PHASE 1.5 + FIX CYCLE (2026-07-04, MEASURED+csynth): kick gap found and fixed
+FIRST silicon roofline (pre-fix): D=512 K=32 OUTPUT kick FWD 1597.8ms / BWD 1881.4ms (0.287 steps/s) —
+5-9x above projection. ATTRIBUTED (csynth per-loop, reconciled to -6/-8%): attention blend achieved II=7 (814ms
+= 51% of FWD, OMITTED from the FLOP projection) + gemm false-dependence II=3 (constexpr-tile blindness) +
+4x weight restream; adam/DDR exonerated. FIXES A-F (A gemm II 3->1 via constexpr tiles + DEPENDENCE-false
+BIT-EXACT; B attention partial-sum lanes II 7->1; C ACQUIRE hoist; E LN lanes; F train-like KICKMEAS) +
+S2_SLOTS 2->8 + PIPE scheduler replacing the illegal 2-engine G (shared-gmem DATAFLOW = HLS-illegal). CSYNTH
+RE-GATE PASS: MAC nest VITIS_LOOP_423_15/16/17 achieved II=1 (was 3), LN II=1, BRAM 64%/LUT 49%/DSP 14% one
+SLR. csim: all fixes bit-exact(A/C)/1-ULP(B/E); CHECK-4 serial-vs-interleaved BIT-IDENTICAL (S=8 pipelining).
+Projected post-fix serial kick FWD ~420 / BWD ~430ms; AFI rebuilding -> re-measure.
+
 ### Phase 1.5 — D=256 stepping stone on ONE FPGA (validate the roofline on silicon)
 - **Build:** the redesigned kernel at D=256 (4–6M params), one block, one FPGA (the S1-isolated F2
   box, never the shared `tiki-f2-silicon`).
