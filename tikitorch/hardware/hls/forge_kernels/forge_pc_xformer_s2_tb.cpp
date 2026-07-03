@@ -198,6 +198,74 @@ static double relerr(const double*a,const double*b,int n,long*ndiff){ double mx=
 static bool allfinite(const std::vector<double>&v){ for(double x:v) if(!isfinite(x)) return false; return true; }
 static bool bitident(const std::vector<double>&a,const std::vector<double>&b){ if(a.size()!=b.size())return false; for(size_t i=0;i<a.size();i++) if(a[i]!=b[i])return false; return true; }
 
+// ================================ CHECK 4: PIPE slot isolation + interleave bit-identity ================================
+// The S=8 SLOT scheme keeps each in-flight sub-batch's volatile state (wide cache, GRIN/GROUT, tok/tgt) in its own
+// DDR mirror (slot g%S2_SLOTS). This gate asserts that running 4 sub-batches INTERLEAVED (fwd g+1 dispatched before
+// bwd g, each in slot g%S2_SLOTS) is BIT-IDENTICAL to the serial baseline (all slot 0) — both the per-g backward
+// up-message GROUT and the final trained masters. It is the csim twin of the driver's PIPE=1 event loop.
+// slot DDR offset (== kernel `po` / driver slot_po): slot 0 = base, slot k = S2_PAR_OFF + (k-1)*S2_PAR_SPAN.
+static long tb_slot_po(int s){ return s ? (long)S2_PAR_OFF + (long)(s-1)*S2_PAR_SPAN : 0L; }
+// stage ONLY the model masters into a fresh (zeroed) gbuf. Unlike stage() it does NOT stage a per-slot input and is
+// called ONCE per run — CHECK 4 accumulates GACC across sub-batches in DDR (no reset between them).
+static void stage_model_fresh(){
+    for(int i=0;i<S2_BUFLEN;i++) gbuf[i]=0;
+    put_f(gbuf,S2_FWQ,mWQ.data(),D*D); put_f(gbuf,S2_FWK,mWK.data(),D*D); put_f(gbuf,S2_FWV,mWV.data(),D*D); put_f(gbuf,S2_FWO,mWO.data(),D*D);
+    put_f(gbuf,S2_FWUP,mWUP.data(),FFN*D); put_f(gbuf,S2_FWDN,mWDN.data(),D*FFN); put_f(gbuf,S2_FWHEAD,mWH.data(),VOCAB*D);
+    put_f(gbuf,S2_FLN1G,mLN1G.data(),D); put_f(gbuf,S2_FLN1B,mLN1B.data(),D); put_f(gbuf,S2_FLN2G,mLN2G.data(),D); put_f(gbuf,S2_FLN2B,mLN2B.data(),D);
+    put_f(gbuf,S2_FLNFG,mLNFG.data(),D); put_f(gbuf,S2_FLNFB,mLNFB.data(),D);
+}
+// stage sub-batch input R (SEQ*D) into slot s's wide down-message (S2_GRIN+slot_po), targets (SEQ) into S2_TGT+s*SEQ.
+static void stage_input_slot(int s, const std::vector<float>&R, const std::vector<int>&T){
+    long po = tb_slot_po(s);
+    std::vector<float> rf(SEQ*D); for(int i=0;i<SEQ*D;i++) rf[i]=R[i];
+    put_f(gbuf, (int)(S2_GRIN + po), rf.data(), SEQ*D);
+    put_i(gbuf, (int)(S2_TGT + s*SEQ), T.data(), SEQ);
+}
+// concatenate the OUTPUT-role trained masters (the tensors adam touches) for a bit-identity compare.
+static void capture_masters(std::vector<double>&out){
+    out.clear();
+    struct M{int off,n;} ms[]={{S2_FWQ,D*D},{S2_FWK,D*D},{S2_FWV,D*D},{S2_FWO,D*D},{S2_FWUP,FFN*D},{S2_FWDN,D*FFN},{S2_FWHEAD,VOCAB*D}};
+    for(auto&m:ms){ std::vector<double> t(m.n); get_f(gbuf,m.off,t.data(),m.n); out.insert(out.end(),t.begin(),t.end()); }
+}
+static bool check4_pipe(){
+    const int NG = 4;                               // 4 sub-batches -> slots 0..3 (< S2_SLOTS=8)
+    std::vector<std::vector<float>> Rg(NG); std::vector<std::vector<int>> Tg(NG);
+    for(int g=0;g<NG;g++){ unsigned sd=4242u + 101u*(unsigned)g; std::vector<float> r; frand(r,SEQ*D,0.5,sd);
+        Rg[g].assign(r.begin(), r.end());
+        Tg[g].resize(SEQ); for(int t=0;t<SEQ;t++){ sd=sd*1103515245u+12345u; Tg[g][t]=(int)((sd>>9)%VOCAB); } }
+    int lrbits=(int)lround(3e-3*1048576.0);
+    // ---- (A) SERIAL reference: all slot 0, ascending g, GACC accumulates across g, adam on the last ----
+    stage_model_fresh();
+    std::vector<std::vector<double>> grout_ser(NG);
+    for(int g=0;g<NG;g++){
+        stage_input_slot(0, Rg[g], Tg[g]);
+        int gz=(g==0)?1:0, du=(g==NG-1)?1:0;
+        setcfg(gbuf,S2_PH_FWD,S2_RL_OUT,0,     lrbits, gz, 0, 0,0,0); forge_pc_xformer_s2_block((ap_uint<512>*)gbuf);
+        setcfg(gbuf,S2_PH_BWD,S2_RL_OUT,du, du?lrbits:0, gz, 0, 0,0,0); forge_pc_xformer_s2_block((ap_uint<512>*)gbuf);
+        grout_ser[g].resize(SEQ*D); get_f(gbuf, S2_GROUT, grout_ser[g].data(), SEQ*D);
+    }
+    std::vector<double> mas_ser; capture_masters(mas_ser);
+    // ---- (B) INTERLEAVED: slot=g%S2_SLOTS, order F0 F1 B0 F2 B1 F3 B2 B3 (fwd g+1 before bwd g) ----
+    stage_model_fresh();
+    std::vector<std::vector<double>> grout_int(NG);
+    auto do_fwd=[&](int g){ int s=g%S2_SLOTS; stage_input_slot(s, Rg[g], Tg[g]); int gz=(g==0)?1:0;
+        setcfg(gbuf,S2_PH_FWD,S2_RL_OUT,0,lrbits,gz,s,0,0,0); forge_pc_xformer_s2_block((ap_uint<512>*)gbuf); };
+    auto do_bwd=[&](int g){ int s=g%S2_SLOTS; int gz=(g==0)?1:0, du=(g==NG-1)?1:0;
+        setcfg(gbuf,S2_PH_BWD,S2_RL_OUT,du,du?lrbits:0,gz,s,0,0,0); forge_pc_xformer_s2_block((ap_uint<512>*)gbuf);
+        grout_int[g].resize(SEQ*D); get_f(gbuf, (int)(S2_GROUT + tb_slot_po(s)), grout_int[g].data(), SEQ*D); };
+    do_fwd(0); do_fwd(1); do_bwd(0); do_fwd(2); do_bwd(1); do_fwd(3); do_bwd(2); do_bwd(3);
+    std::vector<double> mas_int; capture_masters(mas_int);
+    // ---- assert bit-identity ----
+    bool ok=true;
+    for(int g=0;g<NG;g++){ bool bg=bitident(grout_ser[g],grout_int[g]); ok=ok&&bg;
+        long nd=0; for(size_t i=0;i<grout_ser[g].size();i++) if(grout_ser[g][i]!=grout_int[g][i]) nd++;
+        printf("   sub-batch g=%d slot=%d  GROUT serial==interleaved: %-3s (ndiff=%ld/%d)\n", g, g%S2_SLOTS, bg?"YES":"NO", nd, SEQ*D); }
+    bool bm=bitident(mas_ser,mas_int); ok=ok&&bm;
+    long ndm=0; for(size_t i=0;i<mas_ser.size();i++) if(mas_ser[i]!=mas_int[i]) ndm++;
+    printf("   final trained masters serial==interleaved: %-3s (ndiff=%ld/%zu)\n", bm?"YES":"NO", ndm, mas_ser.size());
+    return ok;
+}
+
 int main(){
     printf("=== forge_pc_xformer_s2_block csim  (D=%d H=%d DH=%d FFN=%d SEQ=%d VOCAB=%d  K=%d TILE_O=%d TILE_I=%d SEQ_TILE=%d) ===\n",
            D,H,DH,FFN,SEQ,VOCAB,K,S2_TILE_O,S2_TILE_I,S2_SEQ_TILE);
@@ -209,7 +277,7 @@ int main(){
 
     // ---------- CHECK 1: numerics vs fp64 same-order reference ----------
     Dump d0; run_step(S2_TILE_O,S2_TILE_I,S2_SEQ_TILE,1,d0);
-    int pass1=1, pass2=1;
+    int pass1=1, pass2=1, pass4=1;
     if (SMALL) {
     Ref ref; reference(mWQ.data(),mWK.data(),mWV.data(),mWO.data(),mWUP.data(),mWDN.data(),mWH.data(),
                        mLN1G.data(),mLN1B.data(),mLN2G.data(),mLN2B.data(),mLNFG.data(),mLNFB.data(),mR.data(),tgt.data(),ref);
@@ -246,8 +314,14 @@ int main(){
     int sA=same(dA),sB=same(dB),sC=same(dC);
     pass2 = sA&&sB&&sC;
     printf("   determinism run#1==run#0:%d  run#2==run#0:%d  run#3==run#0:%d   : %s\n",sA,sB,sC,pass2?"PASS":"FAIL");
+
+    // ---------- CHECK 4: PIPE slot isolation + interleave bit-identity ----------
+    printf("[CHECK 4] S2_SLOTS=%d slot pipeline: 4 sub-batches serial(all slot 0) vs interleaved(slot=g%%%d, order\n"
+           "          F0 F1 B0 F2 B1 F3 B2 B3) — per-g GROUT + final trained masters must be BIT-IDENTICAL:\n", S2_SLOTS, S2_SLOTS);
+    pass4 = check4_pipe();
+    printf("   => CHECK 4 (slot pipeline bit-identity): %s\n", pass4?"PASS":"FAIL");
     } else {
-        printf("[CHECK 1/2] skipped at D=%d (numeric + streaming-equivalence gates run in the D<=128 csim)\n", D);
+        printf("[CHECK 1/2/4] skipped at D=%d (numeric + streaming-equivalence + pipe gates run in the D<=128 csim)\n", D);
     }
 
     // ---------- CHECK 3: smoke — all grads finite AND non-trivial (headline at D=512) ----------
@@ -259,7 +333,7 @@ int main(){
     printf("[CHECK 3] D=%d one-step smoke: finite=%d nontrivial=%d  |gWQ|=%.3e |gWUP|=%.3e |gWDN|=%.3e |gWHEAD|=%.3e |gR|=%.3e : %s\n",
            D, f3, nontrivial, mQ,mUP,mDN,mWH,mR, pass3?"PASS":"FAIL");
 
-    int pass = pass1 && pass2 && pass3;
+    int pass = pass1 && pass2 && pass3 && pass4;
     printf("=== %s ===\n", pass?"ALL CHECKS PASS":"FAIL");
     free(gbuf);
     return pass?0:1;

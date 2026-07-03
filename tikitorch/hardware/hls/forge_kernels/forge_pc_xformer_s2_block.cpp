@@ -29,11 +29,11 @@
 //
 // ================================ RESIDENT-ARRAY (BRAM) CENSUS @ D=512 defaults ================================
 // The BUDGET is < ~5.4 MB (80% of the 6.75 MB one-SLR BRAM). Every persistent on-chip array, in bytes:
-//   s2_gemm x2  Bcache          2 x [128*2048] fp32         = 2 x 1048576 = 2.10 MB  (FIX C: whole-c0 dyad'd weight
-//               (engines A+B)                                                          cache, hoisted above r0; FIX G
-//               lhstile         2 x [64*128]  fp32          = 2 x 32768   =  64 KB     duplicates the engine so BWD
-//               y               2 x [64*128]  fp32          = 2 x 32768   =  64 KB     DX+WG overlap in DATAFLOW)
-//               row/gaccrow     2 x [128*2]   fp32          = 2 x 1024    =   2 KB
+//   s2_gemm     Bcache          1 x [128*2048] fp32         =     1048576 = 1.05 MB  (FIX C: whole-c0 dyad'd weight
+//               (single engine)                                                        cache, hoisted above r0)
+//               lhstile         1 x [64*128]  fp32          =       32768 =  32 KB
+//               y               1 x [64*128]  fp32          =       32768 =  32 KB
+//               row/gaccrow     1 x [128*2]   fp32          =        1024 =   1 KB
 //   s2_adam     Wt/mt/vt/gt     4 x [4096]    fp32          =     65536  =  64 KB   (adam RMW tiles)
 //   s2_lnstrip  LN row-block    1 x [64*512]  fp32          =    131072  = 128 KB   (LN fwd/bwd, in place)
 //   s2_tA/s2_tB elementwise     2 x [2048]    fp32          =     16384  =  16 KB   (copy/add/zero/qact/relu)
@@ -42,9 +42,9 @@
 //   LN scalars  ln1s/ln2s/lnfs  3 x [256]     fp32          =      3072  =   3 KB
 //   misc rows   femb/fpos/tok.. ~6 x [512]    fp32          =    ~12288  = ~12 KB
 //   -----------------------------------------------------------------------------------------------------
-//   TOTAL persistent on-chip                                                         ~= 2.9 MB  (< 5.4 MB budget)
-//   (Bcache is TILE_O*KC_MAX = the per-c0 hoisted weight tile; KC_MAX=FFN=2048 at D=512. The two-engine 2.1 MB
-//    is the FIX C+G cost — still comfortably inside the one-SLR budget; DSP stays 1-2% as the MACs are dyad-shift.)
+//   TOTAL persistent on-chip                                                         ~= 1.9 MB  (< 5.4 MB budget)
+//   (Bcache is TILE_O*KC_MAX = the per-c0 hoisted weight tile; KC_MAX=FFN=2048 at D=512. The single-engine 1.05 MB
+//    is the FIX C cost — comfortably inside the one-SLR budget; DSP stays 1-2% as the MACs are dyad-shift.)
 // Nothing above is a full-SEQ tensor; the ~34 MB of full-SEQ statics (WR..gV, gyT/xT, the 4 MB debug temp)
 // are DELETED. The only sizes that scale with the model are the attn head slices (SEQ*DH) and the LN strip
 // (SEQ_TILE*D); both stay small and D-tileable. (See the BEFORE census in the accompanying report.)
@@ -414,11 +414,13 @@ static void NAME(int mode, ap_uint<512> *buffer, int Woff,                      
         }                                                                                                     \
     }                                                                                                         \
 }
-// FIX G: instantiate the engine TWICE (each function's `static` locals are its own => two independent HW
-// instances) so the backward's DX-route and WG for the SAME linear can run concurrently in a DATAFLOW region
-// (DSP is at 1-2%, plenty of room). csim: both are the identical body so outputs are byte-identical.
+// The engine is instantiated ONCE. (An earlier FIX G duplicated it as s2_gemm_b so the FFN backward's DX-route
+// and WG for the SAME linear could overlap in a DATAFLOW region. csynth REJECTED that: two processes both read
+// the single `gmem` m_axi bundle — "Bundled bus interface 'gmem' failed dataflow checking: cannot read data in
+// multiple processes — s2_gemm and s2_gemm_b". Reverted: the FFN DX and WG run SEQUENTIALLY like every other
+// DX/WG pair in this kernel — which is how the pre-FIX-G baseline already computed them, so numerics are
+// unchanged. The throughput that FIX G chased now comes from the S=8 SLOT pipeline event loop in the driver.)
 S2_GEMM_ENGINE(s2_gemm)
-S2_GEMM_ENGINE(s2_gemm_b)
 
 // ------------------------------------------------------------------------------------------------------
 // s2_adam_stream — dyadic-Adam apply as a DDR read-modify-write stream (§2.3.3). (== golden; unchanged.)
@@ -455,19 +457,6 @@ static void s2_wgrad(ap_uint<512> *buffer, int gy_off, int x_off, int O, int I, 
                      int gacc_off, int gzero) {
 #pragma HLS INLINE off
     s2_gemm(S2M_WG, buffer, 0, gy_off, x_off, 0, O, I, M, gacc_off, gzero);
-}
-
-// FIX G: the FFN (WUP) DX-route + weight-grad as a DATAFLOW pair on the TWO engine instances. gX2 (engine A, DX)
-// and gWUP (engine B, WG) both READ the masked gHD (S2_BG_HD) and write DISJOINT tensors (S2_BG_X2 vs GACC_WUP),
-// so they are order-independent — csim runs them sequentially (outputs byte-identical to the old two calls) while
-// HLS overlaps them. REMAINING for full silicon overlap: both engines share the single `gmem` m_axi port, so the
-// two operand streams still arbitrate on one DDR channel; splitting into a 2nd m_axi bundle would decouple the
-// DMA. The MAC arrays are per-instance already, so the compute overlaps regardless.
-static void s2_ffn_wup_dxwg(ap_uint<512> *buffer, int po, int gzero) {
-#pragma HLS INLINE off
-#pragma HLS DATAFLOW
-    s2_gemm  (S2M_DX, buffer, S2_FWUP, S2_BG_HD, 0, S2_BG_X2, S2_SEQ, S2_D, S2_FFN, 0, 0);            // gX2 (A)
-    s2_gemm_b(S2M_WG, buffer, 0, S2_BG_HD, S2_WX2 + po, 0, S2_FFN, S2_D, S2_SEQ, S2_GACC_WUP, gzero); // gWUP (B)
 }
 
 // ======================================================================================================
@@ -730,7 +719,8 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
     s2_gemm(S2M_DX, buffer, S2_FWDN, S2_BG_RP, 0, S2_BG_HD, S2_SEQ, S2_FFN, S2_D, 0, 0);                        // gHD = gRP@dyad(WDN)
     s2_wgrad(buffer, S2_BG_RP, S2_WHD + po, S2_D, S2_FFN, S2_SEQ, S2_GACC_WDN, GZERO);                          // gWDN + GACC
     s2_relu_apply_ddr(buffer, S2_BG_HD, S2_WRMASK + po, S2_SEQ*S2_FFN);                                         // mask gHD
-    s2_ffn_wup_dxwg(buffer, po, GZERO);   // FIX G: gX2 (engine A, DX) || gWUP (engine B, WG) — DATAFLOW, disjoint out
+    s2_gemm(S2M_DX, buffer, S2_FWUP, S2_BG_HD, 0, S2_BG_X2, S2_SEQ, S2_D, S2_FFN, 0, 0);   // gX2 = gHD@dyad(WUP)
+    s2_wgrad(buffer, S2_BG_HD, S2_WX2 + po, S2_FFN, S2_D, S2_SEQ, S2_GACC_WUP, GZERO);      // gWUP + GACC
     // (2) LN2 over M
     s2_ln_bwd_ddr(buffer, S2_BG_X2, FLN2G, ln2s, S2_BG_TMP, S2_SEQ);                                            // gM2 -> TMP
     s2_add_ddr(buffer, S2_BG_M, S2_BG_TMP, S2_BG_M, S2_SEQ*S2_D, 1);                                            // gM = P(gM + gM2)

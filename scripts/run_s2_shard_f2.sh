@@ -9,7 +9,7 @@ set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"; REGION="${REGION:-us-east-1}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-f2.48xlarge}"; AMI="${AMI:-ami-092fc5deb8f3c0f7d}"
 AGFI="${AGFI:?set AGFI}"; STEPS="${STEPS:-3000}"; NSLOTS="${NSLOTS:-8}"; MAX_MINUTES="${MAX_MINUTES:-180}"; ROLE="${ROLE:-tiki-sweep-runner}"
-XF_LR="${XF_LR:-3e-3}"; XF_WARMUP="${XF_WARMUP:-200}"; SEED="${SEED:-7}"; SAMPLE="${SAMPLE:-400}"; ACTSTATS="${ACTSTATS:-0}"; FIXEDOFF="${FIXEDOFF:--1}"; ACCUM="${ACCUM:-8}"; INIT_S3="${INIT_S3:-}"; LR_DECAY="${LR_DECAY:-1}"; LR_MINFRAC="${LR_MINFRAC:-0.1}"; KICKMEAS="${KICKMEAS:-0}"
+XF_LR="${XF_LR:-3e-3}"; XF_WARMUP="${XF_WARMUP:-200}"; SEED="${SEED:-7}"; SAMPLE="${SAMPLE:-400}"; ACTSTATS="${ACTSTATS:-0}"; FIXEDOFF="${FIXEDOFF:--1}"; ACCUM="${ACCUM:-8}"; INIT_S3="${INIT_S3:-}"; LR_DECAY="${LR_DECAY:-1}"; LR_MINFRAC="${LR_MINFRAC:-0.1}"; KICKMEAS="${KICKMEAS:-0}"; PIPE="${PIPE:-0}"
 # byte-level enwik8 token stream (uint16 ids 0-255). Provide ENWIK_S3 (an s3://.../train.u16) OR a BINS_S3 dir that
 # contains train.u16. ENWIK_S3 wins if set. The parent already staged /tmp/enwik8_20m.u16 -> put it at ENWIK_S3.
 ENWIK_S3="${ENWIK_S3:-}"; BINS_S3="${BINS_S3:-s3://tiki-sweep-739966866637/pc_enwik8_bins}"
@@ -28,7 +28,7 @@ shutdown -h +${MAX_MINUTES} dl || true
 exec > /var/log/tiki-s2shard.log 2>&1
 set -x; export HOME=/root
 S3_SRC="${S3_SRC}"; S3_RESULTS="${S3_RESULTS}"; AGFI="${AGFI}"; STEPS="${STEPS}"; NSLOTS="${NSLOTS}"; BINS_S3="${BINS_S3}"; ENWIK_S3="${ENWIK_S3}"
-XF_LR="${XF_LR}"; XF_WARMUP="${XF_WARMUP}"; SEED="${SEED}"; SAMPLE="${SAMPLE}"; ACTSTATS="${ACTSTATS}"; FIXEDOFF="${FIXEDOFF}"; ACCUM="${ACCUM}"; INIT_S3="${INIT_S3}"; LR_DECAY="${LR_DECAY}"; LR_MINFRAC="${LR_MINFRAC}"; KICKMEAS="${KICKMEAS}"
+XF_LR="${XF_LR}"; XF_WARMUP="${XF_WARMUP}"; SEED="${SEED}"; SAMPLE="${SAMPLE}"; ACTSTATS="${ACTSTATS}"; FIXEDOFF="${FIXEDOFF}"; ACCUM="${ACCUM}"; INIT_S3="${INIT_S3}"; LR_DECAY="${LR_DECAY}"; LR_MINFRAC="${LR_MINFRAC}"; KICKMEAS="${KICKMEAS}"; PIPE="${PIPE}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-s2shard.log "\$S3_RESULTS/s2shard.log" --only-show-errors || true; }
 trap up EXIT
 ( while true; do sleep 30; up; done ) &
@@ -48,7 +48,7 @@ ls -la /tmp/pc_enwik8; up
 if [ -n "\$INIT_S3" ]; then mkdir -p /tmp/init; for l in 0 1 2 3 4 5 6 7; do aws s3 cp "\$INIT_S3/master\$l.f32" /tmp/init/master\$l.f32 --only-show-errors 2>/dev/null || true; done; export INIT_DIR=/tmp/init; ls -la /tmp/init; fi
 g++ -O2 -std=c++14 -I"\$SDK/include" -I/opt/tiki/tikitorch/hardware/hls/forge_kernels \
     /opt/tiki/tikitorch/fpga/silicon/forge_pc_xformer_s2_shard.cpp -lfpga_mgmt -o /tmp/xfs2shard 2>&1 | tee /tmp/build.txt; up
-export XF_LR XF_WARMUP SEED SAMPLE ACTSTATS FIXEDOFF ACCUM LR_DECAY LR_MINFRAC KICKMEAS DUMP_DIR=/tmp   # INIT_DIR exported above when INIT_S3 set
+export XF_LR XF_WARMUP SEED SAMPLE ACTSTATS FIXEDOFF ACCUM LR_DECAY LR_MINFRAC KICKMEAS PIPE DUMP_DIR=/tmp   # INIT_DIR exported above when INIT_S3 set
 ( sudo -E /tmp/xfs2shard "\$STEPS" /tmp/pc_enwik8 \$SLOTS 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
 for fdump in img build train; do aws s3 cp /tmp/\$fdump.txt "\$S3_RESULTS/\$fdump.txt" --only-show-errors || true; done
 for w in /tmp/xfs2_master*.f32; do [ -f "\$w" ] && aws s3 cp "\$w" "\$S3_RESULTS/\$(basename \$w)" --only-show-errors || true; done

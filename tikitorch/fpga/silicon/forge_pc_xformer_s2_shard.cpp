@@ -17,8 +17,9 @@
 //     so a CPU twin — /tmp/mp_chain_30m.py — can replay via INIT_DIR in this exact FMaster field order);
 //   * neighbour messages are the WIDE float strips S2_GROUT -> S2_GRIN (SEQ*D floats = 512 KB each), bursted;
 //   * bpb is read from the OUTPUT chip's WIDE float logits S2_WLG;
-//   * PIPE is SERIAL-ONLY in v1 (the s2 kernel HAS S=2 SLOT parity, but pipelining the 30M run is a later
-//     optimization — the driver keeps SLOT=0 throughout and notes it; cross-sub-batch overlap is future work);
+//   * PIPE=1 enables the cross-sub-batch dependency EVENT LOOP (ported from the mp shard) over the s2 kernel's
+//     S=8 SLOT parity: up to S2_SLOTS in-flight sub-batches overlap (slot=g%S2_SLOTS), backward-first dispatch,
+//     per-chip monotonic bwd order for GACC, a per-step barrier. PIPE=0 (default) is the serial bit-compat path;
 //   * KICKMEAS=<n>: the Phase-1.5 single-chip roofline. Run ONE chip in OUTPUT role (the heaviest block: block +
 //     final-LN + LM head + CE + full backward + adam) for n FWD+BWD steps and print per-phase kick ms. INPUT/HID
 //     chips are strictly cheaper (no head), so this is an upper bound on the per-chip kick cost.
@@ -71,6 +72,21 @@ static void kick_report(){
     for(int p=0;p<2;p++) for(int l=0;l<8;l++) if(g_kick_n[p][l])
         printf("[kicktime] %s chip %d: %.1f ms/kick (n=%ld)\n", p?"BWD":"FWD", l, 1e3*g_kick_s[p][l]/g_kick_n[p][l], g_kick_n[p][l]);
     fflush(stdout); }
+
+// ---- ASYNC kick (PIPE scheduler): split kick() into start (poke AP_START) + poll (peek AP_DONE) so the
+//      scheduler can run ONE kick at a time on EACH chip concurrently and overlap sub-batches. Timing is
+//      attributed on completion by the phase of the finished kick (g_kick_s/g_kick_n stay meaningful). ----
+static double g_kick_t0[MAXL];
+static void kick_start(int l){ fpga_pci_poke(bar0[l],R_BUF0,0); fpga_pci_poke(bar0[l],R_BUF1,0);
+    g_kick_t0[l]=now_s(); fpga_pci_poke(bar0[l],R_AP_CTRL,AP_START); }
+static int kick_poll(int l){ uint32_t c=0; fpga_pci_peek(bar0[l],R_AP_CTRL,&c); return (c&AP_DONE)?1:0; }
+// cross-sub-batch PIPELINING: env PIPE (default 0 = the existing serial per-sub-batch sweeps, bit-compatible)
+static int g_pipe=-1;
+static inline int pipe_on(){ if(g_pipe<0){ const char*e=getenv("PIPE"); g_pipe=e?atoi(e):0; } return g_pipe; }
+// DDR slot offset for a per-sub-batch wide/msg region: slot 0 = the base region (offset 0), slots 1..S2_SLOTS-1 =
+// the appended mirrors (stride S2_PAR_SPAN, first at S2_PAR_OFF) — the exact formula the kernel's `po` uses
+// (forge_pc_xformer_s2_block.cpp, cfg lane 6 = slot). Returns long: offsets reach ~39.3M words at S2_SLOTS=8.
+static inline long slot_po(int slot){ return slot ? ((long)S2_PAR_OFF + (long)(slot-1)*S2_PAR_SPAN) : 0L; }
 
 // BURSTED readback: one mmap'd memcpy from the BAR4 read window instead of per-word peek. Env READBURST=0 forces
 // the old per-word path. CHUNKED so tensors larger than the map window (e.g. WUP = FFN*D = 1,048,576 words at
@@ -205,7 +221,7 @@ int main(int argc,char**argv){
         if(fpga_pci_attach(slot[l],FPGA_APP_PF,APP_PF_BAR0,0,&bar0[l])){fprintf(stderr,"bar0 %d\n",slot[l]);return 3;}
         if(fpga_pci_attach(slot[l],FPGA_APP_PF,APP_PF_BAR4,BURST_CAPABLE,&bar4[l])){fprintf(stderr,"bar4 %d\n",slot[l]);return 4;}
         if(fpga_pci_attach(slot[l],FPGA_APP_PF,APP_PF_BAR4,0,&bar4r[l])){fprintf(stderr,"bar4r %d\n",slot[l]);return 4;}
-        hbuf[l]=(int32_t*)calloc((size_t)S2_BUFLEN,4);    // shadow the WHOLE S2 float buffer (~101 MB/chip)
+        hbuf[l]=(int32_t*)calloc((size_t)S2_BUFLEN,4);    // shadow the WHOLE S2 float buffer (~166 MB/chip @ S2_SLOTS=8)
         if(!hbuf[l]){ fprintf(stderr,"calloc hbuf %d (%zu bytes)\n",l,(size_t)S2_BUFLEN*4); return 5; }
     }
 
@@ -229,6 +245,11 @@ int main(int argc,char**argv){
     float *hmsg=(float*)malloc(4L*S2_SEQ*S2_D);   // wide down-message (forward): S2_GROUT(l) -> S2_GRIN(l+1)
     float *emsg=(float*)malloc(4L*S2_SEQ*S2_D);   // wide up-message  (backward): S2_GROUT(l) -> S2_GRIN(l-1)
     float *wlg =(float*)malloc(4L*S2_SEQ*S2_VOCAB);  // OUTPUT chip wide logits (for bpb)
+    // PIPE scheduler: S2_SLOTS-deep boundary buffers indexed by (g % S2_SLOTS) so an in-flight sub-batch g's
+    // message can't be clobbered by another slot's message; per-step sub-batch offsets (drawn once up-front).
+    float *hmsg2[S2_SLOTS], *emsg2[S2_SLOTS];
+    for(int s=0;s<S2_SLOTS;s++){ hmsg2[s]=(float*)malloc(4L*S2_SEQ*S2_D); emsg2[s]=(float*)malloc(4L*S2_SEQ*S2_D); }
+    long  *soff=(long*)malloc(sizeof(long)*(size_t)(ACCUM>0?ACCUM:1));
     double t0=now_s(); double bpb_ema=-1, acc_ema=-1;
     srand(123);
     static long g_fixedoff = getenv("FIXEDOFF") ? atol(getenv("FIXEDOFF")) : -1;
@@ -288,7 +309,8 @@ int main(int argc,char**argv){
             lr = LR * (LR_MINFR + (1.0 - LR_MINFR) * 0.5 * (1.0 + cos(M_PI * t)));
         }
         long last_off = 0;
-        // ============================ SERIAL sweep (SLOT=0 throughout; v1) ============================
+      if(!pipe_on()){
+        // ============================ SERIAL sweep (PIPE=0, default, SLOT=0 throughout, bit-compatible) ==========
         // Per sub-batch: a full FWD sweep 0->L-1 then a full BWD sweep L-1->0. ACCUM = effective BATCH: GZERO=1 on
         // the first sub-batch zeroes the persistent DDR grad accumulators, each later BWD adds, DO_UPDATE=1 on the
         // last sub-batch runs streamed dyadic-Adam on the accumulated sum. All ACCUM sub-batches see the same weights.
@@ -321,9 +343,61 @@ int main(int argc,char**argv){
                 if(l>0) readf(l, S2_GROUT, emsg, (long)S2_SEQ*S2_D);  // WIDE up-message: this block's input-grad -> prev chip
             }
         }
+      } else {
+        // ==================== PIPELINED (PIPE=1): overlap sub-batches via S2_SLOTS(=8) slots ====================
+        // Instead of 2L serial kicks/sub-batch, run a dependency EVENT LOOP over the whole step's 2*L*ACCUM kicks
+        // keyed by the GLOBAL sub-batch index g (=k within this step; windows never cross a step -> the per-step
+        // barrier below structurally satisfies the g%ACCUM==0 window-boundary constraint). A chip runs ONE kick at a
+        // time; it picks any READY op with BACKWARD-FIRST preference. slot(g)=g%S2_SLOTS: up to S2_SLOTS in-flight
+        // sub-batches never share a slot, so F(g+k) (k<S2_SLOTS) can precede B(g). GACC RMW needs strict ASCENDING
+        // bwd order per chip (monotonic bnext[]); GZERO on g==0, DO_UP on g==ACCUM-1 (first/last bwd of the window).
+        for(int k=0;k<ACCUM;k++) soff[k] = g_fixedoff>=0 ? g_fixedoff : (long)(rand() % (ntok - S2_SEQ - 2));
+        last_off = soff[ACCUM-1];
+        int fdone[MAXL], bdone[MAXL], fnext[MAXL], bnext[MAXL], busy[MAXL], bph[MAXL], bg[MAXL];
+        for(int l=0;l<L;l++){ fdone[l]=bdone[l]=fnext[l]=bnext[l]=0; busy[l]=0; bph[l]=0; bg[l]=0; }
+        int total=2*L*ACCUM, ndone=0; double last_progress=now_s();
+        while(ndone<total){
+            // (1) reap completions: attribute timing + read this op's outgoing neighbour message into its slot buffer
+            for(int l=0;l<L;l++) if(busy[l] && kick_poll(l)){
+                int ph=bph[l], g=bg[l], slot=g%S2_SLOTS; long po=slot_po(slot);
+                g_kick_s[ph][l]+=now_s()-g_kick_t0[l]; g_kick_n[ph][l]++;
+                if(ph==0){ if(l<L-1){ readf(l, S2_GROUT+po, hmsg2[slot], (long)S2_SEQ*S2_D); } fdone[l]++; }   // fwd down-msg R'
+                else     { if(l>0)  { readf(l, S2_GROUT+po, emsg2[slot], (long)S2_SEQ*S2_D); } bdone[l]++; }   // bwd up-msg gR
+                busy[l]=0; ndone++; last_progress=now_s();
+            }
+            // (2) dispatch: for each idle chip pick a ready op, BACKWARD-FIRST (drains slots), else a ready forward
+            for(int l=0;l<L;l++) if(!busy[l]){
+                int gb=bnext[l];
+                int bwok = (gb<ACCUM) && (fdone[l]>gb) && (l==L-1 || bdone[l+1]>gb);           // B_l(g): F_l(g) & B_{l+1}(g)
+                int gf=fnext[l];
+                // F_l(g): F_{l-1}(g) done AND the slot g%S2_SLOTS is free (its previous occupant B_l(g-S2_SLOTS) done).
+                int fwok = (gf<ACCUM) && (l==0 || fdone[l-1]>gf) && (gf<S2_SLOTS || bdone[l]>gf-S2_SLOTS);
+                if(bwok){
+                    int slot=gb%S2_SLOTS; long po=slot_po(slot);
+                    int doup=(gb==ACCUM-1)?1:0, gz=(gb==0)?1:0;
+                    setcfg(l, S2_PH_BWD, role_of(l), doup, doup?lrcode(lr):0, gz, slot);
+                    if(l<L-1){ put_f(l, S2_GRIN+po, emsg2[slot], (long)S2_SEQ*S2_D); }  // neighbour WIDE error in
+                    kick_start(l); busy[l]=1; bph[l]=1; bg[l]=gb; bnext[l]++;
+                } else if(fwok){
+                    int slot=gf%S2_SLOTS; long po=slot_po(slot); long off=soff[gf];
+                    setcfg(l, S2_PH_FWD, role_of(l), 0, 0, 0, slot);
+                    if(l==0){
+                        for(int t=0;t<S2_SEQ;t++) hbuf[0][S2_TOK+slot*S2_SEQ+t]=data[off+t]; stage(0,S2_TOK+slot*S2_SEQ,S2_SEQ);
+                    } else {
+                        put_f(l, S2_GRIN+po, hmsg2[slot], (long)S2_SEQ*S2_D);   // upstream chip's R' -> down-message
+                    }
+                    if(l==L-1){ for(int t=0;t<S2_SEQ;t++) hbuf[l][S2_TGT+slot*S2_SEQ+t]=data[off+t+1]; stage(l,S2_TGT+slot*S2_SEQ,S2_SEQ); }  // OUTPUT targets (read in this g's BWD)
+                    kick_start(l); busy[l]=1; bph[l]=0; bg[l]=gf; fnext[l]++;
+                }
+            }
+            if(now_s()-last_progress>60.0){ fprintf(stderr,"PIPE SCHED STALL: no progress 60s (done %d/%d)\n",ndone,total); return 7; }
+        }
+      }
 
         // ===================== per-step bpb/acc from the OUTPUT chip's WIDE logits =====================
-        readf(L-1, S2_WLG, wlg, (long)S2_SEQ*S2_VOCAB);
+        // slot of the LAST sub-batch (k=ACCUM-1): 0 in serial, (ACCUM-1)%S2_SLOTS in pipe mode.
+        long metric_po = pipe_on() ? slot_po((ACCUM-1)%S2_SLOTS) : 0;
+        readf(L-1, S2_WLG + metric_po, wlg, (long)S2_SEQ*S2_VOCAB);
         actstat("logits", L-1, step, wlg, (long)S2_SEQ*S2_VOCAB);
         { int c=0; double bits=0; const double L2=log(2.0);
           for(int t=0;t<S2_SEQ;t++){ int tg=data[last_off+t+1];

@@ -160,13 +160,16 @@ static const int S2_DG_GK  = S2_DG_GQ  + S2_SEQ*S2_D;       // [SEQ*D]
 static const int S2_DG_GV  = S2_DG_GK  + S2_SEQ*S2_D;       // [SEQ*D]
 static const int S2_DG_END = S2_DG_GV  + S2_SEQ*S2_D;
 
-// ------------------------------- SLOT parity (cross-sub-batch pipelining), S=2 this version -------------------------------
-// slot 0 = base [S2_WR..S2_GROUT_END); slot 1 = one appended mirror span. Masters/adam/gacc are single-slot.
-static const int S2_SLOTS    = 2;
+// ------------------------------- SLOT parity (cross-sub-batch pipelining), S=8 (PIPE event loop) -------------------------------
+// slot 0 = base [S2_WR..S2_GROUT_END); slots 1..S2_SLOTS-1 = S2_SLOTS-1 appended mirror spans (stride S2_PAR_SPAN,
+// first at S2_PAR_OFF) — mirrors the mp kernel's proven slot scheme so up to S2_SLOTS in-flight sub-batches overlap
+// without clobbering each other's wide cache / neighbour messages / tok+tgt. Masters/adam/gacc stay single-slot.
+//   slot_off(k) = (k==0) ? 0 : (S2_PAR_OFF + (k-1)*S2_PAR_SPAN)     [== the kernel's `po`, cfg lane 6 = slot]
+static const int S2_SLOTS    = 8;                                  // pipeline slot depth (was 2; PIPE=1 event loop)
 static const int S2_PAR_SPAN = (S2_GROUT + S2_SEQ*S2_D) - S2_WR;   // contiguous per-slot wide/msg span (words)
 static const int S2_PAR      = S2_AL(S2_DG_END);                    // start of the slot>=1 mirror block
-static const int S2_PAR_OFF  = S2_PAR - S2_WR;                      // add to a slot-0 wide/msg offset -> slot-1 copy
-static const int S2_PAR_END  = S2_PAR + (S2_SLOTS-1)*S2_PAR_SPAN;
+static const int S2_PAR_OFF  = S2_PAR - S2_WR;                      // add to a slot-0 wide/msg offset -> slot-k copy (k>=1)
+static const int S2_PAR_END  = S2_PAR + (S2_SLOTS-1)*S2_PAR_SPAN;  // end of all S2_SLOTS-1 mirrors (stride SPAN)
 // slot-indexed token / target lanes (int32)
 static const int S2_TOK      = S2_PAR_END;                          // [SLOTS*SEQ]
 static const int S2_TGT      = S2_TOK + S2_SLOTS*S2_SEQ;            // [SLOTS*SEQ]
