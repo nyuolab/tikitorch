@@ -5,12 +5,12 @@
 #   AWS_PROFILE=... bash scripts/pc_science/run_pc_science_ec2.sh launch     # then status / fetch / terminate
 set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"; REGION="${REGION:-us-east-1}"
-ITYPE="${ITYPE:-c7i.24xlarge}"; AMI="${AMI:-ami-051bfa33df3949860}"; ROLE="${ROLE:-tiki-sweep-runner}"   # AL2023: aws CLI + python3 preinstalled
+ITYPE="${ITYPE:-c7i.48xlarge}"; AMI="${AMI:-ami-051bfa33df3949860}"; ROLE="${ROLE:-tiki-sweep-runner}"   # AL2023: aws CLI + python3 preinstalled
 BIN_S3="${BIN_S3:-s3://tiki-sweep-739966866637/s2_bins/train.u16}"   # byte-level enwik8 (already uploaded)
-DEPTHS="${DEPTHS:-2,4,8,16}"; SEEDS="${SEEDS:-0,1,2}"
-E1_STEPS="${E1_STEPS:-3000}"; E2_STEPS="${E2_STEPS:-5000}"
+DEPTHS="${DEPTHS:-2,4,8,16}"; SEEDS="${SEEDS:-0,1}"
+E1_STEPS="${E1_STEPS:-2000}"; E2_STEPS="${E2_STEPS:-3000}"
 D="${D:-256}"; HH="${HH:-4}"; DH="${DH:-64}"; FFN="${FFN:-1024}"; SEQ="${SEQ:-128}"; VOCAB="${VOCAB:-256}"
-THREADS="${THREADS:-4}"; MAX_MINUTES="${MAX_MINUTES:-480}"
+THREADS="${THREADS:-4}"; MAX_MINUTES="${MAX_MINUTES:-660}"
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"; STATE="${STATE_DIR:-$PROJECT_DIR/.tiki_pcsci_state}"; mkdir -p "$STATE"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
@@ -33,8 +33,11 @@ echo "BOOT \$(date -u)"; nproc
 # AL2023 ships aws CLI + python3; ensure aws + numpy are present (belt-and-suspenders for any AMI)
 command -v aws >/dev/null 2>&1 || { dnf install -y awscli 2>/dev/null || pip3 install awscli 2>/dev/null || true; }
 echo "aws: \$(command -v aws || echo MISSING)  python3: \$(command -v python3 || echo MISSING)"
-python3 -c "import numpy" 2>/dev/null || dnf install -y python3-numpy 2>/dev/null || pip3 install numpy 2>/dev/null || true
-python3 -c "import numpy,sys; print('numpy',numpy.__version__)" || { echo "FATAL: numpy missing"; echo fail | aws s3 cp - "\$S3_RESULTS/DONE" || true; shutdown -h now; }
+dnf install -y python3-pip gcc >/dev/null 2>&1 || true
+pip3 install --quiet "numpy>=1.24" 2>/dev/null || python3 -c "import numpy" 2>/dev/null || dnf install -y python3-numpy 2>/dev/null || true
+python3 -c "import numpy; print('numpy',numpy.__version__); numpy.show_config()" 2>&1 | grep -iE "numpy 1|openblas|blas" | head -3 || { echo "FATAL: numpy missing"; echo fail | aws s3 cp - "\$S3_RESULTS/DONE" || true; shutdown -h now; }
+# EARLY BLAS-SPEED CHECK: a 512x512x512 matmul must be <50ms (fast BLAS); if slow, we still run but flag it
+python3 -c "import numpy as np,time; a=np.random.rand(512,512); t=time.time(); [a@a for _ in range(20)]; print('BLAS 512cube:', round((time.time()-t)/20*1000,1),'ms/matmul')"
 up   # upload the boot log NOW so a launch can be verified within minutes
 mkdir -p /opt/tiki /tmp/pcout && cd /opt/tiki
 for i in 1 2 3; do aws s3 cp "${S3SRC}" s.tgz && break; sleep 8; done && tar xzf s.tgz

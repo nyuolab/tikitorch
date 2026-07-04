@@ -50,7 +50,9 @@ def train_one(arm, L, seed, data, base, steps, accum, lr0, warmup, minfrac, deca
     t0 = time.time(); best = 99.0
     # float-precision optimizer for the BP arms (they are the full-precision reference);
     # PC uses the dyadic-Adam apply (silicon recipe).
-    apply = model.apply_grads if arm == "PC" else getattr(model, "apply_grads_float", model.apply_grads)
+    # PC and BP share the dyadic-Adam apply so PC-vs-BP isolates the GRADIENT METHOD (cascade vs global
+    # backprop), not the optimizer; only BPf (pure-float reference) uses the float optimizer.
+    apply = getattr(model, "apply_grads_float", model.apply_grads) if arm == "BPf" else model.apply_grads
     for step in range(steps):
         lr = cosine_lr(step, steps, lr0, warmup, minfrac, decay)
         accg = None
@@ -94,7 +96,7 @@ def main():
                                  decay, eval_every, eval_batches, tokbin, fout)
     summary = dict(exp="exp2_summary", L=L, seed=seed, finals=finals,
                    gap_PC_BP=round(finals.get("PC", 0) - finals.get("BP", 0), 5),
-                   gap_PC_BPf=round(finals.get("PC", 0) - finals.get("BPf", 0), 5))
+                   gap_PC_BPf=round(finals.get("PC", 0) - finals.get("BPf", 0), 5), note="PC/BP=dyadicAdam BPf=floatAdam; PC-BP isolates cascade-vs-globalBP")
     fout.write(json.dumps(summary) + "\n"); fout.close()
     print(f"[exp2 L={L} s{seed}] SUMMARY {summary}", flush=True)
 
