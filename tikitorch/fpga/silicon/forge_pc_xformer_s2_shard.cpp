@@ -401,8 +401,12 @@ int main(int argc,char**argv){
         if(getenv("S2_DIAG") && step==0){
             static float dbuf[S2_SEQ*S2_FFN]; long po0 = pipe_on()?slot_po((ACCUM-1)%S2_SLOTS):0;
             auto mx=[&](int l,int off,long n){ readf(l,off+po0,dbuf,n); double m=0; for(long j=0;j<n;j++){double a=fabs(dbuf[j]); if(a>m)m=a;} return m; };
-            fprintf(stderr,"[S2_DIAG] chip0 GROUT(R')=%.3e | chip%d GRIN(R_in)=%.3e WRP(block)=%.3e WXF(LNF)=%.3e WLG(logit)=%.3e | FWHEAD=%.3e\n",
-                mx(0,S2_GROUT,(long)S2_SEQ*S2_D), L-1,
+            // chip0 tokens (int) + INPUT forward chain: FEMB, FPOS, WR(embed), WX1(LN1), WRP(block), GROUT
+            static int32_t tk[S2_SEQ]; readw(0,S2_TOK,tk,S2_SEQ); int tmin=1<<30,tmax=-1; for(int t=0;t<S2_SEQ;t++){ if(tk[t]<tmin)tmin=tk[t]; if(tk[t]>tmax)tmax=tk[t]; }
+            fprintf(stderr,"[S2_DIAG] chip0: TOK[%d..%d] FEMB=%.3e FPOS=%.3e WR(embed)=%.3e WX1(LN1)=%.3e WRP(block)=%.3e GROUT=%.3e\n",
+                tmin,tmax, mx(0,S2_FEMB,(long)S2_VOCAB*S2_D), mx(0,S2_FPOS,(long)S2_SEQ*S2_D),
+                mx(0,S2_WR,(long)S2_SEQ*S2_D), mx(0,S2_WX1,(long)S2_SEQ*S2_D), mx(0,S2_WRP,(long)S2_SEQ*S2_D), mx(0,S2_GROUT,(long)S2_SEQ*S2_D));
+            fprintf(stderr,"[S2_DIAG] chip%d GRIN=%.3e WRP=%.3e WXF=%.3e WLG=%.3e FWHEAD=%.3e\n", L-1,
                 mx(L-1,S2_GRIN,(long)S2_SEQ*S2_D), mx(L-1,S2_WRP,(long)S2_SEQ*S2_D),
                 mx(L-1,S2_WXF,(long)S2_SEQ*S2_D), mx(L-1,S2_WLG,(long)S2_SEQ*S2_VOCAB),
                 ({ readf(L-1,S2_FWHEAD,dbuf,(long)S2_SEQ*S2_D); double m=0; for(long j=0;j<(long)S2_SEQ*S2_D;j++){double a=fabs(dbuf[j]);if(a>m)m=a;} m; }));
