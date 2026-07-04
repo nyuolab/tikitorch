@@ -8,9 +8,9 @@ PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"; REGION="${REGION:-us-east-1}"
 ITYPE="${ITYPE:-c7i.48xlarge}"; AMI="${AMI:-ami-051bfa33df3949860}"; ROLE="${ROLE:-tiki-sweep-runner}"   # AL2023: aws CLI + python3 preinstalled
 BIN_S3="${BIN_S3:-s3://tiki-sweep-739966866637/s2_bins/train.u16}"   # byte-level enwik8 (already uploaded)
 DEPTHS="${DEPTHS:-2,4,8,16}"; SEEDS="${SEEDS:-0,1}"
-E1_STEPS="${E1_STEPS:-2000}"; E2_STEPS="${E2_STEPS:-3000}"
+E1_STEPS="${E1_STEPS:-2000}"; E2_STEPS="${E2_STEPS:-2500}"
 D="${D:-256}"; HH="${HH:-4}"; DH="${DH:-64}"; FFN="${FFN:-1024}"; SEQ="${SEQ:-128}"; VOCAB="${VOCAB:-256}"
-THREADS="${THREADS:-4}"; MAX_MINUTES="${MAX_MINUTES:-660}"
+THREADS="${THREADS:-2}"; MAX_MINUTES="${MAX_MINUTES:-660}"
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"; STATE="${STATE_DIR:-$PROJECT_DIR/.tiki_pcsci_state}"; mkdir -p "$STATE"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
@@ -54,9 +54,10 @@ for L in "\${DA[@]}"; do
     echo "env \$COMMON L=\$L SEED=\$S STEPS=${E2_STEPS} WARMUP=100 LR_DECAY=1 EVAL_EVERY=250 EVAL_BATCHES=16 OUT=/tmp/pcout/exp2_L\${L}_s\${S}.jsonl python3 exp2_depthsweep.py > /tmp/pcout/exp2_L\${L}_s\${S}.out 2>&1" >> /tmp/jobs.sh
   done
 done
-echo "=== \$(wc -l < /tmp/jobs.sh) jobs, ${THREADS} threads each, \$(nproc) cpus ==="; cat /tmp/jobs.sh
+echo "=== CPU: nproc=\$(nproc) lscpu-cpus=\$(lscpu 2>/dev/null | awk -F: '/^CPU\\(s\\)/{print \$2}' | head -1) ==="
+echo "=== \$(wc -l < /tmp/jobs.sh) jobs, ${THREADS} threads each ==="; cat /tmp/jobs.sh
 # run at most (nproc/THREADS) concurrently
-PAR=\$(( \$(nproc) / ${THREADS} )); [ \$PAR -lt 1 ] && PAR=1
+PAR=\$(wc -l < /tmp/jobs.sh)   # run ALL jobs concurrently; kernel schedules across cores
 cat /tmp/jobs.sh | xargs -P \$PAR -I{} bash -c '{}'
 echo "=== ALL JOBS DONE \$(date -u) ==="
 # summary: collect exp2 gaps + exp1 final divergence per L
