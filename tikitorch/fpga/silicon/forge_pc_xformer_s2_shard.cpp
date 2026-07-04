@@ -397,6 +397,17 @@ int main(int argc,char**argv){
         // ===================== per-step bpb/acc from the OUTPUT chip's WIDE logits =====================
         // slot of the LAST sub-batch (k=ACCUM-1): 0 in serial, (ACCUM-1)%S2_SLOTS in pipe mode.
         long metric_po = pipe_on() ? slot_po((ACCUM-1)%S2_SLOTS) : 0;
+        // S2_DIAG: at step 0, trace the forward chain maxabs to localize the all-zero-logit bug (relay/block/LNF/head).
+        if(getenv("S2_DIAG") && step==0){
+            static float dbuf[S2_SEQ*S2_FFN]; long po0 = pipe_on()?slot_po((ACCUM-1)%S2_SLOTS):0;
+            auto mx=[&](int l,int off,long n){ readf(l,off+po0,dbuf,n); double m=0; for(long j=0;j<n;j++){double a=fabs(dbuf[j]); if(a>m)m=a;} return m; };
+            fprintf(stderr,"[S2_DIAG] chip0 GROUT(R')=%.3e | chip%d GRIN(R_in)=%.3e WRP(block)=%.3e WXF(LNF)=%.3e WLG(logit)=%.3e | FWHEAD=%.3e\n",
+                mx(0,S2_GROUT,(long)S2_SEQ*S2_D), L-1,
+                mx(L-1,S2_GRIN,(long)S2_SEQ*S2_D), mx(L-1,S2_WRP,(long)S2_SEQ*S2_D),
+                mx(L-1,S2_WXF,(long)S2_SEQ*S2_D), mx(L-1,S2_WLG,(long)S2_SEQ*S2_VOCAB),
+                ({ readf(L-1,S2_FWHEAD,dbuf,(long)S2_SEQ*S2_D); double m=0; for(long j=0;j<(long)S2_SEQ*S2_D;j++){double a=fabs(dbuf[j]);if(a>m)m=a;} m; }));
+            fflush(stderr);
+        }
         readf(L-1, S2_WLG + metric_po, wlg, (long)S2_SEQ*S2_VOCAB);
         actstat("logits", L-1, step, wlg, (long)S2_SEQ*S2_VOCAB);
         { int c=0; double bits=0; const double L2=log(2.0);
