@@ -334,6 +334,19 @@ int main(int argc,char**argv){
                     actstat("R'(wide)", l, step, hmsg, (long)S2_SEQ*S2_D);
                 }
             }
+            // S2_DIAG: read the forward-chain maxabs RIGHT AFTER the forward sweep (before the backward can
+            // clobber WR/GROUT), on the first sub-batch of step 0 — the unambiguous forward-bug localizer.
+            if(getenv("S2_DIAG") && step==0 && k==0){
+                static float db[S2_SEQ*S2_FFN];
+                auto mx=[&](int l,long off,long n){ readf(l,off,db,n); double m=0; for(long j=0;j<n;j++){double a=fabs(db[j]);if(a>m)m=a;} return m; };
+                static int32_t tk[S2_SEQ]; readw(0,S2_TOK,tk,S2_SEQ); int tmn=1<<30,tmx=-1; for(int t=0;t<S2_SEQ;t++){if(tk[t]<tmn)tmn=tk[t];if(tk[t]>tmx)tmx=tk[t];}
+                fprintf(stderr,"[S2_DIAG-FWD] chip0 role=%d: TOK[%d..%d] FEMB=%.3e FPOS=%.3e WR=%.3e WX1=%.3e WRP=%.3e GROUT=%.3e\n",
+                    role_of(0),tmn,tmx, mx(0,S2_FEMB,(long)S2_VOCAB*S2_D), mx(0,S2_FPOS,(long)S2_SEQ*S2_D),
+                    mx(0,S2_WR,(long)S2_SEQ*S2_D), mx(0,S2_WX1,(long)S2_SEQ*S2_D), mx(0,S2_WRP,(long)S2_SEQ*S2_D), mx(0,S2_GROUT,(long)S2_SEQ*S2_D));
+                fprintf(stderr,"[S2_DIAG-FWD] chip%d role=%d: GRIN=%.3e WRP=%.3e WXF=%.3e WLG=%.3e\n",
+                    L-1,role_of(L-1), mx(L-1,S2_GRIN,(long)S2_SEQ*S2_D), mx(L-1,S2_WRP,(long)S2_SEQ*S2_D), mx(L-1,S2_WXF,(long)S2_SEQ*S2_D), mx(L-1,S2_WLG,(long)S2_SEQ*S2_VOCAB));
+                fflush(stderr);
+            }
             // ===================== BACKWARD SWEEP: chip L-1 -> 0 =====================
             g_phase=1;
             for(int l=L-1;l>=0;l--){
