@@ -5,7 +5,7 @@
 #   AWS_PROFILE=... bash scripts/pc_science/run_pc_science_ec2.sh launch     # then status / fetch / terminate
 set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"; REGION="${REGION:-us-east-1}"
-ITYPE="${ITYPE:-c7i.24xlarge}"; AMI="${AMI:-ami-0e2c8caa4b6378d8c}"; ROLE="${ROLE:-tiki-sweep-runner}"
+ITYPE="${ITYPE:-c7i.24xlarge}"; AMI="${AMI:-ami-051bfa33df3949860}"; ROLE="${ROLE:-tiki-sweep-runner}"   # AL2023: aws CLI + python3 preinstalled
 BIN_S3="${BIN_S3:-s3://tiki-sweep-739966866637/s2_bins/train.u16}"   # byte-level enwik8 (already uploaded)
 DEPTHS="${DEPTHS:-2,4,8,16}"; SEEDS="${SEEDS:-0,1,2}"
 E1_STEPS="${E1_STEPS:-3000}"; E2_STEPS="${E2_STEPS:-5000}"
@@ -30,9 +30,12 @@ up(){ aws s3 cp /var/log/tiki-pcsci.log "\$S3_RESULTS/run.log" --only-show-error
 trap up EXIT
 ( while true; do sleep 60; up; done ) &
 echo "BOOT \$(date -u)"; nproc
-# python + numpy
-(command -v python3 || (apt-get update -y && apt-get install -y python3 python3-pip)) >/dev/null 2>&1 || true
-python3 -c "import numpy" 2>/dev/null || pip3 install --quiet numpy || (apt-get update -y && apt-get install -y python3-numpy)
+# AL2023 ships aws CLI + python3; ensure aws + numpy are present (belt-and-suspenders for any AMI)
+command -v aws >/dev/null 2>&1 || { dnf install -y awscli 2>/dev/null || pip3 install awscli 2>/dev/null || true; }
+echo "aws: \$(command -v aws || echo MISSING)  python3: \$(command -v python3 || echo MISSING)"
+python3 -c "import numpy" 2>/dev/null || dnf install -y python3-numpy 2>/dev/null || pip3 install numpy 2>/dev/null || true
+python3 -c "import numpy,sys; print('numpy',numpy.__version__)" || { echo "FATAL: numpy missing"; echo fail | aws s3 cp - "\$S3_RESULTS/DONE" || true; shutdown -h now; }
+up   # upload the boot log NOW so a launch can be verified within minutes
 mkdir -p /opt/tiki /tmp/pcout && cd /opt/tiki
 for i in 1 2 3; do aws s3 cp "${S3SRC}" s.tgz && break; sleep 8; done && tar xzf s.tgz
 aws s3 cp "\$BIN_S3" /tmp/enwik8.u16 --only-show-errors
