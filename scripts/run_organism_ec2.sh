@@ -26,6 +26,7 @@ ROLE="${ROLE:-tiki-sweep-runner}"
 SMOKE="${SMOKE:-0}"
 LIFE_DAYS="${LIFE_DAYS:-14}"
 PROBE_HOURS="${PROBE_HOURS:-6}"
+STEPS_PER_DAY="${STEPS_PER_DAY:-2300000}"   # measured on the shakedown box (c7i.2xlarge)
 HOURLY_RATE_DEFAULT="0.357"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_organism_state"; mkdir -p "$STATE_DIR"
@@ -74,6 +75,8 @@ cfg = make_config(smoke=($SMOKE == 1))
 cfg.life_tag = "$TAG"; cfg.s3_prefix = "$S3P"
 cfg.max_life_days = float($LIFE_DAYS) if not cfg.smoke else cfg.max_life_days
 cfg.probe_every_hours = float($PROBE_HOURS) if not cfg.smoke else cfg.probe_every_hours
+if not cfg.smoke:
+    cfg.steps_per_day = int($STEPS_PER_DAY)   # align life-days with wall-days
 cfg.save(sys.argv[1]); print("config hash", cfg.config_hash())
 PYEOF
 

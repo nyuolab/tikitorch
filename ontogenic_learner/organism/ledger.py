@@ -20,10 +20,13 @@ class Ledger:
         seq numbers; gaps are allowed — they record buffered events lost to a crash)."""
         import glob
         best = 0
-        for p in sorted(glob.glob(os.path.join(self.dir, "ledger-*.jsonl")))[-2:]:
+        paths = sorted(glob.glob(os.path.join(self.dir, "ledger-*.jsonl")) +
+                       glob.glob(os.path.join(self.dir, "ledger-*.jsonl.gz")))[-3:]
+        for p in paths:
             try:
+                op = gzip.open if p.endswith(".gz") else open
                 last = None
-                with open(p) as f:
+                with op(p, "rt") as f:
                     for line in f:
                         if line.strip():
                             last = line

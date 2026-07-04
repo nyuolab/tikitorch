@@ -106,7 +106,10 @@ def run_suite(net, policy, vocab, world, cfg, gens, life_step, out_dir, device):
                    "reservoir": len(policy.res.x)}
     row["health_norm_mean"] = round(float(np.mean(list(health(net).values()))), 3)
     grids = digit_grids(net, vocab, world.ctx, gens["probe"], device)
-    text = sample(net, vocab, world.ctx, "", 300, 0.8, gens["probe"], device)
+    # seed with a real prompt: empty (all-space padding) traps wiki models in a
+    # space-attractor at low temperature (observed on the shakedown box)
+    text = sample(net, vocab, world.ctx, "the history of the ", 300, 0.8,
+                  gens["probe"], device)
     row["wall_s"] = round(time.time() - t0, 1)
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "probes.jsonl"), "a") as f:
