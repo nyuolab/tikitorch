@@ -29,7 +29,9 @@ S3_RESULTS="${S3RES}"; BIN_S3="${BIN_S3}"
 up(){ aws s3 cp /var/log/tiki-pcsci.log "\$S3_RESULTS/run.log" --only-show-errors || true; aws s3 cp /tmp/pcout "\$S3_RESULTS/" --recursive --exclude '*' --include '*.jsonl' --only-show-errors || true; }
 trap up EXIT
 ( while true; do sleep 60; up; done ) &
-echo "BOOT \$(date -u)"; nproc
+echo "BOOT \$(date -u)"; echo "nproc-before=\$(nproc)"
+for f in /sys/devices/system/cpu/cpu[0-9]*/online; do echo 1 > "\$f" 2>/dev/null || true; done
+echo "nproc-after-online=\$(nproc)  lscpu=\$(lscpu 2>/dev/null | awk -F: '/^CPU\\(s\\)/{gsub(/ /,\"\",\$2);print \$2}' | head -1)"
 # AL2023 ships aws CLI + python3; ensure aws + numpy are present (belt-and-suspenders for any AMI)
 command -v aws >/dev/null 2>&1 || { dnf install -y awscli 2>/dev/null || pip3 install awscli 2>/dev/null || true; }
 echo "aws: \$(command -v aws || echo MISSING)  python3: \$(command -v python3 || echo MISSING)"
