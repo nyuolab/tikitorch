@@ -117,7 +117,7 @@ convergence:
 |---|---|---|---|
 | 2 | **1.000000** | [0, 0] | 0 |
 | 4 | **1.000000** | [0, 0, 0, 0] | 0 |
-| 8 | *(sweep in progress)* | | |
+| 8 | **1.000000** | [0×8] | 0 |
 | 16 | *(sweep in progress)* | | |
 
 The synchronous relaxation converges in **one iteration** (Theorem 1) and matches cascade to the last bit,
