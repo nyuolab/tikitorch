@@ -126,6 +126,17 @@ static void setcfg(int l,int phase,int role,int doupd,int lrbits,int gzero=0,int
     // lanes 7/8/9 (tile_o/tile_i/seq_tile) left 0 => kernel uses its compile-time S2_TILE_* defaults
     stage(l,S2O_CFG,S2_WL); }
 static int role_of(int l){ return (l==0)?S2_RL_INPUT : (l==L-1)?S2_RL_OUT : S2_RL_HID; }
+// HOST-SIDE EMBED: the on-chip INPUT embed's bload_f reads FEMB as 0 on silicon (a DDR-path bug csim does NOT
+// reproduce — WR=0 while the driver's readf sees FEMB=4.2; localized via S2_DIAG). Workaround: the driver
+// computes R = EMB[tok]+POS host-side (a memory gather, not compute) and feeds it to chip 0 via the PROVEN
+// GRIN->block path (chip 0 runs as a HID block), and trains EMB/POS host-side from chip 0's up-message gR.
+// Driver-only; NO AFI rebuild. Env HOST_EMBED (default 1). krole() = the role staged to the kernel.
+static int g_he=-1; static inline int host_embed(){ if(g_he<0){const char*e=getenv("HOST_EMBED"); g_he=e?atoi(e):1;} return g_he; }
+static int krole(int l){ return (host_embed() && l==0 && L>1) ? S2_RL_HID : role_of(l); }
+static float *hEMB=0,*hPOS=0,*hmE=0,*hvE=0,*hmP=0,*hvP=0,*hgE=0,*hgP=0;
+// dyadic-Adam step (matches the s2 kernel recipe: pow2 step from |m|/v ratio).
+static inline float dyad_adam(float g,float&m,float&v,float lr){ m=0.875f*m+0.125f*g; v=0.875f*v+0.125f*fabsf(g);
+    float r=fabsf(m)/(v+1e-9f); float st=(r>0)?ldexpf(1.0f,(int)floorf(log2f(r))):0.0f; return lr*((m>0)-(m<0))*st; }
 
 // =====================================================================================================
 // FLOAT-master init — BYTE-FOR-BYTE the mp bf_init contract (forge_pc_xformer_mp_shard.cpp / the bf16 golden),
@@ -241,6 +252,14 @@ int main(int argc,char**argv){
         stage(l,0,S2_BUFLEN);    // persist the whole float buffer (incl. the zeroed adam m/v + grad accumulators) once
     }
 
+    // HOST-EMBED state: reuse chip-0 master's EMB/POS (bf_init recipe); host adam moments + grad accumulators.
+    if(host_embed()){
+        hEMB=M[0]->EMB; hPOS=M[0]->POS;
+        hmE=(float*)calloc((size_t)S2_VOCAB*S2_D,4); hvE=(float*)calloc((size_t)S2_VOCAB*S2_D,4);
+        hmP=(float*)calloc((size_t)S2_SEQ*S2_D,4);   hvP=(float*)calloc((size_t)S2_SEQ*S2_D,4);
+        hgE=(float*)calloc((size_t)S2_VOCAB*S2_D,4); hgP=(float*)calloc((size_t)S2_SEQ*S2_D,4);
+        printf("[xfs2shard] HOST_EMBED on: chip 0 runs as a HID block; EMB/POS embedded+trained host-side.\n");
+    }
     // boundary-message scratch (one float per lane; the wide down/up messages are SEQ*D floats = 512 KB)
     float *hmsg=(float*)malloc(4L*S2_SEQ*S2_D);   // wide down-message (forward): S2_GROUT(l) -> S2_GRIN(l+1)
     float *emsg=(float*)malloc(4L*S2_SEQ*S2_D);   // wide up-message  (backward): S2_GROUT(l) -> S2_GRIN(l-1)
@@ -321,9 +340,13 @@ int main(int argc,char**argv){
             // ===================== FORWARD SWEEP: chip 0 -> L-1 =====================
             g_phase=0;
             for(int l=0;l<L;l++){
-                setcfg(l, S2_PH_FWD, role_of(l), 0, 0, 0, 0);
+                setcfg(l, S2_PH_FWD, krole(l), 0, 0, 0, 0);
                 if(l==0){
-                    for(int t=0;t<S2_SEQ;t++) hbuf[0][S2_TOK+t]=data[off+t]; stage(0,S2_TOK,S2_SEQ);   // INPUT tokens (slot 0)
+                    if(host_embed()){   // R = EMB[tok] + POS computed host-side, fed to chip 0 (HID) via GRIN
+                        for(int t=0;t<S2_SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=S2_VOCAB)v=S2_VOCAB-1;
+                            for(int d=0;d<S2_D;d++) hmsg[t*S2_D+d]=hEMB[(long)v*S2_D+d]+hPOS[t*S2_D+d]; }
+                        put_f(0, S2_GRIN, hmsg, (long)S2_SEQ*S2_D);
+                    } else { for(int t=0;t<S2_SEQ;t++) hbuf[0][S2_TOK+t]=data[off+t]; stage(0,S2_TOK,S2_SEQ); }
                 } else {
                     put_f(l, S2_GRIN, hmsg, (long)S2_SEQ*S2_D);       // upstream chip's WIDE R' -> this chip's down-message
                 }
@@ -350,10 +373,20 @@ int main(int argc,char**argv){
             // ===================== BACKWARD SWEEP: chip L-1 -> 0 =====================
             g_phase=1;
             for(int l=L-1;l>=0;l--){
-                setcfg(l, S2_PH_BWD, role_of(l), do_update, do_update?lrcode(lr):0, (k==0)?1:0, 0);   // DO_UP -> adam; k==0 -> GZERO
+                setcfg(l, S2_PH_BWD, krole(l), do_update, do_update?lrcode(lr):0, (k==0)?1:0, 0);   // DO_UP -> adam; k==0 -> GZERO
                 if(l<L-1){ put_f(l, S2_GRIN, emsg, (long)S2_SEQ*S2_D); }  // neighbour WIDE error in
                 kick(l);
                 if(l>0) readf(l, S2_GROUT, emsg, (long)S2_SEQ*S2_D);  // WIDE up-message: this block's input-grad -> prev chip
+                else if(host_embed()){   // chip 0 (HID) up-message gR = the embed input gradient; train EMB/POS host-side
+                    readf(0, S2_GROUT, emsg, (long)S2_SEQ*S2_D);
+                    if(k==0){ memset(hgE,0,(size_t)S2_VOCAB*S2_D*4); memset(hgP,0,(size_t)S2_SEQ*S2_D*4); }  // GZERO
+                    for(int t=0;t<S2_SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=S2_VOCAB)v=S2_VOCAB-1;
+                        for(int d=0;d<S2_D;d++){ float g=emsg[t*S2_D+d]; hgE[(long)v*S2_D+d]+=g; hgP[t*S2_D+d]+=g; } }
+                    if(do_update){
+                        for(long i=0;i<(long)S2_VOCAB*S2_D;i++) hEMB[i]-=dyad_adam(hgE[i],hmE[i],hvE[i],lr);
+                        for(long i=0;i<(long)S2_SEQ*S2_D;i++)   hPOS[i]-=dyad_adam(hgP[i],hmP[i],hvP[i],lr);
+                    }
+                }
             }
         }
       } else {
