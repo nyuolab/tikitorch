@@ -382,7 +382,7 @@ int main(int argc,char**argv){
                     if(k==0){ memset(hgE,0,(size_t)S2_VOCAB*S2_D*4); memset(hgP,0,(size_t)S2_SEQ*S2_D*4); }  // GZERO
                     for(int t=0;t<S2_SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=S2_VOCAB)v=S2_VOCAB-1;
                         for(int d=0;d<S2_D;d++){ float g=emsg[t*S2_D+d]; hgE[(long)v*S2_D+d]+=g; hgP[t*S2_D+d]+=g; } }
-                    if(do_update){
+                    if(do_update && !getenv("EMB_FREEZE")){
                         for(long i=0;i<(long)S2_VOCAB*S2_D;i++) hEMB[i]-=dyad_adam(hgE[i],hmE[i],hvE[i],lr);
                         for(long i=0;i<(long)S2_SEQ*S2_D;i++)   hPOS[i]-=dyad_adam(hgP[i],hmP[i],hvP[i],lr);
                     }
