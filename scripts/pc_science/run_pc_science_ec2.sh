@@ -10,7 +10,7 @@ BIN_S3="${BIN_S3:-s3://tiki-sweep-739966866637/s2_bins/train.u16}"   # byte-leve
 DEPTHS="${DEPTHS:-2,4,8,16}"; SEEDS="${SEEDS:-0,1}"
 E1_STEPS="${E1_STEPS:-2000}"; E2_STEPS="${E2_STEPS:-2500}"
 D="${D:-256}"; HH="${HH:-4}"; DH="${DH:-64}"; FFN="${FFN:-1024}"; SEQ="${SEQ:-128}"; VOCAB="${VOCAB:-256}"
-THREADS="${THREADS:-2}"; MAX_MINUTES="${MAX_MINUTES:-660}"
+THREADS="${THREADS:-16}"; MAX_MINUTES="${MAX_MINUTES:-660}"
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"; STATE="${STATE_DIR:-$PROJECT_DIR/.tiki_pcsci_state}"; mkdir -p "$STATE"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
