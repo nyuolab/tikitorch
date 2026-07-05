@@ -1,3 +1,24 @@
+# TODO  →  see results/pc_depth_traction/ (EXP_RESULTS.md, PREREG.md, THEORY_*.md)
+1. Run these experiments:
+
+[DONE] Exp 1: cascade-vs-relaxation divergence vs depth (L=2/4/8/16). RESULT: gradient cosine
+= 1.00000 at ALL depths, sync AND async — the equivalence is exact and does NOT compound with
+depth. (softmax/LN attribution needs the transformer relaxation port — the G2b gap — flagged.)
+
+[DONE] Exp 2: PC-vs-BP bpb gap vs depth, 3 seeds, + dyadic-BP arm to split "PC vs BP" from
+"dyadic vs float" — the central traction figure. RESULT: deep PC HAS traction. Both taxes small
+& bounded (substrate +0.02→+0.11 plateau; rule tax NEGATIVE ~−0.2, i.e. local PC WINS), flat
+depth 4→16. Caveat: matched-DATA not matched-COMPUTE (relax ~10-20× FLOPs at depth) — a quality
+gain traded for settling compute (the trade the fabric makes cheap).
+
+2. [DONE] Proof cascade ≡ settled iterative PC → THEORY_CASCADE_EQUIVALENCE.md (feedforward
+graph C1 + chain-rule loss C2 + converged stable settling C3 ⇒ cascade = closed-form fixed
+point; grounded in the measured grad-checks; Exp 1 is the empirical confirmation).
+
+3. [LIVE] The living ontogenic agent works — Organism v0 (ontogenic_learner/organism/) is
+running its 14-day pilot on EC2 (i-0ea5e986108ac2a00): always-on, gated, restart-safe to the
+bit, zero incidents. Interact: `python -m ontogenic_learner.organism.cli status|sample|report`.
+
 # PC-TikiTorch — project graphics
 
 Schematics for the predictive-coding-on-FPGA-fabric program: scaling LLM training across
