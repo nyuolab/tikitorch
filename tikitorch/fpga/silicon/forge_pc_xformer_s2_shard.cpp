@@ -408,7 +408,17 @@ int main(int argc,char**argv){
                 int ph=bph[l], g=bg[l], slot=g%S2_SLOTS; long po=slot_po(slot);
                 g_kick_s[ph][l]+=now_s()-g_kick_t0[l]; g_kick_n[ph][l]++;
                 if(ph==0){ if(l<L-1){ readf(l, S2_GROUT+po, hmsg2[slot], (long)S2_SEQ*S2_D); } fdone[l]++; }   // fwd down-msg R'
-                else     { if(l>0)  { readf(l, S2_GROUT+po, emsg2[slot], (long)S2_SEQ*S2_D); } bdone[l]++; }   // bwd up-msg gR
+                else     { if(l>0)  { readf(l, S2_GROUT+po, emsg2[slot], (long)S2_SEQ*S2_D); }
+                           else if(host_embed()){   // chip 0 (HID) up-msg gR -> host embed gradient (slot-aware GZERO/DO_UP)
+                               readf(0, S2_GROUT+po, emsg2[slot], (long)S2_SEQ*S2_D); long off=soff[g];
+                               if(g==0){ memset(hgE,0,(size_t)S2_VOCAB*S2_D*4); memset(hgP,0,(size_t)S2_SEQ*S2_D*4); }
+                               for(int t=0;t<S2_SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=S2_VOCAB)v=S2_VOCAB-1;
+                                   for(int d=0;d<S2_D;d++){ float gg=emsg2[slot][t*S2_D+d]; hgE[(long)v*S2_D+d]+=gg; hgP[t*S2_D+d]+=gg; } }
+                               if(g==ACCUM-1 && !getenv("EMB_FREEZE")){
+                                   for(long i=0;i<(long)S2_VOCAB*S2_D;i++) hEMB[i]-=dyad_adam(hgE[i],hmE[i],hvE[i],lr);
+                                   for(long i=0;i<(long)S2_SEQ*S2_D;i++)   hPOS[i]-=dyad_adam(hgP[i],hmP[i],hvP[i],lr); }
+                           }
+                           bdone[l]++; }   // bwd up-msg gR
                 busy[l]=0; ndone++; last_progress=now_s();
             }
             // (2) dispatch: for each idle chip pick a ready op, BACKWARD-FIRST (drains slots), else a ready forward
@@ -421,14 +431,18 @@ int main(int argc,char**argv){
                 if(bwok){
                     int slot=gb%S2_SLOTS; long po=slot_po(slot);
                     int doup=(gb==ACCUM-1)?1:0, gz=(gb==0)?1:0;
-                    setcfg(l, S2_PH_BWD, role_of(l), doup, doup?lrcode(lr):0, gz, slot);
+                    setcfg(l, S2_PH_BWD, krole(l), doup, doup?lrcode(lr):0, gz, slot);
                     if(l<L-1){ put_f(l, S2_GRIN+po, emsg2[slot], (long)S2_SEQ*S2_D); }  // neighbour WIDE error in
                     kick_start(l); busy[l]=1; bph[l]=1; bg[l]=gb; bnext[l]++;
                 } else if(fwok){
                     int slot=gf%S2_SLOTS; long po=slot_po(slot); long off=soff[gf];
-                    setcfg(l, S2_PH_FWD, role_of(l), 0, 0, 0, slot);
+                    setcfg(l, S2_PH_FWD, krole(l), 0, 0, 0, slot);
                     if(l==0){
-                        for(int t=0;t<S2_SEQ;t++) hbuf[0][S2_TOK+slot*S2_SEQ+t]=data[off+t]; stage(0,S2_TOK+slot*S2_SEQ,S2_SEQ);
+                        if(host_embed()){   // R = EMB[tok]+POS host-side -> chip 0 (HID) GRIN slot
+                            for(int t=0;t<S2_SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=S2_VOCAB)v=S2_VOCAB-1;
+                                for(int d=0;d<S2_D;d++) hmsg2[slot][t*S2_D+d]=hEMB[(long)v*S2_D+d]+hPOS[t*S2_D+d]; }
+                            put_f(0, S2_GRIN+po, hmsg2[slot], (long)S2_SEQ*S2_D);
+                        } else { for(int t=0;t<S2_SEQ;t++) hbuf[0][S2_TOK+slot*S2_SEQ+t]=data[off+t]; stage(0,S2_TOK+slot*S2_SEQ,S2_SEQ); }
                     } else {
                         put_f(l, S2_GRIN+po, hmsg2[slot], (long)S2_SEQ*S2_D);   // upstream chip's R' -> down-message
                     }
