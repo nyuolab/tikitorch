@@ -118,7 +118,7 @@ convergence:
 | 2 | **1.000000** | [0, 0] | 0 |
 | 4 | **1.000000** | [0, 0, 0, 0] | 0 |
 | 8 | **1.000000** | [0×8] | 0 |
-| 16 | *(sweep in progress)* | | |
+| 16 | **0.9999999999999998** (bit-exact within float eps) | [~2e-16] | 0 |
 
 The synchronous relaxation converges in **one iteration** (Theorem 1) and matches cascade to the last bit,
 with **zero selection flips** — even though softmax and LN are smooth. Interpretation: the residual stream
