@@ -45,6 +45,9 @@
 //   TOTAL persistent on-chip                                                         ~= 1.9 MB  (< 5.4 MB budget)
 //   (Bcache is TILE_O*KC_MAX = the per-c0 hoisted weight tile; KC_MAX=FFN=2048 at D=512. The single-engine 1.05 MB
 //    is the FIX C cost — comfortably inside the one-SLR budget; DSP stays 1-2% as the MACs are dyad-shift.)
+//   NOTE: the DEFAULT build is CONSERVATIVE (S2_AGGRESSIVE_SCHED undefined) — the s2_gemm engine uses Btile
+//   [128*128]=64KB re-streamed per r0 instead of the 1.05MB hoisted Bcache, so persistent on-chip is ~0.9 MB.
+//   Define -DS2_AGGRESSIVE_SCHED to restore the Bcache-hoist fast path (the 1.9 MB census above).
 // Nothing above is a full-SEQ tensor; the ~34 MB of full-SEQ statics (WR..gV, gyT/xT, the 4 MB debug temp)
 // are DELETED. The only sizes that scale with the model are the attn head slices (SEQ*DH) and the LN strip
 // (SEQ_TILE*D); both stay small and D-tileable. (See the BEFORE census in the accompanying report.)
@@ -325,6 +328,18 @@ static inline float s2_treeK(const float *a, const float *b) {
 // lhstile/y/row/gaccrow) — each expansion is a distinct function, so its `static` locals are DISTINCT variables
 // (a separate HW instance) even though they share the same source identifier; the HLS pragmas are function-scoped
 // and refer to that function's own locals, so the _Pragma strings can be constant literals.
+// ------------------------------------------------------------------------------------------------------
+// S2_AGGRESSIVE_SCHED — GATE for the d86d8fd perf scheduling opts (DEFAULTS OFF = conservative). When OFF, the
+// engine uses the PRE-OPT (72d427c) DDR access pattern + scheduling: the B operand is RE-STREAMED per r0
+// row-block via a Btile0/Btile1 ping-pong (NO acquire-hoist), and the inner MAC pipelines WITHOUT the
+// `DEPENDENCE variable=y inter false` assertion (so the tool honours the real y-accumulator recurrence and
+// schedules a safe II). This targets the SILICON-ONLY backward divergence: FIX C's hoist (Bcache loaded once
+// above r0) and the false-dependence II=1 forcing are csim-invisible scheduling/DMA-pattern changes — the
+// two silicon-hazard suspects — while being ARITHMETICALLY identical (the MAC consumes k-blocks in the SAME
+// GLOBAL-k order in both paths, so y accumulates byte-identically; csim stays bit-exact). Define
+// -DS2_AGGRESSIVE_SCHED to restore the fast d86d8fd path.
+// ------------------------------------------------------------------------------------------------------
+#ifdef S2_AGGRESSIVE_SCHED
 #define S2_GEMM_ENGINE(NAME)                                                                                   \
 static void NAME(int mode, ap_uint<512> *buffer, int Woff,                                                    \
                  int lhs_off, int Bres_off, int out_off,                                                       \
@@ -414,6 +429,102 @@ static void NAME(int mode, ap_uint<512> *buffer, int Woff,                      
         }                                                                                                     \
     }                                                                                                         \
 }
+#else  /* CONSERVATIVE (default): pre-opt 72d427c engine — re-stream B per r0 (no hoist), no DEPENDENCE-false */
+// REVERT of d86d8fd's two SILICON-hazard-suspect scheduling opts, LOGIC-IDENTICAL to the aggressive path:
+//   * FIX C hoist OFF: the B operand i-tile is RE-STREAMED (+dyad'd) inside the r0 row-block loop into a single
+//     Btile[TILE_O x TILE_I] (tile-local layout [c*tile_i+klocal]), instead of the whole-c0 Bcache hoisted once
+//     above r0. The MAC consumes k-blocks in the SAME GLOBAL-k order, so y[r*tile_o+c] accumulates BYTE-IDENTICALLY
+//     (csim bit-exact). This restores the conservative DDR access pattern (re-DMA per r0; no ping-pong prefetch —
+//     the most conservative overlap, plain re-stream) and drops the resident weight cache 1.05MB -> 64KB.
+//   * DEPENDENCE-false OFF: the inner MAC keeps `#pragma HLS PIPELINE II=1` (a REQUEST, not a forcing) but DROPS
+//     `#pragma HLS DEPENDENCE variable=y inter false`, so the tool HONORS the real y-accumulator recurrence and
+//     schedules a safe (higher) II rather than asserting no-dependence — removing the csim-invisible RAW-hazard risk.
+// The macro takes NAME (== HEAD's ABI) but is instantiated ONCE (s2_gemm); locals keep 72d427c source names.
+#define S2_GEMM_ENGINE(NAME)                                                                                   \
+static void NAME(int mode, ap_uint<512> *buffer, int Woff,                                                    \
+                 int lhs_off, int Bres_off, int out_off,                                                       \
+                 int rows, int cols, int KC, int gacc_off, int gzero) {                                       \
+    _Pragma("HLS INLINE off")                                                                                  \
+    static float Btile[S2_TILE_O * S2_TILE_I];     /* REVERT FIX C: per-i-tile B, re-streamed inside r0 loop */ \
+    _Pragma("HLS ARRAY_PARTITION variable=Btile cyclic factor=S2_K dim=1")                                     \
+    static float lhstile[S2_SEQ_TILE * S2_TILE_I];                                                             \
+    _Pragma("HLS ARRAY_PARTITION variable=lhstile cyclic factor=S2_K dim=1")                                   \
+    static float y[S2_SEQ_TILE * S2_TILE_O];                                                                   \
+    static float row[S2_TILE_O > S2_TILE_I ? S2_TILE_O : S2_TILE_I];                                           \
+    static float gaccrow[S2_TILE_O];                                                                           \
+    const int tile_o = S2_TILE_O, tile_i = S2_TILE_I, seq_tile = S2_SEQ_TILE;  /* FIX A tiles kept compile-time */\
+    for (int c0 = 0; c0 < cols; c0 += tile_o) {                                                                \
+        int TC = (cols - c0 < tile_o) ? (cols - c0) : tile_o;                                                  \
+        int NI = (KC + tile_i - 1) / tile_i;              /* number of contraction (I) tiles */                \
+        for (int r0 = 0; r0 < rows; r0 += seq_tile) {                                                          \
+            int TR = (rows - r0 < seq_tile) ? (rows - r0) : seq_tile;                                          \
+            for (int i = 0; i < TR * tile_o; i++) y[i] = 0.0f;   /* zero over the ACCESS stride tile_o */      \
+            for (int it = 0; it < NI; it++) {                                                                  \
+                int i0 = it * tile_i;                                                                          \
+                int TI = (KC - i0 < tile_i) ? (KC - i0) : tile_i;                                              \
+                /* -- acquire B i-tile `it` (weight FWD/DX dyad'd, or transposed-x WG) into Btile[c*tile_i+k] */\
+                /*    RE-STREAMED per (c0,r0,it): conservative DDR pattern, no acquire-hoist above r0.        */\
+                if (mode == S2M_DX) {                                                                          \
+                    for (int _k = 0; _k < TI; _k++) {                                                          \
+                        bload_f(buffer, Woff + (i0 + _k) * cols + c0, row, TC);                                \
+                        for (int _c = 0; _c < TC; _c++) Btile[_c * tile_i + _k] = bf_dyad_f(row[_c]);          \
+                    }                                                                                          \
+                } else if (mode == S2M_FWD) {                                                                  \
+                    for (int _c = 0; _c < TC; _c++) {                                                          \
+                        bload_f(buffer, Woff + (c0 + _c) * KC + i0, row, TI);                                  \
+                        for (int _k = 0; _k < TI; _k++) Btile[_c * tile_i + _k] = bf_dyad_f(row[_k]);          \
+                    }                                                                                          \
+                } else { /* WG: B = x[SEQ x I] transposed on load, no dyad */                                  \
+                    for (int _k = 0; _k < TI; _k++) {                                                          \
+                        bload_f(buffer, Bres_off + (i0 + _k) * cols + c0, row, TC);                            \
+                        for (int _c = 0; _c < TC; _c++) Btile[_c * tile_i + _k] = row[_c];                     \
+                    }                                                                                          \
+                }                                                                                              \
+                /* -------- load the activation lhs i-tile (contiguous-k, or WG-transposed) -------- */       \
+                if (mode == S2M_WG) {                                                                          \
+                    for (int _k = 0; _k < TI; _k++) {                                                          \
+                        bload_f(buffer, lhs_off + (i0 + _k) * rows + r0, row, TR);                             \
+                        for (int _r = 0; _r < TR; _r++) lhstile[_r * tile_i + _k] = row[_r];                   \
+                    }                                                                                          \
+                } else {                                                                                       \
+                    for (int _r = 0; _r < TR; _r++)                                                            \
+                        bload_f(buffer, lhs_off + (r0 + _r) * KC + i0, lhstile + _r * tile_i, TI);             \
+                }                                                                                              \
+                /* -------- consume i-tile `it`: K-wide MAC per k-block; NO DEPENDENCE-false (safe II) -------- */\
+                for (int kb = 0; kb < TI; kb += S2_K) {   /* k-blocks in GLOBAL k order (tile-independent) */  \
+                    for (int r = 0; r < TR; r++) {                                                             \
+                        const float *aptr = lhstile + r * tile_i + kb;                                         \
+                        for (int c = 0; c < TC; c++) {                                                         \
+                            _Pragma("HLS PIPELINE II=1")                                                       \
+                            y[r * tile_o + c] += s2_treeK(aptr, Btile + c * tile_i + kb);                      \
+                        }                                                                                      \
+                    }                                                                                          \
+                }                                                                                              \
+            }                                                                                                 \
+            /* -------- finalize + write this row-block's outputs -------- */                                  \
+            if (mode == S2M_WG) {                                                                              \
+                for (int r = 0; r < TR; r++) {                                                                 \
+                    if (!gzero) bload_f(buffer, gacc_off + (r0 + r) * cols + c0, gaccrow, TC);                 \
+                    for (int c = 0; c < TC; c++) {                                                             \
+                        float v = P(y[r * tile_o + c]);                                                        \
+                        if (!gzero) v += gaccrow[c];                                                           \
+                        gaccrow[c] = v;                                                                        \
+                    }                                                                                          \
+                    bstore_f(buffer, gacc_off + (r0 + r) * cols + c0, gaccrow, TC);                            \
+                }                                                                                              \
+            } else {                                                                                           \
+                for (int r = 0; r < TR; r++) {                                                                 \
+                    for (int c = 0; c < TC; c++) {                                                             \
+                        float v = y[r * tile_o + c];                                                           \
+                        row[c] = (mode == S2M_DX) ? P(v) : v;                                                  \
+                    }                                                                                          \
+                    bstore_f(buffer, out_off + (r0 + r) * cols + c0, row, TC);                                 \
+                }                                                                                              \
+            }                                                                                                 \
+        }                                                                                                     \
+    }                                                                                                         \
+}
+#endif  /* S2_AGGRESSIVE_SCHED */
 // The engine is instantiated ONCE. (An earlier FIX G duplicated it as s2_gemm_b so the FFN backward's DX-route
 // and WG for the SAME linear could overlap in a DATAFLOW region. csynth REJECTED that: two processes both read
 // the single `gmem` m_axi bundle — "Bundled bus interface 'gmem' failed dataflow checking: cannot read data in
