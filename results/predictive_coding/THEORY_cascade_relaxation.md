@@ -134,9 +134,44 @@ smooth deep PC is absent, empirically, on a real transformer.
 
 ---
 
-*Companion (Experiment 2, PC-vs-backprop accuracy gap vs depth): trend measured (PC competitive with / ahead
-of backprop at L=2–4, gap shrinking with depth) but the backprop BASELINES need hardening before any claim —
-exact differentiation through the piecewise-constant dyadic quantization gives ~zero weight gradients (the
-dyad blocks gradient flow; STE exists precisely to bypass this), so the dyadic-BP arm and the float-BP arm
-must both be re-run with matched, gradient-flowing baselines. Deferred; §4's Remark stands on Experiment 1
-alone, which is the clean result.*
+## 6. Deep-PC traction: the PC–backprop gap across the tropical spectrum (Experiment 2 — PRELIMINARY)
+
+§5 establishes the *mechanism* (cascade = relaxation on the real transformer). Experiment 2 asks whether that
+mechanism *buys* anything: does PC's trained accuracy track backprop's, and how does the gap scale with depth,
+as the network is moved along the spectrum from purely piecewise-linear to fully smooth? The claim is that
+**the more piecewise-linear the network, the flatter the PC–backprop gap with depth**, because PWL structure
+lets PC reach its equilibrium — which *equals* backprop (Whittington–Bogacz) — in one exact pass, rather than
+by an iterative relaxation that at depth either truncates (finite inference budget) or diverges (ill-conditioned
+settling). §5's mechanism is *why* the leftmost row of the table below is flat.
+
+| network | how PC obtains its gradient | PC–backprop gap vs depth | mechanism / why |
+|---|---|---|---|
+| **pure-PWL tropical** (`SMOOTH_OFF`; dyadic-linear + ReLU + argmax-gather) | cascade = one exact backward pass | **≈ 0, flat to L=16** | Thm 1 (§4): cascade = relaxation = equilibrium = backprop; nothing to iterate |
+| **tropical-dominated** (adds softmax attention + LayerNorm) | cascade with frozen selections | **bounded (~0.5 nat), grows slowly** | the two smooth ops inject a bounded linearization error, residual-bypassed (§5) |
+| **smooth** (float net, well-conditioned so the relaxation converges) | finite-T iterative relaxation | **grows with depth (truncation); T→convergence → backprop** | T inference sweeps propagate the loss error only T layers; deep layers stay undertrained (§3) |
+
+Read top-to-bottom this is the deep-PC-traction result: PWL structure converts the **ill-posed iterative
+inference** of smooth deep PC (§3) into a **single well-posed pass** (§4), so the PC–backprop gap stays
+*bounded* — exactly zero for the pure-PWL net — where the smooth net's gap *grows*.
+
+**Status (PRELIMINARY — to be finalized with the matched re-run).** This table states the intended contrast;
+the numbers are being produced by a refined run. Three corrections over the first pass are required for the
+result to be honest, all now in flight:
+
+  1. **Matched, gradient-flowing backprop baselines.** Exact differentiation through the piecewise-constant
+  dyadic quantization gives ≈ zero weight gradients (STE exists precisely to bypass this); the dyadic-BP arm
+  must use the same STE the cascade does, and must be checked to actually train (loss descends).
+
+  2. **A well-conditioned smooth net.** In the first pass the smooth relaxation *violated its own
+  Whittington–Bogacz check*: run toward convergence it **diverged** at L=16 (bpb → uniform) rather than
+  approaching backprop, because the residual highway makes ‖J‖ > 1 and the Jacobi settling amplifies rounding
+  by ≈ ‖J‖^depth. That is a **solver-conditioning artifact, not honest truncation** — adding LayerNorm does not
+  fix it (the net already has pre-LN; the residual identity path is the cause). The re-run bounds ‖J‖ (residual
+  scaling) so that relaxation-to-convergence ≈ backprop is a *passing* gate; only then does the finite-T arm
+  measure genuine depth truncation.
+
+  3. **Convergence + train/val curves.** Longer training with logged train and held-out val trajectories per
+  arm, to confirm each arm has plateaued before the gap is read.
+
+§4's Remark and §5's measured mechanism stand on Experiment 1 alone (the clean, exact result). §6 is the
+accuracy companion; its table is the target, its numbers pending the corrected run.
