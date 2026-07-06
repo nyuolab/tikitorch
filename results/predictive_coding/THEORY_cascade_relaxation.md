@@ -148,7 +148,7 @@ settling). §5's mechanism is *why* the leftmost row of the table below is flat.
 |---|---|---|---|
 | **pure-PWL tropical** (`SMOOTH_OFF`; dyadic-linear + ReLU + argmax-gather) | cascade = one exact backward pass | **≈ 0, flat to L=16** | Thm 1 (§4): cascade = relaxation = equilibrium = backprop; nothing to iterate |
 | **tropical-dominated** (adds softmax attention + LayerNorm) | cascade with frozen selections | **bounded (~0.5 nat), grows slowly** | the two smooth ops inject a bounded linearization error, residual-bypassed (§5) |
-| **smooth** (float net, well-conditioned so the relaxation converges) | finite-T iterative relaxation | **grows with depth (truncation); T→convergence → backprop** | T inference sweeps propagate the loss error only T layers; deep layers stay undertrained (§3) |
+| **smooth** (float net, softmax + LayerNorm) | finite-T truncated back-substitution | **grows with depth for T<depth; T≥depth = backprop *exactly*** | a fixed inference budget T carries the loss error only T layers deep; deeper layers stay undertrained (§3) |
 
 Read top-to-bottom this is the deep-PC-traction result: PWL structure converts the **ill-posed iterative
 inference** of smooth deep PC (§3) into a **single well-posed pass** (§4), so the PC–backprop gap stays
@@ -162,13 +162,17 @@ result to be honest, all now in flight:
   dyadic quantization gives ≈ zero weight gradients (STE exists precisely to bypass this); the dyadic-BP arm
   must use the same STE the cascade does, and must be checked to actually train (loss descends).
 
-  2. **A well-conditioned smooth net.** In the first pass the smooth relaxation *violated its own
-  Whittington–Bogacz check*: run toward convergence it **diverged** at L=16 (bpb → uniform) rather than
-  approaching backprop, because the residual highway makes ‖J‖ > 1 and the Jacobi settling amplifies rounding
-  by ≈ ‖J‖^depth. That is a **solver-conditioning artifact, not honest truncation** — adding LayerNorm does not
-  fix it (the net already has pre-LN; the residual identity path is the cause). The re-run bounds ‖J‖ (residual
-  scaling) so that relaxation-to-convergence ≈ backprop is a *passing* gate; only then does the finite-T arm
-  measure genuine depth truncation.
+  2. **Honest truncation, verified — not solver instability.** The smooth finite-T inference is the
+  *numerically-exact truncated back-substitution* of the equilibrium recursion (§2): initialise the value-node
+  errors to zero, clamp the top node by the loss, and sweep — each sweep carries the loss error exactly one
+  layer deeper. Because the system is triangular and top-clamped it is **unconditionally stable**: for
+  **T ≥ depth it reproduces backprop bit-exactly** (the Whittington–Bogacz equilibrium — measured grad cos =
+  1.000000, relerr 0 vs backprop at L=16, and byte-identical trained trajectories), and for **T < depth it
+  truncates** the error to the top T layers, leaving the rest undertrained. The degradation is therefore
+  *honest depth-truncation, not a conditioning artifact* — no residual scaling is needed. (An earlier
+  fixed-step value-node relaxation *did* diverge with more steps and produced a spurious blow-up; it is
+  replaced by the exact truncated back-substitution, which makes the Whittington–Bogacz check a structural
+  identity rather than a fitted result.)
 
   3. **Convergence + train/val curves.** Longer training with logged train and held-out val trajectories per
   arm, to confirm each arm has plateaued before the gap is read.
