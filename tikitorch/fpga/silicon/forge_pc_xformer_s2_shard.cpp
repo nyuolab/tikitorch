@@ -390,6 +390,9 @@ int main(int argc,char**argv){
             }
         }
       } else {
+        // HYGIENE: PIPE slot buffers (hmsg2/emsg2) and the kernel's single-slot GACC alias if ACCUM>S2_SLOTS
+        // (two sub-batches map to slot g%S2_SLOTS) -> silent activation/gradient corruption. Guard it.
+        if(ACCUM > S2_SLOTS){ fprintf(stderr,"FATAL: PIPE=1 requires ACCUM<=S2_SLOTS (%d>%d); lower ACCUM or use serial PIPE=0\n", ACCUM, S2_SLOTS); return 8; }
         // ==================== PIPELINED (PIPE=1): overlap sub-batches via S2_SLOTS(=8) slots ====================
         // Instead of 2L serial kicks/sub-batch, run a dependency EVENT LOOP over the whole step's 2*L*ACCUM kicks
         // keyed by the GLOBAL sub-batch index g (=k within this step; windows never cross a step -> the per-step
@@ -505,7 +508,10 @@ int main(int argc,char**argv){
         readf(l, S2_FWUP, m.WUP, (long)S2_FFN*S2_D); readf(l, S2_FWDN, m.WDN, (long)S2_D*S2_FFN);
         readf(l, S2_FLN1G,m.LN1G,S2_D);              readf(l, S2_FLN1B,m.LN1B,S2_D);
         readf(l, S2_FLN2G,m.LN2G,S2_D);              readf(l, S2_FLN2B,m.LN2B,S2_D);
-        if(l==0){   readf(l, S2_FEMB, m.EMB, (long)S2_VOCAB*S2_D); readf(l, S2_FPOS, m.POS, (long)S2_SEQ*S2_D); }
+        // HYGIENE: under host_embed, EMB/POS are trained host-side in hEMB/hPOS (aliased to M[0]->EMB/POS at init);
+        // the on-chip S2_FEMB/S2_FPOS DDR region is the STALE init (chip 0 runs as HID and never writes it). Reading
+        // it back would clobber the trained embeddings -> generation/eval would use untrained init. Skip when host_embed.
+        if(l==0 && !host_embed()){ readf(l, S2_FEMB, m.EMB, (long)S2_VOCAB*S2_D); readf(l, S2_FPOS, m.POS, (long)S2_SEQ*S2_D); }
         if(l==L-1){ readf(l, S2_FLNFG,m.LNFG,S2_D); readf(l, S2_FLNFB,m.LNFB,S2_D); readf(l, S2_FWHEAD,m.WHEAD,(long)S2_VOCAB*S2_D); }
         char op[512]; snprintf(op,512,"%s/xfs2_master%d.f32",DUMP_DIR,l); dump_master_file(m,op);
         printf("[xfs2shard] chip %d: trained float master -> %s\n", l, op);
