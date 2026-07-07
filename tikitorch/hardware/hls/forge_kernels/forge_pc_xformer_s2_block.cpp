@@ -122,26 +122,20 @@ static inline float bf_dyad_f(float wf) {
 }
 
 // ======================================================================================================
-// DE-PIPELINE GATE (DEFAULT ON) — S2_DEPIPELINE_REDUCE
+// DE-PIPELINE GATE (DEFAULT OFF — the laned/pipelined reductions are the correct FAST path)
 // ------------------------------------------------------------------------------------------------------
-// ROOT CAUSE (proven by the per-stage silicon-vs-shim forward diff): the D=512 s2 block DIVERGES ON F2 because
-// EVERY streamed REDUCTION primitive was scheduled at achieved-II=1 via partial-sum LANES (FIX B/E) and the
-// gemm MAC's `y[] +=` was PIPELINE II=1 (FIX A + DEPENDENCE-false). A pure copy (bload->bstore, no reduction)
-// is BIT-EXACT on silicon; every op with a reduction is wrong (LN1 relerr 5e-2 = first divergence; the Q gemm
-// independently relerr 0.92). The common factor is the LANED / II=1-PIPELINED ACCUMULATION: it is a silicon
-// read-during-write / pipelined-fp-accumulate HAZARD that csim (functional, no timing) cannot see. The
-// "conservative" HEAD revert did NOT change the achieved II (the tool re-pipelined the MAC to II=1 anyway and
-// KEPT the lanes) so it diverged identically. s1 trained BIT-EXACT on F2 precisely because it had RESIDENT
-// activations and NO streamed pipelined reductions.
-//
-// THE FIX (this file): FORCE every reduction to a SEQUENTIAL scalar accumulator with NO PIPELINE II=1 pragma,
-// so the tool MUST honour the loop-carried fp-add recurrence and schedule the loop at II = the fadd latency
-// (>1). This physically removes the II=1-pipelined-accumulate hazard. Sequential summation is ALSO csim-exact
-// (it removes the within-1-ULP lane-reorder), so csim stays correct. Throughput cost: each reduction loop now
-// runs at II≈(fadd latency, ~4-8 cyc) instead of 1 → correctness-first, slower. The perf lane path is kept
-// behind the gate for reference but is NOT the default (the synth tcl builds the default = de-pipelined).
+// HISTORY (corrected): this gate was added on the theory that the F2 divergence was a silicon
+// pipelined-fp-accumulate HAZARD in the laned II=1 reductions. That theory was DISPROVEN: an AFI built with
+// every reduction de-pipelined produced silicon LN1 (X1) IDENTICALLY 5.36e-2 wrong (same maxabs 6.3954) —
+// de-pipelining changed NOTHING. The real bug was the LayerNorm dyadic quantiser using hls::log2 + hls::round,
+// which the Vitis HLS hardware APPROXIMATES (s = min(quant,scale); see the bit-exact helpers above). With that
+// fixed bit-exactly, silicon LN1 went to relerr 0.00 (100% bitmatch) — with the reductions STILL laned. So the
+// laned II=1 reductions were always FAITHFUL on silicon (the 8-way lane interleave hides the fadd latency, so
+// there is no read-during-write hazard); de-pipelining only cost ~5x throughput (sequential MAC IterLat 2421)
+// and tripped the driver's 60s kick timeout on the OUTPUT chip's backward (KICK HUNG slot 7). DEFAULT is now
+// OFF = laned/fast. The sequential path is kept behind the gate for reference only.
 #ifndef S2_DEPIPELINE_REDUCE
-#define S2_DEPIPELINE_REDUCE 1
+#define S2_DEPIPELINE_REDUCE 0
 #endif
 
 #define S2_LANES 8
