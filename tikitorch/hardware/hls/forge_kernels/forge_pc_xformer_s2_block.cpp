@@ -423,7 +423,8 @@ static inline float s2_treeK(const float *a, const float *b) {
             const float *aptr = (LHS) + r * (TI_) + kb;                                                        \
             for (int c = 0; c < (TC); c++) {                                                                   \
                 _Pragma("HLS PIPELINE II=1")                                                                   \
-                _Pragma("HLS DEPENDENCE variable=YACC inter false")                                            \
+                _Pragma("HLS DEPENDENCE variable=y inter false") /* accumulator is always `y` (see 389); the  \
+                    macro-param token YACC is NOT expanded inside a _Pragma string -> must name y directly */  \
                 (YACC)[r * (TO) + c] += s2_treeK(aptr, (BB) + c * (BSTR) + kb);                                \
             }                                                                                                  \
         }                                                                                                      \
