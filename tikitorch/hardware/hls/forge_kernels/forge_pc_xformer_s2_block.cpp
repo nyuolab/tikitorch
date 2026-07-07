@@ -107,6 +107,11 @@ static inline float s2_dyad_quant(float x, int MB) {  // == (1+round_MB((x/2^e)-
     float s = 1.0f + hls::ldexp((float)r, -MB);       // r*2^-MB via ldexp (exponent add) — NO mult/div => DSP_MULT=0
     return hls::ldexp(s, e);
 }
+static inline float s2_round_ne(float y) {            // == hls::round(y) (round half away from zero); |y|<2^23.
+#pragma HLS INLINE                                    // float->int truncation is EXACT on HW, unlike hls::round which
+    return (y >= 0.0f) ? (float)(int)(y + 0.5f)       // silicon APPROXIMATES (same class as the LN bug — qact grid).
+                       : (float)(int)(y - 0.5f);
+}
 
 static inline float bf_dyad_f(float wf) {
 #pragma HLS INLINE
@@ -255,7 +260,7 @@ static void s2_qact_ddr(ap_uint<512> *buffer, int off, int n) {
     for (int b = 0; b < n; b += S2_ELT_TILE) {
         int T = (n - b < S2_ELT_TILE) ? (n - b) : S2_ELT_TILE;
         bload_f(buffer, off + b, s2_tA, T);
-        for (int i = 0; i < T; i++) s2_tA[i] = hls::round(s2_tA[i] / sc) * sc;
+        for (int i = 0; i < T; i++) s2_tA[i] = s2_round_ne(s2_tA[i] / sc) * sc;   // was hls::round — silicon-approx; now bit-exact
         bstore_f(buffer, off + b, s2_tA, T);
     }
 }
