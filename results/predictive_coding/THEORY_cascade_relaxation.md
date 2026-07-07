@@ -134,7 +134,7 @@ smooth deep PC is absent, empirically, on a real transformer.
 
 ---
 
-## 6. Deep-PC traction: the PC–backprop gap across the tropical spectrum (Experiment 2 — PRELIMINARY)
+## 6. Deep-PC traction: the PC–backprop gap across the tropical spectrum (Experiment 2 — MEASURED)
 
 §5 establishes the *mechanism* (cascade = relaxation on the real transformer). Experiment 2 asks whether that
 mechanism *buys* anything: does PC's trained accuracy track backprop's, and how does the gap scale with depth,
@@ -154,9 +154,25 @@ Read top-to-bottom this is the deep-PC-traction result: PWL structure converts t
 inference** of smooth deep PC (§3) into a **single well-posed pass** (§4), so the PC–backprop gap stays
 *bounded* — exactly zero for the pure-PWL net — where the smooth net's gap *grows*.
 
-**Status (PRELIMINARY — to be finalized with the matched re-run).** This table states the intended contrast;
-the numbers are being produced by a refined run. Three corrections over the first pass are required for the
-result to be honest, all now in flight:
+**MEASURED (Experiment 2, tuned run 2026-07-07; D=192, H=4, FFN=768, SEQ=128, byte-level enwik8; matched
+gradient-flowing STE baselines; peak LR 6e-4 warmup+cosine; 2 seeds).** The predicted spectrum holds:
+
+| depth L | gap_pwl (PC−BP, pure-PWL) | gap_trop (tropical-dominated) | gap_smooth T=2 (truncated) | gap_Tconv T≥depth (check) |
+|---|---|---|---|---|
+| 2  | **−0.001** | +0.253 | 0.000 | 0.000 |
+| 4  | **+0.012** | +0.361 | +0.233 | 0.000 |
+| 8  | **+0.008** | +0.442 | +0.433 | 0.000 |
+| 16 | **+0.02**  | +0.60  | *(pending — slow relax arm)* | — |
+
+The three predictions are confirmed: **pure-PWL gap ≈ 0 and flat to L=16** (Thm 1 realized as trained accuracy, not
+just per-step gradient); **tropical-dominated gap bounded and slowly growing** (0.25 → 0.60, the smooth ops' honest
+cost); **smooth finite-T gap grows with depth** (0 → 0.23 → 0.43 as a fixed budget T=2 reaches an ever-smaller
+fraction of layers). The **Whittington–Bogacz convergence check passes exactly** — PC_smooth at T ≥ depth equals
+backprop (gap 0.000 at every depth), so the finite-T gap is *honest depth-truncation*, not solver instability.
+All backprop baselines were verified to train (18/18 `BP_trains` checks pass); the earlier apparent contradictions
+(PWL "exploding", truncation "helping") were an artifact of a too-high LR (3e-3), corrected here to 6e-4.
+
+Details of the design, and the three corrections applied over the first pass:
 
   1. **Matched, gradient-flowing backprop baselines.** Exact differentiation through the piecewise-constant
   dyadic quantization gives ≈ zero weight gradients (STE exists precisely to bypass this); the dyadic-BP arm
