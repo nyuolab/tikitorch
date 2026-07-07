@@ -139,6 +139,67 @@ static inline float dyad_adam(float g,float&m,float&v,float lr){ m=0.875f*m+0.12
     float r=fabsf(m)/(v+1e-9f); float st=(r>0)?ldexpf(1.0f,(int)floorf(log2f(r))):0.0f; return lr*((m>0)-(m<0))*st; }
 
 // =====================================================================================================
+// HOST_BACKWARD (env, default 0=OFF): a DIAGNOSTIC/HYBRID training path that BYPASSES every in-kernel backward
+// GEMM. The kernel does ONLY the FORWARD (proven faithful on silicon by S2_DIAG); the driver reads back the
+// forward activations from each chip's DDR wide-cache and computes the ENTIRE backward + dyadic-Adam ON THE HOST
+// in C++, MIRRORING the CPU twin /tmp/mp_chain_30m.py (bwd_block) EXACTLY — same bf16 STE round points, dyadic
+// weights for the dx-route, qact, dyadic-mantissa-LN scales (read from S2_WLN*S), softmax PRAW RECOMPUTE from the
+// cached post-qact Q,K, wgrad/dx per linbwd, the CE grad, and the cross-chip up-error passed host-side (replacing
+// the broken in-kernel GROUT/GRIN backward relay). Updated weights are re-staged to silicon DDR for the NEXT
+// step's forward. If this DESCENDS on silicon while the all-kernel path diverges, the backward GEMMs are the SOLE
+// bug. NOTE: SLOW (host compute + full activation readback per sub-batch) and NOT the on-fabric final — the
+// kernel transposed-strided-load fix + rebuild remains the real solution. This block is arithmetic-only; it adds
+// NO new DDR layout and NO AFI rebuild. All math below is BYTE-for-BYTE the twin's (which descends).
+static int g_hb=-1; static inline int host_backward(){ if(g_hb<0){const char*e=getenv("HOST_BACKWARD"); g_hb=e?atoi(e):0;} return g_hb; }
+
+// ---- bf16 STE round (== kernel bf16_round / twin P()) ----
+static inline float hb_P(float x){ union{float f;uint32_t u;}c; c.f=x; uint32_t u=c.u; uint32_t lsb=(u>>16)&1u; u+=0x7fffu+lsb; u&=0xffff0000u; c.u=u; return c.f; }
+// ---- dyad (== kernel bf_dyad_f / twin dyad) ----
+static inline float hb_dyad(float w){ float a=w<0?-w:w; if(a<1e-30f) return 0.0f; int e=(int)lroundf(log2f(a)); float p=ldexpf(1.0f,e); return w<0?-p:p; }
+// ---- qact IN PLACE over a [n] tensor (== kernel s2_qact_ddr / twin qact): global max, shift-round ----
+static void hb_qact(float*x,long n){ float mx=0; for(long i=0;i<n;i++){ float a=x[i]<0?-x[i]:x[i]; if(a>mx)mx=a; } if(mx<1e-9f)mx=1e-9f; int sh=(int)floorf(log2f(mx))-S2_ABITS; float sc=ldexpf(1.0f,sh); for(long i=0;i<n;i++) x[i]=roundf(x[i]/sc)*sc; }
+// ---- LN backward on a [SEQ x D] strip in place (== kernel s2_ln_bwd_ddr / twin ln_bwd). gamma[d], s[SEQ]. ----
+//   gxhat=P(gy*gamma); mg=mean_d(gxhat); dx=P((gxhat-mg)/s[row]).
+static void hb_ln_bwd(float*gy,const float*gamma,const float*s,int M){ static float gxhat[S2_D];
+    for(int t=0;t<M;t++){ float*gr=gy+(long)t*S2_D; double mg=0; for(int d=0;d<S2_D;d++){ gxhat[d]=hb_P(gr[d]*gamma[d]); mg+=gxhat[d]; } float mgm=(float)(mg/S2_D); for(int d=0;d<S2_D;d++) gr[d]=hb_P((gxhat[d]-mgm)/s[t]); } }
+// ---- linbwd: dx=P(gy @ dyad(W)), dW += P(gy^T @ x). W is [O x I] float master (dyad'd for the dx route). ----
+//   gy:[SEQ x O]  x:[SEQ x I]  -> dx:[SEQ x I]  dW:[O x I] (accumulated into dWacc). rows=SEQ.
+static void hb_linbwd(const float*gy,const float*Wf,const float*x,int O,int I,float*dx,float*dWacc){
+    // dx[r][i] = P( sum_o gy[r][o]*dyad(W[o][i]) )
+    for(long r=0;r<S2_SEQ;r++){ const float*gr=gy+r*O; float*dr=dx+r*I;
+        for(int i=0;i<I;i++){ double acc=0; for(int o=0;o<O;o++) acc+=(double)gr[o]*hb_dyad(Wf[(long)o*I+i]); dr[i]=hb_P((float)acc); } }
+    // dW[o][i] += P( sum_r gy[r][o]*x[r][i] )
+    for(int o=0;o<O;o++){ float*dwo=dWacc+(long)o*I;
+        for(int i=0;i<I;i++){ double acc=0; for(long r=0;r<S2_SEQ;r++) acc+=(double)gy[r*O+o]*x[r*I+i]; dwo[i]+=hb_P((float)acc); } }
+}
+// ---- PRAW recompute + attention backward (== kernel s2_attn_bwd / twin _attn_bwd_vec, per-head, causal) ----
+//   Q,K,V,gATTN are [SEQ x D] (post-qact Q/K/V). Writes gQ,gK,gV [SEQ x D]. P() applied per twin's rounding pts.
+static void hb_attn_bwd(const float*Q,const float*K,const float*V,const float*gATTN,float*gQ,float*gK,float*gV){
+    const float scale=1.0f/sqrtf((float)S2_DH);
+    for(long i=0;i<(long)S2_SEQ*S2_D;i++){ gQ[i]=0; gK[i]=0; gV[i]=0; }
+    static float p[S2_SEQ], gp[S2_SEQ], gsv[S2_SEQ];
+    for(int h=0;h<S2_H;h++){ int hb=h*S2_DH;
+        for(int i=0;i<S2_SEQ;i++){
+            // --- recompute softmax row p[0..i] from cached Q,K (same score/exp/normalize as fwd) ---
+            float mx=-1e30f;
+            for(int j=0;j<=i;j++){ double dot=0; for(int d=0;d<S2_DH;d++) dot+=(double)Q[(long)i*S2_D+hb+d]*K[(long)j*S2_D+hb+d]; p[j]=(float)dot*scale; if(p[j]>mx)mx=p[j]; }
+            double sum=0; for(int j=0;j<=i;j++){ float e=expf(p[j]-mx); p[j]=e; sum+=e; }
+            for(int j=0;j<=i;j++) p[j]/=(float)sum;
+            // --- gp[j]=<gATTN_i,V_j> ; gV[j] += P(p[j]*gATTN_i) ---
+            for(int j=0;j<=i;j++){ double g=0; for(int d=0;d<S2_DH;d++) g+=(double)gATTN[(long)i*S2_D+hb+d]*V[(long)j*S2_D+hb+d]; gp[j]=(float)g;
+                for(int d=0;d<S2_DH;d++) gV[(long)j*S2_D+hb+d]+=hb_P(p[j]*gATTN[(long)i*S2_D+hb+d]); }
+            double ex=0; for(int j=0;j<=i;j++) ex+=(double)p[j]*gp[j];
+            for(int j=0;j<=i;j++) gsv[j]=hb_P(p[j]*(gp[j]-(float)ex))*scale;
+            // gQ[i] += sum_j gsv[j]*K[j] ; gK[j] += gsv[j]*Q[i]
+            for(int d=0;d<S2_DH;d++){ double qa=0; for(int j=0;j<=i;j++) qa+=(double)gsv[j]*K[(long)j*S2_D+hb+d]; gQ[(long)i*S2_D+hb+d]+=(float)qa; }
+            for(int j=0;j<=i;j++) for(int d=0;d<S2_DH;d++) gK[(long)j*S2_D+hb+d]+=gsv[j]*Q[(long)i*S2_D+hb+d];
+        }
+    }
+    // final P() per head-slice write (== kernel post-loop P / twin P(gQ),P(gK),P(gV))
+    for(long i=0;i<(long)S2_SEQ*S2_D;i++){ gQ[i]=hb_P(gQ[i]); gK[i]=hb_P(gK[i]); gV[i]=hb_P(gV[i]); }
+}
+
+// =====================================================================================================
 // FLOAT-master init — BYTE-FOR-BYTE the mp bf_init contract (forge_pc_xformer_mp_shard.cpp / the bf16 golden),
 // scaled to the D=512 dims:
 //   matmul weights ~ U(-1/sqrt(fan_in), 1/sqrt(fan_in)) via the bf_u LCG;  EMB/POS ~ N(0,1) via bf_n (sum of
@@ -253,12 +314,28 @@ int main(int argc,char**argv){
     }
 
     // HOST-EMBED state: reuse chip-0 master's EMB/POS (bf_init recipe); host adam moments + grad accumulators.
+    // HOST_BACKWARD FORCES host_embed (the whole backward — incl. embed — runs host-side), so this block always
+    // fires under HOST_BACKWARD; the host EMB/POS train exactly as they already do in the HOST_EMBED serial path.
     if(host_embed()){
         hEMB=M[0]->EMB; hPOS=M[0]->POS;
         hmE=(float*)calloc((size_t)S2_VOCAB*S2_D,4); hvE=(float*)calloc((size_t)S2_VOCAB*S2_D,4);
         hmP=(float*)calloc((size_t)S2_SEQ*S2_D,4);   hvP=(float*)calloc((size_t)S2_SEQ*S2_D,4);
         hgE=(float*)calloc((size_t)S2_VOCAB*S2_D,4); hgP=(float*)calloc((size_t)S2_SEQ*S2_D,4);
         printf("[xfs2shard] HOST_EMBED on: chip 0 runs as a HID block; EMB/POS embedded+trained host-side.\n");
+    }
+    // HOST_BACKWARD state: per-chip host dyadic-Adam m/v + grad ACCUMULATORS for ALL matmul + head weights, in the
+    // FMaster layout so we iterate tensor-by-tensor. The FLOAT master IS M[l] (updated host-side, re-staged each
+    // step). EMB/POS reuse the hEMB/hmE... arrays above (chip-0 tail). LN gamma/beta are frozen (no grad). ~42 MB/chip.
+    static FMaster *HM[MAXL]={0}, *HV[MAXL]={0}, *HG[MAXL]={0};
+    if(host_backward()){
+        for(int l=0;l<L;l++){
+            HM[l]=(FMaster*)calloc(1,sizeof(FMaster)); HV[l]=(FMaster*)calloc(1,sizeof(FMaster)); HG[l]=(FMaster*)calloc(1,sizeof(FMaster));
+            if(!HM[l]||!HV[l]||!HG[l]){ fprintf(stderr,"calloc host-bwd adam %d\n",l); return 5; }
+        }
+        printf("[xfs2shard] HOST_BACKWARD on: kernel does FORWARD only; driver computes the FULL backward + dyadic-Adam\n"
+               "            HOST-SIDE (mirrors /tmp/mp_chain_30m.py bwd_block; PRAW recomputed from cached Q,K). This\n"
+               "            BYPASSES every in-kernel backward GEMM. Weights re-staged to DDR each step. SLOW; diagnostic.\n");
+        if(pipe_on()){ fprintf(stderr,"FATAL: HOST_BACKWARD requires the SERIAL sweep (PIPE=0); unset PIPE.\n"); return 8; }
     }
     // boundary-message scratch (one float per lane; the wide down/up messages are SEQ*D floats = 512 KB)
     float *hmsg=(float*)malloc(4L*S2_SEQ*S2_D);   // wide down-message (forward): S2_GROUT(l) -> S2_GRIN(l+1)
@@ -372,6 +449,7 @@ int main(int argc,char**argv){
             }
             // ===================== BACKWARD SWEEP: chip L-1 -> 0 =====================
             g_phase=1;
+          if(!host_backward()){
             for(int l=L-1;l>=0;l--){
                 setcfg(l, S2_PH_BWD, krole(l), do_update, do_update?lrcode(lr):0, (k==0)?1:0, 0);   // DO_UP -> adam; k==0 -> GZERO
                 if(l<L-1){ put_f(l, S2_GRIN, emsg, (long)S2_SEQ*S2_D); }  // neighbour WIDE error in
@@ -388,6 +466,96 @@ int main(int argc,char**argv){
                     }
                 }
             }
+          } else {
+            // ================= HOST BACKWARD SWEEP: chip L-1 -> 0, computed ENTIRELY on the host =================
+            // The kernel already ran the FORWARD only (loop above). For each chip we readf its DDR wide-cache
+            // activations (R,X1,Q,K,V,ATTN,M,X2,HD,RP,RMASK,LN scalars; +XF,LG on OUT), recompute PRAW from Q,K,
+            // and run the twin's bwd_block: CE grad (OUT), head + LNF bwd, FFN bwd (relu mask), LN2 bwd, attention
+            // bwd (PRAW recompute), WQ/WK/WV dx+wgrad, LN1 bwd -> gR. gR is the cross-chip up-error (host relay,
+            // replacing the broken in-kernel GROUT/GRIN). Grads accumulate in HG[l]; adam applies on the last
+            // sub-batch to M[l] and re-stages the trained master to DDR for the next step's forward.
+            // Per-chip scratch (static: reused across chips/sub-batches; SEQ*FFN-sized).
+            static float aR[S2_SEQ*S2_D], aX1[S2_SEQ*S2_D], aQ[S2_SEQ*S2_D], aK[S2_SEQ*S2_D], aV[S2_SEQ*S2_D];
+            static float aATTN[S2_SEQ*S2_D], aM[S2_SEQ*S2_D], aX2[S2_SEQ*S2_D], aHD[S2_SEQ*S2_FFN], aRP[S2_SEQ*S2_D];
+            static float aRMASK[S2_SEQ*S2_FFN], aXF[S2_SEQ*S2_D], aLG[S2_SEQ*S2_VOCAB];
+            static float ln1s[S2_SEQ], ln2s[S2_SEQ], lnfs[S2_SEQ];
+            static float gRP[S2_SEQ*S2_D], gM[S2_SEQ*S2_D], gHD[S2_SEQ*S2_FFN], gX2[S2_SEQ*S2_D], gM2[S2_SEQ*S2_D];
+            static float gR[S2_SEQ*S2_D], gATTN[S2_SEQ*S2_D], gQ[S2_SEQ*S2_D], gK[S2_SEQ*S2_D], gV[S2_SEQ*S2_D];
+            static float gX1[S2_SEQ*S2_D], gTMP[S2_SEQ*S2_D], gXF[S2_SEQ*S2_D], gLG[S2_SEQ*S2_VOCAB];
+            for(int l=L-1;l>=0;l--){
+                FMaster &W=*M[l]; FMaster &G=*HG[l];
+                if(k==0) memset(&G,0,sizeof(FMaster));                   // GZERO: zero this chip's grad accumulators
+                // ---- read forward activations from this chip's DDR wide-cache (SLOT 0) ----
+                readf(l,S2_WR,aR,(long)S2_SEQ*S2_D);      readf(l,S2_WX1,aX1,(long)S2_SEQ*S2_D);
+                readf(l,S2_WQ,aQ,(long)S2_SEQ*S2_D);      readf(l,S2_WK,aK,(long)S2_SEQ*S2_D);   readf(l,S2_WV,aV,(long)S2_SEQ*S2_D);
+                readf(l,S2_WATTN,aATTN,(long)S2_SEQ*S2_D);readf(l,S2_WM,aM,(long)S2_SEQ*S2_D);   readf(l,S2_WX2,aX2,(long)S2_SEQ*S2_D);
+                readf(l,S2_WHD,aHD,(long)S2_SEQ*S2_FFN);  readf(l,S2_WRP,aRP,(long)S2_SEQ*S2_D); readf(l,S2_WRMASK,aRMASK,(long)S2_SEQ*S2_FFN);
+                readf(l,S2_WLN1S,ln1s,S2_SEQ);            readf(l,S2_WLN2S,ln2s,S2_SEQ);
+                // ---- OUTPUT chip: CE grad -> head bwd -> LNF bwd -> gRP ; else gRP = incoming host up-error emsg ----
+                if(l==L-1){
+                    readf(l,S2_WXF,aXF,(long)S2_SEQ*S2_D); readf(l,S2_WLG,aLG,(long)S2_SEQ*S2_VOCAB); readf(l,S2_WLNFS,lnfs,S2_SEQ);
+                    for(int t=0;t<S2_SEQ;t++){ float*lr_=aLG+(long)t*S2_VOCAB; float mx=-1e30f;
+                        for(int v=0;v<S2_VOCAB;v++) if(lr_[v]>mx)mx=lr_[v];
+                        double sum=0; static float pr[S2_VOCAB]; for(int v=0;v<S2_VOCAB;v++){ pr[v]=expf(lr_[v]-mx); sum+=pr[v]; }
+                        int tg=(int)data[off+t+1]; for(int v=0;v<S2_VOCAB;v++){ float p=pr[v]/(float)sum, oh=(v==tg)?1.0f:0.0f; gLG[(long)t*S2_VOCAB+v]=hb_P((p-oh)/S2_SEQ); } }
+                    // gXF = P(gLG @ dyad(WHEAD)) ; gWHEAD += P(gLG^T @ XF)
+                    hb_linbwd(gLG,W.WHEAD,aXF,S2_VOCAB,S2_D,gXF,G.WHEAD);
+                    memcpy(gRP,gXF,sizeof(float)*(long)S2_SEQ*S2_D);
+                    hb_ln_bwd(gRP,W.LNFG,lnfs,S2_SEQ);                   // gRP = ln_bwd(gXF, LNFG, lnfs)
+                } else {
+                    memcpy(gRP,emsg,sizeof(float)*(long)S2_SEQ*S2_D);    // incoming wide error (host relay from chip l+1)
+                }
+                // ---- FFN backward: RP = M + FO ; FO = WDN(HD) ; HD = qact(relu(WUP(X2))) ----
+                memcpy(gM,gRP,sizeof(float)*(long)S2_SEQ*S2_D);         // gM = gRP
+                hb_linbwd(gRP,W.WDN,aHD,S2_D,S2_FFN,gHD,G.WDN);        // gHD = P(gRP@dyad(WDN)) ; gWDN += P(gRP^T@HD)
+                for(long i=0;i<(long)S2_SEQ*S2_FFN;i++) if(aRMASK[i]<=0.0f) gHD[i]=0.0f;   // relu mask
+                hb_linbwd(gHD,W.WUP,aX2,S2_FFN,S2_D,gX2,G.WUP);        // gX2 = P(gHD@dyad(WUP)) ; gWUP += P(gHD^T@X2)
+                // ---- LN2 over M: gM = P(gM + ln_bwd(gX2, LN2G, ln2s)) ----
+                memcpy(gM2,gX2,sizeof(float)*(long)S2_SEQ*S2_D); hb_ln_bwd(gM2,W.LN2G,ln2s,S2_SEQ);
+                for(long i=0;i<(long)S2_SEQ*S2_D;i++) gM[i]=hb_P(gM[i]+gM2[i]);
+                // ---- attention backward: M = R + AO ; AO = WO(ATTN) ; ATTN = qact(P@V) ----
+                memcpy(gR,gM,sizeof(float)*(long)S2_SEQ*S2_D);         // gR = gM
+                hb_linbwd(gM,W.WO,aATTN,S2_D,S2_D,gATTN,G.WO);         // gATTN = P(gM@dyad(WO)) ; gWO += P(gM^T@ATTN)
+                hb_attn_bwd(aQ,aK,aV,gATTN,gQ,gK,gV);                  // PRAW recompute + gQ,gK,gV (P'd)
+                // ---- gX1 += dyad(W{Q,K,V})-route ; wgrad each ; then LN1 ----
+                memset(gX1,0,sizeof(float)*(long)S2_SEQ*S2_D);
+                hb_linbwd(gQ,W.WQ,aX1,S2_D,S2_D,gTMP,G.WQ); for(long i=0;i<(long)S2_SEQ*S2_D;i++) gX1[i]+=gTMP[i];
+                hb_linbwd(gK,W.WK,aX1,S2_D,S2_D,gTMP,G.WK); for(long i=0;i<(long)S2_SEQ*S2_D;i++) gX1[i]+=gTMP[i];
+                hb_linbwd(gV,W.WV,aX1,S2_D,S2_D,gTMP,G.WV); for(long i=0;i<(long)S2_SEQ*S2_D;i++) gX1[i]+=gTMP[i];
+                for(long i=0;i<(long)S2_SEQ*S2_D;i++) gX1[i]=hb_P(gX1[i]);   // gX1 = P(gX1)
+                memcpy(gTMP,gX1,sizeof(float)*(long)S2_SEQ*S2_D); hb_ln_bwd(gTMP,W.LN1G,ln1s,S2_SEQ);   // gR1 -> TMP
+                for(long i=0;i<(long)S2_SEQ*S2_D;i++) gR[i]=hb_P(gR[i]+gTMP[i]);   // gR = P(gR + gR1)
+                // ---- emit: INPUT/host-embed chip scatters gR -> EMB/POS host grad ; else relay gR as the up-error ----
+                if(l==0){
+                    if(k==0){ memset(hgE,0,(size_t)S2_VOCAB*S2_D*4); memset(hgP,0,(size_t)S2_SEQ*S2_D*4); }  // GZERO
+                    for(int t=0;t<S2_SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=S2_VOCAB)v=S2_VOCAB-1;
+                        for(int d=0;d<S2_D;d++){ float g=gR[t*S2_D+d]; hgE[(long)v*S2_D+d]+=g; hgP[t*S2_D+d]+=g; } }
+                } else {
+                    for(long i=0;i<(long)S2_SEQ*S2_D;i++) emsg[i]=hb_P(gR[i]);   // wide up-message = P(gR) (host relay to chip l-1)
+                }
+            }
+            // ---- last sub-batch: dyadic-Adam apply on HOST-staged masters, then re-stage to DDR for next fwd ----
+            if(do_update){
+                for(int l=0;l<L;l++){
+                    FMaster &W=*M[l]; FMaster &Mm=*HM[l]; FMaster &Vv=*HV[l]; FMaster &G=*HG[l];
+                    auto adamT=[&](float*w,float*m,float*v,float*g,long n){ for(long i=0;i<n;i++) w[i]-=dyad_adam(g[i],m[i],v[i],(float)lr); };
+                    adamT(W.WQ,Mm.WQ,Vv.WQ,G.WQ,(long)S2_D*S2_D); adamT(W.WK,Mm.WK,Vv.WK,G.WK,(long)S2_D*S2_D);
+                    adamT(W.WV,Mm.WV,Vv.WV,G.WV,(long)S2_D*S2_D); adamT(W.WO,Mm.WO,Vv.WO,G.WO,(long)S2_D*S2_D);
+                    adamT(W.WUP,Mm.WUP,Vv.WUP,G.WUP,(long)S2_FFN*S2_D); adamT(W.WDN,Mm.WDN,Vv.WDN,G.WDN,(long)S2_D*S2_FFN);
+                    if(l==L-1) adamT(W.WHEAD,Mm.WHEAD,Vv.WHEAD,G.WHEAD,(long)S2_VOCAB*S2_D);
+                    // re-stage the trained matmul/head masters into DDR for the NEXT step's forward (LN frozen; EMB/POS host-staged into GRIN each fwd).
+                    put_f(l,S2_FWQ,W.WQ,(long)S2_D*S2_D); put_f(l,S2_FWK,W.WK,(long)S2_D*S2_D);
+                    put_f(l,S2_FWV,W.WV,(long)S2_D*S2_D); put_f(l,S2_FWO,W.WO,(long)S2_D*S2_D);
+                    put_f(l,S2_FWUP,W.WUP,(long)S2_FFN*S2_D); put_f(l,S2_FWDN,W.WDN,(long)S2_D*S2_FFN);
+                    if(l==L-1) put_f(l,S2_FWHEAD,W.WHEAD,(long)S2_VOCAB*S2_D);
+                }
+                // EMB/POS host dyadic-Adam (chip-0 tail; same recipe as HOST_EMBED serial path)
+                if(!getenv("EMB_FREEZE")){
+                    for(long i=0;i<(long)S2_VOCAB*S2_D;i++) hEMB[i]-=dyad_adam(hgE[i],hmE[i],hvE[i],lr);
+                    for(long i=0;i<(long)S2_SEQ*S2_D;i++)   hPOS[i]-=dyad_adam(hgP[i],hmP[i],hvP[i],lr);
+                }
+            }
+          }
         }
       } else {
         // HYGIENE: PIPE slot buffers (hmsg2/emsg2) and the kernel's single-slot GACC alias if ACCUM>S2_SLOTS
