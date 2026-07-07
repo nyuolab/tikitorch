@@ -72,10 +72,46 @@ static inline float bf16_round(float f) {
 static inline float P(float x) { return bf16_round(x); }
 static inline float i2f(int32_t i) { union { float f; int32_t i; } c; c.i = i; return c.f; }
 static inline int32_t f2i(float f) { union { float f; int32_t i; } c; c.f = f; return c.i; }
+
+// ======================================================================================================
+// BIT-EXACT dyadic extraction — silicon == csim == CPU by construction.
+// ------------------------------------------------------------------------------------------------------
+// ROOT CAUSE of the D=512 s2 F2 divergence (proven by per-token silicon-vs-shim LN diff, relerr 2.6e-7 fit):
+// the LayerNorm mantissa quantizer used hls::log2 + hls::round, which the Vitis HLS HARDWARE APPROXIMATES.
+// On silicon the mantissa fails to round UP, so s = min(quant(scale), scale) instead of quant(scale) — a
+// per-token LN-scale error up to 11% at S2_MBITS=2 that cascades to divergence. The ap_int/hls_math csim
+// shim maps hls::log2/round to EXACT libm, so the bug was invisible to every csim/shim check. Fix: derive
+// the dyadic exponent/mantissa straight from the IEEE-754 bits with INTEGER ops (identical on every target;
+// validated bit-identical to libm over dense sweeps). These replace hls::log2/hls::round/hls::floor in the
+// dyadic paths (LN normaliser, bf_dyad_f gemm operands, qact scale, dyadic-Adam step). ldexp is EXACT
+// (it only adds to the exponent field) so it is retained.
+static inline int s2_ilog2_floor(float x) {           // == (int)hls::floor(hls::log2(x)), x>0 normal
+#pragma HLS INLINE
+    union { float f; uint32_t u; } c; c.f = x;
+    return (int)((c.u >> 23) & 0xFFu) - 127;
+}
+static inline int s2_ilog2_round(float x) {           // == (int)hls::round(hls::log2(x)), x>0 normal
+#pragma HLS INLINE
+    union { float f; uint32_t u; } c; c.f = x;
+    int e = (int)((c.u >> 23) & 0xFFu) - 127;
+    uint32_t frac = c.u & 0x7FFFFFu;                  // 3474676 = ceil((sqrt(2)-1)*2^23): mantissa>=sqrt(2) -> round up
+    return e + (frac >= 3474676u ? 1 : 0);
+}
+static inline float s2_dyad_quant(float x, int MB) {  // == (1+round_MB((x/2^e)-1))*2^e, e=floor(log2 x); x>0 normal
+#pragma HLS INLINE
+    union { float f; uint32_t u; } c; c.f = x;
+    int e = (int)((c.u >> 23) & 0xFFu) - 127;
+    uint32_t frac = c.u & 0x7FFFFFu;
+    int drop = 23 - MB;
+    uint32_t r = (frac + (1u << (drop - 1))) >> drop; // MB-bit mantissa, round half-up; carry-safe: r in 0..2^MB
+    float s = 1.0f + hls::ldexp((float)r, -MB);       // r*2^-MB via ldexp (exponent add) — NO mult/div => DSP_MULT=0
+    return hls::ldexp(s, e);
+}
+
 static inline float bf_dyad_f(float wf) {
 #pragma HLS INLINE
     float a = wf < 0 ? -wf : wf; if (a < 1e-30f) return 0.0f;
-    int e = (int)hls::round(hls::log2(a));
+    int e = s2_ilog2_round(a);                        // was (int)hls::round(hls::log2(a)) — silicon-approx; now bit-exact
     float p = hls::ldexp(1.0f, e);
     return wf < 0 ? -p : p;
 }
@@ -214,7 +250,7 @@ static void s2_qact_ddr(ap_uint<512> *buffer, int off, int n) {
         for (int i = 0; i < T; i++) { float a = s2_tA[i] < 0 ? -s2_tA[i] : s2_tA[i]; if (a > mx) mx = a; }
     }
     if (mx < 1e-9f) mx = 1e-9f;
-    int sh = (int)hls::floor(hls::log2(mx)) - S2_ABITS;
+    int sh = s2_ilog2_floor(mx) - S2_ABITS;   // was (int)hls::floor(hls::log2(mx)) — silicon-approx; now bit-exact
     float sc = hls::ldexp(1.0f, sh);
     for (int b = 0; b < n; b += S2_ELT_TILE) {
         int T = (n - b < S2_ELT_TILE) ? (n - b) : S2_ELT_TILE;
@@ -286,9 +322,10 @@ LNRB: for (int r0 = 0; r0 < M; r0 += S2_SEQ_TILE) {
             }
             float scale = s2_lanesum(alane) / S2_D; if (scale < 1e-9f) scale = 1e-9f;
 #endif
-            int e = (int)hls::floor(hls::log2(scale));
-            float mant = hls::round((scale / hls::ldexp(1.0f, e) - 1.0f) * (1 << S2_MBITS)) / (float)(1 << S2_MBITS);
-            float s = (1.0f + mant) * hls::ldexp(1.0f, e);
+            // was: e=floor(log2(scale)); mant=round((scale/2^e-1)*2^MBITS)/2^MBITS; s=(1+mant)*2^e.
+            // hls::log2/hls::round are APPROXIMATE on F2 silicon -> s = min(quant,scale) (fails to round up)
+            // -> up to 11% per-token LN error at MBITS=2 -> divergence. Now bit-exact (silicon == csim).
+            float s = s2_dyad_quant(scale, S2_MBITS);
             s_out[r0 + t] = s;
         LN_Y: for (int d = 0; d < S2_D; d++) xr[d] = gamma[d] * ((xr[d] - mean) / s) + beta[d];
         }
@@ -634,7 +671,7 @@ static void s2_adam_stream(ap_uint<512> *buffer, int Woff, int mom_off, int var_
             float gv = gt[i], ag = gv < 0 ? -gv : gv;
             mt[i] = 0.875f*mt[i] + 0.125f*gv; vt[i] = 0.875f*vt[i] + 0.125f*ag;
             float am = mt[i] < 0 ? -mt[i] : mt[i], ratio = am/(vt[i]+1e-9f);
-            float step = ratio > 0 ? hls::ldexp(1.0f, (int)hls::floor(hls::log2(ratio))) : 0.0f;
+            float step = ratio > 0 ? hls::ldexp(1.0f, s2_ilog2_floor(ratio)) : 0.0f;   // bit-exact floor(log2)
             float sgn = mt[i] > 0 ? 1.0f : (mt[i] < 0 ? -1.0f : 0.0f);
             Wt[i] -= lr*sgn*step;
         }
