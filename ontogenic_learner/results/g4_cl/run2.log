@@ -1,0 +1,31 @@
+[m1at s0]   2000 wiki         wiki=3.415 shak=5.305 norm=5.7 fast=0.06
+[m1at s0]   4000 wiki         wiki=3.125 shak=5.513 norm=6.7 fast=0.09
+[m1at s0]   6000 wiki         wiki=2.988 shak=5.882 norm=7.5 fast=0.11
+[m1at s0]   8000 wiki         wiki=2.895 shak=5.903 norm=8.1 fast=0.12
+[m1at s0]  10000 wiki         wiki=2.851 shak=5.957 norm=8.6 fast=0.13
+[m1at s0]  12000 wiki         wiki=2.822 shak=6.327 norm=9.1 fast=0.13
+[m1at s0]  14000 wiki         wiki=2.779 shak=6.161 norm=9.4 fast=0.14
+[m1at s0]  16000 wiki         wiki=2.738 shak=6.053 norm=9.7 fast=0.14
+[m1at s0]  18000 wiki         wiki=2.701 shak=6.493 norm=10.1 fast=0.14
+[m1at s0]  20000 wiki         wiki=2.686 shak=6.497 norm=10.3 fast=0.14
+[m1at s0]  22000 wiki         wiki=2.676 shak=6.323 norm=10.6 fast=0.15
+[m1at s0]  24000 wiki         wiki=2.652 shak=6.871 norm=10.9 fast=0.15
+[m1at s0]  26000 wiki         wiki=2.631 shak=6.685 norm=11.1 fast=0.15
+[m1at s0]  28000 wiki         wiki=2.657 shak=6.372 norm=11.3 fast=0.15
+[m1at s0]  30000 wiki         wiki=2.620 shak=7.197 norm=11.6 fast=0.15
+[m1at s0]  32000 shakespeare  wiki=2.799 shak=3.044 norm=12.3 fast=0.14 ret=0.681
+[m1at s0]  34000 shakespeare  wiki=2.828 shak=2.902 norm=12.6 fast=0.14 ret=0.630
+[m1at s0]  36000 shakespeare  wiki=2.749 shak=2.935 norm=12.9 fast=0.14 ret=0.676
+[m1at s0]  38000 shakespeare  wiki=2.841 shak=2.825 norm=13.2 fast=0.15 ret=0.619
+[m1at s0]  40000 shakespeare  wiki=2.868 shak=2.792 norm=13.5 fast=0.15 ret=0.613
+[m1at s0]  42000 shakespeare  wiki=2.774 shak=2.840 norm=13.8 fast=0.15 ret=0.642
+[m1at s0]  44000 shakespeare  wiki=2.884 shak=2.755 norm=14.0 fast=0.15 ret=0.606
+[m1at s0]  46000 wiki         wiki=2.634 shak=3.022 norm=14.1 fast=0.15 ret=0.669
+[m1at s0]  48000 wiki         wiki=2.634 shak=3.142 norm=14.3 fast=0.15 ret=0.676
+[m1at s0]  50000 wiki         wiki=2.599 shak=3.208 norm=14.4 fast=0.15 ret=0.649
+[m1at s0]  52000 wiki         wiki=2.574 shak=3.305 norm=14.5 fast=0.15 ret=0.680
+[m1at s0]  54000 wiki         wiki=2.583 shak=3.408 norm=14.7 fast=0.15 ret=0.668
+[m1at s0]  56000 wiki         wiki=2.573 shak=3.383 norm=14.8 fast=0.15 ret=0.649
+[m1at s0]  58000 wiki         wiki=2.566 shak=3.380 norm=14.9 fast=0.15 ret=0.679
+[m1at s0]  60000 wiki         wiki=2.560 shak=3.555 norm=15.1 fast=0.15 ret=0.662
+[m1at s0] done in 668s

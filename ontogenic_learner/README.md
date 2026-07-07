@@ -168,6 +168,63 @@ First life: 14-day pilot (plan: `~/.claude/plans/…majestic-riddle.md`; launche
 
 ## 7. Status log (newest first — keep updating this)
 
+- **2026-07-08** · **G4 COMPLETE — the anchor is how you coax continual learning out of the
+  PC learner** ([G4_SPEC.md](G4_SPEC.md), 18 runs / 12 arms / 4 rounds in one day). The CL
+  hypothesis was restated honestly (cascade==BP ⇒ the *rule* can't carry CL; the discarded
+  Bayesian terms must) and tested mechanism-by-mechanism on a compressed wiki→shak→wiki life.
+  **Winner: the precision-weighted weight-posterior anchor** (`grad += λ·v̂·(θ−θ_EMA)`,
+  v̂ = slow-Adam exp_avg_sq — the G3 Fisher ingredient turned inward; the restored
+  `p(W)=N(θ_post,1/v)` term): interference −38%, end-of-life retention +10pp (no seed
+  overlap), norm halved *and flattened* (first equilibrium observed), at **zero adaptation
+  cost**. Add fire-less τ for SPJS mode (−46% interference, 2.6× fewer kicks, ~0.2 bpc tax).
+  Three honest negatives with mechanisms: epistemic gate CE−H is *anti*-satiating (miscalibrated
+  at ignorant init); per-param grad damping is nullified by Adam's own normalization (consolidation
+  must move the fixed point); parity-strength replay through a 4096 buffer *degrades everything*
+  (buffer memorization — weight-space memory beats data-space memory at organism scale). The
+  workflow's sleep-inversion claim was refuted against the live checkpoint before building
+  (reservoir healthy: 77% wiki slots, priorities ≈ uniform). **v0.1 birth config: two-speed +
+  AdamW + anchor.** Pilot untouched throughout — it is the control life.
+
+- **2026-07-07 (later)** · **Pilot day 2.2 — the Shakespeare shift, first post-shift probe.**
+  Three findings in one measurement (probe 11, ~4 h ≈ 370k steps into the new domain):
+  **(1) Fast adaptation** — shakespeare bpc 28.61 → 4.10 in 4 hours of experience.
+  **(2) Partial retention** — wiki 2.88 → 4.00 (+1.13 interference despite sleep-cycle
+  reservoir rehearsal; well short of collapse; the day-4–6 mixed-revisit phase tests
+  recovery speed). **(3) The norm-growth natural experiment: the curve BENT** — slope
+  dropped from ~+55/0.5M steps (wiki era) to +16/0.5M post-shift, supporting the
+  overconfidence-sharpening hypothesis: unbounded growth is a *novelty-starvation* effect
+  (stationary-data sharpening), not intrinsic to the always-on policy. v0.1 still gets
+  weight decay, but the pathology self-limits under distribution drift — i.e. exactly the
+  regime the organism is built for. Gate behaved as designed: pinned at the 0.30 cap
+  through the shift (rate limiter working), 0.294 settling after.
+
+- **2026-07-07** · **Pilot day 1.8 — first longitudinal finding: unbounded weight-norm
+  growth.** Ops are spotless (4.07M steps, 0 incidents, 0 resumes, gate steady 0.29, ~$17).
+  But the probe series shows mean weight norm growing near-linearly 26 → 404 over 4M steps
+  (neither Adam has weight decay — the G1/B1 lives were too short for it to matter), with
+  the expected signatures: wiki bpc drifting up 2.47 → 2.81 (overconfidence on the
+  surprise-gated hard tail), unseen-domain bpc exploding (digits → 2453 as never-seen pixel
+  symbols get pushed to −∞), plasticity adapt_gain inflating 2.1 → 7.0 (gradient-scale
+  artifact, not real plasticity). **Decision: observe, don't operate mid-life** — this is
+  exactly the "policy stability at 10⁷ steps" risk the pilot was built to measure, and the
+  imminent day-2 Shakespeare shift is the natural experiment (fresh error signal may or may
+  not bend the norm curve). If growth persists post-shift, the v0.1 phylogeny gets
+  AdamW-style decay (a *new birth*, never mid-life surgery). This finding alone justifies
+  running lives longer than benchmarks.
+
+- **2026-07-05** · **🌱 THE PILOT IS BORN** — `i-0ea5e986108ac2a00`, life
+  `org-20260704T161956Z`, a pristine 14-day life at measured pacing (2.3M steps/day).
+  The shakedown before it passed everything: all local gates (bit-resume kill -9 ≡
+  uninterrupted; probe isolation state-hash-exact; monotonic crash-safe ledger), full ops
+  on a smoke box (live S3 sampling, terminate-ack), and an 18-hour full-scale run with
+  **two abuse tests survived** (SSM process kill → systemd restart+resume; full reboot →
+  auto-resume), 5 probe suites, wiki bpc 2.65 and healthy clone-plasticity, **zero
+  incidents across 610k ledger events**. Shakedown finding worth keeping: at τ=0.25 the
+  z-scored gate is self-normalizing — it filters the hardest ~30% of batches even on
+  stationary data (starvation lives at higher τ). Two shakedown bugs fixed before the
+  pilot (gz-aware ledger recovery; prompted text probe — the space-attractor). Interact:
+  `python -m ontogenic_learner.organism.cli status|sample|report|feed`.
+
 - **2026-07-03 (night)** · **B1 benchmark anchoring COMPLETE** ([BENCHMARKS.md](BENCHMARKS.md)):
   **Split-MNIST class-incremental 82.4% (naive collapses to 19.7%; rehearsal 89.7% at 3.5×
   the updates; joint 97.5%)** — rehearsal-class continual learning with the ε-gate declining
