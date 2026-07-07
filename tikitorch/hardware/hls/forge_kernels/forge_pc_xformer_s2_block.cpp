@@ -80,11 +80,44 @@ static inline float bf_dyad_f(float wf) {
     return wf < 0 ? -p : p;
 }
 
-// FIX B/E partial-sum lanes: L independent accumulators indexed [i & (L-1)] break the loop-carried fp-add
-// recurrence (reuse distance L >= the adder latency) so a reduction loop pipelines at achieved-II=1; a final
-// balanced tree folds the L lanes. Same recipe as the mp kernel's bf_matmul. This REORDERS the summation, so
-// results are within-1-bf16-ULP (NOT bit-exact) vs a sequential reference — the TB CHECK-1 gate is <= 1 ULP.
+// ======================================================================================================
+// DE-PIPELINE GATE (DEFAULT ON) — S2_DEPIPELINE_REDUCE
+// ------------------------------------------------------------------------------------------------------
+// ROOT CAUSE (proven by the per-stage silicon-vs-shim forward diff): the D=512 s2 block DIVERGES ON F2 because
+// EVERY streamed REDUCTION primitive was scheduled at achieved-II=1 via partial-sum LANES (FIX B/E) and the
+// gemm MAC's `y[] +=` was PIPELINE II=1 (FIX A + DEPENDENCE-false). A pure copy (bload->bstore, no reduction)
+// is BIT-EXACT on silicon; every op with a reduction is wrong (LN1 relerr 5e-2 = first divergence; the Q gemm
+// independently relerr 0.92). The common factor is the LANED / II=1-PIPELINED ACCUMULATION: it is a silicon
+// read-during-write / pipelined-fp-accumulate HAZARD that csim (functional, no timing) cannot see. The
+// "conservative" HEAD revert did NOT change the achieved II (the tool re-pipelined the MAC to II=1 anyway and
+// KEPT the lanes) so it diverged identically. s1 trained BIT-EXACT on F2 precisely because it had RESIDENT
+// activations and NO streamed pipelined reductions.
+//
+// THE FIX (this file): FORCE every reduction to a SEQUENTIAL scalar accumulator with NO PIPELINE II=1 pragma,
+// so the tool MUST honour the loop-carried fp-add recurrence and schedule the loop at II = the fadd latency
+// (>1). This physically removes the II=1-pipelined-accumulate hazard. Sequential summation is ALSO csim-exact
+// (it removes the within-1-ULP lane-reorder), so csim stays correct. Throughput cost: each reduction loop now
+// runs at II≈(fadd latency, ~4-8 cyc) instead of 1 → correctness-first, slower. The perf lane path is kept
+// behind the gate for reference but is NOT the default (the synth tcl builds the default = de-pipelined).
+#ifndef S2_DEPIPELINE_REDUCE
+#define S2_DEPIPELINE_REDUCE 1
+#endif
+
 #define S2_LANES 8
+#if S2_DEPIPELINE_REDUCE
+// De-pipelined path: the "lane" array is still filled by the caller's SEQUENTIAL loop, but as a defensive
+// fold this is a plain sequential sum (no tree). Callers below no longer feed it laned — they accumulate a
+// scalar directly — so this is only reached by the (now sequential) attention helpers that still stage a lane[].
+static inline float s2_lanesum(float *lane) {      // sequential fold lane[0..L) -> scalar (csim-exact order)
+#pragma HLS INLINE
+    float acc = lane[0];
+    for (int j = 1; j < S2_LANES; j++) acc += lane[j];   // NO PIPELINE: loop-carried fadd recurrence honoured
+    return acc;
+}
+#else
+// PERF (pre-fix) path: L independent accumulators indexed [i & (L-1)] break the loop-carried fp-add recurrence
+// so a reduction loop pipelines at achieved-II=1; a final balanced tree folds the L lanes. THIS IS THE SILICON
+// HAZARD — kept only for reference / A-B, never the default build.
 static inline float s2_lanesum(float *lane) {      // S2_LANES power of two; folds lane[0..L) -> scalar (in place)
 #pragma HLS INLINE
     for (int s = 1; s < S2_LANES; s <<= 1)
@@ -94,6 +127,7 @@ static inline float s2_lanesum(float *lane) {      // S2_LANES power of two; fol
         }
     return lane[0];
 }
+#endif
 
 // ---- 512-bit burst I/O (float lane + int32 lane) — one float/int per 32-bit lane, reused lane-for-lane ----
 static void bload_f(ap_uint<512> *buf, int off, float *dst, int n) {
@@ -225,6 +259,16 @@ LNRB: for (int r0 = 0; r0 < M; r0 += S2_SEQ_TILE) {
         bload_f(buffer, x_off + r0 * S2_D, s2_lnstrip, TR * S2_D);
     LN_T: for (int t = 0; t < TR; t++) {
             float *xr = s2_lnstrip + t * S2_D;
+#if S2_DEPIPELINE_REDUCE
+            // DE-PIPELINE: sequential scalar mean/abs-dev sums. NO PIPELINE pragma → the tool honours the
+            // loop-carried fadd recurrence and schedules LN_S/LN_A at II = fadd latency (>1). csim-exact.
+            float msum = 0.0f;
+        LN_S: for (int d = 0; d < S2_D; d++) msum += xr[d];
+            float mean = msum / S2_D;
+            float asum = 0.0f;
+        LN_A: for (int d = 0; d < S2_D; d++) { float c = xr[d] - mean; asum += c < 0 ? -c : c; }
+            float scale = asum / S2_D; if (scale < 1e-9f) scale = 1e-9f;
+#else
             float slane[S2_LANES];                                   // FIX E: laned mean-sum (LN_S was II=6)
 #pragma HLS ARRAY_PARTITION variable=slane complete dim=1
             for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
@@ -241,6 +285,7 @@ LNRB: for (int r0 = 0; r0 < M; r0 += S2_SEQ_TILE) {
                 float c = xr[d] - mean; alane[d & (S2_LANES-1)] += c < 0 ? -c : c;
             }
             float scale = s2_lanesum(alane) / S2_D; if (scale < 1e-9f) scale = 1e-9f;
+#endif
             int e = (int)hls::floor(hls::log2(scale));
             float mant = hls::round((scale / hls::ldexp(1.0f, e) - 1.0f) * (1 << S2_MBITS)) / (float)(1 << S2_MBITS);
             float s = (1.0f + mant) * hls::ldexp(1.0f, e);
@@ -259,6 +304,12 @@ LBRB: for (int r0 = 0; r0 < M; r0 += S2_SEQ_TILE) {
     LB_T: for (int t = 0; t < TR; t++) {
             float *gr = s2_lnstrip + t * S2_D;
             float gxhat[S2_D];
+#if S2_DEPIPELINE_REDUCE
+            // DE-PIPELINE: sequential mean-of-gxhat. NO PIPELINE → loop-carried fadd on msum honoured, II>1. csim-exact.
+            float msum = 0.0f;
+        LB_C: for (int d = 0; d < S2_D; d++) { gxhat[d] = P(gr[d] * gamma[d]); msum += gxhat[d]; }
+            float mg = msum / S2_D;
+#else
             float mlane[S2_LANES];                                   // FIX E: laned mean-of-gxhat (LB_C was II=6)
 #pragma HLS ARRAY_PARTITION variable=mlane complete dim=1
             for (int l = 0; l < S2_LANES; l++) mlane[l] = 0;
@@ -267,6 +318,7 @@ LBRB: for (int r0 = 0; r0 < M; r0 += S2_SEQ_TILE) {
                 gxhat[d] = P(gr[d] * gamma[d]); mlane[d & (S2_LANES-1)] += gxhat[d];
             }
             float mg = s2_lanesum(mlane) / S2_D;
+#endif
         LB_D: for (int d = 0; d < S2_D; d++) gr[d] = P((gxhat[d] - mg) / s[r0 + t]);
         }
         bstore_f(buffer, dx_off + r0 * S2_D, s2_lnstrip, TR * S2_D);
@@ -294,6 +346,53 @@ static inline float s2_treeK(const float *a, const float *b) {
     }
     return p[0];
 }
+
+// ------------------------------------------------------------------------------------------------------
+// _S2_MAC_ITILE_BASE — the per-i-tile MAC over (r,c), shared by both engines (they differ only in the B
+// operand base/stride: conservative Btile[c*tile_i+kb], aggressive Bcache[c*KC + i0 + kb]).
+//   YACC   = the output accumulator array (y), accessed [r*TILE_O + c]
+//   LHS    = lhstile, accessed [r*tile_i + kb]
+//   BB     = B operand base pointer already offset to i-tile start (Btile, or Bcache+i0)
+//   BSTR   = per-column stride of BB (conservative tile_i, aggressive KC)
+//   TO/TI_ = tile_o / tile_i (compile-time strides)     TR/TC = live row/col counts     TIn = live k count
+//
+// DE-PIPELINE (S2_DEPIPELINE_REDUCE=1, DEFAULT): for each output cell (r,c) accumulate the WHOLE i-tile
+// k-contraction into a SCALAR `acc` over the k-blocks (kb loop) with NO PIPELINE pragma, then y[r][c] += acc.
+// The kb loop is a genuine loop-carried fp-add recurrence on `acc` → the tool CANNOT schedule it below II =
+// the fadd latency (~4-8 cyc). No `y`-address is read-during-write across k-blocks anymore (the recurrence is
+// the scalar `acc`, which the schedule serializes) → the silicon pipelined-accumulate hazard is gone. The
+// k-blocks are visited in ASCENDING GLOBAL-k order and each block still reduces via s2_treeK, so the summation
+// order is IDENTICAL to the previous laned path's per-cell order minus the lane reorder — csim BIT-EXACT vs a
+// sequential reference (and the previous path was only within-1-ULP of that). Throughput: II≈fadd-latency per
+// (r,c) k-block step instead of 1 — correctness-first, slower (see synth II note).
+//
+// PERF path (gate off): the old inner (r,c) PIPELINE II=1 with the same-address k-block recurrence — the
+// SILICON HAZARD. Kept for A-B only.
+#if S2_DEPIPELINE_REDUCE
+#define _S2_MAC_ITILE_BASE(YACC, LHS, BB, BSTR, TO, TI_, TR, TC, TIn)                                          \
+    for (int r = 0; r < (TR); r++) {                                                                           \
+        for (int c = 0; c < (TC); c++) {                                                                       \
+            float acc = 0.0f;                                                                                  \
+            _Pragma("HLS PIPELINE off")                                                                        \
+            for (int kb = 0; kb < (TIn); kb += S2_K) {   /* GLOBAL-k order; loop-carried fadd on acc -> II>1 */\
+                acc += s2_treeK((LHS) + r * (TI_) + kb, (BB) + c * (BSTR) + kb);                               \
+            }                                                                                                  \
+            (YACC)[r * (TO) + c] += acc;                                                                       \
+        }                                                                                                      \
+    }
+#else
+#define _S2_MAC_ITILE_BASE(YACC, LHS, BB, BSTR, TO, TI_, TR, TC, TIn)                                          \
+    for (int kb = 0; kb < (TIn); kb += S2_K) {                                                                 \
+        for (int r = 0; r < (TR); r++) {                                                                       \
+            const float *aptr = (LHS) + r * (TI_) + kb;                                                        \
+            for (int c = 0; c < (TC); c++) {                                                                   \
+                _Pragma("HLS PIPELINE II=1")                                                                   \
+                _Pragma("HLS DEPENDENCE variable=YACC inter false")                                            \
+                (YACC)[r * (TO) + c] += s2_treeK(aptr, (BB) + c * (BSTR) + kb);                                \
+            }                                                                                                  \
+        }                                                                                                      \
+    }
+#endif
 
 // modes
 #define S2M_FWD 0      // out[SEQ x O] = x[SEQ x I] @ dyad(W[O x I])^T ; weight streamed [O x I] ; raw write
@@ -394,17 +493,8 @@ static void NAME(int mode, ap_uint<512> *buffer, int Woff,                      
                     for (int _r = 0; _r < TR; _r++)                                                            \
                         bload_f(buffer, lhs_off + (r0 + _r) * KC + i0, lhstile + _r * tile_i, TI);             \
                 }                                                                                              \
-                /* -------- consume i-tile `it`: K-wide MAC, inner II=1 over (r,c) per k-block -------- */     \
-                for (int kb = 0; kb < TI; kb += S2_K) {   /* k-blocks in GLOBAL k order (tile-independent) */  \
-                    for (int r = 0; r < TR; r++) {                                                             \
-                        const float *aptr = lhstile + r * tile_i + kb;                                         \
-                        for (int c = 0; c < TC; c++) {                                                         \
-                            _Pragma("HLS PIPELINE II=1")                                                       \
-                            _Pragma("HLS DEPENDENCE variable=y inter false")                                   \
-                            y[r * tile_o + c] += s2_treeK(aptr, Bcache + c * KC + i0 + kb);                    \
-                        }                                                                                      \
-                    }                                                                                          \
-                }                                                                                              \
+                /* -------- consume i-tile `it`: K-wide MAC. DE-PIPELINED accumulation -------- */             \
+                _S2_MAC_ITILE_BASE(y, lhstile, (Bcache + i0), KC, tile_o, tile_i, TR, TC, TI)                  \
             }                                                                                                 \
             /* -------- finalize + write this row-block's outputs -------- */                                  \
             if (mode == S2M_WG) {                                                                              \
@@ -490,16 +580,8 @@ static void NAME(int mode, ap_uint<512> *buffer, int Woff,                      
                     for (int _r = 0; _r < TR; _r++)                                                            \
                         bload_f(buffer, lhs_off + (r0 + _r) * KC + i0, lhstile + _r * tile_i, TI);             \
                 }                                                                                              \
-                /* -------- consume i-tile `it`: K-wide MAC per k-block; NO DEPENDENCE-false (safe II) -------- */\
-                for (int kb = 0; kb < TI; kb += S2_K) {   /* k-blocks in GLOBAL k order (tile-independent) */  \
-                    for (int r = 0; r < TR; r++) {                                                             \
-                        const float *aptr = lhstile + r * tile_i + kb;                                         \
-                        for (int c = 0; c < TC; c++) {                                                         \
-                            _Pragma("HLS PIPELINE II=1")                                                       \
-                            y[r * tile_o + c] += s2_treeK(aptr, Btile + c * tile_i + kb);                      \
-                        }                                                                                      \
-                    }                                                                                          \
-                }                                                                                              \
+                /* -------- consume i-tile `it`: K-wide MAC. DE-PIPELINED accumulation -------- */             \
+                _S2_MAC_ITILE_BASE(y, lhstile, Btile, tile_i, tile_o, tile_i, TR, TC, TI)                      \
             }                                                                                                 \
             /* -------- finalize + write this row-block's outputs -------- */                                  \
             if (mode == S2M_WG) {                                                                              \
@@ -595,6 +677,10 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
         for (int i = 0; i < S2_SEQ; i++) {
             float sc[S2_SEQ], pr[S2_SEQ], mx = -1e30f;
             for (int j = 0; j <= i; j++) {
+#if S2_DEPIPELINE_REDUCE
+                float dot = 0.0f;                                        // DE-PIPELINE: sequential score-dot, II>1
+                for (int d = 0; d < S2_DH; d++) dot += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
+#else
                 float lane[S2_LANES];                                    // FIX B: laned score-dot (was II=2)
 #pragma HLS ARRAY_PARTITION variable=lane complete dim=1
                 for (int l = 0; l < S2_LANES; l++) lane[l] = 0;
@@ -603,8 +689,14 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                     lane[d & (S2_LANES-1)] += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
                 }
                 float dot = s2_lanesum(lane);
+#endif
                 sc[j] = dot * scale; if (sc[j] > mx) mx = sc[j];
             }
+#if S2_DEPIPELINE_REDUCE
+            float esum = 0.0f;                                           // DE-PIPELINE: sequential exp-sum, II>1
+            for (int j = 0; j <= i; j++) { float e = hls::exp(sc[j]-mx); pr[j] = e; esum += e; }
+            float sum = esum;
+#else
             float slane[S2_LANES];                                       // FIX B: laned exp-sum (was II=6)
 #pragma HLS ARRAY_PARTITION variable=slane complete dim=1
             for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
@@ -613,8 +705,14 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                 float e = hls::exp(sc[j]-mx); pr[j] = e; slane[j & (S2_LANES-1)] += e;
             }
             float sum = s2_lanesum(slane);
+#endif
             for (int j = 0; j <= i; j++) pr[j] /= sum;
             for (int d = 0; d < S2_DH; d++) {
+#if S2_DEPIPELINE_REDUCE
+                float blend = 0.0f;                                      // DE-PIPELINE: sequential P@V blend, II>1
+                for (int j = 0; j <= i; j++) blend += pr[j] * s2_Vh[j*S2_DH+d];
+                s2_Ah[i*S2_DH+d] = blend;
+#else
                 float blane[S2_LANES];                                   // FIX B: laned P@V blend (was II=7)
 #pragma HLS ARRAY_PARTITION variable=blane complete dim=1
                 for (int l = 0; l < S2_LANES; l++) blane[l] = 0;
@@ -623,6 +721,7 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                     blane[j & (S2_LANES-1)] += pr[j] * s2_Vh[j*S2_DH+d];
                 }
                 s2_Ah[i*S2_DH+d] = s2_lanesum(blane);
+#endif
             }
         }
         for (int t = 0; t < S2_SEQ; t++) bstore_f(buffer, wattn_off + t*S2_D + h*S2_DH, s2_Ah + t*S2_DH, S2_DH);
@@ -645,6 +744,11 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
             // ---- PRAW RECOMPUTE: rebuild this (h,i) softmax row from cached Q,K (SAME laned order as fwd) ----
             float p[S2_SEQ], mx = -1e30f;
             for (int j = 0; j <= i; j++) {
+#if S2_DEPIPELINE_REDUCE
+                float dot = 0.0f;                                        // DE-PIPELINE: sequential score-dot, II>1
+                for (int d = 0; d < S2_DH; d++) dot += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
+                p[j] = dot * ascale; if (p[j] > mx) mx = p[j];
+#else
                 float lane[S2_LANES];                                    // FIX B: laned score-dot
 #pragma HLS ARRAY_PARTITION variable=lane complete dim=1
                 for (int l = 0; l < S2_LANES; l++) lane[l] = 0;
@@ -653,7 +757,12 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                     lane[d & (S2_LANES-1)] += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
                 }
                 p[j] = s2_lanesum(lane) * ascale; if (p[j] > mx) mx = p[j];
+#endif
             }
+#if S2_DEPIPELINE_REDUCE
+            float sum = 0.0f;                                            // DE-PIPELINE: sequential exp-sum, II>1
+            for (int j = 0; j <= i; j++) { float e = hls::exp(p[j]-mx); p[j] = e; sum += e; }
+#else
             float slane[S2_LANES];                                       // FIX B: laned exp-sum
 #pragma HLS ARRAY_PARTITION variable=slane complete dim=1
             for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
@@ -662,10 +771,16 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                 float e = hls::exp(p[j]-mx); p[j] = e; slane[j & (S2_LANES-1)] += e;
             }
             float sum = s2_lanesum(slane);
+#endif
             for (int j = 0; j <= i; j++) p[j] /= sum;
             // ---- attention backward on the recomputed probs (== mp ABWD / twin scalar) ----
             float gp[S2_SEQ];
             for (int j = 0; j <= i; j++) {
+#if S2_DEPIPELINE_REDUCE
+                float gpv = 0.0f;                                        // DE-PIPELINE: sequential gp=<gATTN_i,V_j>, II>1
+                for (int d = 0; d < S2_DH; d++) gpv += s2_Ah[i*S2_DH+d] * s2_Vh[j*S2_DH+d];
+                gp[j] = gpv;
+#else
                 float glane[S2_LANES];                                   // FIX B: laned gp = <gATTN_i, V_j>
 #pragma HLS ARRAY_PARTITION variable=glane complete dim=1
                 for (int l = 0; l < S2_LANES; l++) glane[l] = 0;
@@ -674,8 +789,13 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                     glane[d & (S2_LANES-1)] += s2_Ah[i*S2_DH+d] * s2_Vh[j*S2_DH+d];
                 }
                 gp[j] = s2_lanesum(glane);
+#endif
                 for (int d = 0; d < S2_DH; d++) s2_Dh[j*S2_DH+d] += P(p[j] * s2_Ah[i*S2_DH+d]);   // gV: i-reduction, order kept
             }
+#if S2_DEPIPELINE_REDUCE
+            float ex = 0.0f;                                             // DE-PIPELINE: sequential ex=sum_j p*gp, II>1
+            for (int j = 0; j <= i; j++) ex += p[j]*gp[j];
+#else
             float exlane[S2_LANES];                                      // FIX B: laned ex = sum_j p*gp
 #pragma HLS ARRAY_PARTITION variable=exlane complete dim=1
             for (int l = 0; l < S2_LANES; l++) exlane[l] = 0;
@@ -684,13 +804,19 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                 exlane[j & (S2_LANES-1)] += p[j]*gp[j];
             }
             float ex = s2_lanesum(exlane);
+#endif
             // precompute gs[j] so the gQ (Bh, j-reduction) can be laned; gK (Ch) has no j-recurrence -> direct.
             float gsv[S2_SEQ];
             for (int j = 0; j <= i; j++) gsv[j] = P(p[j]*(gp[j]-ex)) * ascale;
             for (int j = 0; j <= i; j++)                                 // gK: Ch[j] accumulates over i (outer) -> order kept
                 for (int d = 0; d < S2_DH; d++) s2_Ch[j*S2_DH+d] += gsv[j]*s2_Qh[i*S2_DH+d];
-            for (int d = 0; d < S2_DH; d++) {                            // FIX B: gQ (Bh) laned over j (was II=2)
-                float qlane[S2_LANES];
+            for (int d = 0; d < S2_DH; d++) {
+#if S2_DEPIPELINE_REDUCE
+                float qacc = 0.0f;                                       // DE-PIPELINE: sequential gQ blend over j, II>1
+                for (int j = 0; j <= i; j++) qacc += gsv[j]*s2_Kh[j*S2_DH+d];
+                s2_Bh[i*S2_DH+d] += qacc;
+#else
+                float qlane[S2_LANES];                                   // FIX B: gQ (Bh) laned over j (was II=2)
 #pragma HLS ARRAY_PARTITION variable=qlane complete dim=1
                 for (int l = 0; l < S2_LANES; l++) qlane[l] = 0;
                 for (int j = 0; j <= i; j++) {
@@ -698,6 +824,7 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                     qlane[j & (S2_LANES-1)] += gsv[j]*s2_Kh[j*S2_DH+d];
                 }
                 s2_Bh[i*S2_DH+d] += s2_lanesum(qlane);
+#endif
             }
         }
         // heads write disjoint columns of gQ/gK/gV → the per-element accumulation is complete within this head,
