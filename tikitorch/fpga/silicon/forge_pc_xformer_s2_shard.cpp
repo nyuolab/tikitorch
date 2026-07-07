@@ -152,6 +152,41 @@ static inline float dyad_adam(float g,float&m,float&v,float lr){ m=0.875f*m+0.12
 // NO new DDR layout and NO AFI rebuild. All math below is BYTE-for-BYTE the twin's (which descends).
 static int g_hb=-1; static inline int host_backward(){ if(g_hb<0){const char*e=getenv("HOST_BACKWARD"); g_hb=e?atoi(e):0;} return g_hb; }
 
+// =====================================================================================================
+// FWD_DUMP (env, default 0=OFF): a pure DIAGNOSTIC for the s2 silicon-vs-csim forward-divergence hunt. After the
+// FORWARD sweep of step 0 / sub-batch 0 (before any backward can clobber the wide cache), read back EACH forward
+// activation from EACH chip's DDR wide-cache (SLOT 0) and dump the FULL fp32 tensor to <DUMP_DIR>/fwd_<chip>_<name>.f32.
+// Diff these bit-for-bit against the bit-faithful shim's same-named dumps (same matched init + fixed data window)
+// to pin the FIRST forward stage where silicon drifts from source -> localizes the broken (suspected DDR-streamed) op.
+// NO backward is needed for this mode; it piggybacks on the readf path and adds ZERO DDR layout / AFI rebuild.
+// Forward order dumped (== kernel forge_pc_xformer_s2_block fwd): R, X1(LN1), Q,K,V(proj+qact), ATTN(attn+qact),
+// M(=R+AO), X2(LN2), HD(FFN+relu+qact), RP(=M+FO); + XF(LNF) and LG(logits) on the OUTPUT chip only.
+static int g_fd=-1; static inline int fwd_dump(){ if(g_fd<0){const char*e=getenv("FWD_DUMP"); g_fd=e?atoi(e):0;} return g_fd; }
+static void dump_f32(const char* dir, int chip, const char* name, const float* x, long n){
+    char op[600]; snprintf(op,600,"%s/fwd_%d_%s.f32", dir, chip, name);
+    FILE* f=fopen(op,"wb"); if(!f){ fprintf(stderr,"[FWD_DUMP] open %s failed\n",op); return; }
+    fwrite(x,sizeof(float),(size_t)n,f); fclose(f);
+    fprintf(stderr,"[FWD_DUMP] chip %d %-4s -> %s (%ld floats)\n", chip, name, op, n);
+}
+// dump one chip's forward wide-cache. `is_out` also emits XF + LG (only the OUTPUT chip writes them).
+static void fwd_dump_chip(int l, const char* dir, int is_out){
+    static float db[S2_SEQ*S2_FFN];   // largest forward tensor is S2_WHD = SEQ*FFN
+    readf(l,S2_WR,   db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"R",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_WX1,  db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"X1",  db,(long)S2_SEQ*S2_D);
+    readf(l,S2_WQ,   db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"Q",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_WK,   db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"K",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_WV,   db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"V",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_WATTN,db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"ATTN",db,(long)S2_SEQ*S2_D);
+    readf(l,S2_WM,   db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"M",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_WX2,  db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"X2",  db,(long)S2_SEQ*S2_D);
+    readf(l,S2_WHD,  db,(long)S2_SEQ*S2_FFN);dump_f32(dir,l,"HD",  db,(long)S2_SEQ*S2_FFN);
+    readf(l,S2_WRP,  db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"RP",  db,(long)S2_SEQ*S2_D);
+    if(is_out){
+        readf(l,S2_WXF, db,(long)S2_SEQ*S2_D);    dump_f32(dir,l,"XF",db,(long)S2_SEQ*S2_D);
+        readf(l,S2_WLG, db,(long)S2_SEQ*S2_VOCAB);dump_f32(dir,l,"LG",db,(long)S2_SEQ*S2_VOCAB);
+    }
+}
+
 // ---- bf16 STE round (== kernel bf16_round / twin P()) ----
 static inline float hb_P(float x){ union{float f;uint32_t u;}c; c.f=x; uint32_t u=c.u; uint32_t lsb=(u>>16)&1u; u+=0x7fffu+lsb; u&=0xffff0000u; c.u=u; return c.f; }
 // ---- dyad (== kernel bf_dyad_f / twin dyad) ----
@@ -445,6 +480,14 @@ int main(int argc,char**argv){
                     mx(0,S2_WR,(long)S2_SEQ*S2_D), mx(0,S2_WX1,(long)S2_SEQ*S2_D), mx(0,S2_WRP,(long)S2_SEQ*S2_D), mx(0,S2_GROUT,(long)S2_SEQ*S2_D));
                 fprintf(stderr,"[S2_DIAG-FWD] chip%d role=%d: GRIN=%.3e WRP=%.3e WXF=%.3e WLG=%.3e\n",
                     L-1,role_of(L-1), mx(L-1,S2_GRIN,(long)S2_SEQ*S2_D), mx(L-1,S2_WRP,(long)S2_SEQ*S2_D), mx(L-1,S2_WXF,(long)S2_SEQ*S2_D), mx(L-1,S2_WLG,(long)S2_SEQ*S2_VOCAB));
+                fflush(stderr);
+            }
+            // FWD_DUMP: after the forward sweep of step 0 / sub-batch 0, dump every chip's full forward wide-cache
+            // (SLOT 0) to <DUMP_DIR>/fwd_<chip>_<name>.f32 for the bit-level silicon-vs-shim per-stage compare.
+            // Done BEFORE the backward sweep (below) so the wide cache still holds this forward's activations.
+            if(fwd_dump() && step==0 && k==0){
+                fprintf(stderr,"[FWD_DUMP] dumping per-chip forward wide-cache -> %s (fwd_<chip>_<name>.f32)\n", DUMP_DIR);
+                for(int l=0;l<L;l++) fwd_dump_chip(l, DUMP_DIR, (l==L-1));
                 fflush(stderr);
             }
             // ===================== BACKWARD SWEEP: chip L-1 -> 0 =====================
