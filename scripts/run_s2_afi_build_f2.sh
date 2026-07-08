@@ -34,6 +34,7 @@ KERNEL_TCL="${KERNEL_TCL:-synth_pc_xformer_s2_block.tcl}"; KERNEL_PROJ="${KERNEL
 # sweep knobs -> the synth tcl (empty = kernel-header defaults): vocab, the (innocent) aggressive-sched engine
 # gate, the de-pipeline gate, and a csynth clock override (S2_CLK_NS, e.g. 6.667) for sub-250MHz CDC points.
 export S2_VOCAB="${S2_VOCAB:-}"; export S2_AGGRESSIVE_SCHED="${S2_AGGRESSIVE_SCHED:-}"; export S2_DEPIPELINE_REDUCE="${S2_DEPIPELINE_REDUCE:-}"; export S2_CLK_NS="${S2_CLK_NS:-}"
+export S2_SEQ_TILE="${S2_SEQ_TILE:-}"; export S2_TILE_O="${S2_TILE_O:-}"; export S2_TILE_I="${S2_TILE_I:-}"   # tiling knobs (the synth tcl already forwards these)
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-s2afi.log "\$S3_RESULTS/build.log" --only-show-errors || true; }
 trap up EXIT
 ( while true; do sleep 60; up; done ) &
