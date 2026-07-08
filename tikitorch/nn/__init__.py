@@ -423,6 +423,39 @@ class TropicalDilationModule(nn.Module):
         out, indices = expanded.max(dim=-1)  # (batch, out)
         return out + self.bias, indices
 
+    @torch.no_grad()
+    def forward_with_routing(self, x: torch.Tensor):
+        """Forward returning the FROZEN routing for a PC cascade sweep.
+
+        Hard path (``use_softmax=False`` / tau==0): returns ``(y, indices)`` with
+        ``indices`` the (batch, out) argmax winners — the cacheable routing whose
+        adjoint is a pure scatter (zero multiplies). Soft path (tau>0): returns
+        ``(y, None)`` — the softmax routing weights are (batch, out, in) and are
+        deliberately NOT materialized (600MB-class at d=256, B·T≈2k rows); the PC
+        engine recomputes them chunk-wise from the cached input during the sweep.
+        Tiled over output features like ``_chunked_linear`` so the transient stays
+        bounded. Matches ``forward`` bit-exactly on both paths.
+        """
+        O, I = self.weight.shape
+        rows = x.numel() // I
+        xf = x.reshape(rows, I)
+        chunk = O if rows * O * I <= _MAXPLUS_CHUNK_ELEMS else \
+            max(1, _MAXPLUS_CHUNK_ELEMS // max(1, rows * I))
+        outs, idxs = [], []
+        for s in range(0, O, chunk):
+            w = self.weight[s:s + chunk]
+            expanded = w.unsqueeze(0) + xf.unsqueeze(1)      # (rows, chunk, in)
+            if self.use_softmax:
+                y = tropical_softmax(expanded, tau=self.tau, dim=-1)
+            else:
+                y, idx = expanded.max(dim=-1)
+                idxs.append(idx)
+            outs.append(y + self.bias[s:s + chunk])
+        y = torch.cat(outs, dim=-1).reshape(*x.shape[:-1], O)
+        if self.use_softmax:
+            return y, None
+        return y, torch.cat(idxs, dim=-1).reshape(*x.shape[:-1], O)
+
     def extra_repr(self) -> str:
         return (
             f"in_features={self.in_features}, out_features={self.out_features}, "
@@ -1023,6 +1056,42 @@ class DepthwiseMorphConv1d(nn.Module):
             y = y.unsqueeze(2).expand(-1, -1, G, -1).reshape(B, C, L)
 
         return y + self.bias.unsqueeze(0).unsqueeze(-1)
+
+    @torch.no_grad()
+    def forward_with_routing(self, x: torch.Tensor):
+        """Forward returning the FROZEN routing for a PC cascade sweep.
+
+        Hard (``use_soft=False`` / tau==0): ``(y, idx)`` with ``idx`` (B, C, L) the
+        winning kernel slot j* per output — slot j reads input position t − j·d, so
+        the adjoint is a pure scatter to (t − j*·d) and to weight[c, j*] (zero
+        multiplies; error to left-pad positions is dropped, matching ``F.pad``'s
+        backward). Soft (tau>0): ``(y, p)`` with ``p`` (B, C, L, K) the softmax/
+        softmin routing weights — the exact Jacobian of the tau-relaxed op (small:
+        K per output, unlike the d×d projection). Depthwise (``group_size==1``)
+        only. Matches ``forward`` bit-exactly.
+        """
+        assert self.group_size == 1, "forward_with_routing: depthwise only (v1)"
+        B, C, L = x.shape
+        K, d = self.kernel_size, self.dilation
+        x_pad = F.pad(x, ((K - 1) * d, 0))
+        indices = torch.arange(L, device=x.device).unsqueeze(1) + \
+                  torch.arange(K - 1, -1, -1, device=x.device).unsqueeze(0) * d
+        windows = x_pad[:, :, indices]                        # (B, C, L, K)
+        combined = windows + self.weight.unsqueeze(0).unsqueeze(2)
+        soft = self.use_soft and self.tau > 0
+        if self.mode == "dilation":
+            if soft:
+                y = tropical_softmax(combined, tau=self.tau, dim=-1)
+                route = torch.softmax(combined / self.tau, dim=-1)
+            else:
+                y, route = combined.max(dim=-1)
+        else:
+            if soft:
+                y = tropical_softmin(combined, tau=self.tau, dim=-1)
+                route = torch.softmax(-combined / self.tau, dim=-1)
+            else:
+                y, route = combined.min(dim=-1)
+        return y + self.bias.unsqueeze(0).unsqueeze(-1), route
 
     def step(self, x_t: torch.Tensor, buffer: torch.Tensor):
         """Process single timestep incrementally.
