@@ -55,6 +55,11 @@ Homepage = "https://github.com/nyuolab/tikitorch"
 Repository = "https://github.com/nyuolab/tikitorch"
 Issues = "https://github.com/nyuolab/tikitorch/issues"
 
+[project.scripts]
+# Audit any model for multiplier-free (zero-DSP) closure from the shell:
+#   tt-closure tikitorch.models:TropicalForwardForward
+tt-closure = "tikitorch.cli:main"
+
 [tool.setuptools.packages.find]
 include = ["tikitorch*"]
 
@@ -86,6 +91,16 @@ target-version = "py39"
 # Notebooks re-import and re-assign freely across cells by design; lint only for
 # genuine syntax/logic errors, not style or per-cell redefinitions.
 "notebooks/**" = ["E401", "E402", "E701", "E702", "E731", "E741", "F401", "F811", "F841"]
+# Research-derived library modules ported (near-)verbatim from the PC/silicon
+# experiments: the `fabric` distributed-training subpackage and the predictive-coding
+# layers use the compact `l` (layer/link) index and semicolon setup lines idiomatic in
+# that source. The bug-catching F-rules stay ON; only the cosmetic naming/layout
+# E-rules (E741 ambiguous name, E702 semicolon) are relaxed for these files.
+"tikitorch/fabric/**" = ["E702", "E741"]
+"tikitorch/nn/predictive_coding.py" = ["E741"]
+# Silicon reference runners that live under the package are research Python (treated
+# like scripts/): relax layout rules, keep the F-rules on.
+"tikitorch/fpga/silicon/**" = ["E401", "E402", "E701", "E702", "E731", "E741"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

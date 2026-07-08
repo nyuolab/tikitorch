@@ -406,3 +406,50 @@ def test_attention_causal_masking_is_semiring_correct(agg):
     out2 = att(x2, causal_mask=True)
     assert torch.allclose(out[:, :-1], out2[:, :-1], atol=1e-5), f"causality broken for agg={agg}"
     assert torch.isfinite(out).all()
+
+
+# ---------------------------------------------------------------------------
+# Loss modules (nn.Module wrappers over the functional losses)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("softmax", ["exact", "lut"])
+def test_cross_entropy_loss_module_matches_functional(softmax):
+    import tikitorch.functional as F
+    torch.manual_seed(0)
+    logits = torch.randn(4, 7, 10, requires_grad=True)
+    target = torch.randint(0, 10, (4, 7))
+
+    crit = nn.TropicalCrossEntropyLoss(softmax=softmax)
+    loss = crit(logits, target)
+    ref = F.tropical_cross_entropy(logits.detach(), target, softmax=softmax)
+    assert torch.allclose(loss.detach(), ref)
+    assert loss.ndim == 0 and torch.isfinite(loss)
+
+    loss.backward()
+    assert logits.grad is not None and logits.grad.abs().sum() > 0
+
+
+def test_perceptron_loss_module_matches_functional():
+    import tikitorch.functional as F
+    torch.manual_seed(1)
+    logits = torch.randn(3, 5, 8, requires_grad=True)
+    target = torch.randint(0, 8, (3, 5))
+
+    crit = nn.TropicalPerceptronLoss()
+    loss = crit(logits, target)
+    ref = F.tropical_perceptron_loss(logits.detach(), target)
+    assert torch.allclose(loss.detach(), ref)
+
+    loss.backward()
+    assert logits.grad is not None and logits.grad.abs().sum() > 0
+
+
+def test_loss_modules_repr_and_lut_kwargs():
+    assert "softmax='exact'" in repr(nn.TropicalCrossEntropyLoss())
+    r = repr(nn.TropicalCrossEntropyLoss(softmax="lut", lut_size=2048))
+    assert "softmax='lut'" in r and "lut_size=2048" in r
+    assert repr(nn.TropicalPerceptronLoss()) == "TropicalPerceptronLoss()"
+    # set_tau is a no-op contract (so a loss can sit in a tau-annealed model)
+    nn.TropicalCrossEntropyLoss().set_tau(0.0)
+    nn.TropicalPerceptronLoss().set_tau(0.0)

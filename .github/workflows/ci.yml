@@ -96,3 +96,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install mkdocs-material "mkdocstrings[python]"
           mkdocs build
+
+  closure-audit:
+    name: closure-audit (zero-DSP library invariant)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package (CPU torch + numpy + dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch numpy --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+      - name: Audit the closed model zoo (tt-closure CLI)
+        run: |
+          # The library's headline invariant: the whole learning loop maps to zero
+          # DSP blocks. `tt-closure` loads a model and exits nonzero if any standard
+          # multiply-bearing module (nn.Linear/Conv/LayerNorm/...) is present.
+          set -ex
+          tt-closure tikitorch.models:TropicalForwardForward
+          tt-closure tikitorch.models:DyadicForwardForward
+      - name: Closure test suite (assert_closed / find_*_multiplies)
+        run: |
+          # Structural + traced-forward + training-loop closure assertions over the
+          # layers, predictive-coding nets, and forward-forward models.
+          python -m pytest -q tests/test_audit.py tests/test_closure_guard.py \
+            tests/test_forward_forward.py tests/test_predictive_coding.py

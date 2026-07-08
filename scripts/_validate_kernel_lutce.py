@@ -18,7 +18,6 @@ and the sign pattern matches the float tropical_ce_lut gradient.
 Usage:  PYTHONPATH=. python scripts/_validate_kernel_lutce.py
 """
 import ctypes
-import os
 from pathlib import Path
 
 import numpy as np

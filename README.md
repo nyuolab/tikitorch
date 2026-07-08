@@ -28,6 +28,43 @@ It is intentionally PyTorch-shaped: `import tikitorch as tt` and you get
 
 ---
 
+## ★ A tropical LLM generating on real FPGA silicon
+
+The end-to-end payoff: a **strictly multiplier-free** (DSP=0, all shift-add) tropical
+transformer character-LM, trained through a bit-exact integer mirror of the kernel, running
+**inference on a real AWS F2 FPGA** — generating recognizable Shakespeare and measuring
+**held-out 2.42 bits/char on-fabric, bit-exact to the CPU reference**.
+
+Generated on silicon (AGFI `agfi-082aa26aac7495798`, f2.6xlarge, D=128 / 4 layers, 62.5 MHz):
+
+```text
+goood let your dealy half canatst torsul in him falt nor hath warh
+worst indo your kho? romeos! gone!
+for bore time franidius tits isue: and men,
+and the field had fagante-siciuliath, old unto eventy
+...set upidece i grantle, mercrtaine, '3 him own to the glace.
+-warpen holsd did his done argloucester's yen ludinak-sewe...
+```
+
+Character-name-colon play format, real words, and actual names emerging (*romeos*,
+*gloucester's*) — from a model that never executes a single multiply.
+
+| model | bits/char ↓ | multiplies |
+|---|---|---|
+| bigram baseline | 3.47 | — |
+| comparable float **softmax** char-transformer (ref) | ~2.4–2.6 | many |
+| **this — tropical, measured on F2 silicon** | **2.42** | **zero (DSP=0)** |
+
+The multiplier-free model **beats the bigram baseline by ~1.0 bpc and matches a comparable
+float softmax transformer — with zero multiplies, on real silicon.** The recipe (all DSP=0):
+4-term dyadic-CSD (±2^k shift-add) weights + per-matrix pow2 accumulator rescale + a 4-term
+CSD-reciprocal LayerNorm + int16 activations + L1 argmax-gather attention, trained via QAT
+through a bit-exact integer sim of the kernel (float QAT is insufficient — the argmax attention
+is discontinuous, so a ±1 flips a gather). Full writeup with the on-fabric log:
+[`results/lm_shakespeare/S1_KV2_ON_SILICON.md`](results/lm_shakespeare/S1_KV2_ON_SILICON.md).
+
+---
+
 ## Install
 
 ```bash
@@ -35,6 +72,15 @@ pip install -e .
 ```
 
 Requires Python >= 3.9, `torch >= 2.0`, `numpy`. Licensed under **GPLv3**.
+
+**Learn:** new to tropical algebra or migrating from PyTorch? Start with the
+docs **Guide** — [Foundations](docs/guide/foundations.md),
+[Why tropical for ML/DL](docs/guide/why-tropical-ml.md),
+[Tropical geometry](docs/guide/tropical-geometry.md),
+[Beyond deep learning](docs/guide/beyond-deep-learning.md),
+[Migrating from PyTorch](MIGRATION.md), [Choosing a model](docs/guide/choosing-a-model.md),
+[Architecture](docs/guide/architecture.md), [FAQ](docs/guide/faq.md) — and the six
+runnable [notebooks](notebooks/).
 
 ---
 
@@ -110,6 +156,32 @@ model = tt.models.MoTE(d_model=128, n_experts=8, expert_type="transformer",
 Also included: `tt.models.TropicalMLP` and `tt.models.TropicalSequenceModel`
 (carved tropical baselines for classification / sequence tasks), plus
 `MorphMLP`.
+
+### `tt.models.TropicalForwardForward` / `DyadicForwardForward` — forward-only local learning
+
+Hinton's **Forward-Forward** adapted to the tropical substrate: each layer is its
+own learner, trained on a local *goodness* objective from two forward passes
+(positive vs negative data) — **no backward pass**, and the whole training step is
+verified multiplier-free (`tt.assert_no_multiply`). The closure-clean choices:
+top-k goodness (not sum-of-squares), a hinge/margin loss whose gradient is a
+sign-gated scatter, subtract-the-max normalization, and a sign-only update.
+
+Unlike the models above it trains **forward-only** — `forward_forward_fit(X, Y)`,
+not `loss.backward()` — while `forward(x)` returns goodness-based class logits so
+it stays a drop-in classifier.
+
+```python
+model = tt.models.DyadicForwardForward(d_model=2000, n_layers=4, num_classes=10)
+model.forward_forward_fit(X_train, Y_train, epochs=25)     # forward-only, local
+acc = (model(X_test).argmax(1) == Y_test).float().mean()   # drop-in classifier
+```
+
+The faithful **max-plus** variant is a research baseline (MNIST ~0.23 — winner-
+take-all can't compose the label overlay); the closure-clean **dyadic ±2^k**
+variant reaches **~0.92 on MNIST** (within ~7 pp of Hinton's dense FF) — the
+bottleneck is the max-plus primitive, not multiplier-freeness. Full method,
+honest numbers, and limitations:
+[`results/forward_forward/`](results/forward_forward/TROPICAL_FORWARD_FORWARD.md).
 
 ### `tt.optim.PureTropicalSGD` — the strictly multiplier-free optimizer
 

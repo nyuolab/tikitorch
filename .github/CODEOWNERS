@@ -1,0 +1,20 @@
+# Code owners for TikiTorch — auto-requests the maintainer's review on PRs touching
+# these paths. NOTE: whether owner review is *required* is a branch-protection
+# setting; under the current "require PR + green CI" rule this notifies rather than
+# blocks. Replace @RespectableGlioma if the GitHub handle differs.
+
+# Global owner.
+*                          @RespectableGlioma
+
+# Closure-critical library surface — the multiplier-free (zero-DSP) invariant lives here.
+/tikitorch/nn/             @RespectableGlioma
+/tikitorch/functional.py   @RespectableGlioma
+/tikitorch/models/         @RespectableGlioma
+/tikitorch/audit.py        @RespectableGlioma
+/tikitorch/cli.py          @RespectableGlioma
+/tikitorch/__init__.py     @RespectableGlioma
+/tikitorch/fabric/         @RespectableGlioma
+
+# Governance & CI must not be weakened without owner sign-off.
+/.github/                  @RespectableGlioma
+/pyproject.toml            @RespectableGlioma

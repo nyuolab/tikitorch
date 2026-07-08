@@ -16,7 +16,6 @@
 Usage:  PYTHONPATH=. python scripts/_validate_kernel_morph_lm.py
 """
 import ctypes
-import sys
 import time
 from pathlib import Path
 

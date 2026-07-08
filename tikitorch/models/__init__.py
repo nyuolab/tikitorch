@@ -15,6 +15,9 @@ Public models:
     MorphMLP              — alternating dilation/erosion MLP
     TropicalTransformer   — transformer with tropical attention + tropical FFN
     MoTEModel (alias MoTE)— Mixture of Tropical Experts
+    TropicalForwardForward — forward-only, backprop-free local learner (max-plus)
+    DyadicForwardForward  — the same Forward-Forward rule on the dyadic ±2^k
+                            substrate (dense/additive -> much higher accuracy)
 
 The ``task_type`` / loss convention:
     Every model takes a ``task_type`` keyword (``"classification"``, ``"lm"``,
@@ -24,6 +27,14 @@ The ``task_type`` / loss convention:
     classification / lm, MSE for regression). It is *not* enforced by any base
     class — it is provided because the training loops rely on it. MoTEModel
     additionally adds its load-balancing ``aux_loss`` term.
+
+    The Forward-Forward models (``TropicalForwardForward`` / ``DyadicForwardForward``)
+    are the **exception**: they train *forward-only* (a local per-layer goodness
+    objective, no global backward) via ``forward_forward_fit`` / ``make_trainer``,
+    not ``loss.backward()``. Their ``forward(x)`` returns goodness-based class logits
+    so they are still drop-in classifiers, and ``compute_loss`` is provided only as a
+    *non-FF* global-backprop baseline. See :mod:`tikitorch.forward_forward` and
+    ``results/forward_forward/TROPICAL_FORWARD_FORWARD.md``.
 
 Each model also exposes a cheap ``param_count`` property and, where applicable,
 an optional ``hardware_cost(...)`` method returning a
@@ -123,6 +134,8 @@ __all__ = [
     "TropicalTransformer",
     "MoTEModel",
     "MoTE",
+    "TropicalForwardForward",
+    "DyadicForwardForward",
     "classification_loss",
 ]
 
@@ -1334,6 +1347,159 @@ class TropicalCNN(FpgaAccelerable, nn.Module):
     @property
     def param_count(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+# ---------------------------------------------------------------------------
+# Tropical Forward-Forward (forward-only, backprop-free, closure-clean)
+# ---------------------------------------------------------------------------
+
+
+class TropicalForwardForward(FpgaAccelerable, nn.Module):
+    """Tropical Forward-Forward classifier — forward-only, backprop-free, closure-clean.
+
+    Hinton's Forward-Forward on the max-plus substrate, packaged as a standard
+    tikitorch model. **Unlike every other model here it is NOT trained by
+    ``loss.backward()`` on a global head** — each layer is a *local* learner
+    trained on a goodness contrast between positive (correct-label-overlaid) and
+    negative (wrong-label-overlaid) data. The whole training step is multiplier-
+    free (zero-DSP), verified by ``tt.assert_no_multiply`` /
+    ``tt.assert_training_closed``. The mechanics live in
+    :mod:`tikitorch.forward_forward`; this class wires them to the model API.
+
+    Training (forward-only)::
+
+        m = tt.models.TropicalForwardForward(d_model=500, n_layers=3, num_classes=10)
+        m.forward_forward_fit(X_train, Y_train, epochs=20, lr_shift=4, margin=2.0)
+        acc = (m(X_test).argmax(1) == Y_test).float().mean()     # drop-in classifier
+
+    - :meth:`forward` returns **goodness-based class logits** ``(B, num_classes)``
+      (overlay each candidate label, sum the per-layer goodness) — so a trained
+      model is a drop-in classifier (``argmax`` = prediction).
+    - :meth:`forward_forward_fit` / :meth:`forward_forward_step` /
+      :meth:`make_trainer` are the (closure-clean) forward-forward training API.
+    - :meth:`compute_loss` is the cross-entropy on the goodness logits, provided
+      for monitoring and as a *non-FF* global-backprop baseline; it does **not**
+      implement the forward-forward rule (use ``forward_forward_*`` for that).
+
+    Method + honest measured numbers: ``results/forward_forward/TROPICAL_FORWARD_FORWARD.md``.
+    Classification only (``task_type='classification'``).
+    """
+
+    def __init__(self, *, d_model: int = 500, n_layers: int = 3, input_dim: int = 784,
+                 num_classes: int = 10, substrate: str = "maxplus", goodness: str = "topk",
+                 k: int = 10, use_relu: bool = True, leaky_shift=None,
+                 task_type: str = "classification", on: float = 1.0, off: float = 0.0,
+                 skip_first: bool = False, loss_type: str = "cross_entropy"):
+        super().__init__()
+        from tikitorch.forward_forward import TropicalFFNet
+        self.task_type = _validate_task_type(task_type)
+        if self.task_type != "classification":
+            raise ValueError("TropicalForwardForward supports task_type='classification' only")
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.substrate = substrate
+        self.on, self.off, self.skip_first = on, off, skip_first
+        self.loss_type = loss_type
+        dims = [input_dim] + [d_model] * n_layers
+        self.net = TropicalFFNet(dims, num_classes=num_classes, substrate=substrate,
+                                 use_relu=use_relu, leaky_shift=leaky_shift,
+                                 goodness=goodness, k=k)
+
+    @property
+    def layers(self):
+        return self.net.layers
+
+    def _goodness_logits(self, x: torch.Tensor) -> torch.Tensor:
+        """``(B, num_classes)`` accumulated goodness, one column per overlaid label
+        (grad-capable; eval should call under ``torch.no_grad``)."""
+        from tikitorch.forward_forward import overlay_label
+        x = self.net._prep(x)
+        b = x.size(0)
+        cols = []
+        for c in range(self.num_classes):
+            labels = torch.full((b,), c, device=x.device, dtype=torch.long)
+            xc = overlay_label(x, labels, self.num_classes, on=self.on, off=self.off)
+            cols.append(self.net.accumulated_goodness(xc, skip_first=self.skip_first))
+        return torch.stack(cols, dim=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._goodness_logits(x)
+
+    def make_trainer(self, **kwargs):
+        """A :class:`tikitorch.forward_forward.TropicalFFTrainer` over this model's
+        layers (default optimizer: sign-only ``PureTropicalSGD``)."""
+        from tikitorch.forward_forward import TropicalFFTrainer
+        return TropicalFFTrainer(self.net, **kwargs)
+
+    def forward_forward_step(self, x: torch.Tensor, y: torch.Tensor, trainer) -> dict:
+        """One forward-only local update: overlay the correct label (positive) and a
+        wrong label (negative), then run the per-layer trainer. Returns the per-layer
+        loss / goodness diagnostics."""
+        from tikitorch.forward_forward import overlay_label, make_negative_labels
+        xp = overlay_label(x, y, self.num_classes, on=self.on, off=self.off)
+        yn = make_negative_labels(y, self.num_classes)
+        xn = overlay_label(x, yn, self.num_classes, on=self.on, off=self.off)
+        return trainer.train_step(xp, xn)
+
+    def forward_forward_fit(self, X: torch.Tensor, Y: torch.Tensor, *, epochs: int = 10,
+                            batch: int = 100, trainer=None, shuffle: bool = True,
+                            seed: int = 0, **trainer_kwargs):
+        """Convenience forward-only training loop over an in-memory ``(X, Y)``.
+
+        Builds a trainer (unless one is passed; extra kwargs go to
+        :meth:`make_trainer`) and runs ``epochs`` of :meth:`forward_forward_step`.
+        Returns the trainer (reuse it to continue training). Multiplier-free.
+        """
+        if trainer is None:
+            trainer = self.make_trainer(**trainer_kwargs)
+        gen = torch.Generator().manual_seed(seed)
+        n = len(X)
+        for _ in range(epochs):
+            order = torch.randperm(n, generator=gen) if shuffle else torch.arange(n)
+            for i in range(0, n - batch + 1, batch):
+                idx = order[i:i + batch]
+                self.forward_forward_step(X[idx], Y[idx], trainer)
+        return trainer
+
+    def compute_loss(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Cross-entropy on the goodness logits — for monitoring or a *non-FF*
+        global-backprop baseline. NOT the forward-forward training rule (which is
+        local and backprop-free; use :meth:`forward_forward_fit`)."""
+        return _default_compute_loss(self, x, y)
+
+    def set_tau(self, tau: float) -> None:
+        self.net.set_tau(tau)
+
+    @property
+    def param_count(self) -> int:
+        return self.net.param_count
+
+
+class DyadicForwardForward(TropicalForwardForward):
+    """Closure-clean **dyadic** Forward-Forward — the high-accuracy substrate.
+
+    Same forward-only local FF rule as :class:`TropicalForwardForward`, but each
+    layer is a :class:`tikitorch.nn.DyadicLinear` (dense weights constrained to
+    signed powers of two, ``±2^k`` → shift+add-tree, zero DSP) instead of the
+    max-plus dilation. Because the dyadic projection is **dense/additive**, it
+    composes the FF label overlay the way Hinton's float FF does — so it reaches
+    far higher accuracy than the max-plus substrate (which is winner-take-all and
+    caps ~0.3 on MNIST), while staying multiplier-free.
+
+    Closure caveat (inherited from :class:`tikitorch.nn.DyadicLinear`): the
+    deployed forward is zero-DSP as a *static weight-value* property (verified by
+    ``tikitorch.fpga.dyadic_export.verify_schedule``), NOT by the eager op trace —
+    the float sim runs a real ``addmm``, so a dyadic FF does **not** pass the
+    runtime ``tt.assert_no_multiply`` (unlike the max-plus substrate, which does).
+    The weight *update* is sign-only (``SignSGD``/``PureTropicalSGD``), and the
+    on-fabric weight-gradient is the sign-product rule (see ``DyadicLinear``).
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("substrate", "dyadic")
+        if kwargs["substrate"] != "dyadic":
+            raise ValueError("DyadicForwardForward requires substrate='dyadic'")
+        super().__init__(**kwargs)
 
 
 # ---------------------------------------------------------------------------
