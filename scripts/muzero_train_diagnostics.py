@@ -208,7 +208,6 @@ def run_optbisect(a):
 
 
 def _print_verdict(results, vbase):
-    by = {r["optimizer"]: r for r in results}
     sign = min((r for r in results if r["tag"] == "sign"), key=lambda r: r["value_L1"])
     openr = next(r for r in results if r["tag"] == "open")
     magf = min((r for r in results if r["tag"] == "magfree"), key=lambda r: r["value_L1"])

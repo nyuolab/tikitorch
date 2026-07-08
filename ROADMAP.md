@@ -23,9 +23,12 @@ FPGA path. So the gaps that matter are *ergonomics + the moat*, not core-framewo
       rescale is a non-pow2 multiply at most `p` (it's fine only when `1/(1-p)` is a power of two, e.g.
       `p=0.5`); `TropicalDropout` is a `{0,1}` gate (no rescale) — closure-clean for **all** `p`. Swapped
       into the 7 `nn.Dropout` sites across `nn`/`models`. **Done.**
-- [ ] **MIGRATION.md** — side-by-side "your PyTorch loop vs the closed TikiTorch loop" teaching the 4
-      non-obvious closure idioms (`lr_shift` not `lr=`, tropical losses, soft→hard `tau` anneal,
-      power-of-2 dims). The namespace is already 1:1; the *idioms* are the adoption blocker.
+- [x] **MIGRATION.md** — side-by-side "your PyTorch loop vs the closed TikiTorch loop" teaching the
+      non-obvious closure idioms (sign/shift optimizers, tropical losses, soft→hard `tau` anneal,
+      declared-DSP-boundary heads). The namespace is already 1:1; the *idioms* are the adoption
+      blocker. **Done** — root `MIGRATION.md` + canonical `docs/guide/migration.md`, plus a full
+      **Guide** section in the docs (foundations, why-tropical, geometry, beyond-DL, architecture,
+      choosing-a-model, FAQ) and tutorial notebooks 05/06.
 - [ ] **`tt-closure` CLI** (`[project.scripts]`) — point at any `model.py:factory`, print
       `multiplications: 0` / nonzero-exit. Generalizes the `__main__` demo; the CI-gate primitive.
 - [x] **Promote `fpga.dyadic_export`** to first-class — `export_net`/`verify_schedule`/`export_layer`/
@@ -33,7 +36,8 @@ FPGA path. So the gaps that matter are *ergonomics + the moat*, not core-framewo
       (bit-exact shift-schedule round-trip). **Done.** _(Follow-ons: save/load the schedule to disk; embed
       the `verify_schedule` result in the checkpoint as a "closure passport".)_
 - [ ] Cheap credibility: `git tag v0.1.0` + release (CHANGELOG links a missing tag); fix `examples/README`;
-      publish the docs site (the mkdocs site itself now **exists** — added alongside this work).
+      publish the docs site (the mkdocs site itself now **exists** and now carries a full **Guide** +
+      6 notebooks — just needs publishing).
 
 ## NEXT (medium)
 
@@ -102,6 +106,46 @@ silicon, bit-exact to the host golden, and **replication scales it LINEARLY**:
 
 All bit-exact, DSP=0, ~4 W core, wall-clock unchanged (true parallel). N=4 is the SLR-local max
 (per-SLR CL URAM 176/192/~320 → 1+1+2). Recipe + ceiling in `tikitorch/fpga/silicon/SILICON_FINDINGS.md`.
+
+## PC local-credit training track — the *no-global-coordination* substrate bet (2026-06-23)
+
+A second silicon pillar, distinct from the replication track above. Replication is **data-parallel**
+(independent copies, no comm) and the morph-LM trains by SignSGD-**backprop**. This track instead puts
+**local predictive-coding credit assignment** on the multiplier-free fabric — which removes backprop's
+**global** ops (ordered backward sweep, **weight transport**, **all-reduce**, **barrier**). That is the
+structural lever for sharding **one** model across many chips a backprop cluster can't coordinate.
+Docs: `results/predictive_coding/{TRAINING_AT_SCALE,PC_BACKWARD_SILICON,MULTI_F2_SCALE_OUT}.md`.
+
+**Measured on real F2 silicon:**
+
+| result | status | evidence |
+|---|---|---|
+| **PC backward = bit-exact silicon** | ✅ | `forge_pc_wgrad` (full `cascade_grads` layer-step: routed adjoint + weight grad + bias grad + error route + residual skip), DSP=0, 2.920 ns, AGFI `agfi-063e2dd0d3255dcaa`; on-chip readback == `cascade_grads` `max\|diff\|=0` (known-answer + random). **Transpose-free**: the error route reuses the *forward* `q(W)` in place — no separately-stored/synced transposed buffer (this is *not* the bio "weight-transport-free" property, which would need separate feedback weights; the hardware win is no transpose copy + no cross-chip weight movement in the shard). |
+| **Sharded across 2 physical FPGAs** | ✅ | 2-layer backward across an f2.12xlarge's slots 0+1, ONLY a single neighbour error message between them (no global gradient / transport / barrier) → bit-exact to single-process `cascade_grads`. Silicon realization of the gloo `pc_model_parallel.py` proof. |
+| **Fully-on-fabric trainer = trains on silicon** | ✅ | `forge_pc_train_step` — one kick = forward + cascade backward + SignSGD-momentum update, weights+momentum persist in DDR; host only stages a batch + kicks. Pipelined forward (FF 20%, HLS ~8 min), **`DSP_MULT=0`** (1 DSP as an adder), timing-closed **WNS +0.196 ns**, AGFI `agfi-0fdc38db9da6add74`. **On-fabric RUN measured:** 16×16 MNIST chance → **0.7475** over 5 epochs (batch 32, uniform init), entirely on the FPGA; an independent recipe-forward eval of the dumped weights = 0.7413 (cross-confirms). Recipe ceiling ~0.81 at this config / ~0.90 best. Bug found+fixed: kernel `norm_shift` off-by-one (1 less shift than the recipe) stalled training at chance despite a bit-exact one-step verify; compensated host-side (loss target 8→16, no rebuild). Details: `ONFABRIC_TRAINING.md` (honesty-audited). |
+
+**Honest scope.** These prove the **substrate** (multiplier-free + no-global-coordination credit
+assignment *runs and trains* on real silicon) — **not** a throughput win: per the Rung-4 fabric-sim,
+digital PC is break-even-to-slower than backprop (it still pays R relaxation rounds + a weight-grad
+pass). The win is **structural** — sharding without global ops — realized only at extreme comm-bound
+scale **or** on an analog/in-memory substrate where the O(L) error relaxation is continuous-time
+settling. This dovetails with the Cluster track below (PC needs no all-reduce *at all*, vs even 1-bit
+SignSGD's 1-bit one).
+
+**Lessons banked (reusable):** on-silicon verification catches synthesis-only bugs C-sim cannot — a
+`static const` threshold ROM whose init didn't survive Vivado synth (the all-1s **known-answer test**
+localized it in one cheap run; fix = table-free dyad); and inter-layer PC errors **grow** each layer →
+a fixed-point rescale of the neighbour message is load-bearing (same activation-scaling the muzero net
+needed).
+
+- [x] **On-fabric training RUN** — `run_pc_train_f2.sh` on `agfi-0fdc38db9da6add74`: host stages
+      batches + kicks; accuracy climbed **chance → 0.7475** entirely on the FPGA. ✅ (`ONFABRIC_TRAINING.md`)
+- [x] **Make the train-step build cheap** — pipelined the forward reduction (was a 256-wide unroll @ 54% FF,
+      ~2 h HLS): FF → 20%, HLS → ~8 min, timing closed WNS +0.196 ns, compute unchanged (csim still bit-exact). ✅
+- [ ] **Deeper / network-distributed shard** — ≥3 layers across ≥3 FPGAs (f2.48xlarge = 8), then TCP
+      neighbour messages across separate hosts (true no-shared-host messaging).
+- [ ] **Longer/bigger on-fabric run** — batch 128 + randn init + more epochs to chase the recipe's ~0.90
+      ceiling on fabric (this run was a 5-epoch, batch-32 correctness demo at 0.75).
 
 ## CONSTRAINT CLARIFICATION — the invariant is MULTIPLIER-FREE, not DSP=0
 

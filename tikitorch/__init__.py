@@ -88,6 +88,17 @@ except Exception:  # noqa: BLE001
     train = None  # type: ignore[assignment]
     Trainer = None  # type: ignore[assignment]
 
+# Tropical Forward-Forward (forward-only, backprop-free local learning). Guarded
+# like optim/models so a mid-assembly dependency never breaks ``import tikitorch``.
+try:  # pragma: no cover - import guard
+    from tikitorch import forward_forward  # noqa: F401
+    from tikitorch.forward_forward import (  # noqa: F401
+        TropicalFFLayer, TropicalFFNet, TropicalFFTrainer,
+    )
+except Exception:  # noqa: BLE001
+    forward_forward = None  # type: ignore[assignment]
+    TropicalFFLayer = TropicalFFNet = TropicalFFTrainer = None  # type: ignore[assignment]
+
 # Top-level convenience re-exports: architectures and optimizers are reachable
 # directly (``tt.MorphSSM``, ``tt.PureTropicalSGD``) as well as via submodule
 # (``tt.models.MorphSSM``, ``tt.optim.PureTropicalSGD``) -- the way ``torch``
@@ -103,13 +114,17 @@ if fpga is not None:
     _top += ["fpga"]
 if Trainer is not None:
     _top += ["train", "Trainer"]
+if forward_forward is not None:
+    _top += ["forward_forward", "TropicalFFLayer", "TropicalFFNet", "TropicalFFTrainer"]
 if models is not None:
     from tikitorch.models import (  # noqa: F401
         MorphSSM, TropicalTransformer, MoTE, MoTEModel,
         TropicalMLP, TropicalSequenceModel, MorphMLP,
+        TropicalForwardForward, DyadicForwardForward,
     )
     _top += ["MorphSSM", "TropicalTransformer", "MoTE", "MoTEModel",
-             "TropicalMLP", "TropicalSequenceModel", "MorphMLP"]
+             "TropicalMLP", "TropicalSequenceModel", "MorphMLP",
+             "TropicalForwardForward", "DyadicForwardForward"]
 if optim is not None:
     from tikitorch.optim import (  # noqa: F401
         SignSGD, TropicalSGD, PureTropicalSGD, TropicalLion, TropicalAdam,

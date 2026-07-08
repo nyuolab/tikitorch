@@ -66,6 +66,19 @@ If you add a new op, layer, model, or optimizer:
   or `nn.Linear` head), it must be a **declared, documented boundary** — not a
   silent one — so the audit can account for it.
 
+## Docs & notebooks
+
+- The docs site is mkdocs + mkdocstrings: API pages are auto-generated from in-source
+  docstrings, and the prose **Guide** lives under `docs/guide/`. Build it with
+  `pip install -e ".[docs]" && mkdocs build` (what the CI docs job runs).
+- The tutorial notebooks are **generated** from
+  [`notebooks/_build_notebooks.py`](notebooks/_build_notebooks.py) (so they stay
+  diffable). Edit the generator, not the `.ipynb`, then regenerate:
+
+  ```bash
+  python notebooks/_build_notebooks.py
+  ```
+
 ## Code style
 
 - Library code under `tikitorch/` is held to the full ruff ruleset (see

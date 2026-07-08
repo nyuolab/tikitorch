@@ -28,10 +28,22 @@ markdown_extensions:
   - admonition
   - pymdownx.highlight
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - tables
 
 nav:
   - Home: index.md
+  - Guide:
+      - Foundations: guide/foundations.md
+      - Why tropical for ML/DL: guide/why-tropical-ml.md
+      - Tropical geometry of neural nets: guide/tropical-geometry.md
+      - Beyond deep learning: guide/beyond-deep-learning.md
+      - Architecture & diagrams: guide/architecture.md
+      - Choosing a model: guide/choosing-a-model.md
+      - Migrating from PyTorch: guide/migration.md
+      - FAQ & troubleshooting: guide/faq.md
+  - Tutorials (notebooks): guide/notebooks.md
   - API reference:
       - functional: api/functional.md
       - nn (layers): api/nn.md
