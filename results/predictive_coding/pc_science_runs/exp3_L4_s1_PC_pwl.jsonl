@@ -1,0 +1,12 @@
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 0, "T": null, "alpha": 1.0, "train_bpb": 9.26707, "bpb": 9.26948, "best": 9.26948, "lr": 6e-06, "wall": 3.6}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 250, "T": null, "alpha": 1.0, "train_bpb": 3.91352, "bpb": 4.18062, "best": 4.18062, "lr": 0.000595, "wall": 630.1}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 500, "T": null, "alpha": 1.0, "train_bpb": 3.91938, "bpb": 3.94875, "best": 3.94875, "lr": 0.000564, "wall": 1253.0}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 750, "T": null, "alpha": 1.0, "train_bpb": 3.8845, "bpb": 3.95665, "best": 3.94875, "lr": 0.000508, "wall": 1850.2}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 1000, "T": null, "alpha": 1.0, "train_bpb": 3.59828, "bpb": 3.83917, "best": 3.83917, "lr": 0.000433, "wall": 2429.9}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 1250, "T": null, "alpha": 1.0, "train_bpb": 3.77732, "bpb": 3.74672, "best": 3.74672, "lr": 0.000348, "wall": 2978.6}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 1500, "T": null, "alpha": 1.0, "train_bpb": 3.5688, "bpb": 3.7169, "best": 3.7169, "lr": 0.00026, "wall": 3493.7}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 1750, "T": null, "alpha": 1.0, "train_bpb": 3.90534, "bpb": 3.72839, "best": 3.7169, "lr": 0.00018, "wall": 3998.1}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 2000, "T": null, "alpha": 1.0, "train_bpb": 3.53809, "bpb": 3.71435, "best": 3.71435, "lr": 0.000116, "wall": 4497.5}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 2250, "T": null, "alpha": 1.0, "train_bpb": 3.77927, "bpb": 3.68378, "best": 3.68378, "lr": 7.4e-05, "wall": 4980.0}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 4, "seed": 1, "step": 2499, "T": null, "alpha": 1.0, "train_bpb": 3.51653, "bpb": 3.66078, "best": 3.66078, "lr": 6e-05, "wall": 5454.9}
+{"exp": "exp3_summary", "L": 4, "seed": 1, "D": 192, "resid_alpha": 1.0, "finals": {"PC_pwl": 3.6607786253460235}, "relaxTs": [2, 5], "arms": ["PC_pwl"], "checks": [], "note": "gap_pwl=PC_pwl-BP_pwl (~0 flat); gap_trop=PC_trop-BP_trop (bounded); gap_smooth_T*=PC_smooth_T-BP_smooth (grows w/ depth); gap_smooth_Tconv=PC_smooth_Tconv-BP_smooth (CHECK: ~0)"}

@@ -1,0 +1,58 @@
+=== EXPERIMENT 2 (CORRECTED): deep-PC-traction contrast (THREE regimes) ===
+A PWL   : BP_pwl (STE-thru-dyad ceiling) | PC_pwl (cascade)          -> gap ~0 FLAT
+B TROP  : BP_trop (dyadic BP ceiling)    | PC_trop (cascade, ours)   -> gap bounded ~0.5
+C SMOOTH: BP_smooth (float BP ceiling)   | PC_smooth_T{T} (finite-T) | PC_smooth_Tconv (T=2L check)
+
+--- final bpb per arm (mean over seeds) ---
+                L           BP_pwl           PC_pwl          BP_trop          PC_trop        BP_smooth     PC_smooth_T2     PC_smooth_T5  PC_smooth_Tconv
+                2           3.7864           3.7860           3.2759           3.5292           3.0484           3.0484           3.0484           3.0484
+                4           3.7271           3.7389           3.0901           3.4511           2.8956           3.1285           2.8956           2.8956
+                8           3.6911           3.6992           2.9589           3.4007           2.7536           3.1868           2.8828           2.7536
+
+--- GAP CURVE A: PWL   gap_pwl = PC_pwl - BP_pwl   (CLAIM: ~0, FLAT vs depth) ---
+  L= 2  gap_pwl = -0.0005   (PC=3.7860 BP=3.7864, n=2)
+  L= 4  gap_pwl = +0.0117   (PC=3.7389 BP=3.7271, n=2)
+  L= 8  gap_pwl = +0.0081   (PC=3.6992 BP=3.6911, n=2)
+
+--- GAP CURVE B: TROP  gap_trop = PC_trop - BP_trop   (CLAIM: bounded, grows slowly) ---
+  L= 2  gap_trop = +0.2533   (PC=3.5292 BP=3.2759, n=2)
+  L= 4  gap_trop = +0.3609   (PC=3.4511 BP=3.0901, n=2)
+  L= 8  gap_trop = +0.4418   (PC=3.4007 BP=2.9589, n=2)
+
+--- GAP CURVE C: SMOOTH  gap_smooth_T2 = PC_smooth_T2 - BP_smooth  (CLAIM: GROWS w/ depth) ---
+  L= 2  gap_smooth_T2 = +0.0000   (PC=3.0484 BP=3.0484, n=2)
+  L= 4  gap_smooth_T2 = +0.2328   (PC=3.1285 BP=2.8956, n=2)
+  L= 8  gap_smooth_T2 = +0.4332   (PC=3.1868 BP=2.7536, n=2)
+
+--- GAP CURVE C: SMOOTH  gap_smooth_T5 = PC_smooth_T5 - BP_smooth  (CLAIM: GROWS w/ depth) ---
+  L= 2  gap_smooth_T5 = +0.0000   (PC=3.0484 BP=3.0484, n=2)
+  L= 4  gap_smooth_T5 = +0.0000   (PC=2.8956 BP=2.8956, n=2)
+  L= 8  gap_smooth_T5 = +0.1293   (PC=2.8828 BP=2.7536, n=2)
+
+--- CONVERGENCE CHECK: gap_smooth_Tconv = PC_smooth_Tconv(2L) - BP_smooth  (CHECK: ~0) ---
+  L= 2  gap_Tconv = +0.0000   (PC=3.0484 BP=3.0484, n=2)
+  L= 4  gap_Tconv = +0.0000   (PC=2.8956 BP=2.8956, n=2)
+  L= 8  gap_Tconv = +0.0000   (PC=2.7536 BP=2.7536, n=2)
+
+=== CORRECTNESS CHECKS (per L,seed) ===
+  PASS  L= 2 s0  BP_trains(BP_pwl)  {"check": "BP_trains", "arm": "BP_pwl", "init": 8.59803, "final": 3.86553, "passed": true}
+  PASS  L= 2 s0  BP_trains(BP_smooth)  {"check": "BP_trains", "arm": "BP_smooth", "init": 8.29999, "final": 3.18859, "passed": true}
+  PASS  L= 2 s0  BP_trains(BP_trop)  {"check": "BP_trains", "arm": "BP_trop", "init": 8.30202, "final": 3.36581, "passed": true}
+  PASS  L= 2 s1  BP_trains(BP_pwl)  {"check": "BP_trains", "arm": "BP_pwl", "init": 8.70926, "final": 3.71459, "passed": true}
+  PASS  L= 2 s1  BP_trains(BP_smooth)  {"check": "BP_trains", "arm": "BP_smooth", "init": 8.39141, "final": 2.90829, "passed": true}
+  PASS  L= 2 s1  BP_trains(BP_trop)  {"check": "BP_trains", "arm": "BP_trop", "init": 8.38223, "final": 3.18603, "passed": true}
+  PASS  L= 4 s0  BP_trains(BP_pwl)  {"check": "BP_trains", "arm": "BP_pwl", "init": 9.04177, "final": 3.82046, "passed": true}
+  PASS  L= 4 s0  BP_trains(BP_smooth)  {"check": "BP_trains", "arm": "BP_smooth", "init": 8.30543, "final": 3.00326, "passed": true}
+  PASS  L= 4 s0  BP_trains(BP_trop)  {"check": "BP_trains", "arm": "BP_trop", "init": 8.34103, "final": 3.18787, "passed": true}
+  PASS  L= 4 s1  BP_trains(BP_pwl)  {"check": "BP_trains", "arm": "BP_pwl", "init": 9.26857, "final": 3.6536, "passed": true}
+  PASS  L= 4 s1  BP_trains(BP_smooth)  {"check": "BP_trains", "arm": "BP_smooth", "init": 8.51508, "final": 2.78801, "passed": true}
+  PASS  L= 4 s1  BP_trains(BP_trop)  {"check": "BP_trains", "arm": "BP_trop", "init": 8.52981, "final": 2.99356, "passed": true}
+  PASS  L= 8 s0  BP_trains(BP_pwl)  {"check": "BP_trains", "arm": "BP_pwl", "init": 10.10376, "final": 3.79983, "passed": true}
+  PASS  L= 8 s0  BP_trains(BP_smooth)  {"check": "BP_trains", "arm": "BP_smooth", "init": 8.3667, "final": 2.89572, "passed": true}
+  PASS  L= 8 s0  BP_trains(BP_trop)  {"check": "BP_trains", "arm": "BP_trop", "init": 8.39272, "final": 3.08701, "passed": true}
+  PASS  L= 8 s1  BP_trains(BP_pwl)  {"check": "BP_trains", "arm": "BP_pwl", "init": 10.06817, "final": 3.61209, "passed": true}
+  PASS  L= 8 s1  BP_trains(BP_smooth)  {"check": "BP_trains", "arm": "BP_smooth", "init": 8.33478, "final": 2.61142, "passed": true}
+  PASS  L= 8 s1  BP_trains(BP_trop)  {"check": "BP_trains", "arm": "BP_trop", "init": 8.35723, "final": 2.83076, "passed": true}
+  -> 18/18 checks PASS
+
+VERDICT: gap_pwl ~flat near 0; gap_trop bounded; gap_smooth_T* widens with L; gap_Tconv ~0 (all checks PASS).

@@ -1,5 +1,33 @@
 # THROUGHPUT ROADMAP — Distributed PC-Transformer Training on F2
 
+## S2 (D=512, 30M) status — 2026-07-08  ← CURRENT
+
+**AGFI `agfi-0c375fcd404810e17`** (bit-exact forward, trains on-fabric — `S2_30M_ONFABRIC.md`) · D=512, H=8,
+FFN=2048, SEQ=256, VOCAB=256, 8 chips (f2.48xlarge), K=32, 250 MHz, ACCUM=8.
+
+**Anchors [M]:** FWD kick **818 ms** (OUTPUT 836) · BWD kick **1776 ms** (OUTPUT 1817; = 2.17× FWD, dx+wgrad) ·
+serial (PIPE=0) **~167 s/step = 0.006 steps/s** (12 tok/s) · PCIe relay **< 2%** of wall (readf/put_f bursted;
+~2 MB/chip/sub-batch) — the step is **kick-dominated**; kernel + pipelining are the only levers. csynth [M]:
+LUT ~49%/one-SLR, DSP 404, BRAM ~64% at K=32 (post bit-exact fix).
+
+**Lever sequencing (cheapest first; target = the kernel the 124M run needs):**
+
+| # | lever | cost | expected | status |
+|---|---|---|---|---|
+| L0 | **PIPE=1** slot pipeline (S2_SLOTS=8, backward-first, bit-exact CHECK-4) | none (env) | ~6-8× (bottleneck-chip bound ≈ ACCUM×2.6 s ≈ 21 s/step) | measuring (2026-07-08) |
+| L1 | **`S2_AGGRESSIVE_SCHED`** Bcache hoist (kills the 4× dyad restream) — reverted on a divergence suspicion later DISPROVEN (real bug was LN `hls::log2`, fixed bit-exactly) | csynth gate + 1 rebuild | folded into the L2 rebuild | csynth sweep queued |
+| L2 | **`-DS2_K`** MAC-width sweep {32,64,128} × clock {250,200,150 via CLOCK_A} | csynth-only per point | K=64@250 ⇒ ~2×/kick; K=128@150 ⇒ ~2.4×/kick | csynth sweep queued |
+| L3 | `-DS2_VOCAB=8192` (BPE-8192 for the 30M gate run) folded into the SAME rebuild | — | head gemm ×32 (≈+134 ms on OUTPUT @K=32) — verify in csynth | queued |
+| — | in-chip replication | — | **not viable** on VU47P (LUT-bound; morph-LM N=4 precedent needs headroom) | ruled out |
+
+Combined realistic target: PIPE × (hoist + K) ⇒ **~0.05-0.15 steps/s** → a 50-100M-token 30M BPE run in ~1-2
+days. The D=64-era analysis below (kick reconciliation, lever ranking) remains valid methodology; its absolute
+numbers are superseded by the S2 anchors above.
+
+---
+
+## D=64 era analysis (2026-07-03, mp kernel) — superseded numbers, valid method
+
 **Status date:** 2026-07-03 · **AGFI:** `agfi-0a08046c7d64090ff` · **Config:** D=64, H=2, FFN=256, SEQ=64, VOCAB=64, L=3 chips, 150 MHz CDC (6.667 ns/cyc), PIPE=1 (2 slots), ACCUM=8
 **Kernel:** `tikitorch/hardware/hls/forge_kernels/forge_pc_xformer_mp_block.cpp` · **Driver:** `tikitorch/fpga/silicon/forge_pc_xformer_mp_shard.cpp` · **Config:** `forge_pc_xformer_mp_config.hpp`
 

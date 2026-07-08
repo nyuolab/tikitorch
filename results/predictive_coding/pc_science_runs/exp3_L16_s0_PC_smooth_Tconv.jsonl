@@ -1,0 +1,4 @@
+{"exp": "exp3", "arm": "PC_smooth_Tconv", "arm_key": "PC_smooth_Tconv32", "L": 16, "seed": 0, "step": 0, "T": 32, "alpha": 0.25, "train_bpb": 8.39758, "bpb": 8.33568, "best": 8.33568, "lr": 6e-06, "wall": 48.7}
+{"exp": "exp3", "arm": "PC_smooth_Tconv", "arm_key": "PC_smooth_Tconv32", "L": 16, "seed": 0, "step": 250, "T": 32, "alpha": 0.25, "train_bpb": 3.74187, "bpb": 3.91528, "best": 3.91528, "lr": 0.000599, "wall": 12159.2}
+{"exp": "exp3", "arm": "PC_smooth_Tconv", "arm_key": "PC_smooth_Tconv32", "L": 16, "seed": 0, "step": 500, "T": 32, "alpha": 0.25, "train_bpb": 3.65479, "bpb": 3.68352, "best": 3.68352, "lr": 0.000591, "wall": 23937.0}
+{"exp": "exp3", "arm": "PC_smooth_Tconv", "arm_key": "PC_smooth_Tconv32", "L": 16, "seed": 0, "step": 750, "T": 32, "alpha": 0.25, "train_bpb": 3.33265, "bpb": 3.45695, "best": 3.45695, "lr": 0.000577, "wall": 32768.7}

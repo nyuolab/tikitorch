@@ -1,0 +1,12 @@
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 0, "T": null, "alpha": 1.0, "train_bpb": 9.98058, "bpb": 10.04993, "best": 10.04993, "lr": 6e-06, "wall": 7.1}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 250, "T": null, "alpha": 1.0, "train_bpb": 3.97311, "bpb": 4.17343, "best": 4.17343, "lr": 0.000595, "wall": 1245.0}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 500, "T": null, "alpha": 1.0, "train_bpb": 3.93986, "bpb": 3.93359, "best": 3.93359, "lr": 0.000564, "wall": 2419.4}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 750, "T": null, "alpha": 1.0, "train_bpb": 3.93681, "bpb": 3.90635, "best": 3.90635, "lr": 0.000508, "wall": 3481.6}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 1000, "T": null, "alpha": 1.0, "train_bpb": 3.597, "bpb": 3.81226, "best": 3.81226, "lr": 0.000433, "wall": 4483.1}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 1250, "T": null, "alpha": 1.0, "train_bpb": 3.76034, "bpb": 3.72404, "best": 3.72404, "lr": 0.000348, "wall": 5440.0}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 1500, "T": null, "alpha": 1.0, "train_bpb": 3.53963, "bpb": 3.69876, "best": 3.69876, "lr": 0.00026, "wall": 6352.8}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 1750, "T": null, "alpha": 1.0, "train_bpb": 3.90073, "bpb": 3.71434, "best": 3.69876, "lr": 0.00018, "wall": 7261.7}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 2000, "T": null, "alpha": 1.0, "train_bpb": 3.46448, "bpb": 3.67615, "best": 3.67615, "lr": 0.000116, "wall": 8170.8}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 2250, "T": null, "alpha": 1.0, "train_bpb": 3.71864, "bpb": 3.61385, "best": 3.61385, "lr": 7.4e-05, "wall": 9074.3}
+{"exp": "exp3", "arm": "PC_pwl", "arm_key": "PC_pwl", "L": 8, "seed": 1, "step": 2499, "T": null, "alpha": 1.0, "train_bpb": 3.41574, "bpb": 3.61737, "best": 3.61385, "lr": 6e-05, "wall": 9951.6}
+{"exp": "exp3_summary", "L": 8, "seed": 1, "D": 192, "resid_alpha": 1.0, "finals": {"PC_pwl": 3.613853525366764}, "relaxTs": [2, 5], "arms": ["PC_pwl"], "checks": [], "note": "gap_pwl=PC_pwl-BP_pwl (~0 flat); gap_trop=PC_trop-BP_trop (bounded); gap_smooth_T*=PC_smooth_T-BP_smooth (grows w/ depth); gap_smooth_Tconv=PC_smooth_Tconv-BP_smooth (CHECK: ~0)"}

@@ -1,0 +1,12 @@
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 0, "T": null, "alpha": 1.0, "train_bpb": 8.46148, "bpb": 8.3411, "best": 8.3411, "lr": 6e-06, "wall": 3.5}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 250, "T": null, "alpha": 1.0, "train_bpb": 4.59118, "bpb": 4.48999, "best": 4.48999, "lr": 0.000595, "wall": 648.3}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 500, "T": null, "alpha": 1.0, "train_bpb": 3.91929, "bpb": 3.95321, "best": 3.95321, "lr": 0.000564, "wall": 1290.0}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 750, "T": null, "alpha": 1.0, "train_bpb": 3.66564, "bpb": 3.82795, "best": 3.82795, "lr": 0.000508, "wall": 1898.7}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 1000, "T": null, "alpha": 1.0, "train_bpb": 3.73486, "bpb": 3.77462, "best": 3.77462, "lr": 0.000433, "wall": 2486.1}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 1250, "T": null, "alpha": 1.0, "train_bpb": 3.76251, "bpb": 3.71895, "best": 3.71895, "lr": 0.000348, "wall": 3035.9}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 1500, "T": null, "alpha": 1.0, "train_bpb": 3.5569, "bpb": 3.65863, "best": 3.65863, "lr": 0.00026, "wall": 3553.3}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 1750, "T": null, "alpha": 1.0, "train_bpb": 3.45855, "bpb": 3.61426, "best": 3.61426, "lr": 0.00018, "wall": 4058.1}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 2000, "T": null, "alpha": 1.0, "train_bpb": 3.39288, "bpb": 3.5853, "best": 3.5853, "lr": 0.000116, "wall": 4555.7}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 2250, "T": null, "alpha": 1.0, "train_bpb": 3.11111, "bpb": 3.53586, "best": 3.53586, "lr": 7.4e-05, "wall": 5035.6}
+{"exp": "exp3", "arm": "PC_trop", "arm_key": "PC_trop", "L": 4, "seed": 0, "step": 2499, "T": null, "alpha": 1.0, "train_bpb": 3.28734, "bpb": 3.52955, "best": 3.52955, "lr": 6e-05, "wall": 5508.8}
+{"exp": "exp3_summary", "L": 4, "seed": 0, "D": 192, "resid_alpha": 1.0, "finals": {"PC_trop": 3.5295537290783754}, "relaxTs": [2, 5], "arms": ["PC_trop"], "checks": [], "note": "gap_pwl=PC_pwl-BP_pwl (~0 flat); gap_trop=PC_trop-BP_trop (bounded); gap_smooth_T*=PC_smooth_T-BP_smooth (grows w/ depth); gap_smooth_Tconv=PC_smooth_Tconv-BP_smooth (CHECK: ~0)"}
