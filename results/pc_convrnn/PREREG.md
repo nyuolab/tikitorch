@@ -1,7 +1,17 @@
 # PREREG — cascade PC trains fully tropical sequence models (branch `pc-morphssm`)
 
 Committed before any gate runs. Theory: `THEORY_UNROLLED_CASCADE.md`. Style follows
-`results/pc_depth_traction/PREREG.md`. Decisions locked with the user 2026-07-08:
+`results/pc_depth_traction/PREREG.md`.
+
+**PROGRAM GOAL (the north star, per user 2026-07-08):** enable the unique
+generative/relaxation behavior of predictive coding, performantly, via tropical
+deep learning — *pay one forward-pass-equivalent for training credit (the
+cascade), and pay iteration only where you want the generative behavior; the
+equivalence theorem guarantees it is the same model in both modes*
+(THEORY_UNROLLED_CASCADE.md §1b). G0–G5 establish the training half (cascade =
+settled PC, at BP wall-clock, zero-multiply backward at τ=0); G6 establishes
+the inference half (infilling / steering / denoising by state relaxation on the
+same checkpoint). Decisions locked with the user 2026-07-08:
 
 1. **Headline = credit assignment.** Primary arm: **cascade PC training the real
    `tt.models.MorphSSM`** (bakeoff config d=256/L=7/K=7, exp dilation, tropical
@@ -11,8 +21,9 @@ Committed before any gate runs. Theory: `THEORY_UNROLLED_CASCADE.md`. Style foll
 2. **Recurrence (conv-RNN arm) payoff = long-range metrics** (selective copy
    beyond conv RF, train-96/eval-512-1024 streaming, O(d) state), NOT seq-96 bpc
    (predicted null; pre-registered as not-a-failure).
-3. **Scope of this push = G0–G3.** G4 (depth ladder) and G5 (strict rung) are
-   pre-registered below but run as follow-ups.
+3. **Scope of this push = G0–G3.** G4 (depth ladder), G5 (strict rung), and G6
+   (generative inference — the north-star payoff) are pre-registered below but
+   run as follow-ups; G6 is the first follow-up once G3 checkpoints exist.
 
 ## Arms and naming
 
@@ -100,6 +111,33 @@ honestly as the L3 ladder line; (c) flag-plant: `find_training_multiplies` trace
 forward + τ=0 cascade + closed optimizer with only sanctioned waivers (CE
 softmax/LUT boundary, batch-mean divide) — the zero-multiply-backward training-
 closed LM.
+
+### G6 (follow-up, pre-registered) — generative inference on the cascade-trained checkpoint
+The inference half of the program goal. Implement `MorphPCEngine.infer(clamp)`:
+energy descent over STATES with routing re-evaluated each step (DyadicPCNet.infer
+pattern; soft τ during relaxation — pow-2 τ preferred — hard eval of the result;
+pow-2 settling step γ). Consumes the G3 checkpoints — no retraining.
+- **G6a equivalence-in-reverse control:** input-clamped settling must converge
+  to the feedforward pass (E → 0, states → forward activations). This is the
+  sanity gate and the honest demonstration that naive iterative inference adds
+  nothing — the unique behavior REQUIRES a different clamping pattern.
+- **G6b infilling (the headline):** TinyShakespeare, clamp prefix + suffix
+  latents, relax the middle span (embedding-space states; decode by nearest
+  embedding / vocab argmax), spans {8, 16, 32} chars. Baseline on the SAME
+  checkpoint: left-to-right resample of the span conditioned on the prefix only
+  (the causal LM's native capability), matched compute. Pass: settled infill
+  beats the baseline on span CE / exact-match at ≥2 of 3 span lengths, 3 seeds.
+- **G6c denoising/completion:** corrupt {10, 25, 50}% of context tokens, clamp
+  the trusted rest, relax; measure token-recovery accuracy vs a no-settling
+  forward baseline. The deep-tropical analog of the SparseCodingPC win.
+- **Stability pre-registration (the C3-at-inference risk):** if fixed-step
+  settling diverges at d=256 (the U-gate/settle_nudge failure modes), the
+  pre-listed fallbacks are, in order: smaller pow-2 γ, RMS-conditioned state
+  steps, settling at larger τ, narrower/shallower checkpoint. If none converge,
+  report the negative honestly — the training-half claims (G0–G5) stand alone.
+- **Closure disclosure:** relaxation-mode inference at τ>0 is a declared
+  boundary (same rung as the training anneal); the feedforward deploy mode
+  remains fully closed at τ=0. jsonl: `g6_generative.jsonl`.
 
 ## Honest claim ladder (every run states its rung)
 

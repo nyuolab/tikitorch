@@ -653,6 +653,14 @@ def run_one(arch, credit, data, args, log_path):
                   f"({row['tok_per_s']} tok/s)", flush=True)
 
     model.set_tau(0.0)
+    ckpt_dir = args.out / "ckpts"                       # consumed by gate G6
+    ckpt_dir.mkdir(parents=True, exist_ok=True)         # (untracked: binaries)
+    torch.save({"arch": arch, "credit": credit, "seed": args.seed,
+                "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
+                "config": dict(d_model=args.d_model, n_layers=args.n_layers,
+                               kernel=args.kernel, dropout=args.dropout,
+                               lam_min=args.lam_min, vocab=data.vocab)},
+               ckpt_dir / f"{arch}_{credit}_s{args.seed}.pt")
     text = sample(model, data, "\n", args.sample_chars, args.seq_len, device,
                   seed=args.seed)
     # streaming/length-extrapolation eval (recurrence payoff metric)

@@ -29,6 +29,42 @@ superiority — that effect is quantization/settling regularization and flipped 
 on conv (`results/predictive_coding/CHARLM_CONV_LOCAL_PC.md`, +0.17). The claims
 this branch runs on are the four below.
 
+## 1b. The two-mode statement (THE PROGRAM GOAL)
+
+The point of proving cascade ≡ settled-PC is the **asymmetry it licenses**:
+
+> **Pay one forward-pass-equivalent for training credit (the cascade), and pay
+> iteration only where you want the generative behavior — the equivalence
+> theorem guarantees it is the same model in both modes.**
+
+Training by cascade forecloses nothing: the weights it produces are exactly the
+weights the iterative-PC view describes, and the energy function E(states; W)
+ships with them for free. At inference the SAME checkpoint runs in two modes:
+
+- **Feedforward mode** (the default, fully closed at τ=0): the ordinary O(T)
+  forward. Note the precision — clamping the *input* and iteratively settling
+  converges to exactly this forward pass (E → 0 at x_l = f_l(x_{l−1})); naive
+  "iterative inference" is a no-op, only slower. This is C1 read in reverse.
+- **Generative/relaxation mode** (the PC-unique payoff): choose a different
+  clamping pattern and descend the energy over the *states*:
+  * **infilling** — clamp prefix AND suffix, relax the span between (a causal
+    LM has no native bidirectional-constraint mode; PC does, on the same weights);
+  * **goal-conditioned steering** — clamp desired future logits, relax latents;
+  * **denoising / completion** — clamp the trusted fragment of a corrupted
+    context, relax the rest (the SparseCodingPC associative-memory mode, never
+    yet demonstrated on a deep tropical sequence model).
+
+Honest boundaries of the claim (pre-registered): (i) generative mode needs
+*state* relaxation (routing re-evaluated each step) — a different loop from the
+frozen-routing *error* relaxation used for training credit; (ii) state settling
+has measured stability failure modes in this repo (settle_nudge energy
+divergence as weights grow; fixed-step descent divergence at width 768 — the
+U-gate) — C3 is trivial for the cascade but returns as a real problem here;
+(iii) at hard τ=0 the energy is piecewise-linear (kinks at winner changes), so
+relaxation runs at soft τ>0 and is evaluated hard — a disclosed inference-time
+closure boundary for this mode only; the feedforward deploy mode stays fully
+closed. Gate G6 (PREREG) measures all of this.
+
 ## 2. What is actually new here
 
 1. **Settling is deleted where it would be catastrophic.** Iterative PC on the
