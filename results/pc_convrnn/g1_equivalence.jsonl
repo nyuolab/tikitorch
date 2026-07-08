@@ -1,0 +1,107 @@
+{"gate": "G1", "form": "sync", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 4, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 8, "participation": 0.5, "exp_hops": 4.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.0.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 16, "participation": 0.5, "exp_hops": 8.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.0.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 24, "participation": 0.5, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.0.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 48, "participation": 0.5, "exp_hops": 24.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.0.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 16, "participation": 0.25, "exp_hops": 4.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.0.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 32, "participation": 0.25, "exp_hops": 8.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.0.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 48, "participation": 0.25, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.0.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 0, "tau": 0.5, "n_iter": 96, "participation": 0.25, "exp_hops": 24.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.0.out_proj.weight"}
+{"gate": "G1", "form": "chains", "depth": 2, "layer": 1, "seed": 0, "carry_frac": 0.6028, "chain_p50": 1, "chain_p95": 17, "chain_max": 66}
+{"gate": "G1", "form": "chains", "depth": 2, "layer": 0, "seed": 0, "carry_frac": 0.4495, "chain_p50": 0, "chain_p95": 23, "chain_max": 82}
+{"gate": "G1", "form": "delivery", "depth": 2, "seed": 0, "delivery_mean": 1.0, "delivery_min": 1.0}
+{"gate": "G1", "form": "sync", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 4, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 8, "participation": 0.5, "exp_hops": 4.0, "binding": false, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 16, "participation": 0.5, "exp_hops": 8.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 24, "participation": 0.5, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 48, "participation": 0.5, "exp_hops": 24.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 16, "participation": 0.25, "exp_hops": 4.0, "binding": false, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 32, "participation": 0.25, "exp_hops": 8.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 48, "participation": 0.25, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 1, "tau": 0.5, "n_iter": 96, "participation": 0.25, "exp_hops": 24.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "sync", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 4, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 8, "participation": 0.5, "exp_hops": 4.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 16, "participation": 0.5, "exp_hops": 8.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 24, "participation": 0.5, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 48, "participation": 0.5, "exp_hops": 24.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 16, "participation": 0.25, "exp_hops": 4.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 32, "participation": 0.25, "exp_hops": 8.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 48, "participation": 0.25, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 2, "seed": 2, "tau": 0.5, "n_iter": 96, "participation": 0.25, "exp_hops": 24.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "sync", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 6, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 12, "participation": 0.5, "exp_hops": 6.0, "binding": false, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 24, "participation": 0.5, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 36, "participation": 0.5, "exp_hops": 18.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 72, "participation": 0.5, "exp_hops": 36.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 24, "participation": 0.25, "exp_hops": 6.0, "binding": false, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 48, "participation": 0.25, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 72, "participation": 0.25, "exp_hops": 18.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 0, "tau": 0.5, "n_iter": 144, "participation": 0.25, "exp_hops": 36.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "chains", "depth": 4, "layer": 3, "seed": 0, "carry_frac": 0.6296, "chain_p50": 1, "chain_p95": 8, "chain_max": 53}
+{"gate": "G1", "form": "chains", "depth": 4, "layer": 2, "seed": 0, "carry_frac": 0.623, "chain_p50": 1, "chain_p95": 10, "chain_max": 66}
+{"gate": "G1", "form": "chains", "depth": 4, "layer": 1, "seed": 0, "carry_frac": 0.6001, "chain_p50": 1, "chain_p95": 17, "chain_max": 66}
+{"gate": "G1", "form": "chains", "depth": 4, "layer": 0, "seed": 0, "carry_frac": 0.4495, "chain_p50": 0, "chain_p95": 23, "chain_max": 82}
+{"gate": "G1", "form": "delivery", "depth": 4, "seed": 0, "delivery_mean": 1.0, "delivery_min": 1.0}
+{"gate": "G1", "form": "sync", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 6, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 12, "participation": 0.5, "exp_hops": 6.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 24, "participation": 0.5, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 36, "participation": 0.5, "exp_hops": 18.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 72, "participation": 0.5, "exp_hops": 36.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 24, "participation": 0.25, "exp_hops": 6.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 48, "participation": 0.25, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 72, "participation": 0.25, "exp_hops": 18.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 1, "tau": 0.5, "n_iter": 144, "participation": 0.25, "exp_hops": 36.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "sync", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 6, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 12, "participation": 0.5, "exp_hops": 6.0, "binding": false, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 24, "participation": 0.5, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 36, "participation": 0.5, "exp_hops": 18.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 72, "participation": 0.5, "exp_hops": 36.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 24, "participation": 0.25, "exp_hops": 6.0, "binding": false, "cos_worst": 0.0, "worst_param": "embed.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 48, "participation": 0.25, "exp_hops": 12.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 72, "participation": 0.25, "exp_hops": 18.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 4, "seed": 2, "tau": 0.5, "n_iter": 144, "participation": 0.25, "exp_hops": 36.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "sync", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 10, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 20, "participation": 0.5, "exp_hops": 10.0, "binding": false, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 40, "participation": 0.5, "exp_hops": 20.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 60, "participation": 0.5, "exp_hops": 30.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 120, "participation": 0.5, "exp_hops": 60.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 40, "participation": 0.25, "exp_hops": 10.0, "binding": false, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 80, "participation": 0.25, "exp_hops": 20.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 120, "participation": 0.25, "exp_hops": 30.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 0, "tau": 0.5, "n_iter": 240, "participation": 0.25, "exp_hops": 60.0, "binding": true, "cos_worst": 1.0, "worst_param": "output_head.weight"}
+{"gate": "G1", "form": "chains", "depth": 8, "layer": 7, "seed": 0, "carry_frac": 0.3419, "chain_p50": 0, "chain_p95": 2, "chain_max": 9}
+{"gate": "G1", "form": "chains", "depth": 8, "layer": 6, "seed": 0, "carry_frac": 0.6548, "chain_p50": 2, "chain_p95": 24, "chain_max": 63}
+{"gate": "G1", "form": "chains", "depth": 8, "layer": 5, "seed": 0, "carry_frac": 0.4764, "chain_p50": 0, "chain_p95": 4, "chain_max": 21}
+{"gate": "G1", "form": "chains", "depth": 8, "layer": 4, "seed": 0, "carry_frac": 0.6798, "chain_p50": 2, "chain_p95": 11, "chain_max": 15}
+{"gate": "G1", "form": "chains", "depth": 8, "layer": 3, "seed": 0, "carry_frac": 0.6299, "chain_p50": 1, "chain_p95": 8, "chain_max": 53}
+{"gate": "G1", "form": "chains", "depth": 8, "layer": 2, "seed": 0, "carry_frac": 0.6247, "chain_p50": 1, "chain_p95": 10, "chain_max": 66}
+{"gate": "G1", "form": "chains", "depth": 8, "layer": 1, "seed": 0, "carry_frac": 0.6007, "chain_p50": 1, "chain_p95": 17, "chain_max": 66}
+{"gate": "G1", "form": "chains", "depth": 8, "layer": 0, "seed": 0, "carry_frac": 0.4495, "chain_p50": 0, "chain_p95": 23, "chain_max": 82}
+{"gate": "G1", "form": "delivery", "depth": 8, "seed": 0, "delivery_mean": 1.0, "delivery_min": 1.0}
+{"gate": "G1", "form": "sync", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 10, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 20, "participation": 0.5, "exp_hops": 10.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 40, "participation": 0.5, "exp_hops": 20.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 60, "participation": 0.5, "exp_hops": 30.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 120, "participation": 0.5, "exp_hops": 60.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 40, "participation": 0.25, "exp_hops": 10.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 80, "participation": 0.25, "exp_hops": 20.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 120, "participation": 0.25, "exp_hops": 30.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 1, "tau": 0.5, "n_iter": 240, "participation": 0.25, "exp_hops": 60.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.1.out_proj.weight"}
+{"gate": "G1", "form": "sync", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 1, "bitwise": true}
+{"gate": "G1", "form": "sync", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 10, "bitwise": true}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 20, "participation": 0.5, "exp_hops": 10.0, "binding": false, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 40, "participation": 0.5, "exp_hops": 20.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 60, "participation": 0.5, "exp_hops": 30.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 120, "participation": 0.5, "exp_hops": 60.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 40, "participation": 0.25, "exp_hops": 10.0, "binding": false, "cos_worst": 0.0, "worst_param": "embed.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 80, "participation": 0.25, "exp_hops": 20.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 120, "participation": 0.25, "exp_hops": 30.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
+{"gate": "G1", "form": "async", "depth": 8, "seed": 2, "tau": 0.5, "n_iter": 240, "participation": 0.25, "exp_hops": 60.0, "binding": true, "cos_worst": 1.0, "worst_param": "layers.2.out_proj.weight"}
