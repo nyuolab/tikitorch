@@ -245,6 +245,12 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--part", choices=["2a", "2b", "all"], default="all")
     p.add_argument("--tasks", nargs="+", default=["copy", "runmax", "induction"])
+    p.add_argument("--archs", nargs="+",
+                   default=["convrnn", "convrnn-norecur"],
+                   choices=["convrnn", "convrnn-norecur"],
+                   help="which arms to run (single-arm for queue parallelism)")
+    p.add_argument("--seed-list", type=int, nargs="+", default=None,
+                   help="explicit seeds (overrides --seeds range)")
     p.add_argument("--seeds", type=int, default=3)
     p.add_argument("--steps", type=int, default=2000)
     p.add_argument("--batch", type=int, default=32)
@@ -261,9 +267,10 @@ def main():
         ok &= drift_probe(args, args.out / "g2_stability.jsonl")
     if args.part in ("2b", "all"):
         out = args.out / "g2_synthetic.jsonl"
+        seeds = args.seed_list if args.seed_list is not None else list(range(args.seeds))
         for task in args.tasks:
-            for arch in ("convrnn", "convrnn-norecur"):
-                for seed in range(args.seeds):
+            for arch in args.archs:
+                for seed in seeds:
                     run_synthetic(task, arch, seed, args, out)
     print(f"[G2] done (2a {'PASS' if ok else 'CHECK'})")
 

@@ -4,19 +4,23 @@
 # run_connect4_prior_sweep_ec2.sh machinery: env REPO=/opt/tiki,
 # S3_RESULTS=s3://.../results, python at /opt/venv/bin/python.
 #
-# Batches (B4/G5 deferred: the harness's closed-optimizer path is not built yet):
-#   B0  cascade-trained checkpoints for G6 (matched-lr, seeds deterministic)
-#   B1  G6 generative battery: g6a control; g6b infilling sweep; g6c denoising
-#   B2  G2b fallback ladder round 1: selective copy 10k steps x lr {3e-3,1e-2}
-#   B3  G4 depth ladder: d=128, L in {4,8,16,32} x {bp, cascade} x 3 seeds
-#       + relax_async n=1 at L=16
+# v2 (speed fixes measured against the first launch):
+#   * B0 checkpoint training replaced by S3 fetch (the laptop uploads the
+#     matched-lr cascade ckpts to $S3_RESULTS/ckpts_in/ right after launch);
+#     on-box retrain kept only as the fallback if the fetch never lands.
+#   * B2 split into per-(lr, seed) single-arm commands — the v1 form looped
+#     2 archs x 3 seeds inside ONE process (~10-12 h serial, past the
+#     backstop). norecur controls dropped at 10k steps (measured at chance;
+#     the ladder question is the recurrent arm's bar).
+#   * G4 runs at --eval-interval 300 (evals were ~20% of wall).
+#   * NPAR/OMP sized for c7i.16xlarge (64 vCPU): 14 jobs x 4 threads.
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
 OUT=results/pc_convrnn
-mkdir -p "$OUT"
+mkdir -p "$OUT/ckpts"
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-4} MKL_NUM_THREADS=4
-NPAR=${NPAR:-8}
+NPAR=${NPAR:-14}
 
 sync_s3(){ aws s3 sync "$OUT" "$S3_RESULTS/pc_convrnn" --exclude "ckpts/*" \
              --only-show-errors || true; }
@@ -24,11 +28,22 @@ sync_s3(){ aws s3 sync "$OUT" "$S3_RESULTS/pc_convrnn" --exclude "ckpts/*" \
 SYNC_PID=$!
 trap 'kill $SYNC_PID 2>/dev/null; sync_s3' EXIT
 
-# ---- B0: G6 checkpoints (must finish before B1 g6b/g6c) --------------------
-$PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 \
-  --pc-lr 1e-2 --seed 0 --tag onbox_morphssm_cascade_s0 --out "$OUT" &
-$PY scripts/pc_convrnn_charlm.py --arms convrnn:cascade --adam-lr 1e-2 \
-  --pc-lr 1e-2 --seed 0 --tag onbox_convrnn_cascade_s0 --out "$OUT" &
+# ---- B0: fetch matched-lr cascade ckpts (uploaded by the laptop); retrain
+# only as fallback ------------------------------------------------------------
+for i in 1 2 3 4 5; do
+  aws s3 cp "$S3_RESULTS/ckpts_in/morphssm_cascade_s0.pt" "$OUT/ckpts/" --only-show-errors \
+    && aws s3 cp "$S3_RESULTS/ckpts_in/convrnn_cascade_s0.pt" "$OUT/ckpts/" --only-show-errors \
+    && break
+  sleep 60
+done
+if [ ! -f "$OUT/ckpts/morphssm_cascade_s0.pt" ]; then
+  $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 \
+    --pc-lr 1e-2 --seed 0 --tag onbox_morphssm_cascade_s0 --out "$OUT" &
+fi
+if [ ! -f "$OUT/ckpts/convrnn_cascade_s0.pt" ]; then
+  $PY scripts/pc_convrnn_charlm.py --arms convrnn:cascade --adam-lr 1e-2 \
+    --pc-lr 1e-2 --seed 0 --tag onbox_convrnn_cascade_s0 --out "$OUT" &
+fi
 wait
 sync_s3
 
@@ -39,26 +54,30 @@ JOBS=$(mktemp)
 echo "$PY scripts/pc_convrnn_generative.py --gates g6a --settle-steps 1000 --out $OUT --tag onbox" >> "$JOBS"
 for CK in morphssm convrnn; do
   CKPT="$OUT/ckpts/${CK}_cascade_s0.pt"
-  # primary infilling cells + ablations (steps/lr/tau/init)
-  echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 64 --spans 8 16 32 --relax-steps 400 --relax-lr 0.05 --tau-relax 0.5 --coord-sweeps 3 --out $OUT --tag ${CK}_main" >> "$JOBS"
+  # per-span commands (span-32 coord descent is the heavy tail — parallelize it)
+  for SPAN in 8 16 32; do
+    echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 64 --spans $SPAN --relax-steps 400 --relax-lr 0.05 --tau-relax 0.5 --coord-sweeps 3 --out $OUT --tag ${CK}_main_s${SPAN}" >> "$JOBS"
+  done
   echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 64 --spans 16 --relax-steps 1600 --relax-lr 0.2 --tau-relax 0.25 --out $OUT --tag ${CK}_hi" >> "$JOBS"
   echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 64 --spans 16 --relax-steps 400 --relax-lr 0.05 --relax-init mean --out $OUT --tag ${CK}_meaninit" >> "$JOBS"
   echo "$PY scripts/pc_convrnn_generative.py --gates g6c --ckpt $CKPT --n-windows 64 --rates 0.1 0.25 0.5 --relax-steps 400 --out $OUT --tag ${CK}_denoise" >> "$JOBS"
 done
 
-# B2: G2b fallback round 1 (budget/lr) — selective copy at 10k steps
+# B2: G2b fallback round 1 (budget/lr) — one (lr, seed) recurrent-arm run per command
 for LR in 3e-3 1e-2; do
-  echo "$PY scripts/pc_convrnn_stability.py --part 2b --tasks copy --steps 10000 --lr $LR --seeds 3 --out $OUT" >> "$JOBS"
-done
-
-# B3: G4 depth ladder (d=128; matched lr both arms)
-for L in 4 8 16 32; do
   for S in 0 1 2; do
-    echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:bp --adam-lr 1e-2 --d-model 128 --n-layers $L --seed $S --tag g4_bp_L${L}_s${S} --out $OUT" >> "$JOBS"
-    echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --d-model 128 --n-layers $L --seed $S --tag g4_cascade_L${L}_s${S} --out $OUT" >> "$JOBS"
+    echo "$PY scripts/pc_convrnn_stability.py --part 2b --tasks copy --steps 10000 --lr $LR --archs convrnn --seed-list $S --out $OUT" >> "$JOBS"
   done
 done
-echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:relax_async --adam-lr 1e-2 --pc-lr 1e-2 --d-model 128 --n-layers 16 --seed 0 --tag g4_async_L16_s0 --out $OUT" >> "$JOBS"
+
+# B3: G4 depth ladder (d=128; matched lr both arms; light eval cadence)
+for L in 4 8 16 32; do
+  for S in 0 1 2; do
+    echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:bp --adam-lr 1e-2 --d-model 128 --n-layers $L --seed $S --eval-interval 300 --tag g4_bp_L${L}_s${S} --out $OUT" >> "$JOBS"
+    echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --d-model 128 --n-layers $L --seed $S --eval-interval 300 --tag g4_cascade_L${L}_s${S} --out $OUT" >> "$JOBS"
+  done
+done
+echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:relax_async --adam-lr 1e-2 --pc-lr 1e-2 --d-model 128 --n-layers 16 --seed 0 --eval-interval 300 --tag g4_async_L16_s0 --out $OUT" >> "$JOBS"
 
 wc -l "$JOBS"
 # run the queue; log each job's rc; never abort the batch on one failure
