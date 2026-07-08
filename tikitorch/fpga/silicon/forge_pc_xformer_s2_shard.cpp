@@ -429,7 +429,10 @@ int main(int argc,char**argv){
         return 0;
     }
 
+    static int g_trace = getenv("STEPTRACE") ? atoi(getenv("STEPTRACE")) : 0;
+#define STRACE(...) do{ if(g_trace){ fprintf(stderr,"[trace] " __VA_ARGS__); fflush(stderr);} }while(0)
     for(int step=0; step<steps; step++){
+        STRACE("==== step %d BEGIN ====\n", step);
         // linear warmup then optional COSINE DECAY to LR*LR_MINFRAC (LR_DECAY=1). WHY: the silicon's constant-LR
         // loss floor sits higher than a CPU ref's (noisier effective gradient) — ride it down with a schedule.
         static int   LR_DECAY  = getenv("LR_DECAY")  ? atoi(getenv("LR_DECAY"))   : 0;
@@ -463,8 +466,10 @@ int main(int argc,char**argv){
                     put_f(l, S2_GRIN, hmsg, (long)S2_SEQ*S2_D);       // upstream chip's WIDE R' -> this chip's down-message
                 }
                 if(l==L-1){ for(int t=0;t<S2_SEQ;t++) hbuf[l][S2_TGT+t]=data[off+t+1]; stage(l,S2_TGT,S2_SEQ); }  // OUTPUT targets
+                STRACE("s%d k%d FWD chip%d kick...\n", step, k, l);
                 kick(l);
                 if(l<L-1){
+                    STRACE("s%d k%d FWD chip%d readf GROUT...\n", step, k, l);
                     readf(l, S2_GROUT, hmsg, (long)S2_SEQ*S2_D);      // WIDE down-message: this block's R' -> next chip S2_GRIN
                     actstat("R'(wide)", l, step, hmsg, (long)S2_SEQ*S2_D);
                 }
@@ -496,8 +501,10 @@ int main(int argc,char**argv){
             for(int l=L-1;l>=0;l--){
                 setcfg(l, S2_PH_BWD, krole(l), do_update, do_update?lrcode(lr):0, (k==0)?1:0, 0);   // DO_UP -> adam; k==0 -> GZERO
                 if(l<L-1){ put_f(l, S2_GRIN, emsg, (long)S2_SEQ*S2_D); }  // neighbour WIDE error in
+                STRACE("s%d k%d BWD chip%d kick (do_update=%d)...\n", step, k, l, do_update);
                 kick(l);
-                if(l>0) readf(l, S2_GROUT, emsg, (long)S2_SEQ*S2_D);  // WIDE up-message: this block's input-grad -> prev chip
+                if(l>0){ STRACE("s%d k%d BWD chip%d readf GROUT...\n", step, k, l);
+                    readf(l, S2_GROUT, emsg, (long)S2_SEQ*S2_D); }  // WIDE up-message: this block's input-grad -> prev chip
                 else if(host_embed()){   // chip 0 (HID) up-message gR = the embed input gradient; train EMB/POS host-side
                     readf(0, S2_GROUT, emsg, (long)S2_SEQ*S2_D);
                     if(k==0){ memset(hgE,0,(size_t)S2_VOCAB*S2_D*4); memset(hgP,0,(size_t)S2_SEQ*S2_D*4); }  // GZERO
