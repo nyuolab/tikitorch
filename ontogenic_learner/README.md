@@ -168,6 +168,31 @@ First life: 14-day pilot (plan: `~/.claude/plans/…majestic-riddle.md`; launche
 
 ## 7. Status log (newest first — keep updating this)
 
+- **2026-07-08 (later)** · **PILOT ENDED EARLY BY DECISION at life-day 3.3** (graceful CLI
+  terminate: final checkpoint → ack → instance gone; ~$28 total of the $135 budget). Life
+  record preserved in full at `s3://tiki-sweep-739966866637/organism/org-20260704T161956Z`
+  (16 probe suites, 4.39M ledger events, gaps=0; final report snapshot in
+  `organism_report_sync/`; minor open item: report's monotonicity checker flags
+  out-of-order lines with zero gaps — likely a rotation-read-order artifact in report.py,
+  check before the next life). What the 3.3 days bought: zero-incident always-on ops incl.
+  two abuse recoveries (shakedown), the norm-growth/novelty-starvation finding, the
+  fast-adapt-then-overfit and interference curves, the cross-modality monomodal collapse,
+  and the G4 mechanism hunt it triggered (anchor GO). The line now waits on the recurrent
+  CNN PC architecture; the harness, the anchor, and the pathology catalogue carry forward.
+
+- **2026-07-08 (decision)** · **PAUSE deepening this line pending the real PC architecture.**
+  Assessment (user + instance concur): the organism's model is a placeholder (ctx-24 MLP —
+  no recurrence/conv/settling; shared output layer), and the deployed rule is BP+gate+buffer
+  (cascade==BP), so mechanism *magnitudes* here don't transfer; the cross-modality collapse
+  at day 3 is partly architecture artifact. The pilot RUNS TO TERM (day-8 novelty + revisit
+  recovery are still-missing headline data; pre-registration holds), but **v0.1 is NOT born
+  on the MLP** — it waits for the recurrent CNN PC architecture (other instance), then =
+  that architecture + G4 anchor + this harness (FABRIC_SWAP warm-start). G4 phase-2/3
+  (layerwise Π, k-WTA) also deferred to land natively in that architecture. What transfers
+  regardless: the harness (model-agnostic by design), the G4 design rules (fixed-point
+  consolidation; weight-space > buffer-scaling; gate-satiety failures), and the longitudinal
+  pathology catalogue any successor must beat.
+
 - **2026-07-08** · **G4 COMPLETE — the anchor is how you coax continual learning out of the
   PC learner** ([G4_SPEC.md](G4_SPEC.md), 18 runs / 12 arms / 4 rounds in one day). The CL
   hypothesis was restated honestly (cascade==BP ⇒ the *rule* can't carry CL; the discarded
