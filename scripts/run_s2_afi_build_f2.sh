@@ -31,6 +31,9 @@ set -x
 S3_SRC="${S3SRC}"; S3_RESULTS="${S3RES}"; CLOCK_A="${CLOCK_A}"; CSYNTH_ONLY="${CSYNTH_ONLY:-}"
 CL="cl_forge_pc_xformer_s2"; PKG_REL="tikitorch/hardware/hdk/cl_forge_pc_xformer_s2"
 KERNEL_TCL="${KERNEL_TCL:-synth_pc_xformer_s2_block.tcl}"; KERNEL_PROJ="${KERNEL_PROJ:-forge_pc_xformer_s2_block_proj}"; export S2_K="${S2_K:-}"
+# sweep knobs -> the synth tcl (empty = kernel-header defaults): vocab, the (innocent) aggressive-sched engine
+# gate, the de-pipeline gate, and a csynth clock override (S2_CLK_NS, e.g. 6.667) for sub-250MHz CDC points.
+export S2_VOCAB="${S2_VOCAB:-}"; export S2_AGGRESSIVE_SCHED="${S2_AGGRESSIVE_SCHED:-}"; export S2_DEPIPELINE_REDUCE="${S2_DEPIPELINE_REDUCE:-}"; export S2_CLK_NS="${S2_CLK_NS:-}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-s2afi.log "\$S3_RESULTS/build.log" --only-show-errors || true; }
 trap up EXIT
 ( while true; do sleep 60; up; done ) &

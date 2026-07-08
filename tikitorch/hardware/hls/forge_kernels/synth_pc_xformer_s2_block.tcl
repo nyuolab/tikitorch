@@ -14,12 +14,14 @@ set proj  forge_pc_xformer_s2_block_proj
 set top   forge_pc_xformer_s2_block
 set part  "xcvu47p-fsvh2892-2L-e"
 set period 4.0
+if { [info exists ::env(S2_CLK_NS)] && $::env(S2_CLK_NS) ne "" } { set period $::env(S2_CLK_NS) }   ;# e.g. 6.667 = 150MHz
 # compile-time knobs from env (K sweep + optional tile caps); default D=512 dims from the config header.
+# NOTE: empty env vars are SKIPPED (an exported-but-empty S2_K once produced `-DS2_K=` -> "module not found").
 set kdef 32
-if { [info exists ::env(S2_K)] }       { set kdef $::env(S2_K) }
+if { [info exists ::env(S2_K)] && $::env(S2_K) ne "" }       { set kdef $::env(S2_K) }
 set flags "-I. -DS2_K=$kdef"
-foreach v {S2_TILE_O S2_TILE_I S2_SEQ_TILE S2_D S2_H S2_DH S2_FFN S2_SEQ S2_VOCAB} {
-    if { [info exists ::env($v)] } { append flags " -D$v=$::env($v)" }
+foreach v {S2_TILE_O S2_TILE_I S2_SEQ_TILE S2_D S2_H S2_DH S2_FFN S2_SEQ S2_VOCAB S2_AGGRESSIVE_SCHED S2_DEPIPELINE_REDUCE} {
+    if { [info exists ::env($v)] && $::env($v) ne "" } { append flags " -D$v=$::env($v)" }
 }
 puts "==== s2 csynth flags: $flags ===="
 
