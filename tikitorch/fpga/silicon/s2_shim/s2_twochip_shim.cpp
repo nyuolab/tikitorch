@@ -93,7 +93,9 @@ static void dump_f32_(const char* dir, int chip, const char* name, const float* 
     fprintf(stderr,"[FWD_DUMP] chip %d %-4s -> %s (%ld floats)\n", chip, name, op, n);
 }
 static void dump_fwd_chip(const int32_t* b, const char* dir, int chip, int is_out){
-    static std::vector<float> db((size_t)SEQ*FFN);   // largest fwd tensor is S2_WHD = SEQ*FFN
+    // sized for BOTH SEQ*FFN (HD) and SEQ*VOCAB (LG) — at S2_VOCAB=8192 the old SEQ*FFN sizing
+    // overflowed on the LG dump (heap smash / bus error)
+    static std::vector<float> db((size_t)SEQ*FFN > (size_t)SEQ*VOCAB ? (size_t)SEQ*FFN : (size_t)SEQ*VOCAB);
     get_f(b,S2_WR,   db.data(),(long)SEQ*D);  dump_f32_(dir,chip,"R",   db.data(),(long)SEQ*D);
     get_f(b,S2_WX1,  db.data(),(long)SEQ*D);  dump_f32_(dir,chip,"X1",  db.data(),(long)SEQ*D);
     get_f(b,S2_WQ,   db.data(),(long)SEQ*D);  dump_f32_(dir,chip,"Q",   db.data(),(long)SEQ*D);

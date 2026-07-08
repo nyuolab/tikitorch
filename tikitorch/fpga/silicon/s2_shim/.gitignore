@@ -2,3 +2,6 @@ data/
 out/
 build/
 fwd_*/
+data_v8k/
+fwd_ref_*/
+out_*/

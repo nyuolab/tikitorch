@@ -168,9 +168,18 @@ static void dump_f32(const char* dir, int chip, const char* name, const float* x
     fwrite(x,sizeof(float),(size_t)n,f); fclose(f);
     fprintf(stderr,"[FWD_DUMP] chip %d %-4s -> %s (%ld floats)\n", chip, name, op, n);
 }
+// Largest tensor any host-side diagnostic reads: SEQ*FFN (HD), SEQ*VOCAB (LG), or VOCAB*D (FEMB probe).
+// MUST cover all three — at S2_VOCAB=8192 the old S2_SEQ*S2_FFN sizing overflowed on the LG/FEMB reads
+// (16 MB read into a 2 MB static = host bus error / silent BSS corruption).
+static const size_t S2_HOSTBUF =
+    ((size_t)S2_SEQ*S2_FFN   > (size_t)S2_SEQ*S2_VOCAB ? (size_t)S2_SEQ*S2_FFN : (size_t)S2_SEQ*S2_VOCAB) >
+     (size_t)S2_VOCAB*S2_D ?
+    ((size_t)S2_SEQ*S2_FFN   > (size_t)S2_SEQ*S2_VOCAB ? (size_t)S2_SEQ*S2_FFN : (size_t)S2_SEQ*S2_VOCAB) :
+     (size_t)S2_VOCAB*S2_D;
+
 // dump one chip's forward wide-cache. `is_out` also emits XF + LG (only the OUTPUT chip writes them).
 static void fwd_dump_chip(int l, const char* dir, int is_out){
-    static float db[S2_SEQ*S2_FFN];   // largest forward tensor is S2_WHD = SEQ*FFN
+    static float db[S2_HOSTBUF];
     readf(l,S2_WR,   db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"R",   db,(long)S2_SEQ*S2_D);
     readf(l,S2_WX1,  db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"X1",  db,(long)S2_SEQ*S2_D);
     readf(l,S2_WQ,   db,(long)S2_SEQ*S2_D);  dump_f32(dir,l,"Q",   db,(long)S2_SEQ*S2_D);
@@ -497,7 +506,7 @@ int main(int argc,char**argv){
             // S2_DIAG: read the forward-chain maxabs RIGHT AFTER the forward sweep (before the backward can
             // clobber WR/GROUT), on the first sub-batch of step 0 — the unambiguous forward-bug localizer.
             if(getenv("S2_DIAG") && step==0 && k==0){
-                static float db[S2_SEQ*S2_FFN];
+                static float db[S2_HOSTBUF];   // sized for the FEMB (VOCAB*D) + WLG (SEQ*VOCAB) probes
                 auto mx=[&](int l,long off,long n){ readf(l,off,db,n); double m=0; for(long j=0;j<n;j++){double a=fabs(db[j]);if(a>m)m=a;} return m; };
                 static int32_t tk[S2_SEQ]; readw(0,S2_TOK,tk,S2_SEQ); int tmn=1<<30,tmx=-1; for(int t=0;t<S2_SEQ;t++){if(tk[t]<tmn)tmn=tk[t];if(tk[t]>tmx)tmx=tk[t];}
                 fprintf(stderr,"[S2_DIAG-FWD] chip0 role=%d: TOK[%d..%d] FEMB=%.3e FPOS=%.3e WR=%.3e WX1=%.3e WRP=%.3e GROUT=%.3e\n",
@@ -700,7 +709,7 @@ int main(int argc,char**argv){
         long metric_po = pipe_on() ? slot_po((ACCUM-1)%S2_SLOTS) : 0;
         // S2_DIAG: at step 0, trace the forward chain maxabs to localize the all-zero-logit bug (relay/block/LNF/head).
         if(getenv("S2_DIAG") && step==0){
-            static float dbuf[S2_SEQ*S2_FFN]; long po0 = pipe_on()?slot_po((ACCUM-1)%S2_SLOTS):0;
+            static float dbuf[S2_HOSTBUF]; long po0 = pipe_on()?slot_po((ACCUM-1)%S2_SLOTS):0;   // FEMB/WLG probes are VOCAB-sized
             auto mx=[&](int l,int off,long n){ readf(l,off+po0,dbuf,n); double m=0; for(long j=0;j<n;j++){double a=fabs(dbuf[j]); if(a>m)m=a;} return m; };
             // chip0 tokens (int) + INPUT forward chain: FEMB, FPOS, WR(embed), WX1(LN1), WRP(block), GROUT
             static int32_t tk[S2_SEQ]; readw(0,S2_TOK,tk,S2_SEQ); int tmin=1<<30,tmax=-1; for(int t=0;t<S2_SEQ;t++){ if(tk[t]<tmin)tmin=tk[t]; if(tk[t]>tmax)tmax=tk[t]; }
