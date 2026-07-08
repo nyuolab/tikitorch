@@ -17,6 +17,11 @@ import tempfile
 import numpy as np
 import pytest
 
+# Builds + ctypes-loads a native HLS kernel in-process: a kernel bug can segfault the
+# whole pytest run, and the kernel math is already gated by the dedicated `csim` CI job.
+# So this is deselected from the default `pytest -q` (run explicitly with `-m kernel`).
+pytestmark = pytest.mark.kernel
+
 HLS = os.path.join(os.path.dirname(__file__), "..", "tikitorch", "hardware", "hls")
 KERNELS = os.path.join(HLS, "forge_kernels")
 

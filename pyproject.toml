@@ -109,7 +109,8 @@ testpaths = ["tests"]
 # and are inherently stochastic, so they are DESELECTED by default: plain `pytest`
 # and CI run the fast building-block suite (closure, exactness, gradchecks). Run
 # the training tests on demand with `pytest -m slow`.
-addopts = ["-m", "not slow"]
+addopts = ["-m", "not slow and not kernel"]
 markers = [
     "slow: end-to-end training test (research/learning claim); deselected by default, run with `-m slow`",
+    "kernel: builds + ctypes-loads a native HLS kernel in-process (can segfault the run; the kernel math is covered by the `csim` CI job). Deselected by default, run with `-m kernel`",
 ]
