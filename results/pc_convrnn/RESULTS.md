@@ -95,15 +95,73 @@ monotone ratchet (carry-frac → 1, no forgetting); λ > 0 ⇒ bounded and respo
   pre-registered expectation that content-addressed recall is where the
   running-max state struggles.
 
-## G3 — TinyShakespeare bakeoff: pending [running]
+## G3 — TinyShakespeare bakeoff: PASS on every pre-registered criterion [measured]
 
-Interim [measured]: `morphssm:bp` twin finals 1.9352 / 1.8993 / 1.9445 (mean
-1.926 ± 0.024) — reproduces the published 1.934 ± 0.035 in the new harness
-(protocol faithful). First `morphssm:cascade` at the erroneous lr/3 default
-landed 2.0108 (+0.076 vs twin); G0's identical-gradients result means the
-dyadic-era "PC lr = lr/3" rule does not apply to exact-mode cascade — matched-lr
-(1e-2) cascade twins are queued as the pre-registered comparison. The lr/3 rows
-are retained in the jsonl as data, not twin evidence.
+Exact bakeoff protocol (1500 steps, B24, T96, char-65, fixed val windows,
+τ-anneal, mps, hard==soft at final eval in every arm). All runs local (mps);
+jsonl per arm in this directory; checkpoints in `ckpts/` (untracked).
+
+**Arm 0 — parity:** original `nanogpt_shakespeare.py` (canonical-repo
+PYTHONPATH; the bare run imports the stale kanervasforge submodule copy — trap
+recorded) seed 0 @ lr 1e-2 → **1.9445**, inside the published 1.934±0.05. PASS.
+
+**The credit claim (cascade vs bp twin, matched lr 1e-2):**
+
+| seed | morphssm:bp | morphssm:cascade | gap |
+|---|---|---|---|
+| 0 | 1.9352 | 1.9352 | +0.000 |
+| 1 | 1.8993 | 1.9128 | +0.014 |
+| 2 | 1.9445 | 1.9376 | −0.007 |
+
+Mean gap **+0.002 ± 0.011** (bar ≤ 0.05): **PASS**. Cascade PC trains the real
+MorphSSM to backprop-twin quality at backprop wall-clock (454 vs 640 ms/step
+mps; ~4.5–4.8k tok/s both arms). conv-RNN matched-lr twin, seed 0: 1.9271 vs
+bp 1.9271 (gap +0.000); seeds 1–2 intentionally not run — conclusion already
+made, remaining compute moved to EC2 (user decision 2026-07-08). Trajectories
+are NOT bit-identical (fp reduction order differs between autograd kernels and
+the scatter sweep; they agree to ~1e-6 at step 0 and stay within seed-noise) —
+"twin" is a statistical claim; the *gradient* identity is G0's bitwise claim.
+NOTE: the earlier lr/3 cascade rows (mean 1.998) are retained as data; the
+dyadic-era "PC lr = lr/3" rule does NOT apply to exact-mode cascade (G0:
+identical gradients ⇒ matched lr is the correct twin protocol).
+
+**Async fabric probe (n=1 pre-registered):** `morphssm:relax_async`
+(participation 0.5, stale, random order, n_iter=21) → **2.0301** vs its lr/3
+cascade sibling 2.0108: gap **+0.019** (bar ≤ 0.15): **PASS**. Wall cost
+honestly 3.3× (3010 s vs ~910 s).
+
+**Recurrence long-range payoff (pre-registered metric):** train T=96, eval
+hard CE at T=1024 (mean over 3 seeds, degradation vs own T=96):
+
+| arm | T=96 | T=1024 | degradation |
+|---|---|---|---|
+| convrnn:bp | 1.917 | 1.949 | **+0.032** |
+| morphssm:bp | 1.926 | 2.017 | +0.091 |
+| convrnn-norecur:bp | 1.936 | 2.032 | +0.096 |
+
+The recurrent arm degrades ~⅓ of its paired conv-only control (bar ≤ ½):
+**PASS**. Learned λ medians ≈ 0.40–0.49 (recurrence active, not self-disabled).
+
+**Seq-96 headline (pre-registered null):** convrnn 1.917 ≤ morphssm 1.926 ≤
+norecur 1.936 — ordered in the recurrence's favor but within seed spread;
+reported as parity, exactly as pre-registered. No "beats MorphSSM" claim.
+
+## Next steps (EC2 — user decision 2026-07-08: no further local runs)
+
+Compute template: `scripts/run_connect4_prior_sweep_ec2.sh` pattern (IAM
+instance-profile, S3 state, no-SSH polling). All remaining batches are CPU-
+parallel at 0.5M params. Order:
+1. **G6 generative inference (the program north star)** — implement
+   `MorphPCEngine.infer()` + G6a no-op control locally (cheap, CPU), then the
+   G6b infilling / G6c denoising battery on EC2 against the saved G3 ckpts.
+2. **G2b fallback ladder** — selective copy at 10–20k steps × lr probe ×
+   {learned λ, pow2 λ, erosion twin} × 3 seeds (the 95% bar question; G2b
+   showed findability, not retention, is the constraint).
+3. **G4 depth ladder** — d=128, L ∈ {4,8,16,32} × {bp, cascade} × 3 seeds
+   (+async ×1): the settling-free-depth figure.
+4. **G5 strict rung** — PureTropicalSGD + tropical_ce_lut annealed vs MorphSSM
+   strict; hard-from-scratch cascade receipt; `find_training_multiplies`
+   zero-multiply-backward flag-plant.
 
 Wall-clock note [measured]: at the full bakeoff config (d=256, L=7, B=24, T=96)
 the cascade step is at parity with autograd BP — mps 454 vs 640 ms/step
