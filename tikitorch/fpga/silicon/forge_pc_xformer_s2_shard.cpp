@@ -722,6 +722,15 @@ int main(int argc,char**argv){
                 ({ readf(L-1,S2_FWHEAD,dbuf,(long)S2_SEQ*S2_D); double m=0; for(long j=0;j<(long)S2_SEQ*S2_D;j++){double a=fabs(dbuf[j]);if(a>m)m=a;} m; }));
             fflush(stderr);
         }
+        // HOST-TAIL DE-BLOAT: the per-step bpb/acc metric reads the OUTPUT chip's WIDE logits (SEQ*VOCAB =
+        // 2.1M f32 = 8.4MB at VOCAB=8192) — a serialized ~8-9s host tail OUTSIDE the kick pipeline. Compute it
+        // only every METRIC_EVERY steps (default 25; always on step 0, the last step, and checkpoint steps).
+        // Weights are untouched -> bit-exact training; only the logged bpb/acc cadence changes.
+        static int METRIC_EVERY = getenv("METRIC_EVERY") ? atoi(getenv("METRIC_EVERY")) : 25;
+        static int CKPT_EVERY0  = getenv("CKPT_EVERY")   ? atoi(getenv("CKPT_EVERY"))   : 0;
+        bool do_metric = (METRIC_EVERY<=1) || step==step0 || step==steps-1 || (step%METRIC_EVERY==0)
+                         || (CKPT_EVERY0>0 && step>0 && step%CKPT_EVERY0==0);
+        if(do_metric){
         readf(L-1, S2_WLG + metric_po, wlg, (long)S2_SEQ*S2_VOCAB);
         actstat("logits", L-1, step, wlg, (long)S2_SEQ*S2_VOCAB);
         { int c=0; double bits=0; const double L2=log(2.0);
@@ -751,6 +760,7 @@ int main(int argc,char**argv){
               printf("[ckpt] step %d -> %s/ckpt_master*.f32\n", step, DUMP_DIR); fflush(stdout);
           }
         }
+        } // if(do_metric)
     }
 
     double wall=now_s()-t0;

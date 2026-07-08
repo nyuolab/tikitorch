@@ -384,6 +384,31 @@ static inline float s2_treeK(const float *a, const float *b) {
 }
 
 // ------------------------------------------------------------------------------------------------------
+// s2_dotDH — Σ_{d<S2_DH} a[d]*b[d] as a SINGLE combinational DH-wide MAC (DH parallel mults + balanced adder
+// tree). Attention is the one allowed-multiply front, so DH=64 mults/cycle here is fine. Purpose: let the
+// caller's OUTER (j) loop pipeline at II=1 instead of re-entering an inner reduction pipeline O(N) times.
+// The tree association differs from the old 8-way s2_lanesum fold → within-1-ULP (attention stages only).
+// FWD score-dot and BWD PRAW score-dot both route through this helper, so PRAW reproduces the fwd softmax
+// row BIT-IDENTICALLY (required).
+static_assert((S2_DH & (S2_DH-1)) == 0, "S2_DH must be a power of two (s2_dotDH balanced adder tree)");
+static inline float s2_dotDH(const float *a, const float *b) {
+#pragma HLS INLINE
+    float p[S2_DH];
+#pragma HLS ARRAY_PARTITION variable=p complete dim=1
+    for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+        p[d] = a[d] * b[d];                        // DH parallel mult (attention: allowed-multiply front)
+    }
+    for (int s = 1; s < S2_DH; s <<= 1) {          // balanced pairwise tree
+        for (int d = 0; d < S2_DH; d += (s << 1)) {
+#pragma HLS UNROLL
+            p[d] = p[d] + p[d + s];
+        }
+    }
+    return p[0];
+}
+
+// ------------------------------------------------------------------------------------------------------
 // _S2_MAC_ITILE_BASE — the per-i-tile MAC over (r,c), shared by both engines (they differ only in the B
 // operand base/stride: conservative Btile[c*tile_i+kb], aggressive Bcache[c*KC + i0 + kb]).
 //   YACC   = the output accumulator array (y), accessed [r*TILE_O + c]
@@ -713,22 +738,21 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
         }
         for (int i = 0; i < S2_SEQ; i++) {
             float sc[S2_SEQ], pr[S2_SEQ], mx = -1e30f;
-            for (int j = 0; j <= i; j++) {
 #if S2_DEPIPELINE_REDUCE
+            for (int j = 0; j <= i; j++) {
                 float dot = 0.0f;                                        // DE-PIPELINE: sequential score-dot, II>1
                 for (int d = 0; d < S2_DH; d++) dot += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
-#else
-                float lane[S2_LANES];                                    // FIX B: laned score-dot (was II=2)
-#pragma HLS ARRAY_PARTITION variable=lane complete dim=1
-                for (int l = 0; l < S2_LANES; l++) lane[l] = 0;
-                for (int d = 0; d < S2_DH; d++) {
-#pragma HLS PIPELINE II=1
-                    lane[d & (S2_LANES-1)] += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
-                }
-                float dot = s2_lanesum(lane);
-#endif
                 sc[j] = dot * scale; if (sc[j] > mx) mx = sc[j];
             }
+#else
+            // FIX: outer-j pipelines at II=1; the DH reduction is one combinational DH-wide MAC (s2_dotDH).
+            // mx stays a cheap loop-carried max.
+            for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+                float dot = s2_dotDH(&s2_Qh[i*S2_DH], &s2_Kh[j*S2_DH]);
+                sc[j] = dot * scale; if (sc[j] > mx) mx = sc[j];
+            }
+#endif
 #if S2_DEPIPELINE_REDUCE
             float esum = 0.0f;                                           // DE-PIPELINE: sequential exp-sum, II>1
             for (int j = 0; j <= i; j++) { float e = hls::exp(sc[j]-mx); pr[j] = e; esum += e; }
@@ -744,22 +768,36 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
             float sum = s2_lanesum(slane);
 #endif
             for (int j = 0; j <= i; j++) pr[j] /= sum;
-            for (int d = 0; d < S2_DH; d++) {
 #if S2_DEPIPELINE_REDUCE
+            for (int d = 0; d < S2_DH; d++) {
                 float blend = 0.0f;                                      // DE-PIPELINE: sequential P@V blend, II>1
                 for (int j = 0; j <= i; j++) blend += pr[j] * s2_Vh[j*S2_DH+d];
                 s2_Ah[i*S2_DH+d] = blend;
-#else
-                float blane[S2_LANES];                                   // FIX B: laned P@V blend (was II=7)
-#pragma HLS ARRAY_PARTITION variable=blane complete dim=1
-                for (int l = 0; l < S2_LANES; l++) blane[l] = 0;
-                for (int j = 0; j <= i; j++) {
-#pragma HLS PIPELINE II=1
-                    blane[j & (S2_LANES-1)] += pr[j] * s2_Vh[j*S2_DH+d];
-                }
-                s2_Ah[i*S2_DH+d] = s2_lanesum(blane);
-#endif
             }
+#else
+            // FIX: ONE j-loop with S2_DH independent accumulators (disjoint per d → no cross-lane hazard).
+            // The per-(i,d) sum is now ascending-j sequential (was the 8-way lane fold) → within-1-ULP.
+            // acc[d] is an fp-add recurrence: do NOT force II=1 (let the tool pick II=fadd-latency); the win
+            // is collapsing the DH pipeline RE-ENTRIES into a single j-loop.
+            {
+                static float acc[S2_DH];
+#pragma HLS ARRAY_PARTITION variable=acc complete dim=1
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                    acc[d] = 0;
+                }
+                for (int j = 0; j <= i; j++) {
+                    for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                        acc[d] += pr[j] * s2_Vh[j*S2_DH+d];
+                    }
+                }
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                    s2_Ah[i*S2_DH+d] = acc[d];
+                }
+            }
+#endif
         }
         for (int t = 0; t < S2_SEQ; t++) bstore_f(buffer, wattn_off + t*S2_D + h*S2_DH, s2_Ah + t*S2_DH, S2_DH);
     }
@@ -780,22 +818,20 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
         for (int i = 0; i < S2_SEQ; i++) {
             // ---- PRAW RECOMPUTE: rebuild this (h,i) softmax row from cached Q,K (SAME laned order as fwd) ----
             float p[S2_SEQ], mx = -1e30f;
-            for (int j = 0; j <= i; j++) {
 #if S2_DEPIPELINE_REDUCE
+            for (int j = 0; j <= i; j++) {
                 float dot = 0.0f;                                        // DE-PIPELINE: sequential score-dot, II>1
                 for (int d = 0; d < S2_DH; d++) dot += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
                 p[j] = dot * ascale; if (p[j] > mx) mx = p[j];
-#else
-                float lane[S2_LANES];                                    // FIX B: laned score-dot
-#pragma HLS ARRAY_PARTITION variable=lane complete dim=1
-                for (int l = 0; l < S2_LANES; l++) lane[l] = 0;
-                for (int d = 0; d < S2_DH; d++) {
-#pragma HLS PIPELINE II=1
-                    lane[d & (S2_LANES-1)] += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
-                }
-                p[j] = s2_lanesum(lane) * ascale; if (p[j] > mx) mx = p[j];
-#endif
             }
+#else
+            // FIX: SAME s2_dotDH helper as FWD → PRAW reproduces the fwd softmax row bit-identically. II=1 outer-j.
+            for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+                float dot = s2_dotDH(&s2_Qh[i*S2_DH], &s2_Kh[j*S2_DH]);
+                p[j] = dot * ascale; if (p[j] > mx) mx = p[j];
+            }
+#endif
 #if S2_DEPIPELINE_REDUCE
             float sum = 0.0f;                                            // DE-PIPELINE: sequential exp-sum, II>1
             for (int j = 0; j <= i; j++) { float e = hls::exp(p[j]-mx); p[j] = e; sum += e; }
@@ -812,23 +848,26 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
             for (int j = 0; j <= i; j++) p[j] /= sum;
             // ---- attention backward on the recomputed probs (== mp ABWD / twin scalar) ----
             float gp[S2_SEQ];
-            for (int j = 0; j <= i; j++) {
 #if S2_DEPIPELINE_REDUCE
+            for (int j = 0; j <= i; j++) {
                 float gpv = 0.0f;                                        // DE-PIPELINE: sequential gp=<gATTN_i,V_j>, II>1
                 for (int d = 0; d < S2_DH; d++) gpv += s2_Ah[i*S2_DH+d] * s2_Vh[j*S2_DH+d];
                 gp[j] = gpv;
-#else
-                float glane[S2_LANES];                                   // FIX B: laned gp = <gATTN_i, V_j>
-#pragma HLS ARRAY_PARTITION variable=glane complete dim=1
-                for (int l = 0; l < S2_LANES; l++) glane[l] = 0;
-                for (int d = 0; d < S2_DH; d++) {
-#pragma HLS PIPELINE II=1
-                    glane[d & (S2_LANES-1)] += s2_Ah[i*S2_DH+d] * s2_Vh[j*S2_DH+d];
-                }
-                gp[j] = s2_lanesum(glane);
-#endif
                 for (int d = 0; d < S2_DH; d++) s2_Dh[j*S2_DH+d] += P(p[j] * s2_Ah[i*S2_DH+d]);   // gV: i-reduction, order kept
             }
+#else
+            // FIX: gp = <gATTN_i, V_j> via combinational DH-wide MAC → outer-j pipelines at II=1.
+            // gV (s2_Dh) still accumulates per-(j,d) here; its reduction is over the OUTER i, so writing
+            // distinct (j,d) cells each iteration preserves that i-order (unrolled d, no cross-hazard).
+            for (int j = 0; j <= i; j++) {
+#pragma HLS PIPELINE II=1
+                gp[j] = s2_dotDH(&s2_Ah[i*S2_DH], &s2_Vh[j*S2_DH]);
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                    s2_Dh[j*S2_DH+d] += P(p[j] * s2_Ah[i*S2_DH+d]);      // gV: i-reduction, order kept
+                }
+            }
+#endif
 #if S2_DEPIPELINE_REDUCE
             float ex = 0.0f;                                             // DE-PIPELINE: sequential ex=sum_j p*gp, II>1
             for (int j = 0; j <= i; j++) ex += p[j]*gp[j];
@@ -847,22 +886,36 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
             for (int j = 0; j <= i; j++) gsv[j] = P(p[j]*(gp[j]-ex)) * ascale;
             for (int j = 0; j <= i; j++)                                 // gK: Ch[j] accumulates over i (outer) -> order kept
                 for (int d = 0; d < S2_DH; d++) s2_Ch[j*S2_DH+d] += gsv[j]*s2_Qh[i*S2_DH+d];
-            for (int d = 0; d < S2_DH; d++) {
 #if S2_DEPIPELINE_REDUCE
+            for (int d = 0; d < S2_DH; d++) {
                 float qacc = 0.0f;                                       // DE-PIPELINE: sequential gQ blend over j, II>1
                 for (int j = 0; j <= i; j++) qacc += gsv[j]*s2_Kh[j*S2_DH+d];
                 s2_Bh[i*S2_DH+d] += qacc;
-#else
-                float qlane[S2_LANES];                                   // FIX B: gQ (Bh) laned over j (was II=2)
-#pragma HLS ARRAY_PARTITION variable=qlane complete dim=1
-                for (int l = 0; l < S2_LANES; l++) qlane[l] = 0;
-                for (int j = 0; j <= i; j++) {
-#pragma HLS PIPELINE II=1
-                    qlane[j & (S2_LANES-1)] += gsv[j]*s2_Kh[j*S2_DH+d];
-                }
-                s2_Bh[i*S2_DH+d] += s2_lanesum(qlane);
-#endif
             }
+#else
+            // FIX: DH-parallel accumulate like FWD P@V — ONE j-loop, S2_DH independent accumulators (disjoint
+            // per d → no cross-lane hazard). Per-(i,d) sum is ascending-j sequential (was the 8-way lane fold)
+            // → within-1-ULP. acc[d] is an fp-add recurrence: don't force II=1 (tool picks II=fadd-latency);
+            // the win is collapsing the DH pipeline RE-ENTRIES into a single j-loop.
+            {
+                static float acc[S2_DH];
+#pragma HLS ARRAY_PARTITION variable=acc complete dim=1
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                    acc[d] = 0;
+                }
+                for (int j = 0; j <= i; j++) {
+                    for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                        acc[d] += gsv[j]*s2_Kh[j*S2_DH+d];
+                    }
+                }
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                    s2_Bh[i*S2_DH+d] += acc[d];
+                }
+            }
+#endif
         }
         // heads write disjoint columns of gQ/gK/gV → the per-element accumulation is complete within this head,
         // so the final P() (== resident version's post-loop P) can be applied on the head-slice write.
