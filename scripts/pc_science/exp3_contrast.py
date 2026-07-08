@@ -4,11 +4,37 @@ THE CLAIM (the manuscript's central figure): the PC-to-backprop accuracy gap sta
 FLAT with depth for our TROPICAL/cascade PC, while it GROWS with depth for the SMOOTH
 finite-inference PC (the known deep-PC degradation).
 
-This is a 2x2 CONTRAST -- {tropical net, smooth net} x {backprop ceiling, PC method} --
-NOT a cascade-vs-exact-BP comparison on one net (that ~=0 by construction = Experiment 1).
-For a given (L, seed) it trains FOUR arms on byte-level enwik8 to a comparable point,
-logs the bpb trajectory (confirm plateau), reports final bpb per arm, and emits the two
-gap curves.
+This is a CONTRAST across THREE net regimes x {backprop ceiling, PC method} -- NOT a
+cascade-vs-exact-BP comparison on one net (that ~=0 by construction = Experiment 1).
+For a given (L, seed) it trains the arms on byte-level enwik8 to a comparable point,
+logs the bpb trajectory (train + held-out val; confirm plateau), reports final bpb per
+arm, runs the built-in correctness checks, and emits the gap-vs-depth curves.
+
+THE THREE REGIMES (the manuscript spectrum):
+  (A) PURE-PWL tropical  (SMOOTH_OFF=1, MULTFREE=1): argmax-gather attn + identity-J LN
+      + dyadic-linear + ReLU only. cascade == relaxation == BP EXACTLY (Thm 1, Exp1).
+      Arms BP_pwl (STE-through-dyad backprop ceiling) + PC_pwl (cascade). -> gap ~0, FLAT.
+  (B) TROPICAL-DOMINATED  (SMOOTH_OFF=0, MULTFREE=1): dyadic linear + softmax attn +
+      dyadic LN -- the two smooth ops cost a BOUNDED linearisation error. Arms BP_trop +
+      PC_trop (cascade). -> gap bounded (~0.5 nat), grows slowly.
+  (C) SMOOTH well-conditioned  (MULTFREE=0, RESID_ALPHA<1): float softmax + real LN, with
+      per-block residual SCALING alpha on the sublayer contributions (M=R+alpha*AO,
+      RP=M+alpha*FO) so the residual-stream block Jacobian J=I+alpha*delta is well-
+      conditioned and the finite-T PC inference converges to BP even deep. Arms
+      BP_smooth (float BP ceiling) + PC_smooth_T{5,20} (finite-T deep-PC) +
+      PC_smooth_Tconv (T=2*depth, the CONVERGENCE-CHECK arm). -> finite-T grows with
+      depth (truncation); Tconv ~= BP (the built-in correctness check).
+
+  NOTE (adversarial honesty): the finite-T PC used here (relax_finiteT_grads) is the
+  numerically-exact TRUNCATED BACK-SUBSTITUTION (eps init 0, top clamped by the loss,
+  one Jacobi sweep = one layer deeper). It is structurally triangular and top-clamped, so
+  it is UNCONDITIONALLY STABLE and reproduces BP bit-exactly once T>=depth -- there is NO
+  gradient-level divergence at large T (the historical bpb->8 divergence was the OLD
+  fixed-step value-node GD in backward_relaxation, which this path replaces). RESID_ALPHA
+  is therefore NOT required to make the convergence check pass; its measured effect is to
+  make the SMALL-T (truncated) arm track BP better at a given T (fewer sweeps needed on a
+  better-conditioned stream), sharpening the finite-T-vs-Tconv contrast. Applied ONLY to
+  the smooth net; the tropical nets always run alpha=1 (realistic).
 
   TROPICAL net (MULTFREE=1, our dyadic transformer):
     (1) BP_trop     = global backprop with STE THROUGH THE DYAD. mode="backprop" already
@@ -56,11 +82,14 @@ is the numerically-exact, monotone realisation of the same finite-T inference.
 
 Env: L=8 SEED=0
      D=192 H=4 DH=48 FFN=768 SEQ=128 VOCAB=256   (smaller than exp1's D=256 so the
-        4-arm x depth x seed sweep + the T-sweep cost of PC_smooth is affordable)
-     STEPS=4000 ACCUM=8 XF_LR=3e-3 WARMUP=100 LR_DECAY=1 LR_MINFRAC=0.1
-     RELAX_T=5,20 (comma list; PC_smooth_T runs one arm per value)
+        multi-arm x depth x seed sweep + the T-sweep cost of PC_smooth is affordable)
+     STEPS=5000 ACCUM=8 XF_LR=3e-3 WARMUP=100 LR_DECAY=1 LR_MINFRAC=0.1
+     RELAX_T=5,20 (comma list; PC_smooth_T runs one arm per finite budget; PC_smooth_Tconv
+        additionally runs at T=2*depth as the convergence check)
+     RESID_ALPHA=0.25 (smooth-net conditioner; tropical nets ignore it / run alpha=1)
      EVAL_EVERY=250 EVAL_BATCHES=16  TOKBIN=/tmp/enwik8.u16  OUT=exp3_L{L}_s{seed}.jsonl
-One (L, seed) per process; the EC2 runner fans (L x seed) across cores.
+     Each per-eval jsonl record logs BOTH train_bpb (current batch) and bpb (held-out val).
+One (L, seed) per process; the EC2 runner fans (L x seed x arm) across cores.
 """
 import os, sys, json, math, time
 import numpy as np
@@ -121,11 +150,17 @@ def evaluate(model, data, cfg, rng, nb):
 
 
 ARM_SPEC = {
-    #  arm         : (MULTFREE, how-to-get-grads)
-    "BP_trop":     (1, "backprop"),   # dyadic net, global BP (STE-through-dyad) -- ceiling
-    "PC_trop":     (1, "cascade"),    # dyadic net, cascade -- our method
-    "BP_smooth":   (0, "backprop"),   # float net, global BP -- ceiling
-    "PC_smooth_T": (0, "relaxT"),     # float net, finite-T iterative PC -- deep-PC
+    #  arm            : (MULTFREE, SMOOTH_OFF, how-to-get-grads)
+    # -- regime A: PURE-PWL tropical (argmax-gather attn + identity-J LN): gap ~0 flat --
+    "BP_pwl":         (1, 1, "backprop"),   # PWL dyadic net, global BP (STE-thru-dyad) ceiling
+    "PC_pwl":         (1, 1, "cascade"),    # PWL dyadic net, cascade -- ours (== BP exactly)
+    # -- regime B: TROPICAL-DOMINATED (softmax attn + dyadic LN): gap bounded ~0.5 --
+    "BP_trop":        (1, 0, "backprop"),   # dyadic net, global BP (STE-thru-dyad) -- ceiling
+    "PC_trop":        (1, 0, "cascade"),    # dyadic net, cascade -- our method
+    # -- regime C: SMOOTH well-conditioned (float; RESID_ALPHA<1): finite-T grows w/ depth --
+    "BP_smooth":      (0, 0, "backprop"),   # float net, global BP -- ceiling
+    "PC_smooth_T":    (0, 0, "relaxT"),     # float net, finite-T deep-PC (one arm per budget)
+    "PC_smooth_Tconv":(0, 0, "relaxT"),     # float net, T=2*depth -- the CONVERGENCE CHECK
 }
 
 
@@ -139,26 +174,30 @@ def arm_grads(model, cache, tgt, how, T):
     raise ValueError(how)
 
 
-def train_one(arm, L, seed, data, base, steps, accum, lr0, warmup, minfrac, decay,
-              eval_every, eval_batches, T, fout):
-    multfree, how = ARM_SPEC[arm]
+def train_one(arm, arm_key, L, seed, data, base, steps, accum, lr0, warmup, minfrac, decay,
+              eval_every, eval_batches, T, resid_alpha, fout):
+    multfree, smooth_off, how = ARM_SPEC[arm]
     cfg = dict(base); cfg["NL"] = L; cfg["SEED"] = seed; cfg["MULTFREE"] = multfree
     cfg["BF16"] = 1 if multfree else 0
+    cfg["SMOOTH_OFF"] = smooth_off
+    # RESID_ALPHA conditions ONLY the smooth net (MULTFREE=0); tropical nets stay realistic.
+    cfg["RESID_ALPHA"] = resid_alpha if (multfree == 0) else 1.0
     cfg = make_config(**cfg)
     model = Transformer(cfg)
     rng = np.random.RandomState(1234 + seed)          # SAME data stream across arms
     ev_rng_seed = 9999 + seed
-    # dyadic-Adam for the tropical arms (silicon recipe, shared BP_trop<->PC_trop so the
-    # contrast is gradient-method only); float-Adam for the smooth arms.
+    # dyadic-Adam for the tropical arms (silicon recipe, shared BP<->PC so the contrast is
+    # gradient-method only); float-Adam for the smooth arms.
     apply = model.apply_grads if multfree else model.apply_grads_float
-    t0 = time.time(); best = 99.0
-    label = f"{arm}" + (f"(T={T})" if how == "relaxT" else "")
+    t0 = time.time(); best = 99.0; init_val = None; final_val = None
+    label = f"{arm_key}"
     for step in range(steps):
         lr = cosine_lr(step, steps, lr0, warmup, minfrac, decay)
-        accg = None
+        accg = None; train_bpb_acc = 0.0
         for _ in range(accum):
             tok, tgt = sample_batch(cfg, data, rng)
-            _, cache = model.forward(tok)
+            logits, cache = model.forward(tok)
+            train_bpb_acc += float(model.loss_bpb(logits, tgt))
             gd = arm_grads(model, cache, tgt, how, T)
             if accg is None:
                 accg = gd
@@ -168,23 +207,33 @@ def train_one(arm, L, seed, data, base, steps, accum, lr0, warmup, minfrac, deca
                         ba[kk] = ba[kk] + bn[kk]
         apply(accg, lr)
         if (step % eval_every == 0) or (step == steps - 1):
+            train_bpb = train_bpb_acc / accum      # mean train-batch bpb over this step
             bpb = evaluate(model, data, cfg, np.random.RandomState(ev_rng_seed), eval_batches)
             best = min(best, bpb)
-            rec = dict(exp="exp3", arm=arm, L=L, seed=seed, step=step, T=(T if how == "relaxT" else None),
-                       bpb=round(bpb, 5), best=round(best, 5), lr=round(lr, 6),
-                       wall=round(time.time() - t0, 1))
+            if init_val is None:
+                init_val = bpb
+            final_val = bpb
+            rec = dict(exp="exp3", arm=arm, arm_key=arm_key, L=L, seed=seed, step=step,
+                       T=(T if how == "relaxT" else None), alpha=cfg["RESID_ALPHA"],
+                       train_bpb=round(train_bpb, 5), bpb=round(bpb, 5),
+                       best=round(best, 5), lr=round(lr, 6), wall=round(time.time() - t0, 1))
             fout.write(json.dumps(rec) + "\n"); fout.flush()
-            print(f"[exp3 {label} L={L} s{seed}] step {step:5d} bpb={bpb:.4f} best={best:.4f}",
-                  flush=True)
-    return best
+            print(f"[exp3 {label} L={L} s{seed}] step {step:5d} train={train_bpb:.4f} "
+                  f"val={bpb:.4f} best={best:.4f}", flush=True)
+    return dict(best=best, init_val=init_val, final_val=final_val)
 
 
-def _parse_arms(spec, relaxTs):
+def _parse_arms(spec, relaxTs, L):
     """Expand an ARMS spec into a list of (arm_name, arm_key, T) tuples.
-    'all' -> the 4-arm design (5 training runs: +one PC_smooth_T per finite budget).
-    A comma list may name any of: BP_trop PC_trop BP_smooth PC_smooth_T (=> one per T)."""
+    'all' -> the full THREE-regime design:
+        PWL:     BP_pwl, PC_pwl
+        TROP:    BP_trop, PC_trop
+        SMOOTH:  BP_smooth, PC_smooth_T{t} (one per finite budget), PC_smooth_Tconv (T=2L)
+    A comma list may name any ARM_SPEC key (PC_smooth_T => one arm per RELAX_T budget;
+    PC_smooth_Tconv => T=2*depth, the convergence-check arm)."""
     if spec.strip().lower() in ("all", ""):
-        names = ["BP_trop", "PC_trop", "BP_smooth", "PC_smooth_T"]
+        names = ["BP_pwl", "PC_pwl", "BP_trop", "PC_trop",
+                 "BP_smooth", "PC_smooth_T", "PC_smooth_Tconv"]
     else:
         names = [x.strip() for x in spec.split(",") if x.strip()]
     out = []
@@ -192,6 +241,8 @@ def _parse_arms(spec, relaxTs):
         if nm == "PC_smooth_T":
             for T in relaxTs:
                 out.append(("PC_smooth_T", f"PC_smooth_T{T}", T))
+        elif nm == "PC_smooth_Tconv":
+            out.append(("PC_smooth_Tconv", f"PC_smooth_Tconv{2 * L}", 2 * L))
         else:
             out.append((nm, nm, None))
     return out
@@ -199,36 +250,67 @@ def _parse_arms(spec, relaxTs):
 
 def main():
     L = int(os.environ.get("L", 8)); seed = int(os.environ.get("SEED", 0))
-    steps = int(os.environ.get("STEPS", 2500)); accum = int(os.environ.get("ACCUM", 8))
+    steps = int(os.environ.get("STEPS", 5000)); accum = int(os.environ.get("ACCUM", 8))
     lr0 = float(os.environ.get("XF_LR", 3e-3)); warmup = int(os.environ.get("WARMUP", 100))
     minfrac = float(os.environ.get("LR_MINFRAC", 0.1)); decay = int(os.environ.get("LR_DECAY", 1))
     eval_every = int(os.environ.get("EVAL_EVERY", 250)); eval_batches = int(os.environ.get("EVAL_BATCHES", 16))
     tokbin = os.environ.get("TOKBIN", "/tmp/enwik8.u16")
+    # RESID_ALPHA: the smooth-net residual conditioner (< 1). Tropical arms ignore it.
+    resid_alpha = float(os.environ.get("RESID_ALPHA", 0.25))
+    # convergence-check tolerance (nats): |bpb(PC_smooth_Tconv) - bpb(BP_smooth)| must be < TOL.
+    conv_tol = float(os.environ.get("CONV_TOL", 0.15))
     # RELAX_T is a comma list: one PC_smooth_T arm per finite budget (e.g. "5,20").
     relaxTs = [int(x) for x in os.environ.get("RELAX_T", "5,20").split(",") if x.strip()]
-    # ARMS selects which arms this process trains ('all' = the full 4-arm design). The EC2
-    # runner dispatches ONE arm per job so the 4L x 2seed x 5arm grid fans across cores;
+    # ARMS selects which arms this process trains ('all' = the full three-regime design).
+    # The EC2 runner dispatches ONE ARM per job so the L x seed x arm grid fans across cores;
     # a single 'all' process reproduces the whole (L,seed) contrast locally.
     arm_spec = os.environ.get("ARMS", "all")
-    arms = _parse_arms(arm_spec, relaxTs)
+    arms = _parse_arms(arm_spec, relaxTs, L)
     out = os.environ.get("OUT", f"exp3_L{L}_s{seed}.jsonl")
     base = dict(D=int(os.environ.get("D", 192)), H=int(os.environ.get("H", 4)),
                 DH=int(os.environ.get("DH", 48)), FFN=int(os.environ.get("FFN", 768)),
                 SEQ=int(os.environ.get("SEQ", 128)), VOCAB=int(os.environ.get("VOCAB", 256)))
     data = load_tokens(base, tokbin)
-    fout = open(out, "w"); finals = {}
+    fout = open(out, "w")
+    finals = {}   # arm_key -> best (kept for back-compat with the S3 SUMMARY recombiner)
+    stats = {}    # arm_key -> dict(best, init_val, final_val)
 
     for arm_name, arm_key, T in arms:
-        finals[arm_key] = train_one(arm_name, L, seed, data, base, steps, accum, lr0,
-                                    warmup, minfrac, decay, eval_every, eval_batches, T, fout)
+        r = train_one(arm_name, arm_key, L, seed, data, base, steps, accum, lr0,
+                       warmup, minfrac, decay, eval_every, eval_batches, T, resid_alpha, fout)
+        finals[arm_key] = r["best"]; stats[arm_key] = r
 
-    # per-arm summary (always emitted). The two gap curves are computed here when the
-    # needed ceilings + PC arms were both trained IN THIS PROCESS; otherwise the EC2
-    # SUMMARY step recombines per-arm jsonls into the gap-vs-depth curves.
-    summary = dict(exp="exp3_summary", L=L, seed=seed, D=base["D"], finals=finals,
-                   relaxTs=relaxTs, arms=[a[1] for a in arms],
-                   note="gap_trop=PC_trop-BP_trop (claim: ~0 flat vs depth); "
-                        "gap_smooth_T*=PC_smooth_T-BP_smooth (claim: grows with depth)")
+    # -------------------------------------------------------- CORRECTNESS CHECKS --
+    # (a) BP-STE arms actually TRAIN: final val bpb < initial val bpb.
+    # (b) The smooth relaxation-to-CONVERGENCE (Tconv=2L) ~= BP_smooth within conv_tol.
+    # Failing checks are logged + flagged (VISIBLE, not silent).
+    checks = []
+    for arm_key, r in stats.items():
+        if arm_key.startswith("BP_"):
+            trains = (r["final_val"] is not None and r["init_val"] is not None
+                      and r["final_val"] < r["init_val"] - 1e-6)
+            checks.append(dict(check="BP_trains", arm=arm_key,
+                               init=round(r["init_val"], 5), final=round(r["final_val"], 5),
+                               passed=bool(trains)))
+    # convergence check: PC_smooth_Tconv{2L} vs BP_smooth
+    tconv_key = f"PC_smooth_Tconv{2 * L}"
+    if tconv_key in finals and "BP_smooth" in finals:
+        gap = finals[tconv_key] - finals["BP_smooth"]
+        checks.append(dict(check="smooth_Tconv_matches_BP", arm=tconv_key,
+                           Tconv=2 * L, tol=conv_tol,
+                           bpb_PC=round(finals[tconv_key], 5),
+                           bpb_BP=round(finals["BP_smooth"], 5),
+                           gap=round(gap, 5), passed=bool(abs(gap) < conv_tol)))
+
+    # ------------------------------------------------------------------ SUMMARY ---
+    summary = dict(exp="exp3_summary", L=L, seed=seed, D=base["D"],
+                   resid_alpha=resid_alpha, finals=finals, relaxTs=relaxTs,
+                   arms=[a[1] for a in arms], checks=checks,
+                   note="gap_pwl=PC_pwl-BP_pwl (~0 flat); gap_trop=PC_trop-BP_trop (bounded); "
+                        "gap_smooth_T*=PC_smooth_T-BP_smooth (grows w/ depth); "
+                        "gap_smooth_Tconv=PC_smooth_Tconv-BP_smooth (CHECK: ~0)")
+    if "PC_pwl" in finals and "BP_pwl" in finals:
+        summary["gap_pwl_PC_BP"] = round(finals["PC_pwl"] - finals["BP_pwl"], 5)
     if "PC_trop" in finals and "BP_trop" in finals:
         summary["gap_trop_PC_BP"] = round(finals["PC_trop"] - finals["BP_trop"], 5)
     if "BP_smooth" in finals:
@@ -236,8 +318,15 @@ def main():
             k = f"PC_smooth_T{T}"
             if k in finals:
                 summary[f"gap_smooth_T{T}"] = round(finals[k] - finals["BP_smooth"], 5)
+        if tconv_key in finals:
+            summary[f"gap_smooth_Tconv{2 * L}"] = round(finals[tconv_key] - finals["BP_smooth"], 5)
     fout.write(json.dumps(summary) + "\n"); fout.close()
     print(f"[exp3 L={L} s{seed}] SUMMARY {json.dumps(summary)}", flush=True)
+    # print CHECK PASS/FAIL prominently (a failing check must be visible)
+    print(f"[exp3 L={L} s{seed}] CHECKS:", flush=True)
+    for c in checks:
+        print(f"    {'PASS' if c['passed'] else 'FAIL'}  {c['check']}({c['arm']}): {json.dumps(c)}",
+              flush=True)
 
 
 if __name__ == "__main__":

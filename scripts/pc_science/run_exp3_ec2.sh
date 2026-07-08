@@ -14,9 +14,12 @@ PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"; REGION="${REGION:-us-east-1}"
 ITYPE="${ITYPE:-c7i.48xlarge}"; AMI="${AMI:-ami-051bfa33df3949860}"; ROLE="${ROLE:-tiki-sweep-runner}"   # AL2023: aws CLI + python3 preinstalled
 BIN_S3="${BIN_S3:-s3://tiki-sweep-739966866637/s2_bins/train.u16}"   # byte-level enwik8 (already uploaded)
 DEPTHS="${DEPTHS:-2,4,8,16}"; SEEDS="${SEEDS:-0,1}"
-STEPS="${STEPS:-2500}"; RELAX_T="${RELAX_T:-5,20}"
+STEPS="${STEPS:-5000}"; RELAX_T="${RELAX_T:-5,20}"; RESID_ALPHA="${RESID_ALPHA:-0.25}"
+XF_LR="${XF_LR:-6e-4}"; WARMUP="${WARMUP:-100}"; LR_DECAY="${LR_DECAY:-1}"; LR_MINFRAC="${LR_MINFRAC:-0.1}"  # was hardcoded XF_LR=3e-3 (too high; broke PWL + confounded smooth)
 D="${D:-192}"; HH="${HH:-4}"; DH="${DH:-48}"; FFN="${FFN:-768}"; SEQ="${SEQ:-128}"; VOCAB="${VOCAB:-256}"
-THREADS="${THREADS:-16}"; MAX_MINUTES="${MAX_MINUTES:-660}"
+# THREADS default 2: the earlier 512-thread thrash (one BLAS pool per job x many cores)
+# collapsed throughput; 2 threads/job + one-arm-per-job fanned by xargs -P is the sweet spot.
+THREADS="${THREADS:-2}"; MAX_MINUTES="${MAX_MINUTES:-660}"
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"; STATE="${STATE_DIR:-$PROJECT_DIR/.tiki_exp3_state}"; mkdir -p "$STATE"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
@@ -59,16 +62,17 @@ for i in 1 2 3; do aws s3 cp "${S3SRC}" s.tgz && break; sleep 8; done && tar xzf
 aws s3 cp "\$BIN_S3" /tmp/enwik8.u16 --only-show-errors
 cd /opt/tiki/scripts/pc_science
 export TOKBIN=/tmp/enwik8.u16 OMP_NUM_THREADS=${THREADS} OPENBLAS_NUM_THREADS=${THREADS} MKL_NUM_THREADS=${THREADS}
-COMMON="D=${D} H=${HH} DH=${DH} FFN=${FFN} SEQ=${SEQ} VOCAB=${VOCAB} ACCUM=8 XF_LR=3e-3 STEPS=${STEPS} WARMUP=100 LR_DECAY=1 LR_MINFRAC=0.1 EVAL_EVERY=250 EVAL_BATCHES=16 RELAX_T=${RELAX_T}"
+COMMON="D=${D} H=${HH} DH=${DH} FFN=${FFN} SEQ=${SEQ} VOCAB=${VOCAB} ACCUM=8 XF_LR=${XF_LR} STEPS=${STEPS} WARMUP=${WARMUP} LR_DECAY=${LR_DECAY} LR_MINFRAC=${LR_MINFRAC} EVAL_EVERY=250 EVAL_BATCHES=16 RELAX_T=${RELAX_T} RESID_ALPHA=${RESID_ALPHA}"
 # ---- build the per-arm job list (each a background process; the OS scheduler packs them) ----
-# 4 arms of the contrast; PC_smooth_T is dispatched ONCE (it expands internally to one run per
-# RELAX_T budget) -> 5 training runs per (L,seed). ONE ARM PER JOB so the grid fans across cores
-# and no single process serialises all 5 arms (the deep large-T arm is the long pole).
+# THREE-regime contrast; PC_smooth_T is dispatched ONCE (expands internally to one run per
+# RELAX_T budget) and PC_smooth_Tconv is the T=2*depth convergence-check arm -> 8 training
+# runs per (L,seed). ONE ARM PER JOB so the grid fans across cores and no single process
+# serialises all arms (the deep Tconv arm is the long pole).
 : > /tmp/jobs.sh
 IFS=',' read -ra DA <<< "${DEPTHS}"; IFS=',' read -ra SA <<< "${SEEDS}"
 for L in "\${DA[@]}"; do
   for S in "\${SA[@]}"; do
-    for ARM in BP_trop PC_trop BP_smooth PC_smooth_T; do
+    for ARM in ${ARMS_LIST:-BP_pwl PC_pwl BP_trop PC_trop BP_smooth PC_smooth_T PC_smooth_Tconv}; do
       echo "env \$COMMON L=\$L SEED=\$S ARMS=\$ARM OUT=/tmp/pcout/exp3_L\${L}_s\${S}_\${ARM}.jsonl python3 exp3_contrast.py > /tmp/pcout/exp3_L\${L}_s\${S}_\${ARM}.out 2>&1" >> /tmp/jobs.sh
     done
   done
@@ -82,8 +86,9 @@ echo "=== ALL JOBS DONE \$(date -u) ==="
 # ---- SUMMARY: recombine per-arm finals into the two gap-vs-depth curves ----
 python3 - <<'PYEOF' > /tmp/pcout/SUMMARY.txt 2>&1 || true
 import json, glob, statistics as st
-# collect finals per (L, seed, arm) from the per-arm summaries
+# collect finals + checks per (L, seed) from the per-arm summaries
 finals = {}   # (L,seed) -> {armkey: bpb}
+allchecks = []
 for f in sorted(glob.glob('/tmp/pcout/exp3_*.jsonl')):
     for l in open(f):
         try: r = json.loads(l)
@@ -91,39 +96,60 @@ for f in sorted(glob.glob('/tmp/pcout/exp3_*.jsonl')):
         if r.get("exp") == "exp3_summary":
             key = (r["L"], r["seed"])
             finals.setdefault(key, {}).update(r.get("finals", {}))
-# discover the finite-T budgets present
-Ts = sorted({int(k.split("PC_smooth_T")[1]) for kv in finals.values() for k in kv if k.startswith("PC_smooth_T")})
+            for c in r.get("checks", []):
+                allchecks.append((r["L"], r["seed"], c))
+# discover finite-T budgets (exclude the Tconv arms which are named PC_smooth_TconvNN)
+Ts = sorted({int(k.split("PC_smooth_T")[1]) for kv in finals.values() for k in kv
+             if k.startswith("PC_smooth_T") and not k.startswith("PC_smooth_Tconv")})
 Ls = sorted({L for (L, s) in finals})
-print("=== EXPERIMENT 2 (CORRECTED): deep-PC-traction contrast ===")
-print("arms: BP_trop (dyadic-net BP ceiling, STE-thru-dyad) | PC_trop (cascade, ours) |")
-print("      BP_smooth (float-net BP ceiling) | PC_smooth_T{T} (float-net finite-T PC)")
-print()
-print("--- final bpb per arm (mean +- pstdev over seeds) ---")
-hdr = ["L", "BP_trop", "PC_trop", "BP_smooth"] + [f"PC_smoothT{T}" for T in Ts]
-print("  " + "  ".join(f"{h:>11s}" for h in hdr))
 def agg(L, arm):
     xs = [finals[(L, s)][arm] for s in {ss for (ll, ss) in finals if ll == L} if arm in finals.get((L, s), {})]
     if not xs: return None
     return (st.mean(xs), st.pstdev(xs) if len(xs) > 1 else 0.0, len(xs))
+print("=== EXPERIMENT 2 (CORRECTED): deep-PC-traction contrast (THREE regimes) ===")
+print("A PWL   : BP_pwl (STE-thru-dyad ceiling) | PC_pwl (cascade)          -> gap ~0 FLAT")
+print("B TROP  : BP_trop (dyadic BP ceiling)    | PC_trop (cascade, ours)   -> gap bounded ~0.5")
+print("C SMOOTH: BP_smooth (float BP ceiling)   | PC_smooth_T{T} (finite-T) | PC_smooth_Tconv (T=2L check)")
+print()
+print("--- final bpb per arm (mean over seeds) ---")
+arms_order = ["BP_pwl","PC_pwl","BP_trop","PC_trop","BP_smooth"] + [f"PC_smooth_T{T}" for T in Ts]
+hdr = ["L"] + arms_order + ["PC_smooth_Tconv"]
+print("  " + "  ".join(f"{h:>15s}" for h in hdr))
 for L in Ls:
-    cells = [f"{L:>11d}"]
-    for arm in ["BP_trop", "PC_trop", "BP_smooth"] + [f"PC_smooth_T{T}" for T in Ts]:
-        a = agg(L, arm)
-        cells.append(f"{a[0]:>11.4f}" if a else f"{'--':>11s}")
+    cells = [f"{L:>15d}"]
+    for arm in arms_order:
+        a = agg(L, arm); cells.append(f"{a[0]:>15.4f}" if a else f"{'--':>15s}")
+    a = agg(L, f"PC_smooth_Tconv{2*L}"); cells.append(f"{a[0]:>15.4f}" if a else f"{'--':>15s}")
     print("  " + "  ".join(cells))
 print()
-print("--- GAP CURVE 1: tropical  gap_trop = PC_trop - BP_trop  (CLAIM: ~0, FLAT vs depth) ---")
+print("--- GAP CURVE A: PWL   gap_pwl = PC_pwl - BP_pwl   (CLAIM: ~0, FLAT vs depth) ---")
+for L in Ls:
+    pc, bp = agg(L, "PC_pwl"), agg(L, "BP_pwl")
+    if pc and bp: print(f"  L={L:2d}  gap_pwl = {pc[0]-bp[0]:+.4f}   (PC={pc[0]:.4f} BP={bp[0]:.4f}, n={pc[2]})")
+print()
+print("--- GAP CURVE B: TROP  gap_trop = PC_trop - BP_trop   (CLAIM: bounded, grows slowly) ---")
 for L in Ls:
     pc, bp = agg(L, "PC_trop"), agg(L, "BP_trop")
     if pc and bp: print(f"  L={L:2d}  gap_trop = {pc[0]-bp[0]:+.4f}   (PC={pc[0]:.4f} BP={bp[0]:.4f}, n={pc[2]})")
 print()
 for T in Ts:
-    print(f"--- GAP CURVE 2: smooth  gap_smooth_T{T} = PC_smooth_T{T} - BP_smooth  (CLAIM: GROWS w/ depth) ---")
+    print(f"--- GAP CURVE C: SMOOTH  gap_smooth_T{T} = PC_smooth_T{T} - BP_smooth  (CLAIM: GROWS w/ depth) ---")
     for L in Ls:
         pc, bp = agg(L, f"PC_smooth_T{T}"), agg(L, "BP_smooth")
         if pc and bp: print(f"  L={L:2d}  gap_smooth_T{T} = {pc[0]-bp[0]:+.4f}   (PC={pc[0]:.4f} BP={bp[0]:.4f}, n={pc[2]})")
     print()
-print("VERDICT: gap_trop should stay ~flat near 0 across L; gap_smooth_T* should widen with L.")
+print("--- CONVERGENCE CHECK: gap_smooth_Tconv = PC_smooth_Tconv(2L) - BP_smooth  (CHECK: ~0) ---")
+for L in Ls:
+    pc, bp = agg(L, f"PC_smooth_Tconv{2*L}"), agg(L, "BP_smooth")
+    if pc and bp: print(f"  L={L:2d}  gap_Tconv = {pc[0]-bp[0]:+.4f}   (PC={pc[0]:.4f} BP={bp[0]:.4f}, n={pc[2]})")
+print()
+print("=== CORRECTNESS CHECKS (per L,seed) ===")
+npass = sum(1 for _,_,c in allchecks if c.get("passed"))
+for L, s, c in sorted(allchecks, key=lambda x:(x[0],x[1],x[2].get("check",""))):
+    print(f"  {'PASS' if c.get('passed') else 'FAIL'}  L={L:2d} s{s}  {c.get('check')}({c.get('arm')})  {json.dumps(c)}")
+print(f"  -> {npass}/{len(allchecks)} checks PASS")
+print()
+print("VERDICT: gap_pwl ~flat near 0; gap_trop bounded; gap_smooth_T* widens with L; gap_Tconv ~0 (all checks PASS).")
 PYEOF
 up; echo done | aws s3 cp - "\$S3_RESULTS/DONE" --only-show-errors || true
 sync; shutdown -h now

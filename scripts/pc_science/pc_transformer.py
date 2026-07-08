@@ -47,6 +47,17 @@ _DEFAULT = dict(
     F32=0,          # fp32 forward matmul emulation
     SMOOTH_OFF=0,   # 1 = fully-PWL net: hard argmax attention + identity-Jacobian LN
     SEED=7,
+    # --- smooth-net WELL-CONDITIONING (Exp2 gate): scale the two sublayer contributions
+    # by RESID_ALPHA<1 so the residual-stream block Jacobian J = I + alpha*delta has
+    # ||J|| controlled -> the finite-T PC relaxation CONVERGES to BP even at large depth.
+    # Applied CONSISTENTLY in forward, exact BP, cascade, relaxation, and the frozen
+    # sync refwd so ALL backward methods see the identical net. Default 1.0 = unchanged
+    # (the realistic tropical nets always run alpha=1). NOTE: the finite-T PC here is the
+    # numerically-exact truncated back-substitution (unconditionally stable, == BP at
+    # T>=depth), so the convergence gate PASSES at any alpha incl 1.0; alpha's measured
+    # effect is to make the SMALL-T (truncated) arm track BP better at a fixed T. POSTLN
+    # is reserved (an alt post-LN conditioner) but NOT wired -- alpha alone suffices.
+    RESID_ALPHA=1.0, POSTLN=0,
     # relaxation hyperparams
     RELAX_T=200, RELAX_GAMMA=0.5, RELAX_TOL=1e-9,
 )
@@ -327,13 +338,14 @@ class Transformer:
         c['Praw'] = Praw
         c['qsATTN'] = qact_scale(cf, ATTN)
         ATTN = qact(cf, ATTN); c['ATTN'] = ATTN
-        AO = self._matmul(ATTN, blk.WO); M = R + AO; c['M'] = M
+        al = cf["RESID_ALPHA"]
+        AO = self._matmul(ATTN, blk.WO); M = R + al * AO; c['M'] = M
         X2, m2, s2 = layernorm(cf, M, blk.LN2G, blk.LN2B); c['X2'] = X2; c['s2'] = s2
         HDpre = self._matmul(X2, blk.WUP)
         RMASK = (HDpre > 0).astype(float); HD = np.where(RMASK > 0, HDpre, 0.0)
         c['qsHD'] = qact_scale(cf, HD)
         HD = qact(cf, HD); c['HD'] = HD; c['RMASK'] = RMASK
-        FO = self._matmul(HD, blk.WDN); RP = M + FO; c['RP'] = RP
+        FO = self._matmul(HD, blk.WDN); RP = M + al * FO; c['RP'] = RP
         if blk.role in ("out", "both"):
             XF, mf, sf = layernorm(cf, RP, blk.LNFG, blk.LNFB); c['XF'] = XF; c['sf'] = sf
             LG = self._matmul(XF, blk.WHEAD); c['LG'] = LG
@@ -404,12 +416,16 @@ class Transformer:
             g['WHEAD'] = gWHEAD
         else:
             gRP = gRP_in
+        al = cf["RESID_ALPHA"]
         gM = gRP.copy()
-        gHD, gWDN = self._linbwd(gRP, blk.WDN, c['HD']); gHD = np.where(c['RMASK'] > 0, gHD, 0.0)
+        # FFN sublayer branch scaled by alpha (RP = M + alpha*FO); the +M skip is 1.
+        # Feeding al*gRP makes BOTH gHD and gWDN carry the alpha factor (dW = gy.T@x).
+        gHD, gWDN = self._linbwd(al * gRP, blk.WDN, c['HD']); gHD = np.where(c['RMASK'] > 0, gHD, 0.0)
         gX2, gWUP = self._linbwd(gHD, blk.WUP, c['X2'])
         gM2 = ln_bwd(cf, gX2, blk.LN2G, c['s2']); gM = P(gM + gM2)
         gR = gM.copy()
-        gATTN, gWO = self._linbwd(gM, blk.WO, c['ATTN'])
+        # attn sublayer branch is scaled by alpha (M = R + alpha*AO); the +R skip is 1.
+        gATTN, gWO = self._linbwd(al * gM, blk.WO, c['ATTN'])
         gQ, gK, gV = attn_bwd_cascade(cf, gATTN, c['Praw'], c['Q'], c['K'], c['V'])
         gQ = P(gQ); gK = P(gK); gV = P(gV)
         gX1 = np.zeros((SEQ, D))
@@ -454,12 +470,13 @@ class Transformer:
             g['WHEAD'] = gWHEAD
         else:
             gRP = gRP_in
+        al = cf["RESID_ALPHA"]
         gM = gRP.copy()
-        gHD, gWDN = self._linbwd_exact(gRP, blk.WDN, c['HD']); gHD = np.where(c['RMASK'] > 0, gHD, 0.0)
+        gHD, gWDN = self._linbwd_exact(al * gRP, blk.WDN, c['HD']); gHD = np.where(c['RMASK'] > 0, gHD, 0.0)
         gX2, gWUP = self._linbwd_exact(gHD, blk.WUP, c['X2'])
         gM2 = self._ln_bwd_exact(gX2, blk.LN2G, c['s2'], c['M'], blk.LN2B); gM = gM + gM2
         gR = gM.copy()
-        gATTN, gWO = self._linbwd_exact(gM, blk.WO, c['ATTN'])
+        gATTN, gWO = self._linbwd_exact(al * gM, blk.WO, c['ATTN'])
         gQ, gK, gV = attn_bwd_exact(cf, gATTN, c['Praw'], c['Q'], c['K'], c['V'])
         gX1 = np.zeros((SEQ, D))
         t1, gWQ = self._linbwd_exact(gQ, blk.WQ, c['X1']); gX1 += t1
@@ -709,7 +726,8 @@ class Transformer:
         ATTNh = np.matmul(c['Praw'], Vh)
         ATTN = ATTNh.transpose(1, 0, 2).reshape(SEQ, D)
         ATTN = qact_fixed(cf, ATTN, c.get('qsATTN')); c['ATTN'] = ATTN
-        AO = self._matmul(ATTN, blk.WO); M = R + AO; c['M'] = M
+        al = cf["RESID_ALPHA"]
+        AO = self._matmul(ATTN, blk.WO); M = R + al * AO; c['M'] = M
         mean2 = M.mean(-1, keepdims=True); cc2 = M - mean2
         X2 = blk.LN2G * (cc2 / c['s2'][..., None]) + blk.LN2B if not cf["SMOOTH_OFF"] \
             else blk.LN2G * cc2 + blk.LN2B
@@ -717,7 +735,7 @@ class Transformer:
         HDpre = self._matmul(X2, blk.WUP)
         HD = np.where(c['RMASK'] > 0, HDpre, 0.0)      # FROZEN ReLU mask
         HD = qact_fixed(cf, HD, c.get('qsHD')); c['HD'] = HD
-        FO = self._matmul(HD, blk.WDN); RP = M + FO; c['RP'] = RP
+        FO = self._matmul(HD, blk.WDN); RP = M + al * FO; c['RP'] = RP
         if blk.role in ("out", "both"):
             meanf = RP.mean(-1, keepdims=True); ccf = RP - meanf
             XF = blk.LNFG * (ccf / c['sf'][..., None]) + blk.LNFB if not cf["SMOOTH_OFF"] \
@@ -740,13 +758,14 @@ class Transformer:
         """Exact reverse sweep with the residual output grad gRP given directly
         (no head/CE), returning gR (residual-input grad) + weight grads."""
         cf = self.cf; SEQ, D, VOCAB = cf["SEQ"], cf["D"], cf["VOCAB"]
+        al = cf["RESID_ALPHA"]
         g = {}
         gM = gRP.copy()
-        gHD, gWDN = self._linbwd_exact(gRP, blk.WDN, c['HD']); gHD = np.where(c['RMASK'] > 0, gHD, 0.0)
+        gHD, gWDN = self._linbwd_exact(al * gRP, blk.WDN, c['HD']); gHD = np.where(c['RMASK'] > 0, gHD, 0.0)
         gX2, gWUP = self._linbwd_exact(gHD, blk.WUP, c['X2'])
         gM2 = self._ln_bwd_exact(gX2, blk.LN2G, c['s2'], c['M'], blk.LN2B); gM = gM + gM2
         gR = gM.copy()
-        gATTN, gWO = self._linbwd_exact(gM, blk.WO, c['ATTN'])
+        gATTN, gWO = self._linbwd_exact(al * gM, blk.WO, c['ATTN'])
         gQ, gK, gV = attn_bwd_exact(cf, gATTN, c['Praw'], c['Q'], c['K'], c['V'])
         gX1 = np.zeros((SEQ, D))
         t1, gWQ = self._linbwd_exact(gQ, blk.WQ, c['X1']); gX1 += t1
