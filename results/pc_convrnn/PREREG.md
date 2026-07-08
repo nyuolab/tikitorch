@@ -139,6 +139,38 @@ pow-2 settling step γ). Consumes the G3 checkpoints — no retraining.
   boundary (same rung as the training anneal); the feedforward deploy mode
   remains fully closed at τ=0. jsonl: `g6_generative.jsonl`.
 
+## EC2 execution plan (locked with user 2026-07-08 after G0–G3 all-PASS; no further local runs)
+
+One c5.9xlarge via the `run_connect4_prior_sweep_ec2.sh` machinery (S3 state,
+no-SSH, hard backstop), driver `scripts/_pc_morphssm_onbox.sh`, batches in
+parallel with pinned threads:
+- **B1 = G6 battery (north star, first):** on-box cascade-trained checkpoints
+  (matched-lr, deterministic seeds), then G6a settle-to-forward control, G6b
+  infilling spans {8,16,32} × 64 val windows vs matched-compute left-to-right
+  baselines (greedy; best-of-N rescored), G6c denoising {10,25,50}% corruption.
+  Reduced-form settling per the DAG corollary: internal states settle to the
+  forward in closed form, so generative inference iterates ONLY over the free
+  variables (gap/corrupted token embeddings) through the soft forward — the
+  same theorem that makes training one-sweep makes generative inference
+  iterate-only-where-free. Full-state settling kept as the G6a control.
+- **B2 = G2b fallback ladder round 1 (budget/lr only, per the ladder order):**
+  selective copy, convrnn, 10k steps × lr {3e-3, 1e-2} × 3 seeds (6 runs).
+  pow2-λ / erosion-twin rungs only if round 1 fails.
+- **B3 = G4 depth ladder:** d=128, L ∈ {4,8,16,32} × {bp, cascade} × 3 seeds
+  (+ relax_async n=1 at L=16).
+- **B4 = G5 strict rung:** PureTropicalSGD + tropical_ce_lut annealed ×3;
+  hard-from-scratch cascade receipt ×1; `find_training_multiplies` trace.
+
+## The competing-hypothesis question (user, 2026-07-08 — analysis owed once EC2 is running)
+
+Whether the enabled capability can ultimately compete with the transformer:
+**dynamically computed activations (PC settling against clamped constraints at
+inference) vs the transformer's dynamically computed weights (attention as
+input-dependent mixing).** To be analyzed against the measured record — the
+tropical-attention bigram floor, MorphSSM's fixed-routing parity, the
+recurrence's long-range payoff, and the G6 outcomes — and folded into the
+branch's strategy note.
+
 ## Honest claim ladder (every run states its rung)
 
 | rung | training config | claimable |
