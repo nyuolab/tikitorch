@@ -431,7 +431,27 @@ int main(int argc,char**argv){
 
     static int g_trace = getenv("STEPTRACE") ? atoi(getenv("STEPTRACE")) : 0;
 #define STRACE(...) do{ if(g_trace){ fprintf(stderr,"[trace] " __VA_ARGS__); fflush(stderr);} }while(0)
-    for(int step=0; step<steps; step++){
+    // persist_masters(prefix): read every chip's TRAINED float master back from DDR -> <DUMP_DIR>/<prefix>_master<l>.f32.
+    // Used by the end-of-run dump (prefix "xfs2", unchanged filenames) and the rolling CKPT_EVERY checkpoint ("ckpt").
+    auto persist_masters=[&](const char* prefix){
+        for(int l=0;l<L;l++){
+            FMaster &m = *M[l];
+            readf(l, S2_FWQ,  m.WQ,  (long)S2_D*S2_D);   readf(l, S2_FWK,  m.WK,  (long)S2_D*S2_D);
+            readf(l, S2_FWV,  m.WV,  (long)S2_D*S2_D);   readf(l, S2_FWO,  m.WO,  (long)S2_D*S2_D);
+            readf(l, S2_FWUP, m.WUP, (long)S2_FFN*S2_D); readf(l, S2_FWDN, m.WDN, (long)S2_D*S2_FFN);
+            readf(l, S2_FLN1G,m.LN1G,S2_D);              readf(l, S2_FLN1B,m.LN1B,S2_D);
+            readf(l, S2_FLN2G,m.LN2G,S2_D);              readf(l, S2_FLN2B,m.LN2B,S2_D);
+            // HYGIENE: under host_embed, EMB/POS are trained host-side in hEMB/hPOS (aliased to M[0]->EMB/POS at init);
+            // the on-chip S2_FEMB/S2_FPOS region is the STALE init (chip 0 runs as HID and never writes it) -> skip.
+            if(l==0 && !host_embed()){ readf(l, S2_FEMB, m.EMB, (long)S2_VOCAB*S2_D); readf(l, S2_FPOS, m.POS, (long)S2_SEQ*S2_D); }
+            if(l==L-1){ readf(l, S2_FLNFG,m.LNFG,S2_D); readf(l, S2_FLNFB,m.LNFB,S2_D); readf(l, S2_FWHEAD,m.WHEAD,(long)S2_VOCAB*S2_D); }
+            char op[512]; snprintf(op,512,"%s/%s_master%d.f32",DUMP_DIR,prefix,l); dump_master_file(m,op);
+        }
+    };
+    // START_STEP: resume support — start the loop (and thus the LR schedule) at a later step after reloading
+    // a checkpoint via INIT_DIR (see the CKPT_EVERY comment below for the recipe).
+    int step0 = getenv("START_STEP") ? atoi(getenv("START_STEP")) : 0;
+    for(int step=step0; step<steps; step++){
         STRACE("==== step %d BEGIN ====\n", step);
         // linear warmup then optional COSINE DECAY to LR*LR_MINFRAC (LR_DECAY=1). WHY: the silicon's constant-LR
         // loss floor sits higher than a CPU ref's (noisier effective gradient) — ride it down with a schedule.
@@ -703,11 +723,24 @@ int main(int argc,char**argv){
               double pp=pt/sum; if(pp<1e-12)pp=1e-12; bits+=-log(pp)/L2; }
           double ac=(double)c/S2_SEQ, bp=bits/S2_SEQ;
           acc_ema = acc_ema<0?ac:0.99*acc_ema+0.01*ac; bpb_ema = bpb_ema<0?bp:0.99*bpb_ema+0.01*bp;
-          if(step%50==0 || step==steps-1)
+          static int PRINT_EVERY = getenv("PRINT_EVERY") ? atoi(getenv("PRINT_EVERY")) : 1;   // per-step by default (readback happens anyway)
+          if(PRINT_EVERY>0 && (step%PRINT_EVERY==0 || step==steps-1))
               printf("[xfs2shard] step %5d  bpb=%.3f bpb_ema=%.3f  acc=%.3f acc_ema=%.3f  lr=%.1e  (%.3f steps/s)\n",
-                     step, bp, bpb_ema, ac, acc_ema, lr, (step+1)/(now_s()-t0));
+                     step, bp, bpb_ema, ac, acc_ema, lr, (step+1-step0)/(now_s()-t0));
           if(step%200==0 && step>0) kick_report();
           fflush(stdout);
+          // ---- rolling checkpoint (CKPT_EVERY>0): masters -> DUMP_DIR/ckpt_master<l>.f32 + ckpt_meta.txt.
+          // Resume: copy ckpt_master<l>.f32 -> <INIT_DIR>/master<l>.f32, relaunch with INIT_S3/INIT_DIR +
+          // START_STEP=<step+1> (restores weights + LR phase; Adam m/v stay in DDR and are NOT persisted —
+          // a resume resets the moments, which re-settle within ~1/(1-0.875)=8 steps).
+          static int CKPT_EVERY = getenv("CKPT_EVERY") ? atoi(getenv("CKPT_EVERY")) : 0;
+          if(CKPT_EVERY>0 && step>0 && (step%CKPT_EVERY==0 || step==steps-1)){
+              persist_masters("ckpt");
+              char mp[512]; snprintf(mp,512,"%s/ckpt_meta.txt",DUMP_DIR); FILE*mf=fopen(mp,"w");
+              if(mf){ fprintf(mf,"step=%d\nlr=%.6e\nbpb_ema=%.4f\nacc_ema=%.4f\nresume: INIT_DIR<-ckpt_master*.f32 (rename to master<l>.f32) + START_STEP=%d\n",
+                              step, lr, bpb_ema, acc_ema, step+1); fclose(mf); }
+              printf("[ckpt] step %d -> %s/ckpt_master*.f32\n", step, DUMP_DIR); fflush(stdout);
+          }
         }
     }
 
@@ -715,25 +748,12 @@ int main(int argc,char**argv){
     kick_report();
     printf("\n========== DISTRIBUTED SCALE-2 D=512 PC TRANSFORMER on %d FPGAs ==========\n", L);
     printf("[throughput] %d steps (ACCUM=%d), %.1fs, %.3f steps/s | %.0f tok/s | final bpb_ema=%.3f acc_ema=%.3f\n",
-           steps, ACCUM, wall, steps/wall, steps*(double)S2_SEQ*ACCUM/wall, bpb_ema, acc_ema);
+           steps-step0, ACCUM, wall, (steps-step0)/wall, (steps-step0)*(double)S2_SEQ*ACCUM/wall, bpb_ema, acc_ema);
     printf("[gateC] only neighbour wide hidden-states (down) + wide errors (up) crossed chips; NO global model/gradient/all-reduce\n");
 
     // ---- persist each chip's TRAINED float master back from DDR to host (fetch trained weights) ----
-    for(int l=0;l<L;l++){
-        FMaster &m = *M[l];
-        readf(l, S2_FWQ,  m.WQ,  (long)S2_D*S2_D);   readf(l, S2_FWK,  m.WK,  (long)S2_D*S2_D);
-        readf(l, S2_FWV,  m.WV,  (long)S2_D*S2_D);   readf(l, S2_FWO,  m.WO,  (long)S2_D*S2_D);
-        readf(l, S2_FWUP, m.WUP, (long)S2_FFN*S2_D); readf(l, S2_FWDN, m.WDN, (long)S2_D*S2_FFN);
-        readf(l, S2_FLN1G,m.LN1G,S2_D);              readf(l, S2_FLN1B,m.LN1B,S2_D);
-        readf(l, S2_FLN2G,m.LN2G,S2_D);              readf(l, S2_FLN2B,m.LN2B,S2_D);
-        // HYGIENE: under host_embed, EMB/POS are trained host-side in hEMB/hPOS (aliased to M[0]->EMB/POS at init);
-        // the on-chip S2_FEMB/S2_FPOS DDR region is the STALE init (chip 0 runs as HID and never writes it). Reading
-        // it back would clobber the trained embeddings -> generation/eval would use untrained init. Skip when host_embed.
-        if(l==0 && !host_embed()){ readf(l, S2_FEMB, m.EMB, (long)S2_VOCAB*S2_D); readf(l, S2_FPOS, m.POS, (long)S2_SEQ*S2_D); }
-        if(l==L-1){ readf(l, S2_FLNFG,m.LNFG,S2_D); readf(l, S2_FLNFB,m.LNFB,S2_D); readf(l, S2_FWHEAD,m.WHEAD,(long)S2_VOCAB*S2_D); }
-        char op[512]; snprintf(op,512,"%s/xfs2_master%d.f32",DUMP_DIR,l); dump_master_file(m,op);
-        printf("[xfs2shard] chip %d: trained float master -> %s\n", l, op);
-    }
+    persist_masters("xfs2");
+    for(int l=0;l<L;l++) printf("[xfs2shard] chip %d: trained float master -> %s/xfs2_master%d.f32\n", l, DUMP_DIR, l);
 
     // ---- optional coherent-text sample from the OUTPUT chip (roll a SEQ context through the chain) ----
     if(getenv("SAMPLE")){
