@@ -1,0 +1,18 @@
+{"gate": "G2b", "task": "copy", "arch": "convrnn", "seed": 0, "steps": 2000, "lr": 0.01, "acc": {"32": 0.2308, "64": 0.2265, "128": 0.1667}, "lambda_p50": 0.16411881148815155, "wall_s": 873.9}
+{"gate": "G2b", "task": "copy", "arch": "convrnn", "seed": 1, "steps": 2000, "lr": 0.01, "acc": {"32": 0.3237, "64": 0.3567, "128": 0.3333}, "lambda_p50": 0.20988908410072327, "wall_s": 834.6}
+{"gate": "G2b", "task": "copy", "arch": "convrnn", "seed": 2, "steps": 2000, "lr": 0.01, "acc": {"32": 0.68, "64": 0.6354, "128": 0.5962}, "lambda_p50": 0.3027805685997009, "wall_s": 862.4}
+{"gate": "G2b", "task": "copy", "arch": "convrnn-norecur", "seed": 0, "steps": 2000, "lr": 0.01, "acc": {"32": 0.0888, "64": 0.1105, "128": 0.0741}, "lambda_p50": null, "wall_s": 524.4}
+{"gate": "G2b", "task": "copy", "arch": "convrnn-norecur", "seed": 1, "steps": 2000, "lr": 0.01, "acc": {"32": 0.0462, "64": 0.0351, "128": 0.0476}, "lambda_p50": null, "wall_s": 531.0}
+{"gate": "G2b", "task": "copy", "arch": "convrnn-norecur", "seed": 2, "steps": 2000, "lr": 0.01, "acc": {"32": 0.0629, "64": 0.0773, "128": 0.0385}, "lambda_p50": null, "wall_s": 606.9}
+{"gate": "G2b", "task": "runmax", "arch": "convrnn", "seed": 0, "steps": 2000, "lr": 0.01, "acc": {"0": 0.999}, "lambda_p50": 0.2653564512729645, "wall_s": 845.8}
+{"gate": "G2b", "task": "runmax", "arch": "convrnn", "seed": 1, "steps": 2000, "lr": 0.01, "acc": {"0": 0.9994}, "lambda_p50": 0.2687547206878662, "wall_s": 852.0}
+{"gate": "G2b", "task": "runmax", "arch": "convrnn", "seed": 2, "steps": 2000, "lr": 0.01, "acc": {"0": 0.9993}, "lambda_p50": 0.29521945118904114, "wall_s": 798.0}
+{"gate": "G2b", "task": "runmax", "arch": "convrnn-norecur", "seed": 0, "steps": 2000, "lr": 0.01, "acc": {"0": 0.9796}, "lambda_p50": null, "wall_s": 502.7}
+{"gate": "G2b", "task": "runmax", "arch": "convrnn-norecur", "seed": 1, "steps": 2000, "lr": 0.01, "acc": {"0": 0.9805}, "lambda_p50": null, "wall_s": 485.0}
+{"gate": "G2b", "task": "runmax", "arch": "convrnn-norecur", "seed": 2, "steps": 2000, "lr": 0.01, "acc": {"0": 0.9775}, "lambda_p50": null, "wall_s": 530.7}
+{"gate": "G2b", "task": "induction", "arch": "convrnn", "seed": 0, "steps": 2000, "lr": 0.01, "acc": {"32": 0.2131, "64": 0.2388}, "lambda_p50": 0.24956032633781433, "wall_s": 825.5}
+{"gate": "G2b", "task": "induction", "arch": "convrnn", "seed": 1, "steps": 2000, "lr": 0.01, "acc": {"32": 0.038, "64": 0.04}, "lambda_p50": 0.2442275434732437, "wall_s": 788.1}
+{"gate": "G2b", "task": "induction", "arch": "convrnn", "seed": 2, "steps": 2000, "lr": 0.01, "acc": {"32": 0.2857, "64": 0.2462}, "lambda_p50": 0.21946337819099426, "wall_s": 804.7}
+{"gate": "G2b", "task": "induction", "arch": "convrnn-norecur", "seed": 0, "steps": 2000, "lr": 0.01, "acc": {"32": 0.0902, "64": 0.0858}, "lambda_p50": null, "wall_s": 519.9}
+{"gate": "G2b", "task": "induction", "arch": "convrnn-norecur", "seed": 1, "steps": 2000, "lr": 0.01, "acc": {"32": 0.0591, "64": 0.0291}, "lambda_p50": null, "wall_s": 550.8}
+{"gate": "G2b", "task": "induction", "arch": "convrnn-norecur", "seed": 2, "steps": 2000, "lr": 0.01, "acc": {"32": 0.0476, "64": 0.0692}, "lambda_p50": null, "wall_s": 530.8}

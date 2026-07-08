@@ -55,9 +55,55 @@ The tropical-spectral-radius account is quantitative: positive cycle weight ⇒
 linear drift at that rate (the min-plus RNN kill, reproduced); zero leak ⇒
 monotone ratchet (carry-frac → 1, no forgetting); λ > 0 ⇒ bounded and responsive.
 
-## G2b — synthetic battery (kill gate): pending [running]
+## G2b — synthetic battery (kill gate): recurrence attribution CONFIRMED; kill NOT fired; 95% pass bar unmet [measured]
+
+`scripts/pc_convrnn_stability.py --part 2b` (`g2_synthetic.jsonl`): d=64, L=2
+(conv RF = 19), T=256, 3 seeds per arm, BP soft-anneal 2k steps, lr 1e-2,
+λ_min = 2⁻⁸. Chance = 1/16 = 6.25%.
+
+| task | delay/gap | convrnn (3 seeds) | convrnn-norecur (3 seeds) |
+|---|---|---|---|
+| selective copy | 32 | 23.1 / 32.4 / 68.0 % | 8.9 / 4.6 / 6.3 % |
+| selective copy | 64 | 22.7 / 35.7 / 63.5 % | 11.1 / 3.5 / 7.7 % |
+| selective copy | 128 | 16.7 / 33.3 / 59.6 % | 7.4 / 4.8 / 3.9 % |
+| running max | (all-pos) | 99.90 / 99.94 / 99.93 % | 97.96 / 98.05 / 97.75 % |
+| induction | 32 | 21.3 / 3.8 / 28.6 % | 9.0 / 5.9 / 4.8 % |
+| induction | 64 | 23.9 / 4.0 / 24.6 % | 8.6 / 2.9 / 6.9 % |
+
+**Verdicts vs the pre-registered criteria:**
+- **Kill criterion (recurrent arm at chance): decisively NOT fired.** On the two
+  content-carrying tasks all six conv-only controls sit at chance while the
+  recurrent arm is 3–10× above it — the information crosses the RF through the
+  recurrence and nothing else.
+- **Pass bar (copy > 95% at delay 64): unmet at this probe budget.** The seed
+  spread (23→64%) plus the FLAT accuracy across delay 32→128 says retention is
+  not the constraint (λ-decay holds the value across the full delay); circuit
+  *findability* (marker-gated write, query-gated read) is. Fallback ladder
+  applies in the pre-registered order: longer budget / lr probe → pow2-grid λ →
+  erosion twin. No architecture-level kill.
+- **Running-max confound (honest demotion):** with uniform values 1..16 at
+  T=256 the running max saturates to the ceiling early, so window-max +
+  positional prior answers ~98% without memory — the control's 98.0% is prior,
+  not recall, and the task is demoted to a sanity check for the recurrent arm
+  (99.9%, exact, zero variance). The consistent ~2 pp gap is the hard-position
+  sliver the prior cannot answer — weak corroboration only. A discriminative
+  running-max needs a non-ceiling / drifting value distribution or a
+  hard-position-conditioned metric.
+- **Induction (recall) is the capability edge**, as the tropical-SSM results
+  predicted: 2 of 3 seeds find a partial circuit (~24%), one finds none —
+  recurrence-carried but weakest of the battery. Consistent with the
+  pre-registered expectation that content-addressed recall is where the
+  running-max state struggles.
 
 ## G3 — TinyShakespeare bakeoff: pending [running]
+
+Interim [measured]: `morphssm:bp` twin finals 1.9352 / 1.8993 / 1.9445 (mean
+1.926 ± 0.024) — reproduces the published 1.934 ± 0.035 in the new harness
+(protocol faithful). First `morphssm:cascade` at the erroneous lr/3 default
+landed 2.0108 (+0.076 vs twin); G0's identical-gradients result means the
+dyadic-era "PC lr = lr/3" rule does not apply to exact-mode cascade — matched-lr
+(1e-2) cascade twins are queued as the pre-registered comparison. The lr/3 rows
+are retained in the jsonl as data, not twin evidence.
 
 Wall-clock note [measured]: at the full bakeoff config (d=256, L=7, B=24, T=96)
 the cascade step is at parity with autograd BP — mps 454 vs 640 ms/step
