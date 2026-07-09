@@ -80,17 +80,28 @@ sync_s3
 # ---- job queue for B1-B3 (xargs -P over command lines) ---------------------
 JOBS=$(mktemp)
 
-# B1: G6 battery
+# B3: G4 depth ladder (d=128; matched lr both arms; light eval cadence)
+for L in 4 8 16 32; do
+  for S in 0 1 2; do
+    echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:bp --adam-lr 1e-2 --d-model 128 --n-layers $L --seed $S --eval-interval 300 --tag g4_bp_L${L}_s${S} --out $OUT" >> "$JOBS"
+    echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --d-model 128 --n-layers $L --seed $S --eval-interval 300 --tag g4_cascade_L${L}_s${S} --out $OUT" >> "$JOBS"
+  done
+done
+echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:relax_async --adam-lr 1e-2 --pc-lr 1e-2 --d-model 128 --n-layers 16 --seed 0 --eval-interval 300 --tag g4_async_L16_s0 --out $OUT" >> "$JOBS"
+
+# B1: G6 battery (v6: AFTER the cheap G4 jobs — v5 ran the multi-hour G6
+# cells first and starved the ladder; 32 windows / best-of-8 / 2 coord
+# sweeps: the O(T^2) l2r baselines dominated wall)
 echo "$PY scripts/pc_convrnn_generative.py --gates g6a --settle-steps 1000 --out $OUT --tag onbox" >> "$JOBS"
 for CK in morphssm convrnn; do
   CKPT="$OUT/ckpts/${CK}_cascade_s0.pt"
   # per-span commands (span-32 coord descent is the heavy tail — parallelize it)
   for SPAN in 8 16 32; do
-    echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 64 --spans $SPAN --relax-steps 400 --relax-lr 0.05 --tau-relax 0.5 --coord-sweeps 3 --out $OUT --tag ${CK}_main_s${SPAN}" >> "$JOBS"
+    echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 32 --spans $SPAN --relax-steps 400 --relax-lr 0.05 --tau-relax 0.5 --coord-sweeps 2 --bo-n 8 --out $OUT --tag ${CK}_main_s${SPAN}" >> "$JOBS"
   done
-  echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 64 --spans 16 --relax-steps 1600 --relax-lr 0.2 --tau-relax 0.25 --out $OUT --tag ${CK}_hi" >> "$JOBS"
-  echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 64 --spans 16 --relax-steps 400 --relax-lr 0.05 --relax-init mean --out $OUT --tag ${CK}_meaninit" >> "$JOBS"
-  echo "$PY scripts/pc_convrnn_generative.py --gates g6c --ckpt $CKPT --n-windows 64 --rates 0.1 0.25 0.5 --relax-steps 400 --out $OUT --tag ${CK}_denoise" >> "$JOBS"
+  echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 32 --spans 16 --relax-steps 1600 --relax-lr 0.2 --tau-relax 0.25 --out $OUT --tag ${CK}_hi" >> "$JOBS"
+  echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 32 --spans 16 --relax-steps 400 --relax-lr 0.05 --relax-init mean --out $OUT --tag ${CK}_meaninit" >> "$JOBS"
+  echo "$PY scripts/pc_convrnn_generative.py --gates g6c --ckpt $CKPT --n-windows 32 --rates 0.1 0.25 0.5 --relax-steps 400 --out $OUT --tag ${CK}_denoise" >> "$JOBS"
 done
 
 # B2: G2b fallback round 1 — COMPLETED on the v4 box (its synthetic-data jobs
@@ -102,15 +113,6 @@ if [ "${RUN_B2:-0}" = "1" ]; then
     done
   done
 fi
-
-# B3: G4 depth ladder (d=128; matched lr both arms; light eval cadence)
-for L in 4 8 16 32; do
-  for S in 0 1 2; do
-    echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:bp --adam-lr 1e-2 --d-model 128 --n-layers $L --seed $S --eval-interval 300 --tag g4_bp_L${L}_s${S} --out $OUT" >> "$JOBS"
-    echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --d-model 128 --n-layers $L --seed $S --eval-interval 300 --tag g4_cascade_L${L}_s${S} --out $OUT" >> "$JOBS"
-  done
-done
-echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:relax_async --adam-lr 1e-2 --pc-lr 1e-2 --d-model 128 --n-layers 16 --seed 0 --eval-interval 300 --tag g4_async_L16_s0 --out $OUT" >> "$JOBS"
 
 wc -l "$JOBS"
 # run the queue; log each job's rc; never abort the batch on one failure

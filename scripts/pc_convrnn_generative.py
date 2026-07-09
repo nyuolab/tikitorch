@@ -362,7 +362,7 @@ def run_g6b(args, out, data):
                               init=args.relax_init)
         t_pc = time.time() - t0
         greedy = l2r_fill(model, x, free, n_samples=1)
-        bo16 = l2r_fill(model, x, free, n_samples=16, gen=gen)
+        bo16 = l2r_fill(model, x, free, n_samples=args.bo_n, gen=gen)
         t1 = time.time()
         coord = gpc.relax_tokens_coord(x, free, sweeps=args.coord_sweeps)
         t_coord = time.time() - t1
@@ -440,6 +440,8 @@ def main():
     p.add_argument("--relax-steps", type=int, default=200)
     p.add_argument("--relax-lr", type=float, default=0.05)
     p.add_argument("--coord-sweeps", type=int, default=3)
+    p.add_argument("--bo-n", type=int, default=16,
+                   help="best-of-N samples for the suffix-rescored baseline")
     p.add_argument("--relax-init", type=str, default="greedy",
                    choices=["greedy", "mean", "obs"])
     p.add_argument("--settle-steps", type=int, default=200)
