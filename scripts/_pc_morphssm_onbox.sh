@@ -39,6 +39,19 @@ SYNC_PID=$!
 trap 'kill $SYNC_PID 2>/dev/null; sync_s3' EXIT
 health
 
+# ---- data: git archive ships only COMMITTED files, and tinyshakespeare.txt
+# is untracked (the v4 box lost 37/43 jobs to this) — fetch from the sweep
+# prefix, else the public source --------------------------------------------
+mkdir -p data
+if [ ! -f data/tinyshakespeare.txt ]; then
+  aws s3 cp "$S3_RESULTS/data_in/tinyshakespeare.txt" data/tinyshakespeare.txt \
+    --only-show-errors || \
+  curl -sL --retry 3 \
+    https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt \
+    -o data/tinyshakespeare.txt
+fi
+ls -l data/tinyshakespeare.txt
+
 # ---- B0: fetch matched-lr cascade ckpts (uploaded by the laptop); retrain
 # only as fallback ------------------------------------------------------------
 for i in 1 2 3 4 5; do
@@ -80,12 +93,15 @@ for CK in morphssm convrnn; do
   echo "$PY scripts/pc_convrnn_generative.py --gates g6c --ckpt $CKPT --n-windows 64 --rates 0.1 0.25 0.5 --relax-steps 400 --out $OUT --tag ${CK}_denoise" >> "$JOBS"
 done
 
-# B2: G2b fallback round 1 (budget/lr) — one (lr, seed) recurrent-arm run per command
-for LR in 3e-3 1e-2; do
-  for S in 0 1 2; do
-    echo "$PY scripts/pc_convrnn_stability.py --part 2b --tasks copy --steps 10000 --lr $LR --archs convrnn --seed-list $S --out $OUT" >> "$JOBS"
+# B2: G2b fallback round 1 — COMPLETED on the v4 box (its synthetic-data jobs
+# survived the missing-dataset failure); re-enable for fresh sweeps if needed.
+if [ "${RUN_B2:-0}" = "1" ]; then
+  for LR in 3e-3 1e-2; do
+    for S in 0 1 2; do
+      echo "$PY scripts/pc_convrnn_stability.py --part 2b --tasks copy --steps 10000 --lr $LR --archs convrnn --seed-list $S --out $OUT" >> "$JOBS"
+    done
   done
-done
+fi
 
 # B3: G4 depth ladder (d=128; matched lr both arms; light eval cadence)
 for L in 4 8 16 32; do
