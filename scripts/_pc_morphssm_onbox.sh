@@ -47,15 +47,21 @@ for i in 1 2 3 4 5; do
     && break
   sleep 60
 done
+# CAUTION: bare `wait` blocks on ALL background jobs INCLUDING the infinite
+# heartbeat subshell — that hang (one line before the queue) is what zombied
+# boxes v1-v3. Wait on explicit B0 PIDs only.
+B0_PIDS=""
 if [ ! -f "$OUT/ckpts/morphssm_cascade_s0.pt" ]; then
   $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 \
     --pc-lr 1e-2 --seed 0 --tag onbox_morphssm_cascade_s0 --out "$OUT" &
+  B0_PIDS="$B0_PIDS $!"
 fi
 if [ ! -f "$OUT/ckpts/convrnn_cascade_s0.pt" ]; then
   $PY scripts/pc_convrnn_charlm.py --arms convrnn:cascade --adam-lr 1e-2 \
     --pc-lr 1e-2 --seed 0 --tag onbox_convrnn_cascade_s0 --out "$OUT" &
+  B0_PIDS="$B0_PIDS $!"
 fi
-wait
+[ -n "$B0_PIDS" ] && wait $B0_PIDS
 sync_s3
 
 # ---- job queue for B1-B3 (xargs -P over command lines) ---------------------
