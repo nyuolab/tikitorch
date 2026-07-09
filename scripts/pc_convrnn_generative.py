@@ -217,10 +217,16 @@ class GenerativePC:
                 rows = col.nonzero(as_tuple=True)[0]
                 cand = cur[rows].repeat_interleave(V, dim=0)      # (n*V, T)
                 cand[:, t] = torch.arange(V, device=ids.device).repeat(rows.numel())
-                logits = m(cand)[:, :-1]
-                ce = F.cross_entropy(
-                    logits.reshape(-1, V), cand[:, 1:].reshape(-1),
-                    reduction="none").reshape(rows.numel(), V, T - 1)
+                # chunk the candidate forward: at batch n*V the morph-conv
+                # window tensor is ~GBs; an unchunked pass OOM-killed a v5 job
+                ces = []
+                for s0 in range(0, cand.shape[0], 512):
+                    piece = cand[s0:s0 + 512]
+                    logits = m(piece)[:, :-1]
+                    ces.append(F.cross_entropy(
+                        logits.reshape(-1, V), piece[:, 1:].reshape(-1),
+                        reduction="none").reshape(piece.shape[0], T - 1))
+                ce = torch.cat(ces, 0).reshape(rows.numel(), V, T - 1)
                 lo = max(0, t - 2)
                 hi = min(T - 1, t + light_cone)
                 mask = (~free[rows, 1:]).float()[:, None, :]
