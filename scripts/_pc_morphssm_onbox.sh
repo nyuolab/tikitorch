@@ -20,13 +20,24 @@ PY=${PY:-/opt/venv/bin/python}
 OUT=results/pc_convrnn
 mkdir -p "$OUT/ckpts"
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-4} MKL_NUM_THREADS=4
-NPAR=${NPAR:-14}
+NPAR=${NPAR:-10}
 
+# v3: the v2 box died ~4 min into the queue with its trace log never re-uploaded
+# (the EBS died with the diagnosis). The heartbeat now ships the live trace log
+# AND a health line (mem/disk/load/proc count) every 60s so a recurrence is
+# diagnosable from S3 alone.
 sync_s3(){ aws s3 sync "$OUT" "$S3_RESULTS/pc_convrnn" --exclude "ckpts/*" \
              --only-show-errors || true; }
-( while true; do sleep 120; sync_s3; done ) &   # heartbeat sync
+health(){ echo "$(date -u +%H:%M:%S) up=$(cut -d' ' -f1 /proc/uptime) \
+load=$(cut -d' ' -f1-3 /proc/loadavg) memfree=$(awk '/MemAvailable/{print $2}' /proc/meminfo)kB \
+disk=$(df -h / | awk 'NR==2{print $4}') pyjobs=$(pgrep -c -f pc_convrnn || true)" \
+  >> "$OUT/health.log"; }
+( while true; do sleep 60; health; sync_s3; \
+    aws s3 cp /var/log/tiki-sweep.log "$S3_RESULTS/boot.log" --only-show-errors || true; \
+  done ) &   # heartbeat: results + trace log + health telemetry
 SYNC_PID=$!
 trap 'kill $SYNC_PID 2>/dev/null; sync_s3' EXIT
+health
 
 # ---- B0: fetch matched-lr cascade ckpts (uploaded by the laptop); retrain
 # only as fallback ------------------------------------------------------------
