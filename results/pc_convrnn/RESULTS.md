@@ -245,6 +245,40 @@ against the backstop, and chunk candidate-batch forwards (silent OOM kills two
 v5 jobs). v4 delivered G2b; v6 delivered G4 + the G6 battery (8/13 cells; the
 missing four are ablation arms + convrnn span-32, cut by the ceiling).
 
+## M2/M3/M4 round (2026-07-10): recall gate KILLED; crossover FLAT Q1→Q2; FIM baseline LOSES to settling/greedy on this substrate [measured]
+
+**M2 — recall gate (l1+gather hybrid): KILL, as pre-registered.** At gap 64,
+3 seeds: hybrid MQAR 3.3/6.6/5.9% (= chance = norecur), hybrid induction
+6.8/9.3/9.2% vs pure conv-rnn best seed 21.7%. One pre-registered recipe (d=64,
+one mid-stack layer, task loss, τ-anneal) — the gather mixer did not train;
+the recall wall stands. (`g2_synthetic.jsonl` steps=4000 rows.)
+
+**M3 — quality crossover, Q1→Q2: FLAT.** Quality points: Q1 = 1.9352 (1500
+steps), Q2 = 1.8561 (6000 steps, plateaued by ~5k — adequately trained; a v7
+run of the same recipe under different threading gave 1.8044: run-to-run
+±~0.05 across thread configs, both ≫ Q1 — the 1500-step protocol was
+budget-starved, contra the bakeoff's "widening gap" reading). Q2 battery
+(`g6_generative_m3_q2_*`): em PC == greedy EXACTLY at every span
+(.172/.152/.098); coord descends the energy further below truth than ever
+(1.64 vs truth 1.73–1.81) while EM collapses (.03–.05); best-of-8 below
+greedy; denoising ties at both rates (.447, .341). **Δ(settled − greedy) = 0
+at both quality points so far.** Q3 (d384) lands overnight; unless it breaks
+the pattern, the M3 verdict is: no crossover within this substrate's reachable
+quality — the generative-mode payoff requires M1-scale quality gains.
+
+**M4 — FIM cross-family baseline: the retraining answer LOSES on this
+substrate.** FIM-trained MorphSSM (same arch/params/cascade credit, PSM
+sentinels, 50% FIM batches, 6000 steps; plain-LM CE 1.8476 ≈ quality parity
+with Q2's 1.8561): infill EM **8.2/8.8/7.9%** at spans 8/16/32 vs
+settled/greedy **17.2/15.2/9.8%**. The mechanism reading is consistent with
+M2: FIM generation must route BOTH segments to the generation position — a
+recall-shaped operation this family is measured-weak at; the transformer's
+FIM trick works *because* of attention. So on this substrate, inference-time
+modes ≥ retraining — "unique among causal models" survives the within-family
+form of the bear-case attack. Honest scope: an actual transformer-FIM
+baseline (the cross-family form) remains external and would likely win;
+that comparison is about the substrate, not the inference mode.
+
 ## Next steps (EC2 — user decision 2026-07-08: no further local runs)
 
 Compute template: `scripts/run_connect4_prior_sweep_ec2.sh` pattern (IAM
