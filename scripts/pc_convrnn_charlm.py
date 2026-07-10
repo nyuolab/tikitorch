@@ -359,8 +359,11 @@ class MorphPCEngine:
                     e_x[:, :, :T - j * dil] += e_slots[:, :, j * dil:, j]
         else:
             wg = torch.zeros_like(conv.weight)
+            zero = torch.zeros((), device=e_u.device, dtype=e_u.dtype)
             for j in range(K):
-                contrib = e_u * (route == j)
+                # gate as SELECTION (mux), not arithmetic — keeps the tau=0
+                # sweep literally multiply-free under the dispatch audit
+                contrib = torch.where(route == j, e_u, zero)
                 wg[:, j] = contrib.sum(dim=(0, 2))
                 if j * dil < T:
                     e_x[:, :, :T - j * dil] += contrib[:, :, j * dil:]
@@ -421,12 +424,20 @@ class MorphPCEngine:
         e_in = self._norm_adj(e_xn, cache["f1"], layer.norm, grads)
         return e_res + e_in
 
+    loss_mode = "ce"      # "ce" = exact softmax (host boundary) | "lut" =
+                          # shift_softmax LUT probabilities (G5 strict rung)
+
     @torch.no_grad()
     def _top_error(self, logits, targets, caches_top, grads: bool):
         """CE top error at every position -> error at the stack output."""
         m = self.model
         B, T, V = logits.shape
-        eps = torch.softmax(logits.reshape(-1, V).float(), dim=-1)
+        if self.loss_mode == "lut":
+            from tikitorch.functional import shift_softmax
+            eps = shift_softmax(logits.reshape(-1, V).float(),
+                                normalize="exact").clone()
+        else:
+            eps = torch.softmax(logits.reshape(-1, V).float(), dim=-1)
         eps.scatter_add_(1, targets.reshape(-1, 1),
                          -torch.ones(B * T, 1, device=eps.device))
         eps = (eps / (B * T)).to(logits.dtype)              # d(mean-CE)/d(logits)
@@ -612,7 +623,42 @@ def run_one(arch, credit, data, args, log_path):
     engine = MorphPCEngine(model) if credit != "bp" else None
 
     lr = args.adam_lr if credit == "bp" else args.pc_lr
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+    if args.opt == "puretropical":
+        import tikitorch.optim as ttoptim
+        opt = ttoptim.PureTropicalSGD(model.parameters(), lr_shift=args.lr_shift,
+                                      momentum_bits=4)
+    elif args.opt == "tropicallion":
+        import tikitorch.optim as ttoptim
+        opt = ttoptim.TropicalLion(model.parameters(), lr_shift=args.lr_shift)
+    else:
+        opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+    if engine is not None:
+        engine.loss_mode = "lut" if args.loss == "lut" else "ce"
+    if not args.anneal and args.tau == 0.0:
+        model.set_tau(0.0)                       # hard-from-scratch (G5 receipt)
+    if args.strict_audit and engine is not None:
+        from tikitorch.audit import _make_catcher
+        model.set_tau(0.0)
+        gen0 = torch.Generator().manual_seed(0)
+        xa, ya = data.batch("train", 2, args.seq_len, gen0)
+        hits = []
+        with _make_catcher(hits):
+            engine.cascade_grads(xa.to(device), ya.to(device))
+            opt.step()
+        opt.zero_grad(set_to_none=True)
+        waived = {"elementwise-divide", "transcendental"}
+        from collections import Counter
+        cats = Counter(c for c, _ in hits)
+        bad = {c: n for c, n in cats.items() if c not in waived}
+        row = dict(gate="G5_audit", arch=arch, opt=args.opt, loss=args.loss,
+                   tau=0.0, violations=bad,
+                   waived={c: n for c, n in cats.items() if c in waived},
+                   training_closed=not bad)
+        with (args.out / "g5_audit.jsonl").open("a") as f:
+            f.write(json.dumps(row) + "\n")
+        print(f"[G5-audit] training_closed={not bad} violations={bad} "
+              f"waived={dict(row['waived'])}")
+        model.set_tau(max(args.tau, 0.0))
     gen = torch.Generator().manual_seed(args.seed)
     async_gen = torch.Generator().manual_seed(args.seed + 7)
     tag = f"{arch}:{credit}"
@@ -725,6 +771,12 @@ def main():
                    help="PC-arm lr (default adam_lr/3 — the measured rule)")
     p.add_argument("--participation", type=float, default=0.5)
     p.add_argument("--lam-min", type=float, default=2 ** -6)
+    p.add_argument("--opt", type=str, default="adamw",
+                   choices=["adamw", "puretropical", "tropicallion"])
+    p.add_argument("--loss", type=str, default="ce", choices=["ce", "lut"])
+    p.add_argument("--lr-shift", type=int, default=10)
+    p.add_argument("--strict-audit", action="store_true",
+                   help="G5: trace one tau=0 cascade+step for hardware multiplies")
     p.add_argument("--ckpt-name", type=str, default=None,
                    help="checkpoint filename override (default arch_credit_seed.pt)")
     p.add_argument("--eval-interval", type=int, default=100)
