@@ -118,9 +118,9 @@ cmd_launch(){
   tar tzf "$STATE_DIR/src.tar.gz" | grep -qx "scripts/$DRIVER" \
     || { echo "FATAL: scripts/$DRIVER not in committed tree (commit it first)"; exit 1; }
 
-  echo "== resolving latest Ubuntu 22.04 amd64 AMI from SSM =="
+  echo "== resolving AMI from SSM (${AMI_PARAM:-canonical ubuntu 22.04}) =="
   AMI="$(aws_ ssm get-parameters \
-    --names /aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id \
+    --names "${AMI_PARAM:-/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id}" \
     --query 'Parameters[0].Value' --output text)"
   echo "AMI=$AMI"
   [ -n "$AMI" ] && [ "$AMI" != "None" ] || { echo "FATAL: could not resolve AMI"; exit 1; }
@@ -198,7 +198,12 @@ python3 -m venv /opt/venv
 for i in 1 2 3; do /opt/venv/bin/pip install -q awscli && break; sleep 10; done
 up
 for i in 1 2 3; do /opt/venv/bin/pip install -q numpy && break; sleep 10; done
-for i in 1 2 3; do /opt/venv/bin/pip install -q torch --index-url https://download.pytorch.org/whl/cpu && break; sleep 15; done
+TIDX="${TORCH_INDEX-https://download.pytorch.org/whl/cpu}"
+if [ -n "\$TIDX" ]; then
+  for i in 1 2 3; do /opt/venv/bin/pip install -q torch --index-url "\$TIDX" && break; sleep 15; done
+else
+  for i in 1 2 3; do /opt/venv/bin/pip install -q torch && break; sleep 15; done
+fi
 EXTRA="${PIP_EXTRA}"
 [ -n "\$EXTRA" ] && for i in 1 2 3; do /opt/venv/bin/pip install -q \$EXTRA && break; sleep 10; done
 up

@@ -212,6 +212,21 @@ matched quality (Q2), plus the FIM tax on plain-LM CE. **Interpretation
 *unmodified* causal checkpoints — retraining beats settling"; settled ≥ FIM ⇒
 the no-retraining mode is genuinely competitive with the retraining answer.
 
+**M1 — substrate-tax scaling ladder (pre-registered 2026-07-10, GPU box).**
+Corpus text8 (20M chars, committed), BPE-1024 (train-split tokenizer), seq 96,
+batch 24, τ-anneal, metric val bpb. Scales: **S1** morph_d=256/L7 (~0.5M) at
+20M tokens (8,700 steps); **S2** morph_d=832/L7 (~4.9M) at 40M tokens (17,400
+steps). Arms per scale: morphssm:cascade (S1 ×3 / S2 ×2 seeds), morphssm:bp ×1
+(twin-parity at scale), DenseConvLM twin ×2, dense GPT ×2 (S1 d128/L3/ff384;
+S2 d448/L6/ff1344). **Readout:** paired substrate tax = morphssm − dense-conv
+twin (bpb) at S1 vs S2. **Flip (from the strategy note):** tax at S2 ≤ half its
+S1 value with a monotone trend; constant additive tax = weak-survive; growing
+tax = the text8-precedent kill. **Riders on the same box:** (a) G6 battery on
+the S2 cascade checkpoint — the M3 crossover at genuinely better quality;
+(b) cross-family M4: FIM-trained DenseGPT (d128/L3, vocab 68, char) vs the
+same-substrate FIM and settling arms. Twin-parity secondary check: cascade
+within 0.05 bpb of morphssm:bp at both scales.
+
 ## Honest claim ladder (every run states its rung)
 
 | rung | training config | claimable |

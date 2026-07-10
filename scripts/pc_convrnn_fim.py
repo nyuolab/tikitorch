@@ -105,6 +105,8 @@ def main():
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--tau", type=float, default=0.5)
     p.add_argument("--credit", choices=["bp", "cascade"], default="cascade")
+    p.add_argument("--family", choices=["morphssm", "dense"], default="morphssm",
+                   help="dense = DenseGPT FIM baseline (the true cross-family M4 form)")
     p.add_argument("--lr", type=float, default=1e-2)
     p.add_argument("--lam-min", type=float, default=2 ** -6)
     p.add_argument("--fim-prob", type=float, default=0.5)
@@ -135,7 +137,16 @@ def main():
         return
 
     torch.manual_seed(args.seed)
-    model = build_model("morphssm", FIM_VOCAB, args).to(device)
+    if args.family == "dense":
+        from nanogpt_shakespeare import DenseGPT
+        model = DenseGPT(FIM_VOCAB, d=args.d_model, n_heads=4,
+                         n_layers=args.n_layers, d_ff=3 * args.d_model,
+                         max_seq_len=args.seq_len + 3,
+                         dropout=args.dropout).to(device)
+        model.set_tau = lambda t: None                     # dense: anneal no-op
+        args.credit = "bp"                                 # cascade is tropical-only
+    else:
+        model = build_model("morphssm", FIM_VOCAB, args).to(device)
     engine = MorphPCEngine(model) if args.credit == "cascade" else None
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     gen = torch.Generator().manual_seed(args.seed)
@@ -172,7 +183,7 @@ def main():
             ce, acc = ce_sum / total, correct / total
             model.train()
             model.set_tau(tau_at(step, args.steps, args.tau, True))
-            row = dict(gate="M4", step=step, train_loss=float(loss.item()),
+            row = dict(gate="M4", family=args.family, step=step, train_loss=float(loss.item()),
                        val_ce_hard_plainlm=ce, val_acc=acc,
                        wall_s=round(time.time() - t0, 1), credit=args.credit)
             with log.open("a") as f:
@@ -187,12 +198,12 @@ def main():
                 "config": dict(d_model=args.d_model, n_layers=args.n_layers,
                                kernel=args.kernel, dropout=args.dropout,
                                lam_min=args.lam_min, vocab=FIM_VOCAB)},
-               ckpt_dir / f"m4_fim_d{args.d_model}_{args.steps // 1000}k.pt")
+               ckpt_dir / f"m4_fim_{args.family}_d{args.d_model}_{args.steps // 1000}k.pt")
     rows = eval_fim_infill(model, data, args.eval_spans, args.n_windows,
                            args.seq_len, args.seed, device)
     with log.open("a") as f:
         for r in rows:
-            f.write(json.dumps({**r, "final": True, "credit": args.credit}) + "\n")
+            f.write(json.dumps({**r, "final": True, "credit": args.credit, "family": args.family}) + "\n")
 
 
 if __name__ == "__main__":

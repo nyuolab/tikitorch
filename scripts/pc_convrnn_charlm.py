@@ -50,7 +50,7 @@ from tikitorch.nn import (                                # noqa: E402
     TropicalLayerNorm,
     TropicalTopKModule,
 )
-from nanogpt_shakespeare import CharData, evaluate, sample, tau_at  # noqa: E402
+from nanogpt_shakespeare import BPEData, CharData, evaluate, sample, tau_at  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -771,6 +771,8 @@ def main():
                    help="PC-arm lr (default adam_lr/3 — the measured rule)")
     p.add_argument("--participation", type=float, default=0.5)
     p.add_argument("--lam-min", type=float, default=2 ** -6)
+    p.add_argument("--tokenizer", type=str, default="char", choices=["char", "bpe"])
+    p.add_argument("--vocab-size", type=int, default=1024)
     p.add_argument("--opt", type=str, default="adamw",
                    choices=["adamw", "puretropical", "tropicallion"])
     p.add_argument("--loss", type=str, default="ce", choices=["ce", "lut"])
@@ -795,7 +797,8 @@ def main():
         ok = gradcheck(args, out_path=args.out / "g0_gradcheck.jsonl")
         raise SystemExit(0 if ok else 1)
 
-    data = CharData(args.text)
+    data = (BPEData(args.text, args.vocab_size) if args.tokenizer == "bpe"
+            else CharData(args.text))
     log_path = args.out / f"g3_{args.tag}.jsonl"
     print(f"tiny-shakespeare: vocab={data.vocab} train={data.train_ids.numel()} "
           f"val={data.val_ids.numel()}")
