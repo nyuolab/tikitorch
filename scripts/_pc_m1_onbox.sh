@@ -21,6 +21,10 @@ mkdir -p data
 [ -f data/tinyshakespeare.txt ] || \
   aws s3 cp "$S3_RESULTS/data_in/tinyshakespeare.txt" data/tinyshakespeare.txt --only-show-errors || \
   curl -sL --retry 3 https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o data/tinyshakespeare.txt
+if [ ! -f data/text8_20m.txt ]; then
+  aws s3 cp "$S3_RESULTS/data_in/text8_20m.txt" data/text8_20m.txt --only-show-errors || {
+    curl -sL --retry 3 http://mattmahoney.net/dc/text8.zip -o /tmp/text8.zip &&     cd /tmp && unzip -o text8.zip && cd "$REPO" &&     head -c 20000000 /tmp/text8 > data/text8_20m.txt; }
+fi
 ls -l data/text8_20m.txt data/tinyshakespeare.txt
 
 JOBS=$(mktemp)
