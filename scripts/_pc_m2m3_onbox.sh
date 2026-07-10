@@ -16,8 +16,9 @@ mkdir -p "$OUT/ckpts"
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-4} MKL_NUM_THREADS=4
 NPAR=${NPAR:-10}
 
-sync_s3(){ aws s3 sync "$OUT" "$S3_RESULTS/pc_convrnn" --exclude "ckpts/*" \
-             --only-show-errors || true; }
+sync_s3(){ aws s3 sync "$OUT" "$S3_RESULTS/pc_convrnn" --only-show-errors || true; }
+# v8: ckpts INCLUDED in the heartbeat — v7 lost its finished Q2 checkpoint
+# because ckpts only synced after a phase that the backstop never let finish.
 health(){ echo "$(date -u +%H:%M:%S) up=$(cut -d' ' -f1 /proc/uptime) \
 load=$(cut -d' ' -f1-3 /proc/loadavg) memfree=$(awk '/MemAvailable/{print $2}' /proc/meminfo)kB \
 disk=$(df -h / | awk 'NR==2{print $4}') pyjobs=$(pgrep -c -f pc_convrnn || true)" \
@@ -39,26 +40,27 @@ if [ ! -f data/tinyshakespeare.txt ]; then
 fi
 ls -l data/tinyshakespeare.txt
 
-# ---- Phase A ----------------------------------------------------------------
+# ---- Phase A (v8): checkpoints SOLO at high threads — v7 ran them alongside
+# 10 M2 jobs (56 threads on 32 cores) and they went 4x slower than sized; M2
+# itself completed on v7 and is gated off (RUN_M2=1 re-enables).
 JOBS_A=$(mktemp)
-# M3 checkpoints (8 threads each; these are the phase's critical path)
-echo "OMP_NUM_THREADS=8 MKL_NUM_THREADS=8 $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 6000 --eval-interval 500 --seed 0 --ckpt-name m3_q2_d256_6k.pt --tag m3_q2 --out $OUT" >> "$JOBS_A"
-echo "OMP_NUM_THREADS=8 MKL_NUM_THREADS=8 $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 6000 --eval-interval 500 --d-model 384 --seed 0 --ckpt-name m3_q3_d384_6k.pt --tag m3_q3 --out $OUT" >> "$JOBS_A"
-# M2 battery
-for TASK in mqar induction; do
-  for ARCH in convrnn convrnn-hybrid; do
-    for S in 0 1 2; do
-      echo "$PY scripts/pc_convrnn_stability.py --part 2b --tasks $TASK --steps 4000 --archs $ARCH --seed-list $S --out $OUT" >> "$JOBS_A"
+echo "OMP_NUM_THREADS=16 MKL_NUM_THREADS=16 $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 6000 --eval-interval 500 --seed 0 --ckpt-name m3_q2_d256_6k.pt --tag m3_q2 --out $OUT" >> "$JOBS_A"
+echo "OMP_NUM_THREADS=16 MKL_NUM_THREADS=16 $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 6000 --eval-interval 500 --d-model 384 --seed 0 --ckpt-name m3_q3_d384_6k.pt --tag m3_q3 --out $OUT" >> "$JOBS_A"
+if [ "${RUN_M2:-0}" = "1" ]; then
+  for TASK in mqar induction; do
+    for ARCH in convrnn convrnn-hybrid; do
+      for S in 0 1 2; do
+        echo "$PY scripts/pc_convrnn_stability.py --part 2b --tasks $TASK --steps 4000 --archs $ARCH --seed-list $S --out $OUT" >> "$JOBS_A"
+      done
     done
   done
-done
-for S in 0 1 2; do
-  echo "$PY scripts/pc_convrnn_stability.py --part 2b --tasks mqar --steps 4000 --archs convrnn-norecur --seed-list $S --out $OUT" >> "$JOBS_A"
-done
+  for S in 0 1 2; do
+    echo "$PY scripts/pc_convrnn_stability.py --part 2b --tasks mqar --steps 4000 --archs convrnn-norecur --seed-list $S --out $OUT" >> "$JOBS_A"
+  done
+fi
 wc -l "$JOBS_A"
-xargs -P "$NPAR" -I CMD bash -c 'CMD >> '"$OUT"'/onbox_jobs.log 2>&1 || echo "JOB-FAILED: CMD" >> '"$OUT"'/onbox_jobs.log' < "$JOBS_A"
+xargs -P 2 -I CMD bash -c 'CMD >> '"$OUT"'/onbox_jobs.log 2>&1 || echo "JOB-FAILED: CMD" >> '"$OUT"'/onbox_jobs.log' < "$JOBS_A"
 sync_s3
-aws s3 sync "$OUT/ckpts" "$S3_RESULTS/pc_convrnn/ckpts" --only-show-errors || true
 
 # ---- Phase B: G6 battery on the new quality points --------------------------
 JOBS_B=$(mktemp)
