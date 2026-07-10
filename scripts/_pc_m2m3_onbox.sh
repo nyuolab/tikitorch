@@ -40,12 +40,27 @@ if [ ! -f data/tinyshakespeare.txt ]; then
 fi
 ls -l data/tinyshakespeare.txt
 
+# ---- Q selector (v9, two-box parallel M3): the laptop uploads config/Q =
+# "q2" | "q3" | "both" right after launch; default both --------------------
+QSEL="both"
+for i in 1 2 3 4 5; do
+  if QQ=$(aws s3 cp "$S3_RESULTS/config/Q" - 2>/dev/null) && [ -n "$QQ" ]; then
+    QSEL="$QQ"; break
+  fi
+  sleep 30
+done
+echo "QSEL=$QSEL"
+
 # ---- Phase A (v8): checkpoints SOLO at high threads — v7 ran them alongside
 # 10 M2 jobs (56 threads on 32 cores) and they went 4x slower than sized; M2
 # itself completed on v7 and is gated off (RUN_M2=1 re-enables).
 JOBS_A=$(mktemp)
-echo "OMP_NUM_THREADS=16 MKL_NUM_THREADS=16 $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 6000 --eval-interval 500 --seed 0 --ckpt-name m3_q2_d256_6k.pt --tag m3_q2 --out $OUT" >> "$JOBS_A"
-echo "OMP_NUM_THREADS=16 MKL_NUM_THREADS=16 $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 6000 --eval-interval 500 --d-model 384 --seed 0 --ckpt-name m3_q3_d384_6k.pt --tag m3_q3 --out $OUT" >> "$JOBS_A"
+if [ "$QSEL" = "q2" ] || [ "$QSEL" = "both" ]; then
+  echo "OMP_NUM_THREADS=16 MKL_NUM_THREADS=16 $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 6000 --eval-interval 500 --seed 0 --ckpt-name m3_q2_d256_6k.pt --tag m3_q2 --out $OUT" >> "$JOBS_A"
+fi
+if [ "$QSEL" = "q3" ] || [ "$QSEL" = "both" ]; then
+  echo "OMP_NUM_THREADS=16 MKL_NUM_THREADS=16 $PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 6000 --eval-interval 500 --d-model 384 --seed 0 --ckpt-name m3_q3_d384_6k.pt --tag m3_q3 --out $OUT" >> "$JOBS_A"
+fi
 if [ "${RUN_M2:-0}" = "1" ]; then
   for TASK in mqar induction; do
     for ARCH in convrnn convrnn-hybrid; do
@@ -64,7 +79,10 @@ sync_s3
 
 # ---- Phase B: G6 battery on the new quality points --------------------------
 JOBS_B=$(mktemp)
-for Q in m3_q2_d256_6k m3_q3_d384_6k; do
+QLIST="m3_q2_d256_6k m3_q3_d384_6k"
+[ "$QSEL" = "q2" ] && QLIST="m3_q2_d256_6k"
+[ "$QSEL" = "q3" ] && QLIST="m3_q3_d384_6k"
+for Q in $QLIST; do
   CKPT="$OUT/ckpts/${Q}.pt"
   if [ -f "$CKPT" ]; then
     for SPAN in 8 16 32; do
