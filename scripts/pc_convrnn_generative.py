@@ -46,7 +46,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 import tikitorch as tt                                     # noqa: E402
 from pc_convrnn_charlm import ConvRNNLM, build_model       # noqa: E402
-from nanogpt_shakespeare import CharData                   # noqa: E402
+from nanogpt_shakespeare import BPEData, CharData          # noqa: E402
 
 
 def forward_from_emb(model, e: torch.Tensor) -> torch.Tensor:
@@ -448,6 +448,8 @@ def main():
     p.add_argument("--coord-sweeps", type=int, default=3)
     p.add_argument("--bo-n", type=int, default=16,
                    help="best-of-N samples for the suffix-rescored baseline")
+    p.add_argument("--tokenizer", type=str, default="char", choices=["char", "bpe"])
+    p.add_argument("--vocab-size", type=int, default=1024)
     p.add_argument("--relax-init", type=str, default="greedy",
                    choices=["greedy", "mean", "obs"])
     p.add_argument("--settle-steps", type=int, default=200)
@@ -455,7 +457,10 @@ def main():
     args = p.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     out = args.out / f"g6_generative{('_' + args.tag) if args.tag else ''}.jsonl"
-    data = CharData(args.text) if set(args.gates) & {"g6b", "g6c"} else None
+    data = None
+    if set(args.gates) & {"g6b", "g6c"}:
+        data = (BPEData(args.text, args.vocab_size) if args.tokenizer == "bpe"
+                else CharData(args.text))
     if "g6a" in args.gates:
         run_g6a(args, out)
     if "g6b" in args.gates:

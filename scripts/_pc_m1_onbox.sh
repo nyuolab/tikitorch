@@ -53,9 +53,9 @@ JB=$(mktemp)
 CKPT="$OUT/ckpts/m1_s2_cascade_s0.pt"
 if [ -f "$CKPT" ]; then
   for SPAN in 8 16 32; do
-    echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 32 --spans $SPAN --relax-steps 400 --coord-sweeps 2 --bo-n 8 --text data/text8_20m.txt --out $OUT --tag m1_s2_g6_s$SPAN" >> "$JB"
+    echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 32 --spans $SPAN --relax-steps 400 --coord-sweeps 2 --bo-n 8 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --out $OUT --tag m1_s2_g6_s$SPAN" >> "$JB"
   done
-  echo "$PY scripts/pc_convrnn_generative.py --gates g6c --ckpt $CKPT --n-windows 32 --rates 0.1 0.25 --relax-steps 400 --text data/text8_20m.txt --out $OUT --tag m1_s2_g6_denoise" >> "$JB"
+  echo "$PY scripts/pc_convrnn_generative.py --gates g6c --ckpt $CKPT --n-windows 32 --rates 0.1 0.25 --relax-steps 400 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --out $OUT --tag m1_s2_g6_denoise" >> "$JB"
 else
   echo "MISSING-CKPT: $CKPT" >> "$OUT/onbox_jobs.log"
 fi
