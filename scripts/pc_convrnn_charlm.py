@@ -173,15 +173,24 @@ class ConvRNNLayer(MorphSSMLayer):
 class ConvRNNLM(nn.Module):
     """MorphSSM LM (bakeoff layout: embed -> dropout -> layers -> norm -> topk
     head) with an optional per-layer tropical leaky-max recurrence. With
-    ``recurrent=False`` this is module-for-module the MorphSSM bakeoff config."""
+    ``recurrent=False`` this is module-for-module the MorphSSM bakeoff config.
+
+    ``hybrid_attn=True`` inserts ONE l1-score + argmax-GATHER attention
+    sublayer (pre-norm residual) after the middle layer — the RECALL ORGAN of
+    the strategy note (STRATEGY_TRANSFORMER_COMPETITION.md): the mixer is
+    routing-discrete (gather adjoint = a scatter; deploy-pure at tau=0, the
+    measured lossless-induction recipe), projections nn.Linear for the M2
+    capability gate (dyadic later for closure). BP-trained for M2; the cascade
+    adjoint for this layer is gated on M2 passing."""
 
     task_type = "lm"
 
     def __init__(self, vocab: int, d_model: int = 256, n_layers: int = 7,
                  kernel_size: int = 7, dropout: float = 0.1, tau: float = 0.5,
                  recurrent: bool = True, max_dilation: int = 2048,
-                 lam_min: float = 2 ** -6):
+                 lam_min: float = 2 ** -6, hybrid_attn: bool = False):
         super().__init__()
+        from tikitorch.nn import TropicalAttention
         self.embed = nn.Embedding(vocab, d_model)
         self.dropout = TropicalDropout(dropout) if dropout > 0 else nn.Identity()
         self.layers = nn.ModuleList([
@@ -192,6 +201,13 @@ class ConvRNNLM(nn.Module):
                 dropout=dropout, use_soft=True, tau=max(tau, 1e-6),
                 norm_type="tropical", recurrent=recurrent, lam_min=lam_min)
             for i in range(n_layers)])
+        self.attn_at = n_layers // 2 if hybrid_attn else None
+        if hybrid_attn:
+            self.attn_norm = TropicalLayerNorm(d_model)
+            self.attn = TropicalAttention(
+                d_model, n_heads=max(1, d_model // 32), tau=max(tau, 1e-6),
+                use_standard_proj=True, score_variant="l1",
+                agg_variant="gather")
         self.ln_final = TropicalLayerNorm(d_model)
         self.output_head = TropicalTopKModule(d_model, vocab, k=min(8, d_model))
         for layer in self.layers:                         # MorphSSM GPT-2-style init
@@ -210,8 +226,10 @@ class ConvRNNLM(nn.Module):
 
     def forward(self, ids: torch.Tensor) -> torch.Tensor:
         h = self.dropout(self.embed(ids))
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             h = layer(h)
+            if self.attn_at is not None and i == self.attn_at:
+                h = h + self.attn(self.attn_norm(h), causal_mask=True)
         return self.output_head(self.ln_final(h))
 
     def compute_loss(self, x, y):
@@ -516,11 +534,12 @@ def build_model(arch: str, vocab: int, args) -> nn.Module:
             d_model=args.d_model, n_layers=args.n_layers, kernel_size=args.kernel,
             tropical_proj=True, dropout=args.dropout, use_soft=True,
             tau=max(args.tau, 1e-6), task_type="lm", vocab_size=vocab)
-    if arch in ("convrnn", "convrnn-norecur"):
+    if arch in ("convrnn", "convrnn-norecur", "convrnn-hybrid"):
         return ConvRNNLM(vocab, d_model=args.d_model, n_layers=args.n_layers,
                          kernel_size=args.kernel, dropout=args.dropout,
-                         tau=args.tau, recurrent=(arch == "convrnn"),
-                         lam_min=args.lam_min)
+                         tau=args.tau, recurrent=(arch != "convrnn-norecur"),
+                         lam_min=args.lam_min,
+                         hybrid_attn=(arch == "convrnn-hybrid"))
     raise ValueError(arch)
 
 
@@ -655,12 +674,13 @@ def run_one(arch, credit, data, args, log_path):
     model.set_tau(0.0)
     ckpt_dir = args.out / "ckpts"                       # consumed by gate G6
     ckpt_dir.mkdir(parents=True, exist_ok=True)         # (untracked: binaries)
+    ckpt_name = args.ckpt_name or f"{arch}_{credit}_s{args.seed}.pt"
     torch.save({"arch": arch, "credit": credit, "seed": args.seed,
                 "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
                 "config": dict(d_model=args.d_model, n_layers=args.n_layers,
                                kernel=args.kernel, dropout=args.dropout,
                                lam_min=args.lam_min, vocab=data.vocab)},
-               ckpt_dir / f"{arch}_{credit}_s{args.seed}.pt")
+               ckpt_dir / ckpt_name)
     text = sample(model, data, "\n", args.sample_chars, args.seq_len, device,
                   seed=args.seed)
     # streaming/length-extrapolation eval (recurrence payoff metric)
@@ -705,6 +725,8 @@ def main():
                    help="PC-arm lr (default adam_lr/3 — the measured rule)")
     p.add_argument("--participation", type=float, default=0.5)
     p.add_argument("--lam-min", type=float, default=2 ** -6)
+    p.add_argument("--ckpt-name", type=str, default=None,
+                   help="checkpoint filename override (default arch_credit_seed.pt)")
     p.add_argument("--eval-interval", type=int, default=100)
     p.add_argument("--eval-batches", type=int, default=8)
     p.add_argument("--eval-long", type=int, nargs="*", default=[512, 1024],

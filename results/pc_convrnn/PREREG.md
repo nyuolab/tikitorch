@@ -171,6 +171,33 @@ tropical-attention bigram floor, MorphSSM's fixed-routing parity, the
 recurrence's long-range payoff, and the G6 outcomes — and folded into the
 branch's strategy note.
 
+## M2/M3 execution round (pre-registered 2026-07-10, user go "go go go")
+
+**M3 — quality-conditioned settling crossover (the generative north star's
+gate).** Quality ladder of cascade-trained (matched-lr) MorphSSM checkpoints:
+Q1 = the existing 1500-step/d256 ckpt (1.9352 hard CE; its G6 battery = the v6
+rows); Q2 = 6000 steps/d256; Q3 = 6000 steps/d384. G6b (spans {8,16,32}) + G6c
+per new checkpoint, 32 windows, best-of-8, identical protocol to v6.
+**Readout:** Δ(EM, settled − greedy) and Δ(recovery) as a function of base CE.
+**Pass:** Δ turns positive and grows monotonically as CE improves. **Fail is
+informative:** flat/negative Δ at ~1.85-nat quality says the crossover (if it
+exists) sits above this substrate's reachable quality — feeds M1's priority.
+
+**M2 — recall gate with the l1+gather hybrid (the recall organ).**
+`ConvRNNLM(hybrid_attn=True)`: ONE l1-score+argmax-gather attention sublayer
+(pre-norm residual, mid-stack; nn.Linear projections for the capability gate,
+dyadic later for closure; gather adjoint = scatter, hence cascade-compatible
+at τ=0 if the gate passes). Tasks: MQAR (4 kv-pairs, disjoint key/filler
+ranges, query gap ∈ {32,64,128} ≫ RF=19) and induction (gaps {32,64,128}),
+d=64 L=2 T=256, 4000 steps, task loss only, τ-anneal, 3 seeds.
+Arms: convrnn / convrnn-hybrid / convrnn-norecur (mqar control).
+**Pass:** hybrid ≥ 90% at every gap, 3/3 seeds, on BOTH tasks, where the pure
+conv-rnn arm is materially below (≤ ~35%, its measured band). Passing arms the
+next step: the attention layer's frozen-routing cascade adjoint + closure rung.
+**Kill:** hybrid ≤ conv-rnn ⇒ the gather mixer does not train from task loss
+in this stack (the OFF_GPU 0.831-from-LM-loss precedent fails to transfer) —
+the recall wall stands and M1 becomes the program's sole quality lever.
+
 ## Honest claim ladder (every run states its rung)
 
 | rung | training config | claimable |

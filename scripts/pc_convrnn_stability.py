@@ -163,6 +163,28 @@ def gen_batch(task, B, T, gen, delays):
         x[rows, q] = QUERY
         tgt[rows, q] = v
         meta = d
+    elif task == "mqar":
+        # multi-query associative recall: 4 (key, value) pairs early, one key
+        # queried at gap >= delay past its pair — attention's home turf
+        n_pairs = 4
+        # keys 20..39, filler 40..63 — DISJOINT (same-range filler would
+        # duplicate the queried key and make the recall target ambiguous)
+        x = torch.randint(40, FILL_HI, (B, T), generator=gen)
+        d = torch.tensor(delays)[torch.randint(0, len(delays), (B,), generator=gen)]
+        for b in range(B):
+            dd = int(d[b])
+            starts = torch.randperm(max(1, T - dd - 12), generator=gen)[:n_pairs] + 2
+            keys = torch.randperm(20, generator=gen)[:n_pairs] + 20
+            vals = torch.randint(VAL_LO, VAL_HI, (n_pairs,), generator=gen)
+            for k in range(n_pairs):
+                x[b, starts[k]] = keys[k]
+                x[b, min(int(starts[k]) + 1, T - 1)] = vals[k]
+            qi = int(starts[0]) + 1 + dd
+            if qi >= T:
+                qi = T - 1
+            x[b, qi] = keys[0]
+            tgt[b, qi] = vals[0]
+        meta = d
     elif task == "induction":
         d = torch.tensor(delays)[torch.randint(0, len(delays), (B,), generator=gen)]
         a = torch.randint(VAL_LO, VAL_HI, (B,), generator=gen)
@@ -205,10 +227,11 @@ def eval_task(model, task, delays, gen, T, n_batches=16, batch=32):
 
 def run_synthetic(task, arch, seed, args, out_path):
     delays = {"runmax": [0], "copy": [32, 64, 128],
-              "induction": [32, 64]}[task]
+              "induction": [32, 64, 128], "mqar": [32, 64, 128]}[task]
     torch.manual_seed(seed)
     model = ConvRNNLM(VOCAB, d_model=64, n_layers=2, dropout=0.0, tau=0.5,
-                      recurrent=(arch == "convrnn"), lam_min=args.lam_min)
+                      recurrent=(arch != "convrnn-norecur"), lam_min=args.lam_min,
+                      hybrid_attn=(arch == "convrnn-hybrid"))
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     gen = torch.Generator().manual_seed(seed)
     t0 = time.time()
@@ -247,7 +270,7 @@ def main():
     p.add_argument("--tasks", nargs="+", default=["copy", "runmax", "induction"])
     p.add_argument("--archs", nargs="+",
                    default=["convrnn", "convrnn-norecur"],
-                   choices=["convrnn", "convrnn-norecur"],
+                   choices=["convrnn", "convrnn-norecur", "convrnn-hybrid"],
                    help="which arms to run (single-arm for queue parallelism)")
     p.add_argument("--seed-list", type=int, nargs="+", default=None,
                    help="explicit seeds (overrides --seeds range)")
