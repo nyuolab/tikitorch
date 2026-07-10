@@ -328,7 +328,10 @@ int main(int argc,char**argv){
     // training-divergence (effective-batch-8 gradient noise diverges the model past warmup at every usable LR).
     // Default == ACCUM (backward-compatible: unset => byte-identical to the current behavior). Must be a multiple of
     // ACCUM so a grad-accum window contains whole slot-cycles. Used ONLY by the PIPE=1 branch (serial/KICKMEAS keep ACCUM).
-    int EFF_BATCH = getenv("EFF_BATCH") ? atoi(getenv("EFF_BATCH")) : ACCUM;
+    // NB: the runner EXPORTS EFF_BATCH="" when unset -> getenv returns "" (non-null) so `? :` alone would take
+    // atoi("")==0 and make gg%EFF_BATCH a divide-by-zero. Guard empty/<=0 -> default ACCUM.
+    const char* _eb = getenv("EFF_BATCH");
+    int EFF_BATCH = (_eb && *_eb && atoi(_eb) > 0) ? atoi(_eb) : ACCUM;
     if(EFF_BATCH % ACCUM != 0){ fprintf(stderr,"FATAL: EFF_BATCH(%d) must be a multiple of ACCUM(%d)\n",EFF_BATCH,ACCUM); return 9; }
 
     // ---- load byte-level enwik8 token stream (uint16 ids 0-255), SEQ=256 windows ----
