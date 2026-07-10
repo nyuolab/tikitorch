@@ -322,6 +322,14 @@ int main(int argc,char**argv){
     const char* INIT_DIR = getenv("INIT_DIR");
     const char* DUMP_DIR = getenv("DUMP_DIR")?getenv("DUMP_DIR"):"/tmp";
     if(ACCUM<1) ACCUM=1;
+    // EFF_BATCH: the DECOUPLED grad-accumulation / optimizer-update window for the PIPE=1 event loop. The in-flight
+    // activation-cache SLOT window stays S2_SLOTS (slots recycle every S2_SLOTS regardless), but the GACC / metric /
+    // LR window can be LARGER (e.g. 32) so the effective batch exceeds the 8 pipeline slots — the fix for the measured
+    // training-divergence (effective-batch-8 gradient noise diverges the model past warmup at every usable LR).
+    // Default == ACCUM (backward-compatible: unset => byte-identical to the current behavior). Must be a multiple of
+    // ACCUM so a grad-accum window contains whole slot-cycles. Used ONLY by the PIPE=1 branch (serial/KICKMEAS keep ACCUM).
+    int EFF_BATCH = getenv("EFF_BATCH") ? atoi(getenv("EFF_BATCH")) : ACCUM;
+    if(EFF_BATCH % ACCUM != 0){ fprintf(stderr,"FATAL: EFF_BATCH(%d) must be a multiple of ACCUM(%d)\n",EFF_BATCH,ACCUM); return 9; }
 
     // ---- load byte-level enwik8 token stream (uint16 ids 0-255), SEQ=256 windows ----
     char p[512]; snprintf(p,512,"%s/train.u16",dir); FILE*f=fopen(p,"rb"); if(!f){fprintf(stderr,"open %s\n",p);return 2;}
@@ -329,8 +337,8 @@ int main(int argc,char**argv){
     if(fread(data,2,ntok,f)!=(size_t)ntok){fprintf(stderr,"read tokens\n");return 2;} fclose(f);
     printf("[xfs2shard] SCALE-2 D=512 %d-block transformer MODEL-PARALLEL across %d FPGA(s) (slots", L, L);
     for(int l=0;l<L;l++) printf(" %d",slot[l]); printf(")%s\n", KICKMEAS?"  [KICKMEAS roofline]":"");
-    printf("[xfs2shard] %ld train tokens | D=%d H=%d FFN=%d SEQ=%d VOCAB=%d K=%d | LR=%.1e warmup=%d ACCUM=%d seed=%u | S2_BUFLEN=%d words=%.1f MB/chip\n",
-           ntok, S2_D, S2_H, S2_FFN, S2_SEQ, S2_VOCAB, S2_K, LR, WARMUP, ACCUM, seed, S2_BUFLEN, S2_BUFLEN*4.0/1e6);
+    printf("[xfs2shard] %ld train tokens | D=%d H=%d FFN=%d SEQ=%d VOCAB=%d K=%d | LR=%.1e warmup=%d ACCUM=%d EFF_BATCH=%d S2_SLOTS=%d seed=%u | S2_BUFLEN=%d words=%.1f MB/chip\n",
+           ntok, S2_D, S2_H, S2_FFN, S2_SEQ, S2_VOCAB, S2_K, LR, WARMUP, ACCUM, EFF_BATCH, S2_SLOTS, seed, S2_BUFLEN, S2_BUFLEN*4.0/1e6);
 
     if(fpga_mgmt_init()){fprintf(stderr,"mgmt init\n");return 2;}
     for(int l=0;l<L;l++){
@@ -462,7 +470,7 @@ int main(int argc,char**argv){
     int step0 = getenv("START_STEP") ? atoi(getenv("START_STEP")) : 0;
     // LR schedule as a pure function of the step index — SAME warmup+cosine as before, but callable at DISPATCH
     // time for an arbitrary step. The PIPE=1 global event loop overlaps steps, so a per-outer-loop `lr` no longer
-    // exists; each op is dispatched with lr_at(gg/ACCUM). The serial branch keeps calling it once per step.
+    // exists; each op is dispatched with lr_at(gg/EFF_BATCH). The serial branch keeps calling it once per step.
     // linear warmup then optional COSINE DECAY to LR*LR_MINFRAC (LR_DECAY=1). WHY: the silicon's constant-LR
     // loss floor sits higher than a CPU ref's (noisier effective gradient) — ride it down with a schedule.
     int    LR_DECAY  = getenv("LR_DECAY")  ? atoi(getenv("LR_DECAY"))   : 0;
@@ -478,7 +486,7 @@ int main(int argc,char**argv){
 
     // ===================== per-step bpb/acc + checkpoint (shared by the serial and pipelined paths) =====================
     // Fires ONCE per step. In the serial path it runs after that step's full drain; in the PIPE=1 global loop it runs
-    // the instant the OUTPUT chip finishes the LAST backward of the step (gg%ACCUM==ACCUM-1). `metric_po` is the DDR
+    // the instant the OUTPUT chip finishes the LAST backward of the step (gg%EFF_BATCH==EFF_BATCH-1). `metric_po` is the DDR
     // slot offset of the OUTPUT chip's WIDE logits for that step's last sub-batch; `last_off` is that sub-batch's data
     // window start (bpb/acc target alignment). Weights are untouched -> bit-exact training; only the log cadence changes.
     static int METRIC_EVERY = getenv("METRIC_EVERY") ? atoi(getenv("METRIC_EVERY")) : 25;
@@ -715,7 +723,8 @@ int main(int argc,char**argv){
     }
     } else {
       // ==================================================================================================
-      // PIPELINED (PIPE=1): a SINGLE GLOBAL event loop over gg = step*ACCUM + g, hoisted OUT of the step loop so
+      // PIPELINED (PIPE=1): a SINGLE GLOBAL event loop over gg = step*EFF_BATCH + g (EFF_BATCH = grad-accum /
+      // optimizer-update window, DECOUPLED from the S2_SLOTS activation-slot window), hoisted OUT of the step loop so
       // step n+1's forward-fill overlaps step n's backward-drain (~1.5x throughput). No per-step barrier. Per-chip
       // state (fdone/bdone/fnext/bnext) counts GLOBAL sub-batches and is initialized ONCE (never reset per step),
       // so F_l(gg) of step n+1 can dispatch while step n's backward drains. slot(gg)=gg%S2_SLOTS: up to S2_SLOTS
@@ -726,8 +735,8 @@ int main(int argc,char**argv){
       // HYGIENE: PIPE slot buffers (hmsg2/emsg2) and the kernel's single-slot GACC alias if ACCUM>S2_SLOTS
       // (two sub-batches map to slot gg%S2_SLOTS) -> silent activation/gradient corruption. Guard it.
       if(ACCUM > S2_SLOTS){ fprintf(stderr,"FATAL: PIPE=1 requires ACCUM<=S2_SLOTS (%d>%d); lower ACCUM or use serial PIPE=0\n", ACCUM, S2_SLOTS); return 8; }
-      const long GG0 = (long)step0*ACCUM;      // first global sub-batch (START_STEP resume-aware)
-      const long GGN = (long)steps*ACCUM;      // one-past-last global sub-batch
+      const long GG0 = (long)step0*EFF_BATCH;  // first global sub-batch (START_STEP resume-aware); steps count EFF_BATCH-windows (optimizer updates)
+      const long GGN = (long)steps*EFF_BATCH;  // one-past-last global sub-batch
       // soff PER SLOT (not per-step): set at a gg's FIRST forward dispatch (chip 0), read by that gg's backward
       // (OUTPUT targets, host-embed scatter) and the metric. Valid because a slot isn't reused until its backward
       // completes. Also track the last COMPLETED step's last sub-batch offset for the per-step metric.
@@ -745,18 +754,18 @@ int main(int argc,char**argv){
               else     { if(l>0)  { readf(l, S2_GROUT+po, emsg2[slot], (long)S2_SEQ*S2_D); }
                          else if(host_embed()){   // chip 0 (HID) up-msg gR -> host embed gradient (slot-aware GZERO/DO_UP)
                              readf(0, S2_GROUT+po, emsg2[slot], (long)S2_SEQ*S2_D); long off=soff_slot[slot];
-                             if(gg%ACCUM==0){ memset(hgE,0,(size_t)S2_VOCAB*S2_D*4); memset(hgP,0,(size_t)S2_SEQ*S2_D*4); }
+                             if(gg%EFF_BATCH==0){ memset(hgE,0,(size_t)S2_VOCAB*S2_D*4); memset(hgP,0,(size_t)S2_SEQ*S2_D*4); }
                              for(int t=0;t<S2_SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=S2_VOCAB)v=S2_VOCAB-1;
                                  for(int d=0;d<S2_D;d++){ float gv=emsg2[slot][t*S2_D+d]; hgE[(long)v*S2_D+d]+=gv; hgP[t*S2_D+d]+=gv; } }
-                             if(gg%ACCUM==ACCUM-1 && !getenv("EMB_FREEZE")){
-                                 double elr=lr_at((int)(gg/ACCUM));
+                             if(gg%EFF_BATCH==EFF_BATCH-1 && !getenv("EMB_FREEZE")){
+                                 double elr=lr_at((int)(gg/EFF_BATCH));
                                  for(long i=0;i<(long)S2_VOCAB*S2_D;i++) hEMB[i]-=dyad_adam(hgE[i],hmE[i],hvE[i],(float)elr);
                                  for(long i=0;i<(long)S2_SEQ*S2_D;i++)   hPOS[i]-=dyad_adam(hgP[i],hmP[i],hvP[i],(float)elr); }
                          }
                          bdone[l]++;
                          // per-step metric/checkpoint: fires ONCE when the OUTPUT chip finishes the step's LAST bwd.
-                         if(l==L-1 && gg%ACCUM==ACCUM-1){
-                             int mstep=(int)(gg/ACCUM); double mlr=lr_at(mstep);
+                         if(l==L-1 && gg%EFF_BATCH==EFF_BATCH-1){
+                             int mstep=(int)(gg/EFF_BATCH); double mlr=lr_at(mstep);
                              do_step_metric(mstep, mlr, soff_slot[slot], po);
                          }
                        }   // bwd up-msg gR
@@ -775,8 +784,8 @@ int main(int argc,char**argv){
               int fwok = (gf<GGN) && (l==0 || fdone[l-1]>gf) && (gf<GG0+S2_SLOTS || bdone[l]>gf-S2_SLOTS);
               if(bwok){
                   int slot=(int)(gb%S2_SLOTS); long po=slot_po(slot);
-                  int doup=(gb%ACCUM==ACCUM-1)?1:0, gz=(gb%ACCUM==0)?1:0;   // per-step GACC window (global-index modular)
-                  double lr=lr_at((int)(gb/ACCUM));                          // LR of THIS sub-batch's step (dispatch-time)
+                  int doup=(gb%EFF_BATCH==EFF_BATCH-1)?1:0, gz=(gb%EFF_BATCH==0)?1:0;   // EFF_BATCH GACC window (global-index modular; DECOUPLED from S2_SLOTS)
+                  double lr=lr_at((int)(gb/EFF_BATCH));                       // LR of THIS sub-batch's optimizer-update window (dispatch-time)
                   setcfg(l, S2_PH_BWD, krole(l), doup, doup?lrcode(lr):0, gz, slot);
                   if(l<L-1){ put_f(l, S2_GRIN+po, emsg2[slot], (long)S2_SEQ*S2_D); }  // neighbour WIDE error in
                   kick_start(l); busy[l]=1; bph[l]=1; bg[l]=gb; bnext[l]++;
