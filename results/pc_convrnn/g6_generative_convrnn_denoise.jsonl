@@ -1,0 +1,1 @@
+{"gate": "G6c", "arch": "convrnn", "ckpt": "results/pc_convrnn/ckpts/convrnn_cascade_s0.pt", "rate": 0.1, "n_windows": 32, "rec_pc": 0.4505, "rec_greedy": 0.4505, "rec_leave_corrupt": 0.0273}

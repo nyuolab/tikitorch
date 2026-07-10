@@ -146,6 +146,105 @@ The recurrent arm degrades ~⅓ of its paired conv-only control (bar ≤ ½):
 norecur 1.936 — ordered in the recurrence's favor but within seed spread;
 reported as parity, exactly as pre-registered. No "beats MorphSSM" claim.
 
+## G2b fallback round 1 (EC2, 10k steps): best seed 77%, bar unmet, findability confirmed [measured]
+
+Selective copy, recurrent arm only (controls measured at chance at 2k), 10k
+steps × lr {3e-3, 1e-2} × 3 seeds (`g2_synthetic.jsonl`, steps=10000 rows):
+
+| lr | acc @ delay 64 (3 seeds) |
+|---|---|
+| 1e-2 | 19.9 / 34.5 / 34.8 % |
+| **3e-3** | 34.3 / **77.2** / 67.4 % |
+
+Budget+lr (the ladder's first rung) lifts the best seed 64% → 77%, flat across
+delay 32→128 (retention still not the constraint), loss still descending at
+10k. The 95% bar stays unmet; seed variance (34↔77%) keeps the verdict
+"circuit findability, not architecture". Remaining pre-registered rungs:
+pow2-grid λ, erosion twin; the deeper fix is the l1+gather hybrid
+(STRATEGY_TRANSFORMER_COMPETITION.md).
+
+## G4 — depth ladder (d=128, L∈{4,8,16,32} × {bp, cascade} × 3 seeds): PASS at L≤16, marginal at L=32 [measured]
+
+Hard CE, matched lr 1e-2 both arms (`g3_g4_*.jsonl`):
+
+| L | bp | cascade | gap | within seed spread? |
+|---|---|---|---|---|
+| 4 | 2.0116±0.009 | 1.9903±0.028 | −0.021 | yes |
+| 8 | 1.9966±0.031 | 1.9978±0.029 | +0.001 | yes |
+| 16 | 2.0902±0.010 | 2.0886±0.038 | −0.002 | yes |
+| 32 | 2.2617±0.025 | 2.3011±0.036 | **+0.039** | marginal (>1σ, n=3) |
+
+Cascade tracks bp at every depth; the gaps do not trend (−0.021, +0.001,
+−0.002, +0.039). Both arms degrade identically past L=8 (task saturation at
+d=128 — the pre-registered reading: the claim is "BP quality at settling-free
+O(depth) cost", not "depth helps"). The L=32 cell is one marginal σ on n=3 —
+flagged as a watch item, not a kill; a seed extension settles it if the depth
+story is ever load-bearing. The async L=16 probe was cut by the box ceiling
+(partial@300); the G3 async result (+0.019 at L=7, full protocol) remains the
+async evidence.
+
+## G6 battery — generative inference at ~1.9–2.0-nat base quality: machinery PASS, payoff NOT demonstrated; Goodhart replicated at scale [measured]
+
+`g6_generative_{morphssm,convrnn}_*.jsonl`, 32 val windows/cell, cascade-trained
+checkpoints, soft-relax (τ=0.5) / hard-eval per PREREG.
+
+**G6a** (control): PASS both archs — topological settle reproduces the forward
+exactly (relL2 = 0.0); naive Jacobi converges 100–200× then floors in the
+pow-2-norm limit cycle (the documented C3-at-inference pathology).
+
+**G6b infilling** (exact-match on the gap; `bo-8` = best-of-8 suffix-rescored):
+
+| arch | span | em: PC | coord | greedy | bo-8 | ce: truth | greedy | PC | coord |
+|---|---|---|---|---|---|---|---|---|---|
+| morphssm | 8 | .129 | .043 | .133 | .141 | 2.087 | 2.262 | 2.261 | **1.986** |
+| morphssm | 16 | .111 | .035 | .111 | .129 | 2.057 | 2.214 | 2.214 | **1.923** |
+| morphssm | 32 | .119 | .028 | .119 | .089 | 2.105 | 2.314 | 2.314 | **1.982** |
+| convrnn | 8 | .102 | .035 | .102 | .144 | 1.871 | 2.099 | 2.099 | **1.776** |
+| convrnn | 16 | .154 | .039 | .156 | .123 | 1.862 | 2.062 | 2.065 | **1.723** |
+| morphssm | 16 (mean-init) | **.000** | .021 | .117 | .121 | 2.249 | 2.405 | 2.351 | 2.116 |
+
+Pre-registered pass (settled beats matched-compute baseline at ≥2 of 3 spans):
+**not met**. The structure is consistent across both architectures and every
+span: (i) the objective HAS signal — truth sits 0.15–0.25 nats below the greedy
+fill everywhere; (ii) gradient relaxation from greedy init does not move
+(em_pc == em_greedy); from mean init it descends the energy but decodes to
+nothing (em 0.000) — greedy init + projection are load-bearing; (iii) the
+discrete coordinate optimizer reliably drives the energy **below the truth's
+own score** (by ~0.1–0.14 nats) while exact-match collapses 3–4× — the
+Goodhart result, now measured at scale, not smoke. (iv) best-of-8 helps only
+sometimes — inference-time compute helps nobody reliably at this quality.
+This is the M3 quality-gate answer at quality point one (~1.9–2.0 nats): the
+energy landscape of a model this weak does not rank the truth first, so
+optimizing it harder anti-correlates with accuracy. The pre-registered path
+remains the M3 crossover (repeat at ~1.85/~1.75-nat checkpoints).
+
+**G6c denoising** (token recovery at corrupted positions):
+
+| arch | rate | PC | greedy | floor |
+|---|---|---|---|---|
+| convrnn | 0.10 | .451 | .451 | .027 |
+| morphssm | 0.10 (64w, v5) | .417 | .416 | .010 |
+| morphssm | 0.10 | .348 | .348 | .027 |
+| morphssm | 0.25 | .284 | .286 | .024 |
+
+Settling ties the causal greedy fill exactly at every rate — same gating.
+One orthogonal positive: the **conv-RNN denoises 10 pp better than MorphSSM**
+(45.1% vs 34.8% at 10%) — the recurrence improves base context integration,
+another long-range-axis win for Track 2, independent of PC.
+
+## EC2 postscript (the five-box saga, condensed)
+
+v1–v6 (~$50 total): four real infrastructure defects found and fixed, each now
+instrumented against recurrence — (1) drivers must ship logs/telemetry
+continuously, never only at exit (v2 died undiagnosably; v3's telemetry made
+the same failure diagnosable in 6 minutes); (2) bare `wait` blocks on the
+heartbeat subshell — wait on explicit PIDs (the actual v1/v2/v3 zombie cause);
+(3) `git archive` ships only committed files — untracked
+`data/tinyshakespeare.txt` cost v4 37/43 jobs; (4) size each queue COMMAND
+against the backstop, and chunk candidate-batch forwards (silent OOM kills two
+v5 jobs). v4 delivered G2b; v6 delivered G4 + the G6 battery (8/13 cells; the
+missing four are ablation arms + convrnn span-32, cut by the ceiling).
+
 ## Next steps (EC2 — user decision 2026-07-08: no further local runs)
 
 Compute template: `scripts/run_connect4_prior_sweep_ec2.sh` pattern (IAM

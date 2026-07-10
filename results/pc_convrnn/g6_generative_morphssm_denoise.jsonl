@@ -1,0 +1,2 @@
+{"gate": "G6c", "arch": "morphssm", "ckpt": "results/pc_convrnn/ckpts/morphssm_cascade_s0.pt", "rate": 0.1, "n_windows": 32, "rec_pc": 0.3481, "rec_greedy": 0.3481, "rec_leave_corrupt": 0.0273}
+{"gate": "G6c", "arch": "morphssm", "ckpt": "results/pc_convrnn/ckpts/morphssm_cascade_s0.pt", "rate": 0.25, "n_windows": 32, "rec_pc": 0.2844, "rec_greedy": 0.2857, "rec_leave_corrupt": 0.0243}
