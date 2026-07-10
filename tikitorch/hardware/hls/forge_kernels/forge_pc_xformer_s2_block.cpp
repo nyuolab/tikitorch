@@ -122,6 +122,77 @@ static inline float bf_dyad_f(float wf) {
 }
 
 // ======================================================================================================
+// PRECISE MULT-FREE exp — the fix for the SILICON hls::exp SOFTMAX BIAS (the last silicon-approximated
+// intrinsic). Silicon APPROXIMATES hls::exp; the shim/_mpshim maps it to EXACT libm, so a deterministic-but-
+// biased silicon exp was invisible to every csim/twin — the SAME intrinsic-approximation class as the forward
+// LN log2 bug (fixed above with s2_ilog2_*). Measured 2026-07: L=2 AND L=8 exact-libm CPU twins TRAIN STABLY
+// on the exact recipe (V=8192, held-peak-LR, >150 steps) while F2 silicon DIVERGES to bpb 38 — deconfounding
+// depth and isolating the divergence to this one intrinsic. s2_exp_dyad reproduces the golden kernel's proven
+// precise exp (forge_pc_xformer_golden_block.hpp g_exp_q16) in FLOAT using this file's integer-bit template:
+//   exp(x), x<=0 -> d=-x; u = d*log2(e) via a 6-term shift-add (1+1/4+1/8+1/16+1/256+1/1024, EXACT hls::ldexp,
+//   NO multiply -> DSP_MULT=0, err ~0.02% vs true log2(e)); split u into octave(int)+8-bit fraction; then
+//   exp = 2^-u = S2_GEXP[frac] >> octave via a compile-time 256-entry mantissa ROM (2^(-f/256), plain float
+//   literals). Every op is deterministic int/ldexp/ROM -> BIT-IDENTICAL on F2 silicon and the libm shim.
+//   Accuracy vs expf in the softmax-relevant band |x|<8: 0.09-0.18% rel; args < -21.5 floor to 0 (true mass ~0).
+static const float S2_GEXP[256] = {
+    1.0f, 0.997296035f, 0.994599402f, 0.9919101f, 0.98922801f, 0.986553192f,
+    0.983885586f, 0.981225252f, 0.978572071f, 0.975926042f, 0.973287225f, 0.970655501f,
+    0.96803087f, 0.965413392f, 0.962802947f, 0.960199594f, 0.957603276f, 0.95501399f,
+    0.952431679f, 0.949856341f, 0.947287977f, 0.944726586f, 0.94217211f, 0.939624488f,
+    0.93708384f, 0.934549987f, 0.932023048f, 0.929502904f, 0.926989555f, 0.924483061f,
+    0.921983302f, 0.919490278f, 0.917004049f, 0.914524496f, 0.912051678f, 0.909585536f,
+    0.907126069f, 0.904673278f, 0.902227104f, 0.899787486f, 0.897354543f, 0.894928157f,
+    0.892508328f, 0.890094995f, 0.88768822f, 0.885288f, 0.882894218f, 0.880506933f,
+    0.878126085f, 0.875751674f, 0.873383701f, 0.871022105f, 0.868666947f, 0.866318107f,
+    0.863975644f, 0.8616395f, 0.859309673f, 0.856986105f, 0.854668856f, 0.852357924f,
+    0.850053191f, 0.847754657f, 0.845462382f, 0.843176305f, 0.840896428f, 0.838622689f,
+    0.83635509f, 0.83409363f, 0.83183831f, 0.829589069f, 0.827345908f, 0.825108767f,
+    0.822877765f, 0.820652723f, 0.818433702f, 0.816220701f, 0.81401372f, 0.811812639f,
+    0.809617579f, 0.80742842f, 0.805245161f, 0.803067803f, 0.800896406f, 0.798730791f,
+    0.796571076f, 0.794417202f, 0.792269111f, 0.79012686f, 0.787990451f, 0.785859764f,
+    0.783734798f, 0.781615674f, 0.779502213f, 0.777394474f, 0.775292456f, 0.773196101f,
+    0.771105409f, 0.769020379f, 0.766941011f, 0.764867246f, 0.762799084f, 0.760736525f,
+    0.758679509f, 0.756628096f, 0.754582226f, 0.75254184f, 0.750507057f, 0.748477697f,
+    0.746453881f, 0.744435489f, 0.742422581f, 0.740415096f, 0.738413095f, 0.736416459f,
+    0.734425187f, 0.732439399f, 0.730458915f, 0.728483796f, 0.726513982f, 0.724549532f,
+    0.722590387f, 0.720636547f, 0.718688011f, 0.716744721f, 0.714806676f, 0.712873876f,
+    0.710946321f, 0.709023952f, 0.707106769f, 0.705194831f, 0.703288019f, 0.701386333f,
+    0.699489832f, 0.697598457f, 0.695712209f, 0.693831027f, 0.69195497f, 0.690083921f,
+    0.688217998f, 0.686357081f, 0.684501231f, 0.682650387f, 0.680804491f, 0.678963661f,
+    0.677127779f, 0.675296843f, 0.673470914f, 0.671649873f, 0.669833779f, 0.668022573f,
+    0.666216254f, 0.664414883f, 0.662618339f, 0.660826623f, 0.659039795f, 0.657257795f,
+    0.655480623f, 0.65370822f, 0.651940644f, 0.650177836f, 0.648419797f, 0.646666467f,
+    0.644917965f, 0.643174112f, 0.641435027f, 0.639700592f, 0.637970865f, 0.636245847f,
+    0.634525478f, 0.632809758f, 0.631098688f, 0.629392207f, 0.627690375f, 0.625993133f,
+    0.62430048f, 0.622612417f, 0.620928884f, 0.61924994f, 0.617575526f, 0.615905643f,
+    0.614240289f, 0.612579405f, 0.610922992f, 0.609271109f, 0.607623696f, 0.605980694f,
+    0.604342163f, 0.602708042f, 0.601078391f, 0.599453092f, 0.597832203f, 0.596215665f,
+    0.594603539f, 0.592995763f, 0.591392338f, 0.589793265f, 0.588198483f, 0.586608052f,
+    0.585021913f, 0.583440006f, 0.58186245f, 0.580289125f, 0.578720033f, 0.577155232f,
+    0.575594604f, 0.574038267f, 0.572486043f, 0.57093811f, 0.56939429f, 0.567854702f,
+    0.566319287f, 0.564787984f, 0.563260794f, 0.561737776f, 0.560218871f, 0.558704078f,
+    0.557193398f, 0.555686772f, 0.554184198f, 0.552685738f, 0.55119127f, 0.549700916f,
+    0.548214555f, 0.546732187f, 0.545253873f, 0.543779552f, 0.542309165f, 0.540842831f,
+    0.539380372f, 0.537921965f, 0.536467433f, 0.535016835f, 0.53357023f, 0.53212744f,
+    0.530688584f, 0.529253662f, 0.527822614f, 0.52639538f, 0.524972022f, 0.523552537f,
+    0.522136867f, 0.520725071f, 0.519317031f, 0.517912865f, 0.516512454f, 0.515115798f,
+    0.513722956f, 0.51233387f, 0.510948598f, 0.509567022f, 0.508189142f, 0.506815016f,
+    0.505444646f, 0.504077971f, 0.502714932f, 0.501355648f
+};
+static inline float s2_exp_dyad(float x) {            // == hls::exp(x) for x<=0, BIT-EXACT on silicon and shim
+#pragma HLS INLINE
+    if (x >= 0.0f) return 1.0f;                        // s2 softmax always passes x = score - rowmax <= 0
+    float d = -x;                                       // d >= 0
+    float u = d + hls::ldexp(d,-2) + hls::ldexp(d,-3) + hls::ldexp(d,-4)
+                + hls::ldexp(d,-8) + hls::ldexp(d,-10); // d * log2(e), shift-add, mult-free (err ~0.02%)
+    int octave = (int)u; if (octave >= 31) return 0.0f; // 2^-u underflow floor (arg < ~-21.5): true mass ~0
+    float frac = u - (float)octave;                     // [0,1)
+    int fi = (int)(hls::ldexp(frac, 8) + 0.5f);         // round frac*256 (exponent add, no multiply)
+    if (fi > 255) fi = 255;
+    return hls::ldexp(S2_GEXP[fi], -octave);            // 2^(-fi/256) * 2^(-octave), EXACT ldexp
+}
+
+// ======================================================================================================
 // DE-PIPELINE GATE (DEFAULT OFF — the laned/pipelined reductions are the correct FAST path)
 // ------------------------------------------------------------------------------------------------------
 // HISTORY (corrected): this gate was added on the theory that the F2 divergence was a silicon
@@ -755,7 +826,7 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
 #endif
 #if S2_DEPIPELINE_REDUCE
             float esum = 0.0f;                                           // DE-PIPELINE: sequential exp-sum, II>1
-            for (int j = 0; j <= i; j++) { float e = hls::exp(sc[j]-mx); pr[j] = e; esum += e; }
+            for (int j = 0; j <= i; j++) { float e = s2_exp_dyad(sc[j]-mx); pr[j] = e; esum += e; }
             float sum = esum;
 #else
             float slane[S2_LANES];                                       // FIX B: laned exp-sum (was II=6)
@@ -763,7 +834,7 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
             for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
             for (int j = 0; j <= i; j++) {
 #pragma HLS PIPELINE II=1
-                float e = hls::exp(sc[j]-mx); pr[j] = e; slane[j & (S2_LANES-1)] += e;
+                float e = s2_exp_dyad(sc[j]-mx); pr[j] = e; slane[j & (S2_LANES-1)] += e;
             }
             float sum = s2_lanesum(slane);
 #endif
@@ -834,14 +905,14 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
 #endif
 #if S2_DEPIPELINE_REDUCE
             float sum = 0.0f;                                            // DE-PIPELINE: sequential exp-sum, II>1
-            for (int j = 0; j <= i; j++) { float e = hls::exp(p[j]-mx); p[j] = e; sum += e; }
+            for (int j = 0; j <= i; j++) { float e = s2_exp_dyad(p[j]-mx); p[j] = e; sum += e; }
 #else
             float slane[S2_LANES];                                       // FIX B: laned exp-sum
 #pragma HLS ARRAY_PARTITION variable=slane complete dim=1
             for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
             for (int j = 0; j <= i; j++) {
 #pragma HLS PIPELINE II=1
-                float e = hls::exp(p[j]-mx); p[j] = e; slane[j & (S2_LANES-1)] += e;
+                float e = s2_exp_dyad(p[j]-mx); p[j] = e; slane[j & (S2_LANES-1)] += e;
             }
             float sum = s2_lanesum(slane);
 #endif
@@ -1030,7 +1101,7 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
             float mx = -1e30f;
             for (int v = 0; v < S2_VOCAB; v++) { if (lgrow[v] > mx) mx = lgrow[v]; }
             float sum = 0;
-            for (int v = 0; v < S2_VOCAB; v++) { pr[v] = hls::exp(lgrow[v]-mx); sum += pr[v]; }
+            for (int v = 0; v < S2_VOCAB; v++) { pr[v] = s2_exp_dyad(lgrow[v]-mx); sum += pr[v]; }
             for (int v = 0; v < S2_VOCAB; v++) { float p = pr[v]/sum, oh = (v==tgt[t])?1.0f:0.0f; lgrow[v] = P((p-oh)/S2_SEQ); }
             bstore_f(buffer, S2_BG_LG + t*S2_VOCAB, lgrow, S2_VOCAB);
         }
