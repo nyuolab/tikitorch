@@ -198,6 +198,20 @@ next step: the attention layer's frozen-routing cascade adjoint + closure rung.
 in this stack (the OFF_GPU 0.831-from-LM-loss precedent fails to transfer) —
 the recall wall stands and M1 becomes the program's sole quality lever.
 
+**M4 — cross-family uniqueness baseline (pre-registered 2026-07-10, rides Box C).**
+The bear case's challenge: "a transformer shop answers infilling with one
+FIM data-augmentation flag at pretraining, zero inference cost — is settling
+unique beyond causal models?" Sharpest within-substrate form: **FIM-train the
+SAME MorphSSM** (identical arch/params/substrate, cascade credit, vocab 65+3
+sentinels ⟨PRE⟩⟨SUF⟩⟨MID⟩, PSM format, 50% FIM / 50% plain-LM batches, 6000
+steps d256 = the Q2 budget). Eval: the G6b windows/spans verbatim; FIM arm
+generates the middle greedily after [⟨PRE⟩ prefix ⟨SUF⟩ suffix ⟨MID⟩].
+**Readout:** span EM — FIM-trained vs the settled-PC and causal-greedy arms at
+matched quality (Q2), plus the FIM tax on plain-LM CE. **Interpretation
+(pre-registered):** FIM ≫ settled ⇒ "unique" honestly narrows to "unique among
+*unmodified* causal checkpoints — retraining beats settling"; settled ≥ FIM ⇒
+the no-retraining mode is genuinely competitive with the retraining answer.
+
 ## Honest claim ladder (every run states its rung)
 
 | rung | training config | claimable |
