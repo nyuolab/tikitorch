@@ -12,7 +12,7 @@ AGFI="${AGFI:?set AGFI}"; STEPS="${STEPS:-3000}"; NSLOTS="${NSLOTS:-8}"; MAX_MIN
 XF_LR="${XF_LR:-3e-3}"; XF_WARMUP="${XF_WARMUP:-200}"; SEED="${SEED:-7}"; SAMPLE="${SAMPLE:-400}"; ACTSTATS="${ACTSTATS:-0}"; FIXEDOFF="${FIXEDOFF:--1}"; ACCUM="${ACCUM:-8}"; INIT_S3="${INIT_S3:-}"; LR_DECAY="${LR_DECAY:-1}"; LR_MINFRAC="${LR_MINFRAC:-0.1}"; KICKMEAS="${KICKMEAS:-0}"; PIPE="${PIPE:-0}"; S2_DIAG="${S2_DIAG:-}"; EMB_FREEZE="${EMB_FREEZE:-}"; FWD_DUMP="${FWD_DUMP:-}"; HOST_BACKWARD="${HOST_BACKWARD:-}"; STEPTRACE="${STEPTRACE:-}"; READBURST="${READBURST:-}"
 # S2_DEFS: -D flags for the DRIVER compile — MUST match the AFI's kernel flags (e.g. "-DS2_VOCAB=8192 -DS2_K=128"),
 # else the driver's DDR layout (S2_BUFLEN/offsets from the shared config header) mismatches the bitstream = silent ABI corruption.
-S2_DEFS="${S2_DEFS:-}"
+S2_DEFS="${S2_DEFS:-}"; EFF_BATCH="${EFF_BATCH:-}"
 # long-run QoL: per-step print cadence, rolling-checkpoint cadence (masters -> S3 via up()), resume start step.
 PRINT_EVERY="${PRINT_EVERY:-}"; CKPT_EVERY="${CKPT_EVERY:-}"; START_STEP="${START_STEP:-}"
 # byte-level enwik8 token stream (uint16 ids 0-255). Provide ENWIK_S3 (an s3://.../train.u16) OR a BINS_S3 dir that
@@ -33,7 +33,7 @@ shutdown -h +${MAX_MINUTES} dl || true
 exec > /var/log/tiki-s2shard.log 2>&1
 set -x; export HOME=/root
 S3_SRC="${S3_SRC}"; S3_RESULTS="${S3_RESULTS}"; AGFI="${AGFI}"; STEPS="${STEPS}"; NSLOTS="${NSLOTS}"; BINS_S3="${BINS_S3}"; ENWIK_S3="${ENWIK_S3}"
-XF_LR="${XF_LR}"; XF_WARMUP="${XF_WARMUP}"; SEED="${SEED}"; SAMPLE="${SAMPLE}"; ACTSTATS="${ACTSTATS}"; FIXEDOFF="${FIXEDOFF}"; ACCUM="${ACCUM}"; INIT_S3="${INIT_S3}"; LR_DECAY="${LR_DECAY}"; LR_MINFRAC="${LR_MINFRAC}"; KICKMEAS="${KICKMEAS}"; PIPE="${PIPE}"; S2_DIAG="${S2_DIAG}"; EMB_FREEZE="${EMB_FREEZE}"; FWD_DUMP="${FWD_DUMP}"; HOST_BACKWARD="${HOST_BACKWARD}"; STEPTRACE="${STEPTRACE}"; READBURST="${READBURST}"; S2_DEFS="${S2_DEFS}"; PRINT_EVERY="${PRINT_EVERY}"; CKPT_EVERY="${CKPT_EVERY}"; START_STEP="${START_STEP}"
+XF_LR="${XF_LR}"; XF_WARMUP="${XF_WARMUP}"; SEED="${SEED}"; SAMPLE="${SAMPLE}"; ACTSTATS="${ACTSTATS}"; FIXEDOFF="${FIXEDOFF}"; ACCUM="${ACCUM}"; INIT_S3="${INIT_S3}"; LR_DECAY="${LR_DECAY}"; LR_MINFRAC="${LR_MINFRAC}"; KICKMEAS="${KICKMEAS}"; PIPE="${PIPE}"; S2_DIAG="${S2_DIAG}"; EMB_FREEZE="${EMB_FREEZE}"; FWD_DUMP="${FWD_DUMP}"; HOST_BACKWARD="${HOST_BACKWARD}"; STEPTRACE="${STEPTRACE}"; READBURST="${READBURST}"; S2_DEFS="${S2_DEFS}"; PRINT_EVERY="${PRINT_EVERY}"; CKPT_EVERY="${CKPT_EVERY}"; START_STEP="${START_STEP}"; EFF_BATCH="${EFF_BATCH}"
 up(){ command -v aws >/dev/null 2>&1 || return 0
       aws s3 cp /var/log/tiki-s2shard.log "\$S3_RESULTS/s2shard.log" --only-show-errors || true
       # rolling checkpoint (driver CKPT_EVERY>0 writes these): upload so a crashed/interrupted long run can resume
@@ -57,7 +57,7 @@ if [ -n "\$INIT_S3" ]; then mkdir -p /tmp/init; for l in 0 1 2 3 4 5 6 7; do aws
 g++ -O2 -std=c++14 \$S2_DEFS -I"\$SDK/include" -I/opt/tiki/tikitorch/hardware/hls/forge_kernels \
     /opt/tiki/tikitorch/fpga/silicon/forge_pc_xformer_s2_shard.cpp -lfpga_mgmt -o /tmp/xfs2shard 2>&1 | tee /tmp/build.txt; up
 echo "driver S2_DEFS='\$S2_DEFS' (must match the AFI's kernel -D flags)"
-export XF_LR XF_WARMUP SEED SAMPLE ACTSTATS FIXEDOFF ACCUM LR_DECAY LR_MINFRAC KICKMEAS PIPE S2_DIAG EMB_FREEZE FWD_DUMP HOST_BACKWARD STEPTRACE READBURST PRINT_EVERY CKPT_EVERY START_STEP DUMP_DIR=/tmp   # INIT_DIR exported above when INIT_S3 set
+export XF_LR XF_WARMUP SEED SAMPLE ACTSTATS FIXEDOFF ACCUM LR_DECAY LR_MINFRAC KICKMEAS PIPE S2_DIAG EMB_FREEZE FWD_DUMP HOST_BACKWARD STEPTRACE READBURST PRINT_EVERY CKPT_EVERY START_STEP EFF_BATCH DUMP_DIR=/tmp   # INIT_DIR exported above when INIT_S3 set
 ( sudo -E /tmp/xfs2shard "\$STEPS" /tmp/pc_enwik8 \$SLOTS 2>&1 | tee /tmp/train.txt; echo EXIT=\${PIPESTATUS[0]} >> /tmp/train.txt ) || true
 for fdump in img build train; do aws s3 cp /tmp/\$fdump.txt "\$S3_RESULTS/\$fdump.txt" --only-show-errors || true; done
 for w in /tmp/xfs2_master*.f32; do [ -f "\$w" ] && aws s3 cp "\$w" "\$S3_RESULTS/\$(basename \$w)" --only-show-errors || true; done
