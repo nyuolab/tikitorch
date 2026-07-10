@@ -123,6 +123,7 @@ static double ce_bits(const int32_t*b,const int32_t*tgt){
 }
 
 int main(int argc,char**argv){
+    setvbuf(stdout, NULL, _IOLBF, 0);
     const char* OUTDIR   = getenv("OUTDIR")   ? getenv("OUTDIR")   : ".";
     const char* INIT_DIR = getenv("INIT_DIR");
     const char* ENWIK    = getenv("ENWIK");                          // path to a train.u16 (uint16 tokens)
@@ -136,8 +137,9 @@ int main(int argc,char**argv){
     if(!INIT_DIR){ fprintf(stderr,"FATAL: set INIT_DIR (loads INIT_DIR/master{0,1}.f32)\n"); return 2; }
     if(!ENWIK){ fprintf(stderr,"FATAL: set ENWIK (uint16 token stream; FIXEDOFF selects the window)\n"); return 2; }
 
-    printf("=== s2_twochip_shim NL=2 HOST_EMBED  D=%d H=%d FFN=%d SEQ=%d VOCAB=%d K=%d | STEPS=%d ACCUM=%d LR=%.2e WARMUP=%d FIXEDOFF=%ld ===\n",
-           D,H,FFN,SEQ,VOCAB,S2_K,STEPS,ACCUM,LR,WARMUP,FIXEDOFF);
+    printf("=== s2_twochip_shim NL=%d HOST_EMBED  D=%d H=%d FFN=%d SEQ=%d VOCAB=%d K=%d | STEPS=%d ACCUM=%d LR=%.2e WARMUP=%d FIXEDOFF=%ld ROLL=%d ===\n",
+           getenv("NL")?atoi(getenv("NL")):2, D,H,FFN,SEQ,VOCAB,S2_K,STEPS,ACCUM,LR,WARMUP,FIXEDOFF,
+           getenv("ROLL")&&atoi(getenv("ROLL"))?1:0);
 
     // ---- load token stream ----
     FILE*tf=fopen(ENWIK,"rb"); if(!tf){fprintf(stderr,"open %s\n",ENWIK);return 2;}
@@ -146,24 +148,29 @@ int main(int argc,char**argv){
     if(ntok < FIXEDOFF + SEQ + 2){ fprintf(stderr,"FATAL: token stream too short (%ld) for FIXEDOFF=%ld + SEQ+2\n",ntok,FIXEDOFF); return 2; }
     printf("[shim] %ld tokens from %s\n", ntok, ENWIK);
 
-    // ---- per-chip masters (shared init) ----
-    static FMaster M0, M1;
-    { char ip[512]; snprintf(ip,512,"%s/master0.f32",INIT_DIR); if(!load_master_file(M0,ip)){fprintf(stderr,"load %s\n",ip);return 3;} printf("[shim] chip0 init <- %s\n",ip); }
-    { char ip[512]; snprintf(ip,512,"%s/master1.f32",INIT_DIR); if(!load_master_file(M1,ip)){fprintf(stderr,"load %s\n",ip);return 3;} printf("[shim] chip1 init <- %s\n",ip); }
+    // ---- N-chip generalization (NL env, default 2): NL layers on NL chips.
+    //      chip0 = HID with host-embed; chips 1..NL-2 = HID (block only); chip NL-1 = OUT (final-LN + head + CE).
+    //      This is the L=8 deconfounder for the silicon-vs-recipe divergence question — the L=2 twin changed
+    //      exp-exactness AND depth simultaneously; running L=8 with exact-libm exp isolates depth. ----
+    int NL = getenv("NL") ? atoi(getenv("NL")) : 2; if(NL<2) NL=2;
+    std::vector<FMaster*> M(NL);
+    for(int l=0;l<NL;l++){ M[l]=(FMaster*)malloc(sizeof(FMaster)); if(!M[l]){fprintf(stderr,"malloc master %d\n",l);return 4;}
+        char ip[512]; snprintf(ip,512,"%s/master%d.f32",INIT_DIR,l);
+        if(!load_master_file(*M[l],ip)){fprintf(stderr,"load %s (need gen_init CHIPS=%d)\n",ip,NL);return 3;}
+        printf("[shim] chip%d init <- %s\n",l,ip); }
 
-    // ---- two independent kernel buffers (calloc zeroes adam m/v + GACC, exactly like the driver) ----
-    int32_t* b0=(int32_t*)calloc((size_t)S2_BUFLEN,4);
-    int32_t* b1=(int32_t*)calloc((size_t)S2_BUFLEN,4);
-    if(!b0||!b1){fprintf(stderr,"calloc buf\n");return 5;}
-    stage_master(b0,0,M0);   // chip0 = HID (role_is_out=0): stages EMB/POS too (driver l==0 path)
-    stage_master(b1,1,M1);   // chip1 = OUT
+    // ---- NL independent kernel buffers (calloc zeroes adam m/v + GACC, exactly like the driver) ----
+    std::vector<int32_t*> b(NL);
+    for(int l=0;l<NL;l++){ b[l]=(int32_t*)calloc((size_t)S2_BUFLEN,4); if(!b[l]){fprintf(stderr,"calloc buf %d\n",l);return 5;}
+        stage_master(b[l], (l==NL-1)?1:0, *M[l]); }   // last=OUT(stages WHEAD/LNF); else HID(stages EMB/POS, unused by mid chips)
 
     // ---- host-embed state: hEMB/hPOS alias chip0's master EMB/POS (driver: hEMB=M[0]->EMB) ----
-    float* hEMB=M0.EMB; float* hPOS=M0.POS;
+    float* hEMB=M[0]->EMB; float* hPOS=M[0]->POS;
     std::vector<float> hmE(VOCAB*D,0),hvE(VOCAB*D,0),hmP(SEQ*D,0),hvP(SEQ*D,0),hgE(VOCAB*D,0),hgP(SEQ*D,0);
 
     std::vector<float> hmsg(SEQ*D), emsg(SEQ*D);           // wide down / up message (SEQ*D floats)
     std::vector<int32_t> tgt(SEQ);
+    auto ROLE=[&](int l){ return (l==NL-1)?S2_RL_OUT:S2_RL_HID; };
 
     for(int step=0; step<STEPS; step++){
         // driver LR schedule: linear warmup (guard WARMUP>0?WARMUP:1) then optional cosine decay.
@@ -173,38 +180,36 @@ int main(int argc,char**argv){
         int lrb=lrcode(lr);
 
         for(int k=0;k<ACCUM;k++){
+            // ROLL=1: advance the window every sub-batch (step*ACCUM+k), wrapping — a REAL rolling-data trainer
+            // (the true recipe-stability twin of the diverging silicon run). Default: FIXEDOFF fixed window.
             long off = (FIXEDOFF>=0)? FIXEDOFF : 0;        // FIXEDOFF fixes the window (same example every sub-batch)
+            if(getenv("ROLL") && atoi(getenv("ROLL"))){ long span=ntok-SEQ-2; long base=(FIXEDOFF>=0)?FIXEDOFF:0;
+                off = base + ((long)(step*ACCUM+k)*SEQ) % (span>0?span:1); }
             int do_update=(k==ACCUM-1)?1:0;
             int gz=(k==0)?1:0;
 
-            // ============ FORWARD SWEEP chip0 -> chip1 ============
-            // chip0 (HID): host computes R = EMB[tok] + POS -> chip0 S2_GRIN.
+            // ============ FORWARD SWEEP chip0 -> chip NL-1 ============
+            // chip0 (HID): host computes R = EMB[tok] + POS -> S2_GRIN; chips 1..NL-1 read the previous chip's R'.
             for(int t=0;t<SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=VOCAB)v=VOCAB-1;
                 for(int d=0;d<D;d++) hmsg[t*D+d]=hEMB[(long)v*D+d]+hPOS[t*D+d]; }
-            put_f(b0,S2_GRIN,hmsg.data(),(long)SEQ*D);
-            setcfg(b0,S2_PH_FWD,S2_RL_HID,0,0,0,0); forge_pc_xformer_s2_block((ap_uint<512>*)b0);
-            if(FWD_DUMP && step==0 && k==0){ fprintf(stderr,"[FWD_DUMP] chip0 (HID) forward wide-cache -> %s\n",OUTDIR); dump_fwd_chip(b0,OUTDIR,0,0); }
-            get_f(b0,S2_GROUT,hmsg.data(),(long)SEQ*D);    // chip0's wide R' -> down-message
+            for(int l=0;l<NL;l++){
+                put_f(b[l],S2_GRIN,hmsg.data(),(long)SEQ*D);
+                if(l==NL-1){ for(int t=0;t<SEQ;t++) tgt[t]=data[off+t+1]; put_i(b[l],S2_TGT,tgt.data(),SEQ); }  // OUT targets
+                setcfg(b[l],S2_PH_FWD,ROLE(l),0,0,0,0); forge_pc_xformer_s2_block((ap_uint<512>*)b[l]);
+                if(FWD_DUMP && step==0 && k==0 && (l==0||l==NL-1)){ fprintf(stderr,"[FWD_DUMP] chip%d forward wide-cache -> %s\n",l,OUTDIR); dump_fwd_chip(b[l],OUTDIR,l,l==NL-1); }
+                if(l==NL-1){ if(k==0){ double ce=ce_bits(b[l],tgt.data()); printf("[shim] step %d k0 CE(pre-update) = %.4f bits/tok (baseline log2(V)=%.3f)\n", step, ce, log2((double)VOCAB)); } }
+                else get_f(b[l],S2_GROUT,hmsg.data(),(long)SEQ*D);   // this chip's wide R' -> next chip's input
+            }
 
-            // chip1 (OUT): GRIN = chip0's R' ; targets = data[off+t+1].
-            put_f(b1,S2_GRIN,hmsg.data(),(long)SEQ*D);
-            for(int t=0;t<SEQ;t++) tgt[t]=data[off+t+1];
-            put_i(b1,S2_TGT,tgt.data(),SEQ);
-            setcfg(b1,S2_PH_FWD,S2_RL_OUT,0,0,0,0); forge_pc_xformer_s2_block((ap_uint<512>*)b1);
-            if(FWD_DUMP && step==0 && k==0){ fprintf(stderr,"[FWD_DUMP] chip1 (OUT) forward wide-cache -> %s\n",OUTDIR); dump_fwd_chip(b1,OUTDIR,1,1); }
-            if(k==0){ double ce=ce_bits(b1,tgt.data()); printf("[shim] step %d k0 CE(pre-update) = %.4f bits/tok (baseline log2(V)=%.3f)\n", step, ce, log2((double)VOCAB)); }
+            // ============ BACKWARD SWEEP chip NL-1 -> chip0 ============
+            // OUT chip seeds CE grad internally (no GRIN); each upstream HID chip reads the downstream up-error.
+            for(int l=NL-1;l>=0;l--){
+                if(l<NL-1) put_f(b[l],S2_GRIN,emsg.data(),(long)SEQ*D);   // up-error from the downstream chip
+                setcfg(b[l],S2_PH_BWD,ROLE(l),do_update,do_update?lrb:0,gz,0); forge_pc_xformer_s2_block((ap_uint<512>*)b[l]);
+                get_f(b[l],S2_GROUT,emsg.data(),(long)SEQ*D);            // up-error -> upstream chip (chip0: gR = embed input grad)
+            }
 
-            // ============ BACKWARD SWEEP chip1 -> chip0 ============
-            // chip1 (OUT): BWD; DO_UP on last sub-batch, GZERO on first.
-            setcfg(b1,S2_PH_BWD,S2_RL_OUT,do_update,do_update?lrb:0,gz,0); forge_pc_xformer_s2_block((ap_uint<512>*)b1);
-            get_f(b1,S2_GROUT,emsg.data(),(long)SEQ*D);    // wide up-message (input grad) -> chip0
-
-            // chip0 (HID): GRIN = up-error; BWD; DO_UP/GZERO same schedule.
-            put_f(b0,S2_GRIN,emsg.data(),(long)SEQ*D);
-            setcfg(b0,S2_PH_BWD,S2_RL_HID,do_update,do_update?lrb:0,gz,0); forge_pc_xformer_s2_block((ap_uint<512>*)b0);
-            get_f(b0,S2_GROUT,emsg.data(),(long)SEQ*D);    // chip0 up-message gR = embed input gradient
-
-            // host trains EMB/POS from gR (driver serial-sweep host_embed path).
+            // host trains EMB/POS from gR (== emsg after chip0's backward; driver serial-sweep host_embed path).
             if(gz){ memset(hgE.data(),0,(size_t)VOCAB*D*4); memset(hgP.data(),0,(size_t)SEQ*D*4); }  // GZERO
             for(int t=0;t<SEQ;t++){ int v=(int)data[off+t]; if(v<0)v=0; if(v>=VOCAB)v=VOCAB-1;
                 for(int d=0;d<D;d++){ float g=emsg[t*D+d]; hgE[(long)v*D+d]+=g; hgP[t*D+d]+=g; } }
@@ -216,30 +221,28 @@ int main(int argc,char**argv){
         printf("[shim] step %d done (lr=%.3e lrbits=%d)\n", step, lr, lrb);
     }
 
-    // ---- dump per-chip trained masters in FMaster field order (== driver readback semantics) ----
-    // chip0 (HID+host_embed): WQ..WDN + LN1/LN2 from buffer; EMB/POS host-trained (M0 already holds them via alias);
-    //                         WHEAD/LNFG/LNFB stay init (never staged/written for HID) -> keep M0's loaded init.
-    get_f(b0,S2_FWQ, M0.WQ, (long)D*D);   get_f(b0,S2_FWK, M0.WK, (long)D*D);
-    get_f(b0,S2_FWV, M0.WV, (long)D*D);   get_f(b0,S2_FWO, M0.WO, (long)D*D);
-    get_f(b0,S2_FWUP,M0.WUP,(long)FFN*D); get_f(b0,S2_FWDN,M0.WDN,(long)D*FFN);
-    get_f(b0,S2_FLN1G,M0.LN1G,D);         get_f(b0,S2_FLN1B,M0.LN1B,D);
-    get_f(b0,S2_FLN2G,M0.LN2G,D);         get_f(b0,S2_FLN2B,M0.LN2B,D);
-    // M0.EMB/POS ARE hEMB/hPOS (host-trained in place). M0.WHEAD/LNFG/LNFB remain the loaded init.
+    // ---- dump per-chip trained masters (only for the NL==2 one-step-reference use case; the L=8 stability
+    //      sweep's deliverable is the CE trajectory above, so it skips the readback dump). ----
+    if(NL==2){
+        FMaster &M0=*M[0], &M1=*M[1]; int32_t *b0=b[0], *b1=b[1];
+        get_f(b0,S2_FWQ, M0.WQ, (long)D*D);   get_f(b0,S2_FWK, M0.WK, (long)D*D);
+        get_f(b0,S2_FWV, M0.WV, (long)D*D);   get_f(b0,S2_FWO, M0.WO, (long)D*D);
+        get_f(b0,S2_FWUP,M0.WUP,(long)FFN*D); get_f(b0,S2_FWDN,M0.WDN,(long)D*FFN);
+        get_f(b0,S2_FLN1G,M0.LN1G,D);         get_f(b0,S2_FLN1B,M0.LN1B,D);
+        get_f(b0,S2_FLN2G,M0.LN2G,D);         get_f(b0,S2_FLN2B,M0.LN2B,D);
+        get_f(b1,S2_FWQ, M1.WQ, (long)D*D);   get_f(b1,S2_FWK, M1.WK, (long)D*D);
+        get_f(b1,S2_FWV, M1.WV, (long)D*D);   get_f(b1,S2_FWO, M1.WO, (long)D*D);
+        get_f(b1,S2_FWUP,M1.WUP,(long)FFN*D); get_f(b1,S2_FWDN,M1.WDN,(long)D*FFN);
+        get_f(b1,S2_FLN1G,M1.LN1G,D);         get_f(b1,S2_FLN1B,M1.LN1B,D);
+        get_f(b1,S2_FLN2G,M1.LN2G,D);         get_f(b1,S2_FLN2B,M1.LN2B,D);
+        get_f(b1,S2_FLNFG,M1.LNFG,D);         get_f(b1,S2_FLNFB,M1.LNFB,D);
+        get_f(b1,S2_FWHEAD,M1.WHEAD,(long)VOCAB*D);
+        char op[512];
+        snprintf(op,512,"%s/shim_master0.f32",OUTDIR); dump_master_file(M0,op); printf("[shim] chip0 trained master -> %s\n",op);
+        snprintf(op,512,"%s/shim_master1.f32",OUTDIR); dump_master_file(M1,op); printf("[shim] chip1 trained master -> %s\n",op);
+    }
 
-    // chip1 (OUT): WQ..WDN + LN1/LN2 + WHEAD + LNF from buffer; EMB/POS stay init (untouched).
-    get_f(b1,S2_FWQ, M1.WQ, (long)D*D);   get_f(b1,S2_FWK, M1.WK, (long)D*D);
-    get_f(b1,S2_FWV, M1.WV, (long)D*D);   get_f(b1,S2_FWO, M1.WO, (long)D*D);
-    get_f(b1,S2_FWUP,M1.WUP,(long)FFN*D); get_f(b1,S2_FWDN,M1.WDN,(long)D*FFN);
-    get_f(b1,S2_FLN1G,M1.LN1G,D);         get_f(b1,S2_FLN1B,M1.LN1B,D);
-    get_f(b1,S2_FLN2G,M1.LN2G,D);         get_f(b1,S2_FLN2B,M1.LN2B,D);
-    get_f(b1,S2_FLNFG,M1.LNFG,D);         get_f(b1,S2_FLNFB,M1.LNFB,D);
-    get_f(b1,S2_FWHEAD,M1.WHEAD,(long)VOCAB*D);
-
-    char op[512];
-    snprintf(op,512,"%s/shim_master0.f32",OUTDIR); dump_master_file(M0,op); printf("[shim] chip0 trained master -> %s\n",op);
-    snprintf(op,512,"%s/shim_master1.f32",OUTDIR); dump_master_file(M1,op); printf("[shim] chip1 trained master -> %s\n",op);
-
-    free(b0); free(b1);
-    printf("=== s2_twochip_shim DONE ===\n");
+    for(int l=0;l<NL;l++){ free(b[l]); free(M[l]); }
+    printf("=== s2_twochip_shim DONE (NL=%d) ===\n", NL);
     return 0;
 }
