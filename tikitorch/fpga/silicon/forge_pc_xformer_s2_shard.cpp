@@ -196,6 +196,35 @@ static void fwd_dump_chip(int l, const char* dir, int is_out){
     }
 }
 
+// BWD_DUMP (env): after the in-kernel BACKWARD sweep of step 0 / sub-batch 0, dump each chip's backward
+// gradient wide-cache (S2_BG_*) to <DUMP_DIR>/bwd_<chip>_<name>.f32 — the BACKWARD analog of FWD_DUMP. Diff
+// bit-for-bit vs the shim's same-named dumps (matched init) to pin the FIRST backward stage where silicon
+// drifts from the exact reference. Backward order (OUT chip): gLG, gXF, gRP, gM, gHD, gX2, gATTN, gQ, gK, gV, gX1, gR.
+static int g_bd=-1; static inline int bwd_dump(){ if(g_bd<0){const char*e=getenv("BWD_DUMP"); g_bd=e?atoi(e):0;} return g_bd; }
+static void dump_b32(const char* dir, int chip, const char* name, const float* x, long n){
+    char op[600]; snprintf(op,600,"%s/bwd_%d_%s.f32", dir, chip, name);
+    FILE* f=fopen(op,"wb"); if(!f){ fprintf(stderr,"[BWD_DUMP] open %s failed\n",op); return; }
+    fwrite(x,sizeof(float),(size_t)n,f); fclose(f);
+    fprintf(stderr,"[BWD_DUMP] chip %d %-5s -> %s (%ld floats)\n", chip, name, op, n);
+}
+static void bwd_dump_chip(int l, const char* dir, int is_out){
+    static float db[S2_HOSTBUF];
+    if(is_out){
+        readf(l,S2_BG_LG, db,(long)S2_SEQ*S2_VOCAB); dump_b32(dir,l,"gLG",db,(long)S2_SEQ*S2_VOCAB);
+        readf(l,S2_BG_XF, db,(long)S2_SEQ*S2_D);     dump_b32(dir,l,"gXF",db,(long)S2_SEQ*S2_D);
+    }
+    readf(l,S2_BG_RP,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gRP",  db,(long)S2_SEQ*S2_D);
+    readf(l,S2_BG_M,   db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gM",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_BG_HD,  db,(long)S2_SEQ*S2_FFN); dump_b32(dir,l,"gHD",  db,(long)S2_SEQ*S2_FFN);
+    readf(l,S2_BG_X2,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gX2",  db,(long)S2_SEQ*S2_D);
+    readf(l,S2_BG_ATTN,db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gATTN",db,(long)S2_SEQ*S2_D);
+    readf(l,S2_BG_Q,   db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gQ",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_BG_K,   db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gK",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_BG_V,   db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gV",   db,(long)S2_SEQ*S2_D);
+    readf(l,S2_BG_X1,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gX1",  db,(long)S2_SEQ*S2_D);
+    readf(l,S2_BG_R,   db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gR",   db,(long)S2_SEQ*S2_D);
+}
+
 // ---- bf16 STE round (== kernel bf16_round / twin P()) ----
 static inline float hb_P(float x){ union{float f;uint32_t u;}c; c.f=x; uint32_t u=c.u; uint32_t lsb=(u>>16)&1u; u+=0x7fffu+lsb; u&=0xffff0000u; c.u=u; return c.f; }
 // ---- dyad (== kernel bf_dyad_f / twin dyad) ----
@@ -627,6 +656,13 @@ int main(int argc,char**argv){
                         for(long i=0;i<(long)S2_SEQ*S2_D;i++)   hPOS[i]-=dyad_adam(hgP[i],hmP[i],hvP[i],lr);
                     }
                 }
+            }
+            // BWD_DUMP: after the in-kernel backward sweep of step 0 / sub-batch 0, dump each chip's backward
+            // grad wide-cache for the bit-level silicon-vs-shim per-stage backward compare (localizes the biased op).
+            if(bwd_dump() && step==0 && k==0){
+                fprintf(stderr,"[BWD_DUMP] dumping per-chip backward grad cache -> %s (bwd_<chip>_<name>.f32)\n", DUMP_DIR);
+                for(int l2=0;l2<L;l2++) bwd_dump_chip(l2, DUMP_DIR, (l2==L-1));
+                fflush(stderr);
             }
           } else {
             // ================= HOST BACKWARD SWEEP: chip L-1 -> 0, computed ENTIRELY on the host =================

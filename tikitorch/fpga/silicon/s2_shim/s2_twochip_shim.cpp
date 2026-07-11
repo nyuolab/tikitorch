@@ -111,6 +111,17 @@ static void dump_fwd_chip(const int32_t* b, const char* dir, int chip, int is_ou
         get_f(b,S2_WLG, db.data(),(long)SEQ*VOCAB);dump_f32_(dir,chip,"LG",db.data(),(long)SEQ*VOCAB);
     }
 }
+// BWD_DUMP: the backward analog — dump this chip's backward grad wide-cache (S2_BG_*) after its BWD kick, as
+// bwd_<chip>_<name>.f32, for the bit-level silicon-vs-shim per-stage backward compare (localizes the biased op).
+static void dump_bwd_chip(const int32_t* b, const char* dir, int chip, int is_out){
+    static std::vector<float> db((size_t)SEQ*FFN > (size_t)SEQ*VOCAB ? (size_t)SEQ*FFN : (size_t)SEQ*VOCAB);
+    auto D_=[&](int off,const char*nm,long n){ get_f(b,off,db.data(),n); char op[600]; snprintf(op,600,"%s/bwd_%d_%s.f32",dir,chip,nm); FILE*f=fopen(op,"wb"); if(f){fwrite(db.data(),4,(size_t)n,f);fclose(f);} };
+    if(is_out){ D_(S2_BG_LG,"gLG",(long)SEQ*VOCAB); D_(S2_BG_XF,"gXF",(long)SEQ*D); }
+    D_(S2_BG_RP,"gRP",(long)SEQ*D);  D_(S2_BG_M,"gM",(long)SEQ*D);   D_(S2_BG_HD,"gHD",(long)SEQ*FFN);
+    D_(S2_BG_X2,"gX2",(long)SEQ*D);  D_(S2_BG_ATTN,"gATTN",(long)SEQ*D); D_(S2_BG_Q,"gQ",(long)SEQ*D);
+    D_(S2_BG_K,"gK",(long)SEQ*D);    D_(S2_BG_V,"gV",(long)SEQ*D);   D_(S2_BG_X1,"gX1",(long)SEQ*D);
+    D_(S2_BG_R,"gR",(long)SEQ*D);
+}
 
 // CE bits/token from the OUTPUT chip's wide logits S2_WLG and the target sequence.
 static double ce_bits(const int32_t*b,const int32_t*tgt){
@@ -206,6 +217,7 @@ int main(int argc,char**argv){
             for(int l=NL-1;l>=0;l--){
                 if(l<NL-1) put_f(b[l],S2_GRIN,emsg.data(),(long)SEQ*D);   // up-error from the downstream chip
                 setcfg(b[l],S2_PH_BWD,ROLE(l),do_update,do_update?lrb:0,gz,0); forge_pc_xformer_s2_block((ap_uint<512>*)b[l]);
+                if(getenv("BWD_DUMP")&&atoi(getenv("BWD_DUMP"))&&step==0&&k==0){ fprintf(stderr,"[BWD_DUMP] chip%d backward grad cache -> %s\n",l,OUTDIR); dump_bwd_chip(b[l],OUTDIR,l,l==NL-1); }
                 get_f(b[l],S2_GROUT,emsg.data(),(long)SEQ*D);            // up-error -> upstream chip (chip0: gR = embed input grad)
             }
 
