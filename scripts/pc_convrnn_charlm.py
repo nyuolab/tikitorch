@@ -514,6 +514,33 @@ class MorphPCEngine:
         self._embed_grads(E[0], top)
         return logits
 
+    @torch.no_grad()
+    def serve_and_learn(self, ids, targets, opt=None, fire=None):
+        """FUSED serve+learn (north-star V0): ONE forward serves the logits and
+        caches the frozen routing; if ``fire`` (bool, or callable(ce)->bool for
+        surprise gating) the reverse sweep runs FROM THOSE CACHES + opt.step().
+        Cost: 1 forward (serve) + [1 reverse sweep + opt] iff fired — vs the
+        unfused harness path (serve forward + cascade_grads re-forward + sweep
+        = ~3x). Grads are bitwise identical to :meth:`cascade_grads` (same
+        code path on the same caches). Returns (logits, serve_ce, fired)."""
+        logits, caches, top = self._forward_cache(ids)
+        V = logits.shape[-1]
+        ce = F.cross_entropy(logits.reshape(-1, V).float(),
+                             targets.reshape(-1)).item()
+        fired = False
+        if opt is not None:
+            do = fire(ce) if callable(fire) else bool(fire)
+            if do:
+                opt.zero_grad(set_to_none=True)
+                e = self._top_error(logits, targets, top, grads=True)
+                for layer, cache in zip(reversed(self.model.layers),
+                                        reversed(caches)):
+                    e = self._layer_adjoint(layer, e, cache, grads=True)
+                self._embed_grads(e, top)
+                opt.step()
+                fired = True
+        return logits, ce, fired
+
     def train_step(self, x, y, opt, credit="cascade", **kw):
         opt.zero_grad(set_to_none=True)
         if credit == "cascade":
