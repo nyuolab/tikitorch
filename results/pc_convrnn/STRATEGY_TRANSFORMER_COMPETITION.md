@@ -93,6 +93,18 @@ cheap to train at ITS quality; it does not close the quality gap.
 - **M5 — iso-quality board energy:** PMBus tokens/J ≥3× vs GPU at an
   iso-quality point ≥ trigram.
 
+## 4b. NORTH STAR (elevated by user 2026-07-10/11; validation pre-registered)
+
+*"A device sits on its stream; every example it serves, it may also learn
+from, at about the cost of serving it twice, with no extra silicon, no extra
+memory class, and no synchronization with anything else."* Two separate but
+related goals: **Goal A** — the live loop (one process, serve + intermittent
+in-place learning at ~2×; a mechanism claim) and **Goal B** — lifelong
+retention (what is learned persists usefully in the weights; a
+continual-learning claim). Validation = the V-gate ladder in
+`ontogenic_learner/NORTHSTAR_VALIDATION.md` (V0 fusion/cost-audit → V5
+full-card PMBus), fusing this branch's substrate with the ontogenic harness.
+
 ## 5. Program implications (adopted)
 
 1. Reframe the competitive claim: *same-checkpoint dual-mode training+inference

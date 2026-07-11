@@ -1,5 +1,12 @@
 # ontogenic_learner
 
+> **2026-07-11 — PAUSE LIFTED.** The recurrent substrate this line was waiting
+> for exists (branch pc-morphssm: cascade≡BP MorphSSM, zero-multiply audited,
+> no activation graph, async-exact). The fused validation program is
+> pre-registered in `NORTHSTAR_VALIDATION.md` (V-gates; two-goal framing:
+> live-loop vs lifelong retention). All char-61 numbers below are now
+> hypothesis-only references — the V-gates run BPE-1024 on the real substrate.
+
 > *The parameters×tokens era belongs to backprop-on-GPU and always will; the experience×time
 > era has no incumbent yet — and this program's measured assets (local rule, bit-exactness,
 > elasticity, mult-free silicon) are exactly the properties that era prices. The window is
