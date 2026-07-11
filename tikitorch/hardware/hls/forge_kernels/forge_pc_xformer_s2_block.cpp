@@ -797,6 +797,8 @@ static float s2_Ah[S2_SEQ * S2_DH];   // ATTN out (fwd) / gATTN in (bwd)
 static float s2_Bh[S2_SEQ * S2_DH];   // gQ head slice (bwd)
 static float s2_Ch[S2_SEQ * S2_DH];   // gK head slice (bwd)
 static float s2_Dh[S2_SEQ * S2_DH];   // gV head slice (bwd)
+static float s2_PALL[S2_SEQ * S2_SEQ];// bwd Phase-1: per-query softmax rows p_i[j] (WRITE-ONCE; Phase-2 reads)
+static float s2_GSV [S2_SEQ * S2_SEQ];// bwd Phase-1: per-query score gradients gsv_i[j] (WRITE-ONCE; Phase-2 reads)
 
 static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off, int wattn_off) {
 #pragma HLS INLINE off
@@ -885,29 +887,25 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
             bload_f(buffer, wv_off    + t*S2_D + h*S2_DH, s2_Vh + t*S2_DH, S2_DH);
             bload_f(buffer, gattn_off + t*S2_D + h*S2_DH, s2_Ah + t*S2_DH, S2_DH);
         }
-        for (int i = 0; i < S2_SEQ*S2_DH; i++) { s2_Bh[i] = 0; s2_Ch[i] = 0; s2_Dh[i] = 0; }
+        // ============================================================================================
+        // ATTENTION BACKWARD — synthesis-robust rewrite (2026-07-11, root-caused via BWD_DUMP silicon-vs-shim).
+        // The prior loop computed gp[j] AND the gV cross-iteration RMW (s2_Dh += over the OUTER i) FUSED in one
+        // pipelined loop; on F2 that scheduling hazard corrupted gp -> gsv==0 -> gQ/gK read back EXACTLY ZERO
+        // and gV wrong (cosine 0.31). Invisible to g++ csim / the twin (no __SYNTHESIS__ guard — an implicit
+        // synth != csim divergence), so it masqueraded as a training-instability. FIX: PHASE 1 computes p_i and
+        // gsv_i in SEPARATE clean loops (gp is NOT fused with any accumulation) and STORES them write-once
+        // (s2_PALL/s2_GSV, no RMW); PHASE 2 forms gQ/gK/gV as fresh-accumulator reductions mirroring the PROVEN
+        // forward P@V (acc[d] per output, no cross-iteration RMW on a shared array). Accumulation order is kept
+        // identical to the old sweeps, so the result is bit-identical to the reference in exact arithmetic.
+        // ---- PHASE 1: per query i, recompute softmax row p_i[j] and score gradient gsv_i[j]; store write-once.
         for (int i = 0; i < S2_SEQ; i++) {
-            // ---- PRAW RECOMPUTE: rebuild this (h,i) softmax row from cached Q,K (SAME laned order as fwd) ----
             float p[S2_SEQ], mx = -1e30f;
-#if S2_DEPIPELINE_REDUCE
-            for (int j = 0; j <= i; j++) {
-                float dot = 0.0f;                                        // DE-PIPELINE: sequential score-dot, II>1
-                for (int d = 0; d < S2_DH; d++) dot += s2_Qh[i*S2_DH+d] * s2_Kh[j*S2_DH+d];
-                p[j] = dot * ascale; if (p[j] > mx) mx = p[j];
-            }
-#else
-            // FIX: SAME s2_dotDH helper as FWD → PRAW reproduces the fwd softmax row bit-identically. II=1 outer-j.
             for (int j = 0; j <= i; j++) {
 #pragma HLS PIPELINE II=1
-                float dot = s2_dotDH(&s2_Qh[i*S2_DH], &s2_Kh[j*S2_DH]);
+                float dot = s2_dotDH(&s2_Qh[i*S2_DH], &s2_Kh[j*S2_DH]);   // == fwd score, bit-identical PRAW
                 p[j] = dot * ascale; if (p[j] > mx) mx = p[j];
             }
-#endif
-#if S2_DEPIPELINE_REDUCE
-            float sum = 0.0f;                                            // DE-PIPELINE: sequential exp-sum, II>1
-            for (int j = 0; j <= i; j++) { float e = s2_exp_dyad(p[j]-mx); p[j] = e; sum += e; }
-#else
-            float slane[S2_LANES];                                       // FIX B: laned exp-sum
+            float slane[S2_LANES];
 #pragma HLS ARRAY_PARTITION variable=slane complete dim=1
             for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
             for (int j = 0; j <= i; j++) {
@@ -915,78 +913,61 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                 float e = s2_exp_dyad(p[j]-mx); p[j] = e; slane[j & (S2_LANES-1)] += e;
             }
             float sum = s2_lanesum(slane);
-#endif
             for (int j = 0; j <= i; j++) p[j] /= sum;
-            // ---- attention backward on the recomputed probs (== mp ABWD / twin scalar) ----
-            float gp[S2_SEQ];
-#if S2_DEPIPELINE_REDUCE
-            for (int j = 0; j <= i; j++) {
-                float gpv = 0.0f;                                        // DE-PIPELINE: sequential gp=<gATTN_i,V_j>, II>1
-                for (int d = 0; d < S2_DH; d++) gpv += s2_Ah[i*S2_DH+d] * s2_Vh[j*S2_DH+d];
-                gp[j] = gpv;
-                for (int d = 0; d < S2_DH; d++) s2_Dh[j*S2_DH+d] += P(p[j] * s2_Ah[i*S2_DH+d]);   // gV: i-reduction, order kept
-            }
-#else
-            // FIX: gp = <gATTN_i, V_j> via combinational DH-wide MAC → outer-j pipelines at II=1.
-            // gV (s2_Dh) still accumulates per-(j,d) here; its reduction is over the OUTER i, so writing
-            // distinct (j,d) cells each iteration preserves that i-order (unrolled d, no cross-hazard).
-            for (int j = 0; j <= i; j++) {
-#pragma HLS PIPELINE II=1
-                gp[j] = s2_dotDH(&s2_Ah[i*S2_DH], &s2_Vh[j*S2_DH]);
-                for (int d = 0; d < S2_DH; d++) {
-#pragma HLS UNROLL
-                    s2_Dh[j*S2_DH+d] += P(p[j] * s2_Ah[i*S2_DH+d]);      // gV: i-reduction, order kept
-                }
-            }
-#endif
-#if S2_DEPIPELINE_REDUCE
-            float ex = 0.0f;                                             // DE-PIPELINE: sequential ex=sum_j p*gp, II>1
-            for (int j = 0; j <= i; j++) ex += p[j]*gp[j];
-#else
-            float exlane[S2_LANES];                                      // FIX B: laned ex = sum_j p*gp
+            // gp_i[j] = <gATTN_i, V_j> in its OWN loop (NOT fused with any accumulation) ; ex = sum_j p_i[j]*gp_i[j]
+            float gp[S2_SEQ], exlane[S2_LANES];
 #pragma HLS ARRAY_PARTITION variable=exlane complete dim=1
             for (int l = 0; l < S2_LANES; l++) exlane[l] = 0;
             for (int j = 0; j <= i; j++) {
 #pragma HLS PIPELINE II=1
+                gp[j] = s2_dotDH(&s2_Ah[i*S2_DH], &s2_Vh[j*S2_DH]);
                 exlane[j & (S2_LANES-1)] += p[j]*gp[j];
             }
             float ex = s2_lanesum(exlane);
-#endif
-            // precompute gs[j] so the gQ (Bh, j-reduction) can be laned; gK (Ch) has no j-recurrence -> direct.
-            float gsv[S2_SEQ];
-            for (int j = 0; j <= i; j++) gsv[j] = P(p[j]*(gp[j]-ex)) * ascale;
-            for (int j = 0; j <= i; j++)                                 // gK: Ch[j] accumulates over i (outer) -> order kept
-                for (int d = 0; d < S2_DH; d++) s2_Ch[j*S2_DH+d] += gsv[j]*s2_Qh[i*S2_DH+d];
-#if S2_DEPIPELINE_REDUCE
+            for (int j = 0; j <= i; j++) { s2_PALL[i*S2_SEQ+j] = p[j]; s2_GSV[i*S2_SEQ+j] = P(p[j]*(gp[j]-ex)) * ascale; }
+        }
+        // ---- PHASE 2: fresh-accumulator reductions (== forward P@V pattern; NO cross-iteration RMW). ----
+        // gV[j][d] = sum_{i>=j} P(p_i[j]*gATTN_i[d]) ; gK[j][d] = sum_{i>=j} gsv_i[j]*Q_i[d]  (ascending-i order).
+        for (int j = 0; j < S2_SEQ; j++) {
+            float accV[S2_DH], accK[S2_DH];
+#pragma HLS ARRAY_PARTITION variable=accV complete dim=1
+#pragma HLS ARRAY_PARTITION variable=accK complete dim=1
             for (int d = 0; d < S2_DH; d++) {
-                float qacc = 0.0f;                                       // DE-PIPELINE: sequential gQ blend over j, II>1
-                for (int j = 0; j <= i; j++) qacc += gsv[j]*s2_Kh[j*S2_DH+d];
-                s2_Bh[i*S2_DH+d] += qacc;
+#pragma HLS UNROLL
+                accV[d] = 0; accK[d] = 0;
             }
-#else
-            // FIX: DH-parallel accumulate like FWD P@V — ONE j-loop, S2_DH independent accumulators (disjoint
-            // per d → no cross-lane hazard). Per-(i,d) sum is ascending-j sequential (was the 8-way lane fold)
-            // → within-1-ULP. acc[d] is an fp-add recurrence: don't force II=1 (tool picks II=fadd-latency);
-            // the win is collapsing the DH pipeline RE-ENTRIES into a single j-loop.
-            {
-                static float acc[S2_DH];
-#pragma HLS ARRAY_PARTITION variable=acc complete dim=1
+            for (int i = j; i < S2_SEQ; i++) {
+                float pij = s2_PALL[i*S2_SEQ+j], gij = s2_GSV[i*S2_SEQ+j];
                 for (int d = 0; d < S2_DH; d++) {
 #pragma HLS UNROLL
-                    acc[d] = 0;
-                }
-                for (int j = 0; j <= i; j++) {
-                    for (int d = 0; d < S2_DH; d++) {
-#pragma HLS UNROLL
-                        acc[d] += gsv[j]*s2_Kh[j*S2_DH+d];
-                    }
-                }
-                for (int d = 0; d < S2_DH; d++) {
-#pragma HLS UNROLL
-                    s2_Bh[i*S2_DH+d] += acc[d];
+                    accV[d] += P(pij * s2_Ah[i*S2_DH+d]);
+                    accK[d] += gij * s2_Qh[i*S2_DH+d];
                 }
             }
-#endif
+            for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                s2_Dh[j*S2_DH+d] = accV[d]; s2_Ch[j*S2_DH+d] = accK[d];
+            }
+        }
+        // gQ[i][d] = sum_{j<=i} gsv_i[j]*K_j[d]  (ascending-j order).
+        for (int i = 0; i < S2_SEQ; i++) {
+            float accQ[S2_DH];
+#pragma HLS ARRAY_PARTITION variable=accQ complete dim=1
+            for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                accQ[d] = 0;
+            }
+            for (int j = 0; j <= i; j++) {
+                float gij = s2_GSV[i*S2_SEQ+j];
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                    accQ[d] += gij * s2_Kh[j*S2_DH+d];
+                }
+            }
+            for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                s2_Bh[i*S2_DH+d] = accQ[d];
+            }
         }
         // heads write disjoint columns of gQ/gK/gV → the per-element accumulation is complete within this head,
         // so the final P() (== resident version's post-loop P) can be applied on the head-slice write.
