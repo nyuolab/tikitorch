@@ -102,7 +102,63 @@ pragmas) — fixed (`0af45b5`).
 
 ---
 
-## 3. Honest scope
+## 3. The SECOND divergence — training-stability, root-caused to the softmax `hls::exp` (2026-07-10)
+
+§1's 30-step descent was **warmup only**. Held at peak LR past ~step 100, the D=512/L=8 model (moved to
+BPE-8192, VOCAB=8192, K=64, prod AGFI `agfi-0b7691e71f2bbf079`) **descends then DIVERGES** — bpb 13.5→11.3
+(warmup) then climbs **15.8@125 → 38@450** (confidently-wrong: logits saturate on the wrong class). Onset
+delays as LR drops but appears at every productive LR. **The trap:** every prior "trains on F2" result was
+≤40 steps — inside warmup — so this was never seen. *A "trains on fabric" claim needs >150 updates held at
+peak LR.* The forward is bit-exact (§2), so this is a distinct, **biased-gradient** instability — §3.3 traces
+it to the one silicon-approximate op §4 below had dismissed as "bounded, does not affect": the softmax `hls::exp`.
+
+### 3.1 The false-trail ledger (each ruled out by a disproving experiment)
+
+| hypothesis | disproving experiment |
+|---|---|
+| dyadic-Adam runaway | **proof**: `m`=EMA(g), `v`=EMA(\|g\|), *same* 0.875/0.125 coeffs ⇒ \|m\|≤v invariantly ⇒ step = lr·sign·2^floor(log2(\|m\|/(v+ε))) ≤ lr, always. The optimizer is bounded — cannot explode. |
+| cross-step pipeline staleness | serial PIPE=0 diverged identically |
+| small-batch gradient noise | EFF_BATCH=32 (4× effective batch) diverged identically ⇒ a *biased*, not variance, error (averaging can't remove it) |
+| host embedding gradient | EMB_FREEZE=1 (embeddings frozen) still diverged (bpb→27); the CE-loss gradient *seed* is computed on-chip |
+| a depth-amplified recipe bug (detached-scale LN backward) | **the L=8 exact-libm twin is stable** (§3.2) — refuted at the true depth |
+
+### 3.2 The deconfounder — L=2 AND L=8 exact-libm CPU twins (the decisive method)
+
+The shim `s2_twochip_shim.cpp` compiles the REAL kernel with `_mpshim` mapping every `hls::` intrinsic to
+**exact libm**, then runs the full training loop on CPU; generalized to N chips (`NL` env, commit `14ae1c4`)
+to run the true L=8 recipe. V=8192, rolling BPE data, held LR 2.6e-4, ACCUM=8, 160 steps:
+
+| config | arithmetic | post-warmup CE (bits/tok) |
+|---|---|---|
+| L=2 | exact-libm twin | **stable** — mean 10.14, 0 steps >15 |
+| L=8 | exact-libm twin | **stable** — mean 10.09, descends to 7.08, 0 steps >15 |
+| L=8 | **F2 silicon** | **diverges → 38** |
+
+Both depths train stably in *exact* arithmetic; silicon diverges at both. This **deconfounds depth** (the L=2
+twin alone was ambiguous — it changed exp-exactness AND depth at once) and isolates the divergence to a
+**silicon-approximated intrinsic** the shim computes exactly. Per `_mpshim` those are `hls::exp/sqrt/log2`;
+the dyadic paths are already bit-exact integer (§2) and `hls::sqrt` is a shared compile-time 1/√DH constant, so
+the **softmax `hls::exp`** is the sole variable-input suspect — the CE-loss seed (highest risk: no forward
+master keeps it consistent) plus the attention softmax.
+
+### 3.3 The fix — `s2_exp_dyad` (bit-exact mult-free exp), commit `0be81fe`
+
+Port the golden kernel's proven precise exp (`g_exp_q16`) into float using §2's integer-bit template: for x≤0,
+`d=−x`; `u = d·log2(e)` via a 6-term shift-add (`1+¼+⅛+1/16+1/256+1/1024`, exact `ldexp` — **no multiply**);
+split `u` into octave + 8-bit fraction; `exp = 2^−u = S2_GEXP[frac] >> octave` with a **compile-time 256-entry**
+`2^(−f/256)` mantissa ROM. Every op is deterministic int / `ldexp` / ROM ⇒ **BIT-IDENTICAL on silicon and
+shim** (the property that makes the shim a valid oracle, exactly as the §2 LN fix). 0.09–0.18% vs `expf` in the
+softmax band; args < −21.5 floor to 0 (true mass ~0). All 5 `hls::exp` sites swapped (fwd attn, bwd PRAW, CE seed).
+
+- **Twin validation** — L=8 twin REBUILT with `s2_exp_dyad` tracks the exact-libm twin bit-for-bit and stays
+  stable (mean **10.09**, 0 divergence, matching exact-libm through the full run).
+- **CSYNTH gate** — clean: **0 new DSP multiplies** (`ldexp`→`generic_ldexp_float_s` DSP=0; the 1349 DSP are the
+  pre-existing sanctioned attention/bf16 mults), timing closes 250 MHz, +3 BRAM (the ROM) / +6k LUT (fits SLR).
+- **P&R** — TIMING MET (~2.3h), AGFI **`agfi-0bb58e4b8eee1e199`**.
+- **Silicon gate** — _[PENDING]_ held-LR 2.6e-4, 300 steps on the fixed AGFI (run `s2shard-20260711T024736Z`):
+  must stay bounded/descending past step 125 where the old kernel hit 38.
+
+## 4. Honest scope
 
 - **Is:** a 30-step MEASURED loss descent (bpb −0.75, acc 0→16.8%) of a 30.6M-param, 8-block,
   model-parallel PC-transformer running its forward + cascade backward + dyadic-Adam on 8 physical FPGAs,
@@ -110,13 +166,26 @@ pragmas) — fixed (`0af45b5`).
 - **Is not:** convergence (that requires the throughput work — 0.006 steps/s serial ⇒ ~2.4 days for one
   enwik8 epoch), a tokenizer-competitive LM claim (byte-level V=256), or an energy win.
 - Embedding trains host-side (HOST_EMBED — the established workaround for the FEMB silicon DDR-read bug);
-  LN γ/β frozen per recipe. Attention softmax `hls::exp` remains the one silicon-approximate op in the
-  forward (bounded, does not affect the dyadic paths; it is inside the allowed-multiply attention front).
-- Single seed, single data order; the 30-step window is before LR decay matters.
+  LN γ/β frozen per recipe. **The softmax `hls::exp` — flagged here originally as "bounded, does not affect"
+  — was the §3 training-divergence cause; fixed by `s2_exp_dyad` (§3.3). It is now the last silicon-approximate
+  intrinsic eliminated: every `hls::log2/round/floor/exp` in the fwd+bwd is bit-exact integer/ROM.**
+- The §3 convergence claim is pending the silicon gate; the §1 window was 30 steps (warmup, pre-LR-decay).
 
-## 4. Reproduce
+## 5. Reproduce
 
 ```bash
+# §3 deconfounder — L=8 exact-libm CPU twin (no F2), then the fix twin (must both stay stable):
+cd tikitorch/fpga/silicon/s2_shim
+SEED=7 CHIPS=8 OUTDIR=data_v8k ./build/gen_init                    # V=8192 matched init, 8 chips
+INIT_DIR=data_v8k ENWIK=data_v8k/train.u16 NL=8 STEPS=160 ACCUM=8 \
+  XF_LR=2.6e-4 XF_WARMUP=10 ROLL=1 ./build/s2twochip               # exact-libm twin (rebuild with s2_exp_dyad = fix twin)
+
+# §3.3 silicon gate on the exp-fix AGFI (held LR — the divergence condition):
+AGFI=agfi-0bb58e4b8eee1e199 S2_DEFS="-DS2_K=64 -DS2_VOCAB=8192 -DS2_SEQ_TILE=256" \
+ENWIK_S3=s3://tiki-sweep-739966866637/s2_bpe8192_bins/train.u16 \
+NSLOTS=8 STEPS=300 ACCUM=8 XF_LR=2.6e-4 XF_WARMUP=10 LR_DECAY=0 PIPE=1 \
+  bash scripts/run_s2_shard_f2.sh launch
+
 # forward bit-exactness (2-chip, ~20 min + ~1 min local):
 SHIM_DEFS="" FWD_DUMP=1 OUTDIR=fwd_ref bash tikitorch/fpga/silicon/s2_shim/build_and_run.sh
 AGFI=agfi-0c375fcd404810e17 bash tikitorch/fpga/silicon/s2_shim/SILICON_CMD.sh   # then fetch + compare_fwd.py
