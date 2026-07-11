@@ -29,40 +29,26 @@ ls -l data/text8_20m.txt data/tinyshakespeare.txt
 
 JOBS=$(mktemp)
 T8="--tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --device cuda"
-# --- S1 (0.5M): morph arms via harness; dense arms via nanogpt --------------
-for S in 0 1 2; do
-  echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 8700 --eval-interval 500 $T8 --seed $S --ckpt-name m1_s1_cascade_s$S.pt --tag m1_s1_cascade_s$S --out $OUT" >> "$JOBS"
-done
-echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:bp --adam-lr 1e-2 --steps 8700 --eval-interval 500 $T8 --seed 0 --tag m1_s1_bp_s0 --out $OUT" >> "$JOBS"
-for S in 0 1; do
-  echo "$PY scripts/nanogpt_shakespeare.py --runs dense-conv --morph-d 256 --morph-layers 7 --steps 8700 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --device cuda --seed $S --tag m1_s1_denseconv_s$S --out $OUT" >> "$JOBS"
-  echo "$PY scripts/nanogpt_shakespeare.py --runs dense --d-model 128 --n-layers 3 --d-ff 384 --n-heads 4 --steps 8700 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --device cuda --seed $S --tag m1_s1_dense_s$S --out $OUT" >> "$JOBS"
-done
-# --- S2 (5M) -----------------------------------------------------------------
-for S in 0 1; do
-  echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:cascade --adam-lr 1e-2 --pc-lr 1e-2 --steps 17400 --eval-interval 1000 --d-model 832 $T8 --seed $S --ckpt-name m1_s2_cascade_s$S.pt --tag m1_s2_cascade_s$S --out $OUT" >> "$JOBS"
-done
-echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:bp --adam-lr 1e-2 --steps 17400 --eval-interval 1000 --d-model 832 $T8 --seed 0 --tag m1_s2_bp_s0 --out $OUT" >> "$JOBS"
+# v3 (post-ceiling recovery): fetch the S2 cascade ckpt from the v2 prefix so
+# the battery can run FIRST-class; queue ordered by decisiveness.
+aws s3 cp "s3://tiki-sweep-739966866637/sweep-20260710T214449Z/results/pc_convrnn/ckpts/m1_s2_cascade_s0.pt" "$OUT/ckpts/" --only-show-errors || true
 for S in 0 1; do
   echo "$PY scripts/nanogpt_shakespeare.py --runs dense-conv --morph-d 832 --morph-layers 7 --steps 17400 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --device cuda --seed $S --tag m1_s2_denseconv_s$S --out $OUT" >> "$JOBS"
+done
+for S in 0 1; do
   echo "$PY scripts/nanogpt_shakespeare.py --runs dense --d-model 448 --n-layers 6 --d-ff 1344 --n-heads 8 --steps 17400 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --device cuda --seed $S --tag m1_s2_dense_s$S --out $OUT" >> "$JOBS"
 done
-# --- riders -------------------------------------------------------------------
+CKPT="$OUT/ckpts/m1_s2_cascade_s0.pt"
+if [ -f "$CKPT" ]; then
+  for SPAN in 8 16; do
+    echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 32 --spans $SPAN --relax-steps 400 --coord-sweeps 2 --bo-n 8 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --device cuda --out $OUT --tag m1_s2_g6_s$SPAN" >> "$JOBS"
+  done
+  echo "$PY scripts/pc_convrnn_generative.py --gates g6c --ckpt $CKPT --n-windows 32 --rates 0.1 --relax-steps 400 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --device cuda --out $OUT --tag m1_s2_g6_denoise" >> "$JOBS"
+fi
 echo "$PY scripts/pc_convrnn_fim.py --family dense --d-model 128 --n-layers 3 --steps 6000 --device cuda --out $OUT" >> "$JOBS"
+echo "$PY scripts/pc_convrnn_charlm.py --arms morphssm:bp --adam-lr 1e-2 --steps 17400 --eval-interval 1000 --d-model 832 $T8 --seed 0 --tag m1_s2_bp_s0 --out $OUT" >> "$JOBS"
 wc -l "$JOBS"
 xargs -P 1 -I CMD bash -c 'CMD >> '"$OUT"'/onbox_jobs.log 2>&1 || echo "JOB-FAILED: CMD" >> '"$OUT"'/onbox_jobs.log' < "$JOBS"
 
-# --- G6 battery at scale (S2 cascade s0 ckpt) ----------------------------------
-JB=$(mktemp)
-CKPT="$OUT/ckpts/m1_s2_cascade_s0.pt"
-if [ -f "$CKPT" ]; then
-  for SPAN in 8 16 32; do
-    echo "$PY scripts/pc_convrnn_generative.py --gates g6b --ckpt $CKPT --n-windows 32 --spans $SPAN --relax-steps 400 --coord-sweeps 2 --bo-n 8 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --out $OUT --tag m1_s2_g6_s$SPAN" >> "$JB"
-  done
-  echo "$PY scripts/pc_convrnn_generative.py --gates g6c --ckpt $CKPT --n-windows 32 --rates 0.1 0.25 --relax-steps 400 --tokenizer bpe --vocab-size 1024 --text data/text8_20m.txt --out $OUT --tag m1_s2_g6_denoise" >> "$JB"
-else
-  echo "MISSING-CKPT: $CKPT" >> "$OUT/onbox_jobs.log"
-fi
-xargs -P 1 -I CMD bash -c 'CMD >> '"$OUT"'/onbox_jobs.log 2>&1 || echo "JOB-FAILED: CMD" >> '"$OUT"'/onbox_jobs.log' < "$JB"
 sync_s3
 echo "ONBOX-DONE"
