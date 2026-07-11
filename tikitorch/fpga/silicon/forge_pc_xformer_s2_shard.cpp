@@ -223,6 +223,12 @@ static void bwd_dump_chip(int l, const char* dir, int is_out){
     readf(l,S2_BG_V,   db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gV",   db,(long)S2_SEQ*S2_D);
     readf(l,S2_BG_X1,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gX1",  db,(long)S2_SEQ*S2_D);
     readf(l,S2_BG_R,   db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"gR",   db,(long)S2_SEQ*S2_D);
+    // RELIABILITY CHECK: the kernel copies S2_BG_Q/K/V -> S2_DG_GQ/GK/GV at the END of the backward (block :1135).
+    // If these COPIES disagree with S2_BG_Q/K/V above, then S2_BG_* was clobbered after the copy and the gQ/gK/gV
+    // dump above is a READBACK ARTIFACT (not the real gradient). If they AGREE, the dump is trustworthy.
+    readf(l,S2_DG_GQ,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"dgQ",  db,(long)S2_SEQ*S2_D);
+    readf(l,S2_DG_GK,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"dgK",  db,(long)S2_SEQ*S2_D);
+    readf(l,S2_DG_GV,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"dgV",  db,(long)S2_SEQ*S2_D);
 }
 
 // ---- bf16 STE round (== kernel bf16_round / twin P()) ----
@@ -238,9 +244,17 @@ static void hb_ln_bwd(float*gy,const float*gamma,const float*s,int M){ static fl
 // ---- linbwd: dx=P(gy @ dyad(W)), dW += P(gy^T @ x). W is [O x I] float master (dyad'd for the dx route). ----
 //   gy:[SEQ x O]  x:[SEQ x I]  -> dx:[SEQ x I]  dW:[O x I] (accumulated into dWacc). rows=SEQ.
 static void hb_linbwd(const float*gy,const float*Wf,const float*x,int O,int I,float*dx,float*dWacc){
-    // dx[r][i] = P( sum_o gy[r][o]*dyad(W[o][i]) )
-    for(long r=0;r<S2_SEQ;r++){ const float*gr=gy+r*O; float*dr=dx+r*I;
-        for(int i=0;i<I;i++){ double acc=0; for(int o=0;o<O;o++) acc+=(double)gr[o]*hb_dyad(Wf[(long)o*I+i]); dr[i]=hb_P((float)acc); } }
+    // dx[r][i] = P( sum_o gy[r][o]*dyad(W[o][i]) ). PERF (2026-07-11): the old (r,i,o) nest recomputed
+    // hb_dyad(W[o][i]) — a log2f — for every row r, i.e. I*O*SEQ log2f (1.07B for the V=8192 head => minutes/
+    // step, which stalled HOST_BACKWARD). Reorder to (i,o,r): compute each dyad ONCE (I*O log2f, 256x fewer),
+    // accumulate over o ascending into a per-row DOUBLE accumulator -> BIT-IDENTICAL to the old order.
+    static double dacc[S2_SEQ];
+    for(int i=0;i<I;i++){
+        for(long r=0;r<S2_SEQ;r++) dacc[r]=0.0;
+        for(int o=0;o<O;o++){ float dw=hb_dyad(Wf[(long)o*I+i]); const float*gyo=gy+o;
+            for(long r=0;r<S2_SEQ;r++) dacc[r]+=(double)gyo[r*O]*dw; }
+        for(long r=0;r<S2_SEQ;r++) dx[(long)r*I+i]=hb_P((float)dacc[r]);
+    }
     // dW[o][i] += P( sum_r gy[r][o]*x[r][i] )
     for(int o=0;o<O;o++){ float*dwo=dWacc+(long)o*I;
         for(int i=0;i<I;i++){ double acc=0; for(long r=0;r<S2_SEQ;r++) acc+=(double)gy[r*O+o]*x[r*I+i]; dwo[i]+=hb_P((float)acc); } }
