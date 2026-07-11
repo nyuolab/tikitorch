@@ -1,0 +1,1 @@
+{"gate": "G6c", "arch": "morphssm", "ckpt": "results/pc_convrnn/ckpts/m3_q3_d384_6k.pt", "rate": 0.1, "n_windows": 32, "rec_pc": 0.4846, "rec_greedy": 0.4846, "rec_leave_corrupt": 0.0273}

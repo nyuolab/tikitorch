@@ -14,3 +14,19 @@
 {"gate": "M4", "span": 8, "em_fim": 0.082, "n_windows": 32, "final": true, "credit": "cascade"}
 {"gate": "M4", "span": 16, "em_fim": 0.0879, "n_windows": 32, "final": true, "credit": "cascade"}
 {"gate": "M4", "span": 32, "em_fim": 0.0791, "n_windows": 32, "final": true, "credit": "cascade"}
+{"gate": "M4", "family": "dense", "step": 0, "train_loss": 4.405303478240967, "val_ce_hard_plainlm": 3.5395923455556235, "val_acc": 0.15440538194444445, "wall_s": 0.4, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 500, "train_loss": 2.082298755645752, "val_ce_hard_plainlm": 1.9902094999949138, "val_acc": 0.4207356770833333, "wall_s": 3.6, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 1000, "train_loss": 1.948160171508789, "val_ce_hard_plainlm": 1.8611906104617648, "val_acc": 0.45751953125, "wall_s": 6.8, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 1500, "train_loss": 1.7086552381515503, "val_ce_hard_plainlm": 1.8050281869040594, "val_acc": 0.47607421875, "wall_s": 10.1, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 2000, "train_loss": 1.6051157712936401, "val_ce_hard_plainlm": 1.7643807464175754, "val_acc": 0.48583984375, "wall_s": 13.3, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 2500, "train_loss": 1.5816051959991455, "val_ce_hard_plainlm": 1.731209887398614, "val_acc": 0.4896918402777778, "wall_s": 16.5, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 3000, "train_loss": 1.7821362018585205, "val_ce_hard_plainlm": 1.7006649838553534, "val_acc": 0.5005967881944444, "wall_s": 19.7, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 3500, "train_loss": 1.6430420875549316, "val_ce_hard_plainlm": 1.6851592461268108, "val_acc": 0.5038519965277778, "wall_s": 23.0, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 4000, "train_loss": 1.6952357292175293, "val_ce_hard_plainlm": 1.6649195220735338, "val_acc": 0.5086805555555556, "wall_s": 26.1, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 4500, "train_loss": 1.5631881952285767, "val_ce_hard_plainlm": 1.6446881824069552, "val_acc": 0.5151909722222222, "wall_s": 29.3, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 5000, "train_loss": 1.5298534631729126, "val_ce_hard_plainlm": 1.6390285359488592, "val_acc": 0.5182834201388888, "wall_s": 32.5, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 5500, "train_loss": 1.6789923906326294, "val_ce_hard_plainlm": 1.631300648053487, "val_acc": 0.5217556423611112, "wall_s": 35.8, "credit": "bp"}
+{"gate": "M4", "family": "dense", "step": 5999, "train_loss": 1.5129650831222534, "val_ce_hard_plainlm": 1.6272251738442316, "val_acc": 0.5189887152777778, "wall_s": 39.0, "credit": "bp"}
+{"gate": "M4", "span": 8, "em_fim": 0.0508, "n_windows": 32, "final": true, "credit": "bp", "family": "dense"}
+{"gate": "M4", "span": 16, "em_fim": 0.0996, "n_windows": 32, "final": true, "credit": "bp", "family": "dense"}
+{"gate": "M4", "span": 32, "em_fim": 0.0752, "n_windows": 32, "final": true, "credit": "bp", "family": "dense"}

@@ -279,6 +279,63 @@ form of the bear-case attack. Honest scope: an actual transformer-FIM
 baseline (the cross-family form) remains external and would likely win;
 that comparison is about the substrate, not the inference mode.
 
+## G5 strict rung (2026-07-11): the zero-multiply-training flag-plant, MACHINE-AUDITED [measured]
+
+- **Audit (`g5_audit.jsonl`): training_closed = TRUE.** One τ=0 cascade sweep +
+  full PureTropicalSGD step + LUT loss traces to **zero unwaived hardware
+  multiplies** (waived: LUT exp2 ROM ×1 transcendental, batch-mean/normalize
+  divides ×2 — the repo's sanctioned artifacts). The one offender found and
+  fixed en route: the conv adjoint's slot gate is now a `torch.where` mux, not
+  a mask multiply. The L2 claim-ladder rung is closed.
+- **Quality:** strict-annealed 1500 steps: **2.218 / 2.196** (≈ beats the
+  published strict 2.231). Hard-from-scratch receipt: **2.475** ≈ bigram
+  2.482 — the pre-registered L3 price, confirmed. Strict at 6k budget: 2.462 —
+  WORSE than 1500 (the known long-horizon sign-drift collapse; the documented
+  fix, bit-shift lr decay, was not wired in — flagged, cheap follow-up).
+
+## M3 completed (Q3): the crossover is FLAT at all three quality points [measured]
+
+Q3 = d384/6k = **1.8331** (hard==soft). Ladder 1.935 → 1.856 → 1.833:
+Δ(settled − greedy) = **0.000 at every point** (Q3: infill span-8 em .176 ==
+greedy; denoise .485 == greedy; coord Goodharts again, 1.602 < truth 1.714),
+while base capability itself climbs with quality (denoise recovery 34.8 →
+44.7 → 48.5%). Q3's span-16/32 cells were cut by a box ceiling (2/4 banked) —
+directionally irrelevant given three-point flatness. **M3 verdict: no
+settled-inference crossover within this substrate's reachable quality.**
+
+## M1 — the substrate-tax scaling ladder: the decisive (bearish) answer [measured]
+
+text8, BPE-1024, seq 96, τ-anneal; S1 = 0.5M @ 20M tokens, S2 = 4.9M (d832)
+@ 40M tokens; val bpb (`g3_m1_*.jsonl`, `m1_s*.jsonl`):
+
+| scale | morphssm:cascade | dense-conv twin | dense GPT | paired tax | vs GPT |
+|---|---|---|---|---|---|
+| S1 | 2.0216 (n=3) | 1.8611 (n=2) | 1.8792 (n=2) | **+0.160** | +0.142 |
+| S2 | 1.9221 (s1 partial agrees 1.9231) | 1.7407 (n=2) | 1.5917 (n=2) | **+0.181** | **+0.330** |
+
+- **Pre-registered flip (tax halves by S2): FAILS.** The paired tax vs the
+  conv twin is constant-to-slightly-growing (+0.16 → +0.18) — the
+  "weak-survive" outcome at best. Against the transformer the gap **more than
+  doubles** (+0.14 → +0.33): attention's scaling exponent is better, and the
+  conv-prior families (ours AND the dense twin) both fall behind it at scale.
+  The head-on quality race vs transformers is now closed **with scaling
+  evidence**, not just fixed-budget snapshots.
+- **Twin parity at scale:** cascade == bp at S1 (2.022 vs 2.015). At S2 the bp
+  arm **OOM'd at 44GB** (autograd's activation graph at d832) while the
+  cascade trained the same model in the same memory budget — the cascade is
+  more memory-frugal than backprop at scale (no stored activation graph;
+  routing caches only). A genuine, unplanned systems finding.
+- **Cross-family FIM (dense GPT d128/L3, char, plain CE 1.627):** infill EM
+  **5.1/10.0/7.5%** — BELOW our substrate's greedy/settled arms (17.2/15.2/
+  9.8%) despite the better LM. At 0.5M-scale char level, FIM training converts
+  suffix information into infill accuracy for NO family — the capability
+  regime itself is below threshold, which softens the M4 within-family reading
+  (it is not a uniquely tropical failure) and reinforces the M3 conclusion:
+  bidirectional-inference payoffs live above this scale for everyone.
+- Not run (honest gaps): G6 battery at S2 (relaxation-through-autograd OOM'd
+  at d832 — needs chunked/checkpointed relax, follow-up), S2 bp seed (same
+  OOM), cascade S2 s1 final (ceiling; partial at 15k agrees to 0.001).
+
 ## Next steps (EC2 — user decision 2026-07-08: no further local runs)
 
 Compute template: `scripts/run_connect4_prior_sweep_ec2.sh` pattern (IAM
