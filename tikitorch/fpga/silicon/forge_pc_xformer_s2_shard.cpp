@@ -63,9 +63,10 @@ static void stage(int l,long off,long n){ for(long o=off;o<off+n;o+=262144){ lon
 // AP_DONE, so the measured span IS kernel execution). g_phase set by the sweep loops / the KICKMEAS loop.
 static int g_phase = 0;                       // 0=fwd 1=bwd (index into the accumulators)
 static double g_kick_s[2][8]; static long g_kick_n[2][8];
+static double g_kick_to=-1; static inline double kick_timeout(){ if(g_kick_to<0){const char*e=getenv("KICK_TIMEOUT"); g_kick_to=(e&&atof(e)>0)?atof(e):60.0;} return g_kick_to; }
 static void kick(int l){ fpga_pci_poke(bar0[l],R_BUF0,0); fpga_pci_poke(bar0[l],R_BUF1,0);
     double t0=now_s(); fpga_pci_poke(bar0[l],R_AP_CTRL,AP_START); uint32_t c=0;
-    while(now_s()-t0<60.0){ fpga_pci_peek(bar0[l],R_AP_CTRL,&c);                       // s2 kicks are heavier -> 60s cap
+    while(now_s()-t0<kick_timeout()){ fpga_pci_peek(bar0[l],R_AP_CTRL,&c);            // s2 kicks heavier -> 60s cap; KICK_TIMEOUT env raises it (de-pipeline builds)
         if(c&AP_DONE){ g_kick_s[g_phase][l]+=now_s()-t0; g_kick_n[g_phase][l]++; return; } }
     fprintf(stderr,"KICK HUNG slot %d\n",l); exit(6); }
 static void kick_report(){
