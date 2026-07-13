@@ -265,3 +265,42 @@ jsonl: results/st_stream/v2_live.jsonl; 30 runs = 3 arms × 3 regimes × 3 seeds
   and are masked in analysis.
 - **D2 delivered:** `results/st_stream/D2_life_stripchart.{html,png}` — the
   one-process life on one screen (hard_shift/gated/s0; 8,332 windows).
+
+### V3 — PASS as pre-registered: on the Pareto frontier at the realistic
+budget, never dominated on the tuple (2026-07-13, g5.2xlarge ~2h;
+jsonl: results/st_stream/v3_lora.jsonl; 33 rows = iso warm + 32 runs)
+- **Iso-quality warm start:** dense GPT (d256/6L/8H/ff1024) hit val bpb
+  2.0263 vs target 2.0273 (delta −0.001, two-sided flag TRUE) — in **1,150
+  steps / 16.6 s** on the A10G. Capability-ceiling context reported honestly:
+  the dense substrate reaches our checkpoint's text8 quality ~3 orders of
+  magnitude faster, and its FROZEN stream baseline is better too (preq 6.74
+  vs our 7.50 on hard_shift) despite identical text8 quality.
+- **The frontier claim (hard_shift, same window sequences, extra
+  update-compute in fwd-eq of own serve):** ours = preq **4.53 at +0.13**
+  (z*=0.25; +0.047 at z*=1.0 for 4.75). The incumbent at ≤ +0.2 budget
+  (LoRA cadence-200k, any rank) reaches only **5.35–5.44** — worse quality
+  at ~1.4× our budget. The **cheapest incumbent cell that beats our
+  quality** is LoRA r16/drift-triggered: 4.17 at **+0.43 (3.3× our budget)**
+  and 2.7× serve memory (138 vs 51 MB — the activation-graph class). No
+  cell has (preq ≤ 4.53 AND extra ≤ 0.13): **not dominated**.
+- **The incumbent's high-compute end is real and reported:** online-BP
+  (update every window) reaches preq 3.38–3.39 on hard_shift/drift at
+  **+3.0 (4× serve total, 23× our extra)**; LoRA r32/c10k 3.50 at +4.85.
+  GPUs win unconstrained-compute quality; they lose the
+  low-power/always-on segment — exactly the pre-registered segmentation.
+- Cross-regime: novel_vocab OURS WINS OUTRIGHT (4.39 vs LoRA-center 4.47 at
+  7× less compute); drift theirs 4.04 at +0.92 vs ours 4.58 at +0.13.
+- **Stationary symmetry:** their online-BP also HURTS on stationary
+  (+0.17 regret) — unconditional per-window learning damages any substrate;
+  gating is universal, not a tropical patch. LoRA-periodic stationary is
+  benign (−0.03) at +0.92 compute burned for nothing.
+- Caveats on record: seed 0 only (our side is 3-seed, CIs ±0.02); LoRA
+  placement = FFN+head (nn.MultiheadAttention bypasses module swap — stated
+  handicap, rank sweep spans capacity); MAC-vs-add energy translation pends
+  V5 (each incumbent MAC = mult+add ≥ our 2 adds, so the fwd-eq axis
+  UNDERSTATES our advantage); serving-mode asymmetry: V2's train-mode serve
+  artifact (+0.06 vs eval) biases against US in this table — conservative.
+- **N2 updated:** 1.13× amortized (1.047× at z*=1.0) with zero added
+  multiplies and serve-class memory, beside the tuned-LoRA tax: matching our
+  quality costs the incumbent 3.3× our update budget and a 2.7× memory
+  class; at our budget its best quality trails by +0.82 nats/tok.
