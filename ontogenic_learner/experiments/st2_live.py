@@ -177,12 +177,14 @@ def run(args):
                 fire_rate=round(fires / n, 4), norm=round(norm, 2))) + "\n")
     tele.close()
 
-    hc = 1.0 - (sum_ro / max(sum_rof, 1e-9)) if learn else 0.0
+    # HC undefined when frozen is already near-oracle (stationary control)
+    hc = (1.0 - sum_ro / sum_rof) if (learn and sum_rof / n > 0.02) else None
     row = dict(gate="V2", arm=args.arm, regime=args.regime, seed=args.seed,
+               gate_z=args.gate_z,
                n_windows=n, preq_ce=round(sum_l / n, 4),
                preq_ce_frozen=round(sum_f / n, 4),
                regret_vs_frozen=round((sum_l - sum_f) / n, 4),
-               headroom_captured=round(hc, 4),
+               headroom_captured=(round(hc, 4) if hc is not None else None),
                fire_rate=round(fires / n, 4),
                amortized_mult=round(fwd_eq / n, 4),
                adapt_latency_windows={str(k): v for k, v in lat.items()},
