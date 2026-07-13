@@ -189,3 +189,55 @@ the only maximized scalar. The Pareto is always published alongside.
 
 V0 (local $0) → V1 (~$20) → V2 (~$40) → V3 (~$60) ∥ V4 (~$40–80) → V5 (user).
 Fail-fast: each kill refunds the remainder. Total EC2 ≈ $160–200.
+
+---
+
+## RESULTS (running ledger — verdicts against the pre-registered criteria above)
+
+### V0 — PASS (2026-07-12, local, $0; jsonl: results/st_stream/v0_gate.jsonl)
+- A1 streaming `.step()` ≡ batched forward: relL2 = 0.0 (bit-identical at τ=0).
+- A2 fused `serve_and_learn` grads ≡ `cascade_grads`: **bitwise**.
+- A3 measured cost: fused **1.23× wall / 1.38× op-volume** vs serve-only
+  (unfused legacy shape: 2.23× / 2.38× — the fusion IS the ~2× claim, with
+  headroom). First run's 1.26× wall was CPU noise; op-volume is deterministic.
+- A4 audits at τ=0: loop-only clean; **closed config (LUT loss +
+  PureTropicalSGD) clean end-to-end**; AdamW's own foreach update arithmetic
+  recorded as the research arm's declared boundary.
+- Headline: **serve+learn ≈ 1.4× serve, not 2×** — the north-star wording
+  "about the cost of serving it twice" is *conservative*.
+
+### V1 — PASS (2026-07-13, EC2; jsonl: results/st_stream/v1_streams.jsonl)
+- Tokenizer identity: rebuilt BPE-1024 reproduces the ckpt's banked text8
+  bpb 2.0273 exactly.
+- Oracle bounds (CE nats/tok): wiki 3.9004 · shakespeare 3.3605 · docs 2.9932
+  · code 2.4077. Headroom vs frozen: 0.079 / 6.73 / 8.69 / 9.98 bits/tok.
+- Regime admissibility: hard_shift 6.37, drift 6.37, novel_vocab 3.64
+  bits/tok (all ≥ 0.3 ✓); stationary control 0.079 < 0.15 ✓.
+
+### V2 — BENEFIT PASS, gate-calibration finding open (2026-07-13, EC2;
+jsonl: results/st_stream/v2_live.jsonl; 30 runs = 3 arms × 3 regimes × 3 seeds
++ stationary control)
+- **Gated arm (the live loop), regret vs frozen (nats/tok, mean±sd over
+  seeds):** hard_shift **−2.973±0.023**, drift **−2.921±0.008**, novel_vocab
+  **−1.580±0.017**. Headroom-captured: **0.685 / 0.674 / 0.607**. Fire-rate
+  ~0.33–0.35; amortized multiplier **~1.13×** serve-only. Regret < 0 with
+  seed CIs on all three adaptive regimes ⇒ **the pre-registered pass**.
+- **N1 (paper number):** headroom-captured 0.61–0.69, regret −1.58…−2.97
+  nats/tok over 800k served tokens, at 1.13× amortized serve cost.
+- **Honest finding 1 — anchor transfer failure:** gated+anchor at λ=1.0
+  (the G4 placeholder-era constant) strangles plasticity on the real
+  substrate: HC collapses to 0.05–0.19. λ re-tune is pre-registered into V4;
+  the anchor is a Goal-B mechanism and was never required for the Goal-A pass.
+- **Honest finding 2 — calibration kill triggered on the control:** on
+  stationary data the gate fires 0.357 and regret is **+0.103** (needless
+  updates hurt). z* = 0.25 (the G1 constant) is not regime-discriminating.
+  **V2b sweep** (z* ∈ {0.5, 1.0, 2.0} × {stationary, hard_shift}, box
+  i-062b98c1430e3e7c1) is in flight to find a z* that self-quiets on
+  stationary while keeping the shift benefit. V2B RESULT: ______
+- Instrumentation notes: the frozen ARM's apparent +0.06 self-regret is a
+  dropout artifact (learner serves in train mode, twin scores in eval — a
+  bias *against* the learner, left in place); stationary HC rows written
+  before the masking patch contain a garbage denominator (denominator ≈ 0)
+  and are masked in analysis.
+- **D2 delivered:** `results/st_stream/D2_life_stripchart.{html,png}` — the
+  one-process life on one screen (hard_shift/gated/s0; 8,332 windows).
