@@ -81,9 +81,11 @@ svg text{font-family:inherit;}
   <div class="panel">
     <h2>Gate fire-rate (fraction of windows that trigger a learning kick)</h2>
     <p class="note">The gate storms at each domain boundary (62% entering
-    shakespeare, then falling to 19%) but idles near ~35% even in-distribution —
-    the known z*&nbsp;=&nbsp;0.25 calibration gap; the V2b threshold sweep is
-    tuning it. Serving never pauses either way.</p>
+    shakespeare, then falling to 19%) but idles near ~35% even in-distribution.
+    V2b verdict: the idle floor is structural — a self-normalized z-gate fires
+    at a fixed quantile regardless of regime (z*&nbsp;=&nbsp;1.0 keeps 81% of
+    the benefit at 36% of the cost; the absolute-margin gate revision goes to
+    V4). Serving never pauses either way.</p>
     <svg id="fires" width="1120" height="120"></svg>
   </div>
   <div class="panel">
