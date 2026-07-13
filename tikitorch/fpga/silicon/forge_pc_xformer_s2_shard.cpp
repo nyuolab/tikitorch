@@ -335,6 +335,19 @@ static void stage_master(int l, const FMaster &m){
     if(l==0){   put_f(l, S2_FEMB, m.EMB, (long)S2_VOCAB*S2_D); put_f(l, S2_FPOS, m.POS, (long)S2_SEQ*S2_D); }
     if(l==L-1){ put_f(l, S2_FLNFG,m.LNFG,S2_D); put_f(l, S2_FLNFB,m.LNFB,S2_D); put_f(l, S2_FWHEAD,m.WHEAD,(long)S2_VOCAB*S2_D); }
 }
+// stage the PRE-TRANSPOSED weights Wt[I x O] (from W[O x I]) into the S2_WT_* scratch, so the backward DX route
+// (mode S2M_DXT) reads the CONTRACTION contiguously (== forward) instead of the strided read that hazards on
+// F2 at D=512. Wt[i*O + o] = W[o*I + i]. Call after stage_master (init) and after every weight update (training).
+static void stage_wt(int l, const FMaster &m){
+    static float *wt=0; if(!wt) wt=(float*)malloc((size_t)S2_VOCAB*S2_D*4);
+    auto T=[&](const float*W,int O,int I,int off){ for(int o=0;o<O;o++){ const float*wr=W+(long)o*I; for(int i=0;i<I;i++) wt[(long)i*O+o]=wr[i]; }
+        put_f(l, off, wt, (long)O*I); };
+    T(m.WQ, S2_D,S2_D, S2_WT_WQ);  T(m.WK, S2_D,S2_D, S2_WT_WK);
+    T(m.WV, S2_D,S2_D, S2_WT_WV);  T(m.WO, S2_D,S2_D, S2_WT_WO);
+    T(m.WUP, S2_FFN,S2_D, S2_WT_WUP);   // WUP[FFN x D] -> Wt[D x FFN]
+    T(m.WDN, S2_D,S2_FFN, S2_WT_WDN);   // WDN[D x FFN] -> Wt[FFN x D]
+    if(l==L-1) T(m.WHEAD, S2_VOCAB,S2_D, S2_WT_WH);   // WHEAD[VOCAB x D] -> Wt[D x VOCAB]
+}
 
 // per-chip activation-statistics probe (ACTSTATS=1; no-op otherwise) — does the WIDE residual stream / logits
 // collapse, explode, or saturate across chips 0->L-1 or over training? Printed at step 0 and every 500 steps.
@@ -409,6 +422,7 @@ int main(int argc,char**argv){
         if(INIT_DIR){ char ip[512]; snprintf(ip,512,"%s/master%d.f32",INIT_DIR,l);
             if(load_master_file(*M[l],ip)) printf("[xfs2shard] chip %d: loaded host init %s\n", l, ip); }
         stage_master(l, *M[l]);
+        stage_wt(l, *M[l]);      // PRE-TRANSPOSE the DX-route weights -> S2_WT_* (init; per-step restage added for training)
         stage(l,0,S2_BUFLEN);    // persist the whole float buffer (incl. the zeroed adam m/v + grad accumulators) once
     }
 

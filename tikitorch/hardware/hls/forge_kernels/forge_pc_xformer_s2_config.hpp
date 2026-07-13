@@ -196,7 +196,23 @@ static const int S2_BG_X1   = S2_BG_V    + S2_SEQ*S2_D;     // [SEQ*D]    gX1
 static const int S2_BG_TMP  = S2_BG_X1   + S2_SEQ*S2_D;     // [SEQ*D]    shared temp (gM2 / dx-route tmp / gR1)
 static const int S2_BG_END  = S2_BG_TMP  + S2_SEQ*S2_D;
 
-static const int S2_BUFLEN   = S2_AL(S2_BG_END);
+// ------------------------------- PRE-TRANSPOSED weights for the backward DX route (scratch DDR) -------------------------------
+// The DX route dx=gy@dyad(W) contracts over O; reading W[O x I] contiguous-over-I means the CONTRACTION (O) is
+// STRIDED (stride I=cols), which at D=512 is non-coalesced -> the csim-invisible silicon DMA hazard (the fwd
+// contracts over its own contiguous dim, so it is bit-exact). FIX: the host stages a TRANSPOSED copy Wt[I x O]
+// here; the DX route (mode S2M_DXT) then reads Wt contiguous-over-O (the contraction), exactly like the forward.
+// Sizes == the forward weights (transpose keeps element count). Non-mirrored (derived from the shared weights).
+static const int S2_WT      = S2_AL(S2_BG_END);
+static const int S2_WT_WQ   = S2_WT;                         // WQ^T [D*D]
+static const int S2_WT_WK   = S2_WT_WQ  + S2_D*S2_D;         // WK^T [D*D]
+static const int S2_WT_WV   = S2_WT_WK  + S2_D*S2_D;         // WV^T [D*D]
+static const int S2_WT_WO   = S2_WT_WV  + S2_D*S2_D;         // WO^T [D*D]
+static const int S2_WT_WUP  = S2_WT_WO  + S2_D*S2_D;         // WUP^T [D*FFN]
+static const int S2_WT_WDN  = S2_WT_WUP + S2_D*S2_FFN;       // WDN^T [FFN*D]
+static const int S2_WT_WH   = S2_WT_WDN + S2_FFN*S2_D;       // WHEAD^T [D*VOCAB]
+static const int S2_WT_END  = S2_WT_WH  + S2_D*S2_VOCAB;
+
+static const int S2_BUFLEN   = S2_AL(S2_WT_END);
 
 // per-slot span contiguity (single additive slot offset must be valid)
 static_assert(S2_GRIN == S2_WLNFS + S2_SEQ, "parity span not contiguous: S2_GRIN has an alignment gap");
