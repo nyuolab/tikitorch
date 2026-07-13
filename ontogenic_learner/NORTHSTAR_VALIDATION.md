@@ -304,3 +304,24 @@ jsonl: results/st_stream/v3_lora.jsonl; 33 rows = iso warm + 32 runs)
   multiplies and serve-class memory, beside the tuned-LoRA tax: matching our
   quality costs the incumbent 3.3× our update budget and a 2.7× memory
   class; at our budget its best quality trails by +0.82 nats/tok.
+
+### V4cal — margin gate VALIDATED, V4-life constants locked (2026-07-13,
+c7i.4xlarge ~2.5h; 10 runs appended to v2_live.jsonl)
+- **The two-timescale absolute-margin gate satisfies the calibration
+  criterion the z-family could not:** stationary fire-rate 0.24% / 0.01% /
+  0.01% at δ = 0.25/0.5/1.0 (z-family: 27–35% at every z*), while keeping
+  the shift benefit — hard_shift at δ=0.25: regret −2.67, HC 0.616, fire
+  11.2%, amortized 1.042×; drift at δ=0.5 sustains firing (6.7%, HC 0.553).
+- **Artifact decomposed:** stationary regret stays +0.11 with fires ≈ 0 ⇒
+  the stationary "harm" in all earlier rows was the train-mode dropout
+  serving artifact, not update damage.
+- **Anchor λ:** 0.01 → HC 0.474 (−0.08 vs the λ=0 same-gate baseline
+  0.554); 0.1 → 0.373. λ=0.01 locked; its retention payback is V4's
+  question.
+- **lr decay smoke:** mechanism sound; halve-per-200-fires over-decays at
+  800k (regret −0.77 — starved lr in late domains). Life cadence scales to
+  ~2000 fires/halving.
+- **V4-LIFE CONSTANTS (locked):** margin gate δ=0.25 (fast 0.9 / slow
+  0.999) · anchor λ=0.01 (EMA 0.9999, clamp 100) · bit-shift lr decay
+  every 2000 fired kicks · serve dropout OFF (kills the +0.11 artifact;
+  noted as a config delta vs V2).
