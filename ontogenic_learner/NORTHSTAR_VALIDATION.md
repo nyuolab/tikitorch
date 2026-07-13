@@ -233,7 +233,31 @@ jsonl: results/st_stream/v2_live.jsonl; 30 runs = 3 arms × 3 regimes × 3 seeds
   updates hurt). z* = 0.25 (the G1 constant) is not regime-discriminating.
   **V2b sweep** (z* ∈ {0.5, 1.0, 2.0} × {stationary, hard_shift}, box
   i-062b98c1430e3e7c1) is in flight to find a z* that self-quiets on
-  stationary while keeping the shift benefit. V2B RESULT: ______
+  stationary while keeping the shift benefit. **V2B RESULT (2026-07-13, 6
+  runs, seed 0): NO z* in this gate family satisfies the criterion — the
+  fire-rate is regime-INDEPENDENT at every threshold** (stationary vs
+  hard_shift: 0.271/0.257 at z*=0.5, 0.138/0.124 at 1.0, 0.030/0.034 at
+  2.0). Mechanism: a z-score against the gate's OWN running EMA mean/var
+  converges to firing at a fixed quantile of whatever distribution it sits
+  on — the self-normalization erases exactly the regime information the
+  criterion needs. The boundary storms are real signal (EMA lag); the idle
+  floor is the fixed quantile. Raising z* trades benefit for volume on BOTH
+  regimes together: hard_shift regret −2.86/−2.40/−1.10 and HC
+  0.66/0.55/0.25 at amortized mult 1.098/1.047/1.013. Stationary regret is
+  flat (+0.11/+0.13/+0.15) at every fire-rate, i.e. dominated by the
+  dropout serving artifact, not update damage. **Best operating point of
+  this family: z* = 1.0** (81% of the z*=0.25 benefit at 36% of its
+  learning cost). **Gate revision pre-registered into V4: the two-timescale
+  ABSOLUTE-MARGIN gate** — fire when fast-EMA(CE) exceeds slow-EMA(CE) by
+  δ nats (no variance normalization). On stationary both timescales
+  converge → gap → 0 → self-quiets by construction; on shift the gap jumps
+  by the CE step (~4 nats ≫ δ) → storms; under drift a persistent gap
+  sustains firing. Same O(1) scalar cost as the z-gate.
+- **Harness bug (V2b, no data loss):** the three z* jobs per regime wrote
+  the SAME `v2_tele_{regime}_gated_s0.jsonl` concurrently — box telemetry
+  files are interleaved and were NOT synced back; the intact V2-grid
+  telemetry (which D2 uses) is canonical. Fix before V4: tele filename must
+  carry gate_z/run tag.
 - Instrumentation notes: the frozen ARM's apparent +0.06 self-regret is a
   dropout artifact (learner serves in train mode, twin scores in eval — a
   bias *against* the learner, left in place); stationary HC rows written
