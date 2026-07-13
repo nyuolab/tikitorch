@@ -916,17 +916,44 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
             }
             float sum = s2_lanesum(slane);
             for (int j = 0; j <= i; j++) p[j] /= sum;
-            // gp_i[j] = <gATTN_i, V_j> in its OWN loop (NOT fused with any accumulation) ; ex = sum_j p_i[j]*gp_i[j]
-            float gp[S2_SEQ], exlane[S2_LANES];
-#pragma HLS ARRAY_PARTITION variable=exlane complete dim=1
-            for (int l = 0; l < S2_LANES; l++) exlane[l] = 0;
+            // gsv_i[j] = P( p_i[j] * <gATTN_i, V_j - Vbar_i> ) * ascale,  Vbar_i[d] = sum_{j<=i} p_i[j]*V_j[d].
+            // This is the softmax VJP  p_ij*(gp_ij - ex_i)  [gp_ij=<gA_i,V_j>, ex_i=<gA_i,Vbar_i>] rewritten to
+            // KILL the fused gp[]-write + exlane-RMW II=1 pipeline that F2 miscompiles: on silicon the scheduler
+            // dropped the gp[] BRAM writes so gp read back its zero-init -> ex=0 -> gsv=P(0)=0 EXACTLY -> gQ/gK=0
+            // (bit-exact 0, root-caused 2026-07-13 via dumped-operand reconstruction + adversarial verify; the
+            // 2026-07-11 two-phase rewrite un-fused gV but left THIS loop fused, so it stayed the live hazard).
+            // Vbar is the PROVEN-on-silicon forward P@V blend pattern (DH independent unrolled accumulators, outer
+            // loop NOT II=1); gsv is then a combinational per-(i,j) balanced-tree dot of the DEVIATION (no scalar
+            // cancellation) stored WRITE-ONCE — no gp[] array, no loop-carried RMW fused with a dot.
+            float vbar[S2_DH];
+#pragma HLS ARRAY_PARTITION variable=vbar complete dim=1
+            for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                vbar[d] = 0;
+            }
+            for (int j = 0; j <= i; j++) {
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                    vbar[d] += p[j] * s2_Vh[j*S2_DH+d];
+                }
+            }
             for (int j = 0; j <= i; j++) {
 #pragma HLS PIPELINE II=1
-                gp[j] = s2_dotDH(&s2_Ah[i*S2_DH], &s2_Vh[j*S2_DH]);
-                exlane[j & (S2_LANES-1)] += p[j]*gp[j];
+                float prod[S2_DH];                        // gA_i[d] * (V_j[d] - Vbar_i[d]) ; then balanced tree
+#pragma HLS ARRAY_PARTITION variable=prod complete dim=1
+                for (int d = 0; d < S2_DH; d++) {
+#pragma HLS UNROLL
+                    prod[d] = s2_Ah[i*S2_DH+d] * (s2_Vh[j*S2_DH+d] - vbar[d]);
+                }
+                for (int s = 1; s < S2_DH; s <<= 1) {     // same association as s2_dotDH (within-1-ULP)
+                    for (int d = 0; d < S2_DH; d += (s << 1)) {
+#pragma HLS UNROLL
+                        prod[d] = prod[d] + prod[d + s];
+                    }
+                }
+                s2_PALL[i*S2_SEQ+j] = p[j];
+                s2_GSV[i*S2_SEQ+j]  = P(p[j] * prod[0]) * ascale;
             }
-            float ex = s2_lanesum(exlane);
-            for (int j = 0; j <= i; j++) { s2_PALL[i*S2_SEQ+j] = p[j]; s2_GSV[i*S2_SEQ+j] = P(p[j]*(gp[j]-ex)) * ascale; }
         }
         // ---- PHASE 2: fresh-accumulator reductions (== forward P@V pattern; NO cross-iteration RMW). ----
         // gV[j][d] = sum_{i>=j} P(p_i[j]*gATTN_i[d]) ; gK[j][d] = sum_{i>=j} gsv_i[j]*Q_i[d]  (ascending-i order).
@@ -942,7 +969,11 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                 float pij = s2_PALL[i*S2_SEQ+j], gij = s2_GSV[i*S2_SEQ+j];
                 for (int d = 0; d < S2_DH; d++) {
 #pragma HLS UNROLL
-                    accV[d] += P(pij * s2_Ah[i*S2_DH+d]);
+                    // accV: RAW accumulate then P once post-loop (line ~1000), IDENTICAL to accK and the proven
+                    // forward P@V blend. The old per-term P(pij*gA) fused a bf16-round INTO the loop-carried RMW,
+                    // which F2 miscompiled -> gV double-counted (~2x) / dropped (~58% exact-zero, rising with the
+                    // i>=j depth). Removing the in-loop P makes accV structurally the proven accumulator.
+                    accV[d] += pij * s2_Ah[i*S2_DH+d];
                     accK[d] += gij * s2_Qh[i*S2_DH+d];
                 }
             }
