@@ -42,7 +42,12 @@ KICK_COST = 0.38          # V0-measured: fused op-volume ratio 1.38x => kick = 0
 
 
 class SurpriseGate:
-    """z-scored surprise on window CE (G1 constants: EMA 0.99, z* = 0.25)."""
+    """z-scored surprise on window CE (G1 constants: EMA 0.99, z* = 0.25).
+
+    V2b verdict: this family is a fixed-quantile RATE LIMITER, not a novelty
+    detector — self-normalization makes the steady-state fire-rate
+    regime-independent at every z*. Kept for reproducibility; the margin gate
+    below is the V4 revision."""
 
     def __init__(self, ema=0.99, gate_z=0.25):
         self.ema, self.gate_z = ema, gate_z
@@ -58,6 +63,27 @@ class SurpriseGate:
         self.mu = self.ema * self.mu + (1 - self.ema) * ce
         self.var = self.ema * self.var + (1 - self.ema) * (ce - self.mu) ** 2
         return fire
+
+
+class MarginGate:
+    """Two-timescale ABSOLUTE-margin gate (the V2b revision): fire when the
+    fast EMA of window CE exceeds the slow EMA by delta NATS. No variance
+    normalization, so on stationary data fast==slow -> gap -> 0 and the gate
+    self-quiets by construction; a shift jumps the gap by the CE step (~4
+    nats >> delta) and storms until the learner closes it."""
+
+    def __init__(self, delta=0.5, fast=0.9, slow=0.999):
+        self.delta, self.a_f, self.a_s = delta, fast, slow
+        self.mu_f = None
+        self.mu_s = None
+
+    def __call__(self, ce: float) -> bool:
+        if self.mu_f is None:
+            self.mu_f = self.mu_s = ce
+            return True                                    # first window: learn
+        self.mu_f = self.a_f * self.mu_f + (1 - self.a_f) * ce
+        self.mu_s = self.a_s * self.mu_s + (1 - self.a_s) * ce
+        return (self.mu_f - self.mu_s) > self.delta
 
 
 class Anchor:
@@ -113,13 +139,22 @@ def run(args):
     frozen.eval()
     engine = MorphPCEngine(learner)
     opt = torch.optim.AdamW(learner.parameters(), lr=args.lr, weight_decay=0.01)
-    gate = SurpriseGate(gate_z=args.gate_z)
-    anchor = Anchor(learner) if args.arm == "gated_anchor" else None
+    gate = (MarginGate(delta=args.delta) if args.gate == "margin"
+            else SurpriseGate(gate_z=args.gate_z))
+    anchor = (Anchor(learner, lam=args.anchor_lam)
+              if args.arm == "gated_anchor" else None)
     learn = args.arm != "frozen"
 
     sched = regime_schedule(args.regime, assets, era_tokens=args.era_tokens)
     gen = torch.Generator().manual_seed(args.seed)
-    tele_path = OUT / f"v2_tele_{args.regime}_{args.arm}_s{args.seed}.jsonl"
+    # gate tag in the filename: parallel sweep cells must never share a tele
+    # file (V2b lesson — three z* jobs interleaved one file)
+    gtag = (f"m{args.delta}" if args.gate == "margin" else f"z{args.gate_z}")
+    if anchor is not None:
+        gtag += f"_lam{args.anchor_lam}"
+    if args.tag:
+        gtag += f"_{args.tag}"
+    tele_path = OUT / f"v2_tele_{args.regime}_{args.arm}_{gtag}_s{args.seed}.jsonl"
     tele = tele_path.open("w")
     n = fires = 0
     sum_l = sum_f = sum_ro = sum_rof = fwd_eq = 0.0
@@ -159,6 +194,12 @@ def run(args):
             fired = False
         n += 1
         fires += int(fired)
+        if args.lr_decay_every and fired and fires % args.lr_decay_every == 0:
+            # bit-shift lr decay (nanogpt lines 509-516): halve on a fired-kick
+            # schedule — the long-horizon sign-drift fix, smoke-tested here
+            # ahead of the V4 life
+            for grp in opt.param_groups:
+                grp["lr"] = grp["lr"] / 2.0
         fwd_eq += 1.0 + (KICK_COST if fired else 0.0)
         sum_l += ce_l
         sum_f += ce_f
@@ -180,7 +221,12 @@ def run(args):
     # HC undefined when frozen is already near-oracle (stationary control)
     hc = (1.0 - sum_ro / sum_rof) if (learn and sum_rof / n > 0.02) else None
     row = dict(gate="V2", arm=args.arm, regime=args.regime, seed=args.seed,
-               gate_z=args.gate_z,
+               gate_kind=args.gate,
+               gate_z=(args.gate_z if args.gate == "z" else None),
+               delta=(args.delta if args.gate == "margin" else None),
+               anchor_lam=(args.anchor_lam if anchor is not None else None),
+               lr_decay_every=args.lr_decay_every or None,
+               tag=args.tag or None,
                n_windows=n, preq_ce=round(sum_l / n, 4),
                preq_ce_frozen=round(sum_f / n, 4),
                regret_vs_frozen=round((sum_l - sum_f) / n, 4),
@@ -219,7 +265,15 @@ if __name__ == "__main__":
                                         "stationary"], required=True)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--gate", choices=["z", "margin"], default="z")
     p.add_argument("--gate-z", type=float, default=0.25)
+    p.add_argument("--delta", type=float, default=0.5,
+                   help="margin gate threshold, nats")
+    p.add_argument("--anchor-lam", type=float, default=1.0)
+    p.add_argument("--lr-decay-every", type=int, default=0,
+                   help="halve lr every N FIRED kicks (0 = off)")
+    p.add_argument("--tag", default="",
+                   help="extra tele-filename tag for parallel sweep cells")
     p.add_argument("--era-tokens", type=int, default=200_000)
     p.add_argument("--window", type=int, default=96)
     p.add_argument("--tele-every", type=int, default=10)
