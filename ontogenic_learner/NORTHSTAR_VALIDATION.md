@@ -325,3 +325,43 @@ c7i.4xlarge ~2.5h; 10 runs appended to v2_live.jsonl)
   0.999) · anchor λ=0.01 (EMA 0.9999, clamp 100) · bit-shift lr decay
   every 2000 fired kicks · serve dropout OFF (kills the +0.11 artifact;
   noted as a config delta vs V2).
+
+### V4 — PASS on every pre-registered criterion (2026-07-14, c7i.8xlarge
+~6.5h; jsonl: v4_life.jsonl, v4_probes_*.jsonl, v4_tele_*.jsonl; 4 lives)
+- **The life (main):** 10M served tokens, 5 rotated cycles
+  (wiki→shak→docs→code, order rotated per cycle — the review's deadband
+  fix). Regret vs frozen **−2.617** nats/tok, HC **0.602**, at amortized
+  **1.0063×** serve — the gate fired **1.65%** of windows over the whole
+  life, collapsing 1,275 fires (cycle 1) → 45 (cycle 5); eras 15–18 fully
+  silent. The device learned when its stream demanded it, then just served.
+- **Norm equilibrium: PASS.** 3072.6 → 3142.4 (+2.27% over 10M tokens);
+  slope +4.73 units/Mtok full-life → **+0.39 last quarter** (12×
+  deceleration = plateau).
+- **Forgetting: PASS, stability-plasticity trade stated honestly.** The
+  wiki-specialist birth model became a stable GENERALIST: probe average
+  7.48 → 4.82 nats (−2.66) at the price of the birth specialty (wiki 3.91
+  → ~5.0). Per-domain probe CEs improve nearly every cycle after cycle 1
+  (code 4.82→4.23, docs 5.49→4.94, shak 5.22→5.04); interference
+  excursions bounded (wiki oscillates 4.75–5.35) and NON-INCREASING across
+  cycles.
+- **Sign-drift: PASS via the pre-registered adversary** (drifttest rider):
+  20,833 consecutive fired updates on stationary data — 3.5× the historical
+  strict@6k collapse horizon — with 10 lr halvings exercised; ended BETTER
+  than frozen (regret −0.048), no collapse. Caveat on record: exercises the
+  mechanism under AdamW (research arm); the closed shift-optimizer variant
+  remains on the strict track.
+- **top1_agree** vs the cycle-1 snapshot drifts to ~0.5–0.65 while probe
+  CEs improve — weights keep moving (plasticity alive), performance keeps
+  rising: healthy drift, not collapse.
+- **Audit:** 1,236 kicks audited across the 4 lives (5% sampling),
+  **0 violations**; anchor/AdamW arithmetic outside the audited region (V0
+  A4 declared boundary); full-life attributability is total (deterministic
+  from seed + ckpt chain).
+- **N3 (paper number):** 10M tokens / 5 cycles: regret −2.62 (HC 0.602) at
+  1.0063× serve; norm equilibrium (+2.3%, slope →0.4/Mtok); per-domain
+  probe improvement every cycle with bounded, non-increasing interference;
+  fire-rate 1.65% → 0.4%/cycle-5; sign-drift adversary passed at 3.5× the
+  collapse horizon; 0 multiply violations in 1,236 audited kicks.
+- Riders (V4b inputs): riderA (wiki,docs) regret −1.385/HC 0.465; riderB
+  (shak,code) −2.064/HC 0.361; both fire ≤4%, 0 violations. V4B MERGE
+  RESULT: ______
