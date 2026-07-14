@@ -70,10 +70,14 @@ aws s3 cp "\$S3_DEPLOY/s1_kv2_deploy.npy" /tmp/buf.npy || die "deploy-npy"
 aws s3 cp "\$S3_DEPLOY/s1_vocab.txt" /tmp/vocab.txt || die "deploy-vocab"
 # ---- build BOTH proven hosts with their proven lines ----
 gcc -O2 -std=gnu11 -DHAVE_FPGA_CLKGEN=0 ${KDEFS} -I"\$SDK/include" \
+    -I/opt/tiki/tikitorch/hardware/hls/forge_kernels \
+    -I/opt/tiki/tikitorch/fpga/silicon/cstdint_shim \
     /opt/tiki/tikitorch/fpga/silicon/forge_s1_infer_f2.c -lfpga_mgmt -lm -o /tmp/s1_infer \
     2>&1 | tee /tmp/build_infer.txt
 [ -x /tmp/s1_infer ] || die "infer-build"
 gcc -O2 -std=gnu11 -DHAVE_FPGA_CLKGEN=0 -I"\$SDK/include" \
+    -I/opt/tiki/tikitorch/hardware/hls/forge_kernels \
+    -I/opt/tiki/tikitorch/fpga/silicon/cstdint_shim \
     /opt/tiki/tikitorch/fpga/silicon/forge_train_step_s1_f2.c -lfpga_mgmt -lm -o /tmp/s1_f2 \
     2>&1 | tee /tmp/build_train.txt
 [ -x /tmp/s1_f2 ] || die "train-build"
