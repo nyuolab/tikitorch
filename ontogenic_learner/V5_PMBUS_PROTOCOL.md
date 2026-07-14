@@ -68,3 +68,31 @@ win. Board-joules(SL) ≥ GPU-LoRA board-joules at matched tokens+quality ⇒ th
 energy claim fails at board level and the number feeds the ASIC study as the
 FPGA-tax input (the card is EXPECTED to lose board power; that loss is an
 input, not a defeat).
+
+## Session scoping amendment (2026-07-14, pre-registered BEFORE the run)
+
+Executed by the assistant (user delegated). Decisions:
+- **Kernel/AGFI:** `agfi-050b219d4090fb8d6` — the morph-LM config-B fused
+  train kernel (fwd+CE+bwd+signSGD on fabric), chosen because it is the
+  BIT-EXACT-certified one (wcrc KAT vs host golden gates the session). The
+  L=2 xformer bundle path is avoided: its known wrong-direction-update
+  silicon defect (G1B_RESULT) would violate fairness invariant 2.
+- **Arms mapping:** S = repeated mode-0 forward sweeps; SL = repeated mode-3
+  fused single-step kicks; SL-gated = serve sweeps + one fused kick per 61
+  sweeps (the V4-measured 1.65% life fire-rate, replayed as a duty cycle);
+  idle = loaded image, no kicks. 3 interleaved reps x >=10 min.
+- **Instrument:** `fpga-describe-local-image -S 0 -M` at 1 Hz — the F2 image
+  power/rail telemetry named in this runbook. We report EXACTLY what the
+  tool exposes, labeled; if it exposes rails but not a full-card 12V edge,
+  the number is reported as rail/image power, NOT board power, and the
+  full-card claim is scoped accordingly (this is the honest limit of F2
+  telemetry without external instrumentation).
+- **GPU baseline:** g5.xlarge (A10G) board power via nvidia-smi at 1 Hz
+  during the SAME streams: frozen serve, LoRA-periodic (V3 center cell),
+  and online-BP — run by `scripts/_pc_v5gpu_onbox.sh`.
+- **Iso-quality note:** the F2 kernel is the small config-B LM (its banked
+  quality tier), not the d256 stream model; the cross-substrate tokens/J
+  comparison is therefore reported at each substrate's own measured quality
+  tier with the capability gap STATED, per the honesty rung. The marginal
+  serve->serve+learn multiplier (the N2 silicon half) is within-substrate
+  and unaffected.
