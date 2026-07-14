@@ -531,8 +531,6 @@ static inline float s2_dotDH(const float *a, const float *b) {
 #define S2M_FWD 0      // out[SEQ x O] = x[SEQ x I] @ dyad(W[O x I])^T ; weight streamed [O x I] ; raw write
 #define S2M_DX  1      // dx[SEQ x I]  = gy[SEQ x O] @ dyad(W[O x I]) ; weight streamed transposed ; P write
 #define S2M_WG  2      // dW[O x I]    = gy[SEQ x O]^T-contraction @ x[SEQ x I] ; both streamed ; P + GACC-RMW
-#define S2M_DXT 3      // dx[SEQ x I]  = gy[SEQ x O] @ dyad(Wt[I x O]) ; PRE-TRANSPOSED weight Wt[cols x KC] streamed
-                       //   CONTIGUOUS-over-contraction (== S2M_FWD access, no strided/hazard DMA) ; P write (like DX)
 
 // ------------------------------------------------------------------------------------------------------
 // s2_gemm — the reusable K-wide streamed contraction engine (fwd matmul, bwd dx, bwd wgrad). EVERYTHING is
@@ -600,7 +598,7 @@ static void NAME(int mode, ap_uint<512> *buffer, int Woff,                      
                     bload_f(buffer, Woff + (_i0 + _k) * cols + c0, row, TC);                                  \
                     for (int _c = 0; _c < TC; _c++) Bcache[_c * KC + _i0 + _k] = bf_dyad_f(row[_c]);          \
                 }                                                                                             \
-            } else if (mode == S2M_FWD || mode == S2M_DXT) {                                                                     \
+            } else if (mode == S2M_FWD) {                                                                     \
                 for (int _c = 0; _c < TC; _c++) {                                                             \
                     bload_f(buffer, Woff + (c0 + _c) * KC + _i0, row, _TI);                                   \
                     for (int _k = 0; _k < _TI; _k++) Bcache[_c * KC + _i0 + _k] = bf_dyad_f(row[_k]);         \
@@ -646,7 +644,7 @@ static void NAME(int mode, ap_uint<512> *buffer, int Woff,                      
                 for (int r = 0; r < TR; r++) {                                                                 \
                     for (int c = 0; c < TC; c++) {                                                             \
                         float v = y[r * tile_o + c];                                                           \
-                        row[c] = (mode == S2M_DX || mode == S2M_DXT) ? P(v) : v;                                                  \
+                        row[c] = (mode == S2M_DX) ? P(v) : v;                                                  \
                     }                                                                                          \
                     bstore_f(buffer, out_off + (r0 + r) * cols + c0, row, TC);                                 \
                 }                                                                                              \
@@ -694,7 +692,7 @@ static void NAME(int mode, ap_uint<512> *buffer, int Woff,                      
                         bload_f(buffer, Woff + (i0 + _k) * cols + c0, row, TC);                                \
                         for (int _c = 0; _c < TC; _c++) Btile[_c * tile_i + _k] = bf_dyad_f(row[_c]);          \
                     }                                                                                          \
-                } else if (mode == S2M_FWD || mode == S2M_DXT) {                                                                  \
+                } else if (mode == S2M_FWD) {                                                                  \
                     for (int _c = 0; _c < TC; _c++) {                                                          \
                         bload_f(buffer, Woff + (c0 + _c) * KC + i0, row, TI);                                  \
                         for (int _k = 0; _k < TI; _k++) Btile[_c * tile_i + _k] = bf_dyad_f(row[_k]);          \
@@ -733,7 +731,7 @@ static void NAME(int mode, ap_uint<512> *buffer, int Woff,                      
                 for (int r = 0; r < TR; r++) {                                                                 \
                     for (int c = 0; c < TC; c++) {                                                             \
                         float v = y[r * tile_o + c];                                                           \
-                        row[c] = (mode == S2M_DX || mode == S2M_DXT) ? P(v) : v;                                                  \
+                        row[c] = (mode == S2M_DX) ? P(v) : v;                                                  \
                     }                                                                                          \
                     bstore_f(buffer, out_off + (r0 + r) * cols + c0, row, TC);                                 \
                 }                                                                                              \
@@ -1119,7 +1117,7 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
             for (int v = 0; v < S2_VOCAB; v++) { float p = pr[v]/sum, oh = (v==tgt[t])?1.0f:0.0f; lgrow[v] = P((p-oh)/S2_SEQ); }
             bstore_f(buffer, S2_BG_LG + t*S2_VOCAB, lgrow, S2_VOCAB);
         }
-        s2_gemm(S2M_DXT, buffer, S2_WT_WH, S2_BG_LG, 0, S2_BG_XF, S2_SEQ, S2_D, S2_VOCAB, 0, 0);   // dx = gLG@dyad(WHEAD)
+        s2_gemm(S2M_DX, buffer, S2_FWHEAD, S2_BG_LG, 0, S2_BG_XF, S2_SEQ, S2_D, S2_VOCAB, 0, 0);   // dx = gLG@dyad(WHEAD)
         s2_wgrad(buffer, S2_BG_LG, S2_WXF + po, S2_VOCAB, S2_D, S2_SEQ, S2_GACC_WH, GZERO);         // dW head + GACC
         s2_ln_bwd_ddr(buffer, S2_BG_XF, FLNFG, lnfs, S2_BG_RP, S2_SEQ);                                         // gRP
         if (DO_UP) s2_adam_stream(buffer, S2_FWHEAD, S2_MOM+S2_OFF_FHEAD, S2_VAR+S2_OFF_FHEAD, S2_GACC_WH, S2_VOCAB*S2_D, LR);
@@ -1129,26 +1127,26 @@ extern "C" void forge_pc_xformer_s2_block(ap_uint<512> *buffer) {
 
     // (1) FFN backward: RP=M+FO, FO=WDN(HD), HD=qact(relu(WUP(X2)))
     s2_copy_ddr(buffer, S2_BG_RP, S2_BG_M, S2_SEQ*S2_D, 0);                                                     // gM = gRP
-    s2_gemm(S2M_DXT, buffer, S2_WT_WDN, S2_BG_RP, 0, S2_BG_HD, S2_SEQ, S2_FFN, S2_D, 0, 0);                        // gHD = gRP@dyad(WDN)
+    s2_gemm(S2M_DX, buffer, S2_FWDN, S2_BG_RP, 0, S2_BG_HD, S2_SEQ, S2_FFN, S2_D, 0, 0);                        // gHD = gRP@dyad(WDN)
     s2_wgrad(buffer, S2_BG_RP, S2_WHD + po, S2_D, S2_FFN, S2_SEQ, S2_GACC_WDN, GZERO);                          // gWDN + GACC
     s2_relu_apply_ddr(buffer, S2_BG_HD, S2_WRMASK + po, S2_SEQ*S2_FFN);                                         // mask gHD
-    s2_gemm(S2M_DXT, buffer, S2_WT_WUP, S2_BG_HD, 0, S2_BG_X2, S2_SEQ, S2_D, S2_FFN, 0, 0);   // gX2 = gHD@dyad(WUP)
+    s2_gemm(S2M_DX, buffer, S2_FWUP, S2_BG_HD, 0, S2_BG_X2, S2_SEQ, S2_D, S2_FFN, 0, 0);   // gX2 = gHD@dyad(WUP)
     s2_wgrad(buffer, S2_BG_HD, S2_WX2 + po, S2_FFN, S2_D, S2_SEQ, S2_GACC_WUP, GZERO);      // gWUP + GACC
     // (2) LN2 over M
     s2_ln_bwd_ddr(buffer, S2_BG_X2, FLN2G, ln2s, S2_BG_TMP, S2_SEQ);                                            // gM2 -> TMP
     s2_add_ddr(buffer, S2_BG_M, S2_BG_TMP, S2_BG_M, S2_SEQ*S2_D, 1);                                            // gM = P(gM + gM2)
     // (3) attention backward: M=R+AO, AO=WO(ATTN), ATTN=qact(P@V), P=softmax(QK/sqrt(DH)) [PRAW RECOMPUTE]
     s2_copy_ddr(buffer, S2_BG_M, S2_BG_R, S2_SEQ*S2_D, 0);                                                      // gR = gM
-    s2_gemm(S2M_DXT, buffer, S2_WT_WO, S2_BG_M, 0, S2_BG_ATTN, S2_SEQ, S2_D, S2_D, 0, 0);                          // gATTN = gM@dyad(WO)
+    s2_gemm(S2M_DX, buffer, S2_FWO, S2_BG_M, 0, S2_BG_ATTN, S2_SEQ, S2_D, S2_D, 0, 0);                          // gATTN = gM@dyad(WO)
     s2_wgrad(buffer, S2_BG_M, S2_WATTN + po, S2_D, S2_D, S2_SEQ, S2_GACC_WO, GZERO);                            // gWO + GACC
     s2_attn_bwd(buffer, S2_WQ + po, S2_WK + po, S2_WV + po, S2_BG_ATTN, S2_BG_Q, S2_BG_K, S2_BG_V);            // gQ,gK,gV (P'd)
     // (4) gX1 += dyad(W{Q,K,V})^T-route ; wgrad each ; then LN1
     s2_zero_ddr(buffer, S2_BG_X1, S2_SEQ*S2_D);
-    s2_gemm(S2M_DXT, buffer, S2_WT_WQ, S2_BG_Q, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
+    s2_gemm(S2M_DX, buffer, S2_FWQ, S2_BG_Q, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
     s2_wgrad(buffer, S2_BG_Q, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WQ, GZERO);
-    s2_gemm(S2M_DXT, buffer, S2_WT_WK, S2_BG_K, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
+    s2_gemm(S2M_DX, buffer, S2_FWK, S2_BG_K, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
     s2_wgrad(buffer, S2_BG_K, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WK, GZERO);
-    s2_gemm(S2M_DXT, buffer, S2_WT_WV, S2_BG_V, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
+    s2_gemm(S2M_DX, buffer, S2_FWV, S2_BG_V, 0, S2_BG_TMP, S2_SEQ, S2_D, S2_D, 0, 0); s2_add_ddr(buffer, S2_BG_X1, S2_BG_TMP, S2_BG_X1, S2_SEQ*S2_D, 0);
     s2_wgrad(buffer, S2_BG_V, S2_WX1 + po, S2_D, S2_D, S2_SEQ, S2_GACC_WV, GZERO);
     s2_copy_ddr(buffer, S2_BG_X1, S2_BG_X1, S2_SEQ*S2_D, 1);                                                    // gX1 = P(gX1)
     s2_ln_bwd_ddr(buffer, S2_BG_X1, FLN1G, ln1s, S2_BG_TMP, S2_SEQ);                                            // gR1 -> TMP
