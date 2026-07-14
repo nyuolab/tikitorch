@@ -1,0 +1,38 @@
+[s1] forge_train_step_s1 on F2: S1_BUFLEN=404496 (1.543 MB); n_steps=32; regime=FREEZE_CODES; seed=4242; DDR addr=0x0
+[s1] dims D=64 H=2 DH=32 FFN=256 L_SEQ=64 V=64 N_LAYERS=1 Q_CODE=6 (CE floor=log V=4.1589)
+[s1] AWS_CLK_GEN: MMCM_LOCK=0x00000001 (A locked) -> SYS_RST_REG cleared (raw readback 0x00000000; writable bits[9:0]=0x000, expect 0x000; reserved [31:10] stay set per spec); clk_extra_a1 (kernel clock; freq=AFI build recipe, A0=62.5MHz) live, CL resets released
+[s1] staged 1.543 MB into DDR via BAR4 in 0.002 s
+[s1] stage-check WFP_EMBED @231312: ddr={15,8,-15,-8} host={15,8,-15,-8} mism=0/8
+[s1] stage-check WFP_LN1_G @284560: ddr={64,64,64,64} host={64,64,64,64} mism=0/8
+[s1] stage-check CE_LUT    @57728: ddr={65536,62757,60097,57549} host={65536,62757,60097,57549} mism=0/8
+[s1] stage-check TOKENS    @58240: ddr={0,1,2,3} host={0,1,2,3} mism=0/8
+[s1] POST-STAGE READBACK (masters/LUT/tokens): MATCH (staging landed) (0 mismatches across 32 probed words)
+[s1] DIAG kernel-read (host-staged live EMBED, NO do_opt): peak|R|=20 -> KERNEL READS DDR (do_opt INIT is the bug)
+[s1] post-INIT EMBED(live)  @0: live={15,8,-15,-8,-11,-4,-11,-13}
+[s1] post-INIT W_HEAD(live) @53632: live={-11,-2,-10,-17,18,0,-19,-6}
+[s1] post-INIT LN1_G(live)  @53248: live={32,32,32,32,32,32,32,32}
+[s1] POST-INIT do_opt(INIT) copy: POPULATED (23/24 live words nonzero)
+[s1] INITIAL  CE = 4.1487   acc = 24/64   (loss-proxy[0] = 24)
+[s1] DIAG backward (mode-1): max|grad_logit|=64512  max|g_EMBED|=54656  max|g_W_HEAD|=516096 -> do_bwd COMMITS grads (issue is do_opt STEP)
+[s1] ============================================================
+[s1] DIAG do_opt WRITE-WALL probe (region=EMBED, regime=FREEZE_CODES): sentinel-stage -> kick STEP -> readback
+[s1] DIAG do_opt STEP write table (EMBED lane0; staged sentinel -> DDR readback vs host prediction):
+[s1]   wfp_master : staged=100     got=100     pred=99      -> UNCHANGED (the dropped write)
+[s1]   m          : staged=0       got=0       pred=32      -> UNCHANGED (the dropped write)
+[s1]   v          : staged=0       got=0       pred=32      -> UNCHANGED (the dropped write)
+[s1]   dst_live   : staged=12345   got=12345   pred=99      -> UNCHANGED (the dropped write)
+[s1] DIAG VERDICT: do_opt STEP drops ALL m_axi writes (wfp/m/v/dst all UNCHANGED) -> kernel m_axi STEP path dead on silicon
+[s1] DIAG do_opt: canonical EMBED (g/wfp/m/v/dst) restored from hbuf -> training state clean
+[s1] ============================================================
+[s1] HOST-DRIVEN training (HOST-SIDE optimizer, do_opt bypassed): 32 steps of {mode0 fwd, mode1 bwd, HOST dyadic-Adam VALUE step, BAR4 restage EMBED+W_HEAD} regime=FREEZE_CODES
+[s1]   step    1: CE = 4.1333  acc = 48/64
+[s1]   step   20: CE = 3.7583  acc = 64/64
+[s1] host-driven training done in 2.732 s (32 steps, 85.4 ms/step incl host round-trips), ret=0
+[s1] FINAL    CE = 3.6100   acc = 64/64   (loss-proxy[0] = 0)   peak|R| = 80   max|gradlogit rowsum| = 0
+[s1] CODE backbone: 0 / 49344 code bytes moved (FREEZE: expect 0 = codes frozen) — the honest 'did the dense backbone TRAIN' check
+[s1] ============================================================
+[s1] CE 4.1487 -> 3.6100  (drop 0.5387 nats; uniform/collapse floor = 4.1589)   acc 24 -> 64/64
+[s1] [gates] CE-drops>=0.5: yes   below-floor: yes   acc-improves: yes   no-saturation: yes
+[s1] -> S1 TRAINER (fwd+bwd on F2, host optimizer) CONVERGES (trajectory matches CSIM)
+[s1] ============================================================
+[S1 RESULT] regime=FREEZE_CODES seed=4242 n_steps=32 CE0=4.1487 CE1=3.6100 drop=0.5387 floor=4.1589 acc0=24 acc1=64 peakR=80 codes_moved=0/49344 msPerStep=85.37 ret=0

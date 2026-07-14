@@ -1,0 +1,338 @@
+# T_START=1784037629
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037629,64.50, 0'
+1784037629,64.50, 0
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037630,64.58, 0'
+1784037630,64.58, 0
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037631,66.61, 8'
+1784037631,66.61, 8
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037632,77.21, 27'
+1784037632,77.21, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037633,78.85, 26'
+1784037633,78.85, 26
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037634,78.93, 27'
+1784037634,78.93, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037635,79.00, 27'
+1784037635,79.00, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037636,79.12, 27'
+1784037636,79.12, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037637,78.93, 27'
+1784037637,78.93, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037638,79.77, 27'
+1784037638,79.77, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037639,79.97, 27'
+1784037639,79.97, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037640,79.61, 27'
+1784037640,79.61, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037641,79.63, 27'
+1784037641,79.63, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037642,79.57, 26'
+1784037642,79.57, 26
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037643,80.09, 27'
+1784037643,80.09, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037644,80.15, 28'
+1784037644,80.15, 28
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037645,80.16, 26'
+1784037645,80.16, 26
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037646,79.99, 27'
+1784037646,79.99, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037647,79.97, 27'
+1784037647,79.97, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037648,80.19, 27'
+1784037648,80.19, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037649,80.36, 27'
+1784037649,80.36, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037650,79.62, 27'
+1784037650,79.62, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037651,79.72, 27'
+1784037651,79.72, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037653,79.99, 27'
+1784037653,79.99, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037654,79.91, 27'
+1784037654,79.91, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037655,80.38, 27'
+1784037655,80.38, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037656,80.40, 27'
+1784037656,80.40, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037657,80.27, 27'
+1784037657,80.27, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037658,80.41, 27'
+1784037658,80.41, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037659,80.42, 27'
+1784037659,80.42, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037660,80.28, 27'
+1784037660,80.28, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037661,80.30, 27'
+1784037661,80.30, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037662,80.37, 27'
+1784037662,80.37, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037663,80.00, 27'
+1784037663,80.00, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037664,80.03, 27'
+1784037664,80.03, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037665,79.98, 27'
+1784037665,79.98, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037666,79.85, 27'
+1784037666,79.85, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037667,79.82, 27'
+1784037667,79.82, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037668,80.40, 27'
+1784037668,80.40, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037669,79.99, 27'
+1784037669,79.99, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037670,80.24, 27'
+1784037670,80.24, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037671,80.19, 27'
+1784037671,80.19, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037672,79.88, 27'
+1784037672,79.88, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037673,79.85, 27'
+1784037673,79.85, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037674,79.92, 27'
+1784037674,79.92, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037675,79.77, 27'
+1784037675,79.77, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037676,80.02, 27'
+1784037676,80.02, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037677,80.07, 27'
+1784037677,80.07, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037678,79.85, 27'
+1784037678,79.85, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037679,79.93, 27'
+1784037679,79.93, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037680,79.84, 26'
+1784037680,79.84, 26
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037681,78.05, 24'
+1784037681,78.05, 24
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037682,80.04, 27'
+1784037682,80.04, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037683,80.35, 27'
+1784037683,80.35, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037685,80.47, 27'
+1784037685,80.47, 27
++ sleep 1
++ true
+++ date +%s
+++ nvidia-smi --query-gpu=power.draw,utilization.gpu --format=csv,noheader,nounits
++ echo '1784037686,80.39, 27'
+1784037686,80.39, 27
++ sleep 1
+# T_END=1784037686

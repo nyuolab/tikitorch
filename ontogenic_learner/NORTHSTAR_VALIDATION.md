@@ -378,3 +378,39 @@ c7i.4xlarge ~2.5h; 10 runs appended to v2_live.jsonl)
   merge and balanced averaging is near-optimal. Fleet consolidation for
   gated-PC lives needs a firing-normalized importance (or probe-based
   Fisher) — pre-registered as the V4b.1 follow-up, not assumed.
+
+### V5 — FLOOR REPORT, the pre-registered honest branch (2026-07-14,
+assistant-run per user delegation; f2.6xlarge, two-image S1 session; data:
+results/v5_pmbus/; scoping amendments in V5_PMBUS_PROTOCOL.md)
+- **Session integrity:** both KATs green ON SILICON before and during
+  measurement — serve image generated bit-faithful text (426.5 ms/char,
+  forward-bound); trainer image CONVERGED during the power windows (CE
+  4.149→1.912, acc 24/64→64/64, trajectory == CSIM, 512 steps/kick ×14
+  kicks ×3 reps). GPU rider reproduced its V3 numbers exactly while
+  logging board power. Strike 1 = dropped -I lines (fail-fast, ~$0.50).
+- **THE HEADLINE IS A BOUND:** F2 Vccint telemetry quantizes at 1 W, and
+  every arm sits at ~4 W (idle-serve 4.55, serve 3.99, idle-train 4.00,
+  serve+learn 4.01). The serve→serve+learn power delta is UNRESOLVABLE:
+  **marginal learning power ≤ ~1 W on a ~4 W core rail**, i.e. learning
+  while serving is energetically invisible at this kernel scale on this
+  instrument. Per the pre-registered kill/honest-negative branch, the
+  floor is reported — not a win.
+- Banked absolute numbers (Vccint rail, labeled — NOT board power): the
+  trainer runs **5.30 mJ/token-position total-rail at 756 tok/s** while
+  converging; dynamic (active − same-image idle) ≈ 0.013 mJ/tok — below
+  quantization, quoted only as ≤-bound. Serve on the kv2 image is
+  LATENCY-dominated (62.5 MHz clock, sequential generation): 1.70 J per
+  generated token — a clock/architecture artifact of the deploy image,
+  not a power story.
+- **The regime-level GPU contrast (the meaningful cross-substrate row,
+  rails-vs-board caveat STATED):** the A10G burns **79 W board just
+  sitting on the batch-1 stream at 26% utilization** — 5.64 mJ/tok
+  frozen-serve, 7.49 LoRA-periodic, 16.00 online-BP (measured, same
+  streams, nvidia-smi board power). The F2 core rail runs the ENTIRE
+  serve+learn loop within ~4 W. A full-card F2 comparison needs external
+  12V instrumentation; as pre-registered, this feeds the ASIC study as
+  the FPGA-tax/floor input rather than claiming a board-level win.
+- **N2-silicon:** the fused-loop op-volume multiplier (1.38×) could not be
+  resolved as a power multiplier because the substrate's absolute power is
+  at the telemetry floor — the honest statement is "learning adds ≤1 W to
+  a ~4 W rail; amortized at the V4 fire-rate the addition is unmeasurable."

@@ -1,0 +1,22 @@
+[infer] forge_train_step_s1 FORWARD on F2: S1_BUFLEN=4507664 (17.195 MB) D=128 H=4 FFN=512 L_SEQ=64 V=64(real=39) N_LAYERS=4
+[infer] mode: FORWARD/INFERENCE ONLY (no bwd/opt/train); gen=200 temp=128.0 seed=1234; DDR addr=0x0
+[infer] vocab: 39 chars from /tmp/vocab.txt (id 0 = 0x0a)
+[infer] AWS_CLK_GEN: MMCM_LOCK=0x00000001 (A locked) -> SYS_RST_REG cleared (raw 0x00000000; writable[9:0]=0x000, expect 0x000); clk_extra_a1 (kernel clk) live, resets released
+[infer] staged 17.195 MB into DDR via BAR4 in 0.015 s
+[infer] stage-check EMBED   @0: ddr={-47,25,-6,54} host={-47,25,-6,54} mism=0/8
+[infer] stage-check W_HEAD  @796928: ddr={161,33,34,41251} host={161,33,34,41251} mism=0/8
+[infer] stage-check CE_LUT  @805120: ddr={65536,62757,60097,57549} host={65536,62757,60097,57549} mism=0/8
+[infer] stage-check POS/TOK @4466704: ddr={-5,50,14,32} host={-5,50,14,32} mism=0/8
+[infer] POST-STAGE READBACK: MATCH (weights landed) (0 mismatches / 32 probed words)
+[infer] ============================================================
+[infer] GENERATE 200 chars (rolling ctx<=64, temp=128.0):
+[infer] >>> 
+
+
+goood let your dealy half canatst torsul in him falt nor hath warh
+worst indo your kho? romeos! gone!
+for bore time franidius tits isue: and men,
+and the field had fagante-siciuliath,old unto event
+[infer] generated 200 chars in 85.307 s (426.5 ms/char, forward-bound)
+[infer] ============================================================
+[infer] done (forward-only inference; weights untouched on DDR)

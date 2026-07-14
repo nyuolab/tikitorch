@@ -1,0 +1,195 @@
+ARM=serve_r2 T_START=1784040233
+[infer] forge_train_step_s1 FORWARD on F2: S1_BUFLEN=4507664 (17.195 MB) D=128 H=4 FFN=512 L_SEQ=64 V=64(real=39) N_LAYERS=4
+[infer] mode: FORWARD/INFERENCE ONLY (no bwd/opt/train); gen=5000 temp=128.0 seed=1234; DDR addr=0x0
+[infer] vocab: 39 chars from /tmp/vocab.txt (id 0 = 0x0a)
+[infer] AWS_CLK_GEN: MMCM_LOCK=0x00000001 (A locked) -> SYS_RST_REG cleared (raw 0x00000000; writable[9:0]=0x000, expect 0x000); clk_extra_a1 (kernel clk) live, resets released
+[infer] staged 17.195 MB into DDR via BAR4 in 0.013 s
+[infer] stage-check EMBED   @0: ddr={-47,25,-6,54} host={-47,25,-6,54} mism=0/8
+[infer] stage-check W_HEAD  @796928: ddr={161,33,34,41251} host={161,33,34,41251} mism=0/8
+[infer] stage-check CE_LUT  @805120: ddr={65536,62757,60097,57549} host={65536,62757,60097,57549} mism=0/8
+[infer] stage-check POS/TOK @4466704: ddr={-5,50,14,32} host={-5,50,14,32} mism=0/8
+[infer] POST-STAGE READBACK: MATCH (weights landed) (0 mismatches / 32 probed words)
+[infer] ============================================================
+[infer] GENERATE 5000 chars (rolling ctx<=64, temp=128.0):
+[infer] >>> 
+
+
+goood let your dealy half canatst torsul in him falt nor hath warh
+worst indo your kho? romeos! gone!
+for bore time franidius tits isue: and men,
+and the field had fagante-siciuliath,old unto eventy
+lack anticent it tog'd.
+
+be ducatina:
+comppenes:
+set upidece i grantle, mercrtaine, '3 him own to the glace.
+-warpen holsd did his done argloucester's yen ludinak-sewe camestiomalle.
+
+
+if it you maid and o'ed' havom keeep'd;
+ke glourt. someo countred e.
+his this ban gurievious:
+and permbeouthsone fayirsed be son,
+noble or habrant of this him plase:
+thou wil geteer that wist of roofindnge,
+hench smal thought york? great,
+kle flainged; scould that husber of than lift,
+ta tcoped
+in handst, into the all hench too mater.
+
+
+
+shread, what sporti undony peachired oxfolow
+wing toher furtague and will, dessimed york!
+paybst hath fairstshe give
+sybut glammout, your have stayping nevedseed hand might: is
+short, not:
+ dupes whysous.
+yonly this thy loke atoly to so ten my wom that?
+the ling
+an goo, more an the -numpitenant your where under as,
+or day stift,
+hath untaches!
+thy these with shep touch merjite, i'l kil streplate not
+god, just'd asay if well faidincences!
+swits'd ery thee mor. conter my word.
+
+i thirkes, and her prossph your should bon stale,
+your our pray!
+was hume compin:
+for than sweeitate, i moviny!'s kings my lives
+evof the its she she exarl to!
+by sets,
+no strust so both.
+fight bitte ausurwel to save,
+laugallius:
+aufffic queepier.
+
+savecterbfrince, rominius:
+that not for father by outly, the mutt, stread do bear one of able,
+ast,
+i betward, with perform; fork
+uncle; hathow what richilder?
+-toundes tid thums and loord: defirst, in shall here ait am sake heart.
+
+if esstrvervil, the so e,
+was york:
+warly, we the tream, from that you kisssem to his but it,
+to thought havopayswee to danger, the sils to my an ming my you be
+but,
+too sin that i sob from pain,
+a your not him ery freturn my statimed
+and to se you erougiages!
+heave ton't to she soron leavest of the,
+whooman rece you trap sir,
+bloow, upon not soft, would and i death
+bitery: 'tand inved by livong but arm.
+
+thistrst vengereeee his sa persuting and wive's on vit of thy up!
+strucious:
+there porthip-or west it son'd flatts think
+his; hay erby saturys with -ey nefolowes;
+uncinioly or odddines
+god.
+
+
+anger eronicence his what? dispent him
+
+ben may, playing thrall god and his fromnioritus it,
+o, noted hathong, where clistron!-i hath ap quen! and and evowng uswoman,
+killler, noble not morowily.
+meenius:
+if to wellll, mybelo!
+tad,-mayels light. pity.s for now!
+run where tubt show nothing love light
+divivid beine send aped!
+foounctert?'d longs man! should men! so; no minely.
+like of, allll, nive marke not faul.
+
+now, stides stant, pooowe she it a king king,
+well ours to love goon:
+way.
+foorth
+mother, antay holdis pray, of thee to 'ting hench rew comilo, lords!
+when her lok god foth'd them bring seenig,
+i beind the shad, wordst saybowds o uple.
+
+
+-henche angrels and they do shallll he handlow,
+any hear pocatcion wif ton the gool.
+
+
+what isab womman:
+ed; vivevends or best of the baut not: the wort.
+
+
+play kil helprande with the hy promady how:
+i hath thy those wel with you. are
+
+trialllleunes:
+may should do topy.
+
+wel, pointren' nurse much; you here, their best? lord, fathrour seared, which her wind,
+ven,
+to appurle to they markinler'd hand, to
+allll the king that is gater in the tongue
+carelio, titss faultse sea, in for they did should did thou ded die
+as i a be up.
+
+
+justierd: asick himselvo.' noies, glouter hit?
+
+dearst:
+frieds do myshalllll i backen, womoring hangi:
+hear
+willl lought underss is fortul case
+with he, him henry,
+to al.
+
+lesss:
+was not a who confordiors, and man,
+speks the proud shall in where off the or by iisalin;
+her fair
+and, welllll had much o' to but
+the king ince forth, evirmplot us as her pedly:
+it
+much mades and at lord worth
+body, what the put their me, us farewel that what -that hang him,
+where,
+whereing povarth:
+houses-mutes as hart;
+caulis:
+youth, let not yo said you manes, fin hast
+not ade with mane too our body the ye,
+a spetily husbes with hands, defur tider i i am hath i shal beweer.
+
+
+that browling in atords sedublt, wep whilst we thou lady the wey:
+alll we be incerlemncimes, it.-again torth; lady thank.
+well,
+
+
+hapy his  prove amerlle: erheam that friends, i whom
+shrarines! your starw of ixshal life, dancied this stain,
+brinchman, rarturer slisdiure, our in flame and man his,
+if there glay hearts trais, man, greetlan,
+wor pridy deather of south gleast
+the
+was siverst of my your went to the wast
+lister bunden it mapulose the says wisteds?
+my cultinked york:
+do, and to much frolker and death, weards
+i having it thou blug-on
+
+nopthed, aligrety why weent.tise til fuather?
+witsh't even gravin then vis do not but the ofight; have to mistrelf on his many sons pew him.
+what or they true sxopen: unfalt learn heads,
+ay i sly loook king's ner the unkin;
+ofecies they succes teemptrake great when,
+i'l and he part, vel vof so prove
+fa
+llead 
+[infer] generated 5000 chars in 2132.666 s (426.5 ms/char, forward-bound)
+[infer] ============================================================
+[infer] done (forward-only inference; weights untouched on DDR)
+ARM=serve_r2 T_END=1784042367 ITERS=1
