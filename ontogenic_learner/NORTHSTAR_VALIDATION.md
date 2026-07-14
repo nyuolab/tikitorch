@@ -363,5 +363,18 @@ c7i.4xlarge ~2.5h; 10 runs appended to v2_live.jsonl)
   fire-rate 1.65% → 0.4%/cycle-5; sign-drift adversary passed at 3.5× the
   collapse horizon; 0 multiply violations in 1,236 audited kicks.
 - Riders (V4b inputs): riderA (wiki,docs) regret −1.385/HC 0.465; riderB
-  (shak,code) −2.064/HC 0.361; both fire ≤4%, 0 violations. V4B MERGE
-  RESULT: ______
+  (shak,code) −2.064/HC 0.361; both fire ≤4%, 0 violations.
+- **V4b MERGE RESULT (2026-07-14): HONEST NEGATIVE — the G3-F2 Fisher
+  recipe did NOT transfer.** Naive averaging beats Fisher on all four
+  domains (mean 5.51 vs 5.80; naive within +0.54 of every solo and BETTER
+  than the solo on 3 own-shard cells). Mechanism hypothesis, on record:
+  (a) under SPARSE GATED firing, Adam second moments are stale and
+  fire-rate-mismatched across riders (A fired 4.0%, B 1.4% — importance
+  reflects when a rider last fired, not what it knows), corrupting the
+  precision weighting that worked in dense-update G3-F2; (b) the
+  disjoint-shard premise failed — riders converged to overlapping
+  generalist basins (riderA beats riderB on riderB's OWN shard: shak
+  5.98 vs 6.10, code 5.01 vs 5.55), so there were no true specialists to
+  merge and balanced averaging is near-optimal. Fleet consolidation for
+  gated-PC lives needs a firing-normalized importance (or probe-based
+  Fisher) — pre-registered as the V4b.1 follow-up, not assumed.
