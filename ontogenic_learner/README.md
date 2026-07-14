@@ -80,7 +80,30 @@ Wikipedia (bpc 2.90), then a strictly sequential non-i.i.d. stream with large or
 updates/domain, 3 seeds, mean:
 
 | arm | final avg bpc ↓ | forgetting ↓ | base drift ↓ | plasticity ↑ |
-|---|---|---|---|---|
+|---|
+## 2b. The V-gate program (2026-07-12 → 07-14) — the successor ladder, COMPLETE
+
+The pause-lifting program that fused this line with the pc-morphssm substrate.
+Full prereg + verdicts: [NORTHSTAR_VALIDATION.md](NORTHSTAR_VALIDATION.md);
+one-page visual: `results/st_stream/D2_life_stripchart.html` (also published
+as a live artifact).
+
+| gate | verdict |
+|---|---|
+| V0 fused mechanism | ✅ 1.23× wall / 1.38× ops vs serve; grads bitwise ≡ cascade; zero-multiply closed config |
+| V1 streams + oracles | ✅ headrooms 6.7–10 bits/tok off-domain; tokenizer identity exact |
+| V2 does-it-help | ✅ regret −1.6…−3.0 nats/tok, HC 0.61–0.69, at 1.13× serve |
+| V2b gate law | ✗→✓ z-gates are fixed-quantile rate limiters (can't self-quiet); the two-timescale ABSOLUTE-MARGIN gate replaces them (self-quiets by construction — V4cal: 0.01–0.24% stationary fire) |
+| V3 honest incumbents | ✅ frontier held: matching our quality costs tuned LoRA 3.3× our update budget + a 2.7× memory class; online-BP wins unconstrained compute (segmentation as pre-registered); online-BP also HURTS on stationary — gating is universal |
+| V4 lifetime (10M tokens, 5 rotated cycles) | ✅ ALL criteria: HC 0.602 at 1.0063× serve; fires 1275→45/cycle (self-quieting); norm equilibrium; non-increasing interference; sign-drift adversary survived 3.5× the collapse horizon; 0/1,236 audit violations |
+| V4b fleet merge | ✗ HONEST NEGATIVE: Fisher merge loses to naive averaging under sparse gated firing (stale, fire-rate-mismatched importance; riders converged to overlapping generalist basins) → V4b.1 = firing-normalized importance |
+| V5 silicon energy | session in flight (two-image S1 design; scoping in [V5_PMBUS_PROTOCOL.md](V5_PMBUS_PROTOCOL.md)) |
+
+This ladder retires G1b (the loop is now certified end-to-end on the real
+substrate at life scale; the L=2 xformer silicon defect remains open on the
+fabric track) and delivers G4's compute half (V3) with its energy half in V5.
+Paper numbers N1/N2/N3 are banked in the prereg ledger.
+---|---|---|---|
 | frozen | 6.548 | — | — | 0.00 |
 | cascade (naive sequential BP) | 3.529 | +0.610 | +0.712 | 1.00 |
 | rehearsal (control) | 3.623 | +0.625 | +0.899 | 0.98 |
@@ -174,6 +197,14 @@ First life: 14-day pilot (plan: `~/.claude/plans/…majestic-riddle.md`; launche
 *operational* train≡inference; the settling-based unification remains the U-gate track.
 
 ## 7. Status log (newest first — keep updating this)
+
+- **2026-07-14** · **V-GATE PROGRAM COMPLETE (except V5, in flight).** V0–V4
+  all pass as pre-registered; two honest negatives published with mechanisms
+  (V2b gate law; V4b Fisher-under-sparse-firing). Headlines: the fused
+  serve+learn loop measured at 1.38× ops; a 10M-token single-process life at
+  1.0063× serving cost with retention, norm equilibrium and a fully audited
+  update stream; the incumbent Pareto held. See §2b and
+  NORTHSTAR_VALIDATION.md. All results/telemetry committed on pc-morphssm.
 
 - **2026-07-08 (later)** · **PILOT ENDED EARLY BY DECISION at life-day 3.3** (graceful CLI
   terminate: final checkpoint → ack → instance gone; ~$28 total of the $135 budget). Life
