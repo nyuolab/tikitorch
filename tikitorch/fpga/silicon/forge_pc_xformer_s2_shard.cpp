@@ -230,6 +230,10 @@ static void bwd_dump_chip(int l, const char* dir, int is_out){
     readf(l,S2_DG_GQ,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"dgQ",  db,(long)S2_SEQ*S2_D);
     readf(l,S2_DG_GK,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"dgK",  db,(long)S2_SEQ*S2_D);
     readf(l,S2_DG_GV,  db,(long)S2_SEQ*S2_D);   dump_b32(dir,l,"dgV",  db,(long)S2_SEQ*S2_D);
+    // DIAGNOSTIC: head-0 phase-1 scratch snapshots (kernel bstored s2_GSV/s2_PALL here BEFORE phase-2 read them).
+    // scrGSV ZERO => phase-1 s2_GSV write dropped; scrGSV NONZERO while gQ/gK==0 => phase-2 strided read is the hazard.
+    readf(l,S2_SCR_GSV, db,(long)S2_SEQ*S2_SEQ); dump_b32(dir,l,"scrGSV", db,(long)S2_SEQ*S2_SEQ);
+    readf(l,S2_SCR_PALL,db,(long)S2_SEQ*S2_SEQ); dump_b32(dir,l,"scrPALL",db,(long)S2_SEQ*S2_SEQ);
 }
 
 // ---- bf16 STE round (== kernel bf16_round / twin P()) ----

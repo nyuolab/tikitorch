@@ -196,7 +196,14 @@ static const int S2_BG_X1   = S2_BG_V    + S2_SEQ*S2_D;     // [SEQ*D]    gX1
 static const int S2_BG_TMP  = S2_BG_X1   + S2_SEQ*S2_D;     // [SEQ*D]    shared temp (gM2 / dx-route tmp / gR1)
 static const int S2_BG_END  = S2_BG_TMP  + S2_SEQ*S2_D;
 
-static const int S2_BUFLEN   = S2_AL(S2_BG_END);
+// DIAGNOSTIC scratch snapshots (head-0 attention-backward phase-1): the kernel bstores s2_GSV/s2_PALL here right
+// after phase-1; the driver reads them back to split "phase-1 write dropped -> scratch reads ZERO" (write-drop
+// hazard) from "scratch NONZERO but phase-2 strided read yields gQ/gK=0" (phase-2 read hazard). +512KB, negligible.
+static const int S2_SCR_GSV  = S2_AL(S2_BG_END);              // [SEQ*SEQ] head-0 s2_GSV snapshot
+static const int S2_SCR_PALL = S2_SCR_GSV + S2_SEQ*S2_SEQ;    // [SEQ*SEQ] head-0 s2_PALL snapshot
+static const int S2_SCR_END  = S2_SCR_PALL + S2_SEQ*S2_SEQ;
+
+static const int S2_BUFLEN   = S2_AL(S2_SCR_END);
 
 // per-slot span contiguity (single additive slot offset must be valid)
 static_assert(S2_GRIN == S2_WLNFS + S2_SEQ, "parity span not contiguous: S2_GRIN has an alignment gap");

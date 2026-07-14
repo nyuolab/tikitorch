@@ -953,6 +953,13 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                 s2_GSV[i*S2_SEQ+j]  = P(p[j] * prod[0]) * ascale;
             }
         }
+        // DIAGNOSTIC (head 0 only): snapshot the phase-1 scratch to DDR via a CLEAN sequential bstore, BEFORE
+        // phase-2 reads it. Read-back ZERO => phase-1 s2_GSV/s2_PALL writes were dropped (write-drop hazard);
+        // read-back NONZERO while gQ/gK come back 0 => the phase-2 STRIDED read s2_GSV[i*SEQ+j] is the hazard.
+        if (h == 0) {
+            bstore_f(buffer, S2_SCR_GSV,  s2_GSV,  S2_SEQ*S2_SEQ);
+            bstore_f(buffer, S2_SCR_PALL, s2_PALL, S2_SEQ*S2_SEQ);
+        }
         // ---- PHASE 2: fresh-accumulator reductions (== forward P@V pattern; NO cross-iteration RMW). ----
         // gV[j][d] = sum_{i>=j} P(p_i[j]*gATTN_i[d]) ; gK[j][d] = sum_{i>=j} gsv_i[j]*Q_i[d]  (ascending-i order).
         for (int j = 0; j < S2_SEQ; j++) {
