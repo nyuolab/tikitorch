@@ -1,0 +1,12 @@
+{"t": 0, "where": "birth", "ce_wiki": 3.9077, "ce_docs": 9.3148, "norm": 3072.62}
+{"t": 249984, "where": "era_end_0", "ce_wiki": 3.9052, "ce_docs": 9.3355, "norm": 3075.56}
+{"t": 499968, "where": "era_end_1", "ce_wiki": 4.9842, "ce_docs": 5.5422, "norm": 3116.08}
+{"t": 499968, "where": "cycle1_snapshot"}
+{"t": 749952, "where": "era_end_2", "ce_wiki": 4.989, "ce_docs": 5.5362, "agree_wiki": 0.9834, "agree_docs": 0.9827, "norm": 3116.12}
+{"t": 999936, "where": "era_end_3", "ce_wiki": 4.989, "ce_docs": 5.5362, "agree_wiki": 0.9834, "agree_docs": 0.9827, "norm": 3116.12}
+{"t": 1249920, "where": "era_end_4", "ce_wiki": 4.989, "ce_docs": 5.5362, "agree_wiki": 0.9834, "agree_docs": 0.9827, "norm": 3116.12}
+{"t": 1499904, "where": "era_end_5", "ce_wiki": 5.0224, "ce_docs": 5.2905, "agree_wiki": 0.8031, "agree_docs": 0.7354, "norm": 3118.28}
+{"t": 1749888, "where": "era_end_6", "ce_wiki": 5.0339, "ce_docs": 5.2814, "agree_wiki": 0.7959, "agree_docs": 0.7363, "norm": 3118.33}
+{"t": 1999872, "where": "era_end_7", "ce_wiki": 5.0339, "ce_docs": 5.2814, "agree_wiki": 0.7959, "agree_docs": 0.7363, "norm": 3118.33}
+{"t": 2249856, "where": "era_end_8", "ce_wiki": 5.0335, "ce_docs": 5.2803, "agree_wiki": 0.7936, "agree_docs": 0.7324, "norm": 3118.37}
+{"t": 2499840, "where": "era_end_9", "ce_wiki": 5.0402, "ce_docs": 5.2474, "agree_wiki": 0.7712, "agree_docs": 0.7021, "norm": 3118.62}

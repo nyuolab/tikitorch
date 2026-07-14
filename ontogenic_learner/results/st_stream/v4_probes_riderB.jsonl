@@ -1,0 +1,12 @@
+{"t": 0, "where": "birth", "ce_shakespeare": 7.7718, "ce_code": 8.9164, "norm": 3072.62}
+{"t": 249984, "where": "era_end_0", "ce_shakespeare": 7.729, "ce_code": 8.8938, "norm": 3072.63}
+{"t": 499968, "where": "era_end_1", "ce_shakespeare": 6.8602, "ce_code": 6.6579, "norm": 3080.72}
+{"t": 499968, "where": "cycle1_snapshot"}
+{"t": 749952, "where": "era_end_2", "ce_shakespeare": 6.6925, "ce_code": 6.396, "agree_shakespeare": 0.7334, "agree_code": 0.8073, "norm": 3082.88}
+{"t": 999936, "where": "era_end_3", "ce_shakespeare": 6.6925, "ce_code": 6.396, "agree_shakespeare": 0.7334, "agree_code": 0.8073, "norm": 3082.88}
+{"t": 1249920, "where": "era_end_4", "ce_shakespeare": 6.6286, "ce_code": 6.3375, "agree_shakespeare": 0.6917, "agree_code": 0.7767, "norm": 3083.62}
+{"t": 1499904, "where": "era_end_5", "ce_shakespeare": 6.4319, "ce_code": 5.9017, "agree_shakespeare": 0.5348, "agree_code": 0.6481, "norm": 3085.8}
+{"t": 1749888, "where": "era_end_6", "ce_shakespeare": 6.3739, "ce_code": 5.7048, "agree_shakespeare": 0.4583, "agree_code": 0.5957, "norm": 3086.81}
+{"t": 1999872, "where": "era_end_7", "ce_shakespeare": 6.1538, "ce_code": 5.5844, "agree_shakespeare": 0.4316, "agree_code": 0.5814, "norm": 3089.29}
+{"t": 2249856, "where": "era_end_8", "ce_shakespeare": 6.1538, "ce_code": 5.5844, "agree_shakespeare": 0.4316, "agree_code": 0.5814, "norm": 3089.29}
+{"t": 2499840, "where": "era_end_9", "ce_shakespeare": 6.0973, "ce_code": 5.5492, "agree_shakespeare": 0.4157, "agree_code": 0.5791, "norm": 3089.95}
