@@ -96,3 +96,19 @@ Executed by the assistant (user delegated). Decisions:
   tier with the capability gap STATED, per the honesty rung. The marginal
   serve->serve+learn multiplier (the N2 silicon half) is within-substrate
   and unaffected.
+
+## Scoping amendment 2 (2026-07-14, pre-launch review verdict)
+
+The morph-LM single-image plan (amendment 1) is FALSIFIED by review: the
+fused AGFI synthesizes ONLY mode 3 (modes 0/1/2 are `#if !SYNTHESIS`
+host-only — SILICON_FINDINGS.md); a forward-only serve arm cannot exist on
+it. **Final design = the two-image S1-family session the original arm
+matrix actually described:** serve on `agfi-082aa26aac7495798` (S1 kv2
+FORWARD-ONLY build, bpc 2.4230 banked) as sustained token generation;
+serve+learn on `agfi-0179e963c146d39f7` (S1 trainer v17, fwd+bwd on fabric,
+FREEZE_CODES) as looped mode-3 kicks; per-image idle floors; DYNAMIC deltas
+(active − same-image idle) are the comparable quantity across images;
+SL-gated is derived per this runbook's own identity (S + 1.65% × (SL−S)).
+Both arms use the proven host binaries unmodified. KAT-lite gates per phase.
+The cross-image static-power difference is stated as a limit; the marginal
+DYNAMIC energy of learning is the headline.
