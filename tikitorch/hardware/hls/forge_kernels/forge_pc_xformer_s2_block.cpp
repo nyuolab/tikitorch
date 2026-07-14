@@ -935,8 +935,11 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                     vbar[d] += p[j] * s2_Vh[j*S2_DH+d];
                 }
             }
+            // NO PIPELINE II=1 here: on F2 an II=1-pipelined loop writing per-iteration addresses into a large
+            // on-chip array (s2_GSV/s2_PALL) COMMITS ONLY THE LAST iteration's write per row (diagnosed 2026-07-14
+            // via DDR scratch snapshot: scrGSV=0, scrPALL=diagonal-only). Leave it unpipelined so every write lands
+            // — the prod[] tree is combinational (UNROLL), the write is at the tail; the tool commits each j.
             for (int j = 0; j <= i; j++) {
-#pragma HLS PIPELINE II=1
                 float prod[S2_DH];                        // gA_i[d] * (V_j[d] - Vbar_i[d]) ; then balanced tree
 #pragma HLS ARRAY_PARTITION variable=prod complete dim=1
                 for (int d = 0; d < S2_DH; d++) {
