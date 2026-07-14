@@ -272,8 +272,10 @@ jsonl: results/st_stream/v3_lora.jsonl; 33 rows = iso warm + 32 runs)
 - **Iso-quality warm start:** dense GPT (d256/6L/8H/ff1024) hit val bpb
   2.0263 vs target 2.0273 (delta −0.001, two-sided flag TRUE) — in **1,150
   steps / 16.6 s** on the A10G. Capability-ceiling context reported honestly:
-  the dense substrate reaches our checkpoint's text8 quality ~3 orders of
-  magnitude faster, and its FROZEN stream baseline is better too (preq 6.74
+  the dense substrate reaches our checkpoint's text8 quality in 1,150 steps
+  vs our 8,699 (~70x less wall clock, cross-hardware; an earlier draft of
+  this line said "~3 orders of magnitude" — corrected 2026-07-14 against
+  the jsonls), and its FROZEN stream baseline is better too (preq 6.74
   vs our 7.50 on hard_shift) despite identical text8 quality.
 - **The frontier claim (hard_shift, same window sequences, extra
   update-compute in fwd-eq of own serve):** ours = preq **4.53 at +0.13**
@@ -332,8 +334,10 @@ c7i.4xlarge ~2.5h; 10 runs appended to v2_live.jsonl)
   (wiki→shak→docs→code, order rotated per cycle — the review's deadband
   fix). Regret vs frozen **−2.617** nats/tok, HC **0.602**, at amortized
   **1.0063×** serve — the gate fired **1.65%** of windows over the whole
-  life, collapsing 1,275 fires (cycle 1) → 45 (cycle 5); eras 15–18 fully
-  silent. The device learned when its stream demanded it, then just served.
+  life, collapsing 1,275 fires (cycle 1) → 45 (cycle 5); two late eras fully
+  silent and 42 of cycle 5's 45 kicks in one final-revisit storm (an earlier
+  draft said "eras 15–18 fully silent" — corrected 2026-07-14 against the
+  telemetry). The device learned when its stream demanded it, then just served.
 - **Norm equilibrium: PASS.** 3072.6 → 3142.4 (+2.27% over 10M tokens);
   slope +4.73 units/Mtok full-life → **+0.39 last quarter** (12×
   deceleration = plateau).
