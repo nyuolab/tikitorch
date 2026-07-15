@@ -179,17 +179,32 @@ static const float S2_GEXP[256] = {
     0.513722956f, 0.51233387f, 0.510948598f, 0.509567022f, 0.508189142f, 0.506815016f,
     0.505444646f, 0.504077971f, 0.502714932f, 0.501355648f
 };
-static inline float s2_exp_dyad(float x) {            // == hls::exp(x) for x<=0, BIT-EXACT on silicon and shim
+// BIT-EXACT ldexp: x * 2^n via pure INTEGER exponent-field add. hls::ldexp with a NON-1.0 mantissa is
+// silicon-APPROXIMATED (the softmax collapsed to one-hot on F2 -> hard attention -> gQ/gK=0 -> divergence;
+// forward ATTN was V[argmax] cos 1.0, scores only span ~1-3 so the true softmax is smooth). hls::ldexp(1.0f,n)
+// happens to work (verified LN scale), which masked this — but ldexp(d,-2)/ldexp(frac,8)/ldexp(GEXP,-oct) do not.
+// Integer bit-manipulation is identical on silicon and csim, so this is faithful by construction (== the LN fix).
+static inline float s2_ldexp_i(float x, int n) {      // x * 2^n, x may be denormal-free normal or 0
+#pragma HLS INLINE
+    if (x == 0.0f) return 0.0f;
+    union { float f; uint32_t u; } c; c.f = x;
+    int e = (int)((c.u >> 23) & 0xFFu) + n;            // biased exponent + n
+    if (e <= 0)   return 0.0f;                          // underflow -> flush to 0 (softmax tail mass ~0)
+    if (e >= 255) { c.u = (c.u & 0x80000000u) | 0x7F800000u; return c.f; } // overflow -> inf (never hit here)
+    c.u = (c.u & 0x807FFFFFu) | ((uint32_t)e << 23);
+    return c.f;
+}
+static inline float s2_exp_dyad(float x) {            // == exp(x) for x<=0, BIT-EXACT on silicon and shim
 #pragma HLS INLINE
     if (x >= 0.0f) return 1.0f;                        // s2 softmax always passes x = score - rowmax <= 0
     float d = -x;                                       // d >= 0
-    float u = d + hls::ldexp(d,-2) + hls::ldexp(d,-3) + hls::ldexp(d,-4)
-                + hls::ldexp(d,-8) + hls::ldexp(d,-10); // d * log2(e), shift-add, mult-free (err ~0.02%)
+    float u = d + s2_ldexp_i(d,-2) + s2_ldexp_i(d,-3) + s2_ldexp_i(d,-4)
+                + s2_ldexp_i(d,-8) + s2_ldexp_i(d,-10); // d * log2(e), shift-add, mult-free (err ~0.02%)
     int octave = (int)u; if (octave >= 31) return 0.0f; // 2^-u underflow floor (arg < ~-21.5): true mass ~0
     float frac = u - (float)octave;                     // [0,1)
-    int fi = (int)(hls::ldexp(frac, 8) + 0.5f);         // round frac*256 (exponent add, no multiply)
+    int fi = (int)(s2_ldexp_i(frac, 8) + 0.5f);         // round frac*256 (exponent add, no multiply)
     if (fi > 255) fi = 255;
-    return hls::ldexp(S2_GEXP[fi], -octave);            // 2^(-fi/256) * 2^(-octave), EXACT ldexp
+    return s2_ldexp_i(S2_GEXP[fi], -octave);            // 2^(-fi/256) * 2^(-octave), bit-exact ldexp
 }
 
 // ======================================================================================================
