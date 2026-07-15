@@ -1,7 +1,9 @@
 # E2 — reward in the loop: a mechanism-screening factorial (prereg DRAFT)
 
 *2026-07-15. The decisive gate promoted by E1's kill (prediction ≠ control).
-Status: DRAFT — freeze before any run. Design intent (user, 2026-07-15): (a)
+Status: FROZEN 2026-07-15 (user sign-off). DECISIONS: (1) first screen = 2 envs
+(foraging + MinAtar), BabyAI joins post-2x2; (2) neuromod gate uses REALIZED
+reward for a clean 2x2 — predicted-salience is tested only IF a+b wins. Design intent (user, 2026-07-15): (a)
 and (b) are likely both needed eventually but it's too early to pick; test the
 mechanisms as a factorial ACROSS environments of differing reward density
 before drilling.*
