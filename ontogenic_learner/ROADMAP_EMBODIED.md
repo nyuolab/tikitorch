@@ -32,12 +32,33 @@ capture re-entry; E1 keeps rotation and the finding is published.
 **Pass:** both reproduce the V4 criteria (HC ≥ 0.5, norm-slope deceleration,
 per-cycle fire collapse). **Kill:** either fails ⇒ the V4 verdict carries a
 seed-fragility caveat.
+**E0-1 VERDICT (2026-07-15): KILL on the self-quieting condition.** The
+excess gate met the benefit bars (hard_shift HC 0.687 ≥ 0.554 ✓; two_cycle
+HC 0.649 vs margin+0.05 = 0.648 — met by 0.001, single seed, i.e. no real
+edge) but FAILED stationary self-quieting decisively (fire 17.6% vs the <1%
+bar): subtracting a second noisy estimator (unigram CE) adds variance to
+the gated quantity and the margin fires on that noise. The symmetric
+counterpart to the V2b law: self-normalization erases regime information;
+difficulty-normalization via a noisy reference reintroduces a variance
+floor. Exploratory (tele-sampled, biased): cycle-2 regrets are essentially
+tied (−2.54 margin vs −2.59 excess). **Per the kill branch: E1 runs the
+plain margin gate δ=0.25 + rotated biome schedule.** A low-variance
+difficulty estimate (slow-EMA'd or probe-based) is the follow-up idea, not
+assumed.
+
 **E0-3 strict adversary.** PureTropicalSGD (lr = 2^-10, momentum 4 bits) +
 bit-shift decay (lr_shift+1 per 2000 fires), anchorless, fire-always
 stationary 20,833 steps — the SAME optimizer family whose 6k-step collapse
 set the horizon. **Pass:** end prequential CE ≤ start (no collapse) ⇒ the
 V4 AdamW caveat closes. **Kill:** collapse ⇒ the caveat stands; decay
 cadence retuned before any strict-config life.
+**E0-3 VERDICT (2026-07-15): KILL.** Cumulative preq CE 5.34 vs frozen 3.88
+(regret +1.45) despite all 10 halvings firing on schedule — the drift is
+DECELERATED by the decay (visible in the trajectory) but the damage
+accrues before the cadence bites. Audit: 0 violations (the closed path is
+clean; it is not yet STABLE at this cadence). The V4 AdamW caveat stands.
+Retune direction for the follow-up cell: faster early decay (halve per
+~500 fires) and/or birth lr_shift 12.
 
 ### E1 — action without an actor/learner split (the decisive gate)
 **Question:** can the SAME forward pass produce an action *and* be the
