@@ -95,6 +95,15 @@ the claim demotes to "perception learns in-process; control still needs a
 second process" — published as the boundary.
 
 ### E2 — reward IN THE LOOP (PROMOTED to the decisive gate by E1's kill; three mechanisms)
+**Environments (E2_ENV_DECISION.md, 2026-07-15):** run standard benchmarks
+ALONGSIDE the bespoke world through one adapter. MinAtar = ADOPT/primary
+(verified: constant K=6 raw API, ~13-symbol board vocab, our streaming-RL
+baseline has published numbers here, game-cycle biomes); BabyAI/MiniGrid =
+adopt-with-caveats/stretch (Apache, partial-obs, but sparse episodic reward
+clashes with one-step MPC — gated on E2 working on MinAtar). Unifying design:
+a REWARD TOKEN per frame makes the MPC preference env-agnostic (P(next reward))
+— which IS reward-mechanism (b). Sequence: MinAtar first, bespoke cross-check,
+BabyAI stretch.
 (a) **Neuromodulated gate:** fire the kick only on surprise × reward-salience
 coincidence (a scalar gate input, not a gradient path) — keeps strict
 closure. (b) **Reward-as-prediction:** add a reward channel to the predicted
