@@ -60,7 +60,19 @@ clean; it is not yet STABLE at this cadence). The V4 AdamW caveat stands.
 Retune direction for the follow-up cell: faster early decay (halve per
 ~500 fires) and/or birth lr_shift 12.
 
-### E1 — action without an actor/learner split (the decisive gate)
+### E1 — action without an actor/learner split (the decisive gate) — KILL (2026-07-15)
+**VERDICT: KILL, mechanism mapped (E1_SPEC "E1 VERDICT").** Prediction-only
+in-process learning improves the world model (obs-CE down; action-conditional
+signal up with birth) but greedy 1-step MPC over it does NOT forage — and a
+BETTER-predicting model forages WORSE than random (return/1k 26→11→2→0 as
+spread 0.00→0.46→0.53, 2 seeds, under the softmax controller). Prediction and
+control are decoupled/anti-correlated: confident myopic exploitation of
+residual miscalibration underperforms random ground-covering. The live-loop
+mechanism (Goal A) is intact; prediction ALONE is not control. Pilot caught
+this at ~$8 (no grid launched). **E2 is now the REQUIRED next gate.** Original
+design below (retained for the record).
+
+
 **Question:** can the SAME forward pass produce an action *and* be the
 sufficient statistic for learning, in a closed sensorimotor loop?
 **Design:** an agent in a procedural text/grid world; the substrate's forward
@@ -76,7 +88,7 @@ as V4. **Kill:** if pure prediction-error learning cannot move the policy,
 the claim demotes to "perception learns in-process; control still needs a
 second process" — published as the boundary.
 
-### E2 — reward without a learner process (three pre-registered mechanisms)
+### E2 — reward IN THE LOOP (PROMOTED to the decisive gate by E1's kill; three mechanisms)
 (a) **Neuromodulated gate:** fire the kick only on surprise × reward-salience
 coincidence (a scalar gate input, not a gradient path) — keeps strict
 closure. (b) **Reward-as-prediction:** add a reward channel to the predicted

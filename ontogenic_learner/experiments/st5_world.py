@@ -200,6 +200,7 @@ class Agent:
         self.ug = UnigramCE(VOCAB) if args.gate == "excess" else None
         self.ctx = torch.zeros(args.window, dtype=torch.long)
         self.window = args.window
+        self.tau_act = args.tau_act
 
     def push(self, frame):
         self.ctx = torch.cat([self.ctx[len(frame):], frame])
@@ -223,9 +224,14 @@ class Agent:
     def act_and_learn(self, world, learn=True):
         """One embodied step. Returns (reward, fired, obs_ce)."""
         scores = self.score_actions()
-        eps = torch.rand(())
-        action = (int(torch.randint(0, 5, (1,))) if float(eps) < 0.05
-                  else pick(scores))
+        # A4: softmax action selection over EXCESS-above-mean preference, temp
+        # tau_act. Flat scores (uninformed model) -> ~uniform (explore, so the
+        # agent never parks on noise); peaked scores -> greedy. Replaces
+        # argmax+tie-break, which turned meaningless 1e-9 score noise into a
+        # fixed-direction march into the wall (pilot v2: 83% one action).
+        t = torch.tensor(scores)
+        probs = torch.softmax((t - t.mean()) / self.tau_act, dim=0)
+        action = int(torch.multinomial(probs, 1))
         reward, next_obs = world.step(action)
         frame = encode_frame(next_obs, action)
         self.push(frame)
@@ -391,5 +397,6 @@ if __name__ == "__main__":
     p.add_argument("--delta", type=float, default=0.25)
     p.add_argument("--prelife-frames", type=int, default=20_000)
     p.add_argument("--prelife-steps", type=int, default=3_000)
+    p.add_argument("--tau-act", type=float, default=0.02)
     args = p.parse_args()
     run(args)

@@ -1,0 +1,11 @@
+E1 birth-length calibration (2026-07-15, softmax controller A4, world 0)
+food-north-probe spread (action-conditionality) | 2000-step forage return/1k (random~20)
+birth 8000f/1500s  seed0: spread 0.0079 argmax=3(wrong)  forage 26.0
+birth 8000f/1500s  seed1: spread 0.0000 argmax=2(wrong)  forage 19.5
+birth 20000f/4000s seed0: spread 0.4565 argmax=0(RIGHT)  forage 11.0
+birth 20000f/4000s seed1: spread 0.1878 argmax=0(RIGHT)  forage  2.0
+birth 40000f/8000s seed0: spread 0.2141 argmax=0(RIGHT)  forage  0.0
+birth 40000f/8000s seed1: spread 0.5268 argmax=3(wrong)  forage  1.5
+FINDING: as action-conditional prediction IMPROVES (spread up, argmax correct),
+greedy 1-step MPC foraging gets WORSE than random. Prediction and control are
+decoupled/anti-correlated. -> E1 KILL; E2 (reward in the loop) required.

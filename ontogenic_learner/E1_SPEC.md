@@ -142,3 +142,37 @@ transitions and yields a correctly action-conditional model (controlled
 food-to-north probe: N=0.150 vs stay=0.043, spread 0.11). Birth is
 world-model SHAPING, identical across live/frozen via the shared seed; the
 LIFE still tests continued GATED learning. Verdict criteria unchanged.
+
+## E1 VERDICT (2026-07-15): KILL on the pre-registered branch — a mechanism, not a null
+
+**Result (pilot world 0 + multi-seed birth calibration, softmax controller A4):**
+- Perception LEARNS in one process: live obs-CE 0.7355 < frozen 0.751; the
+  action-conditional signal grows with birth length (food-north-probe spread
+  0.00 → 0.46 → 0.53) and the model correctly scores the food-direction
+  highest on the clean test state.
+- Control does NOT benefit — and gets WORSE as prediction improves:
+  foraging return/1k vs birth length (2 seeds): 8k-birth 26.0/19.5 (~random)
+  → 20k-birth 11.0/2.0 → 40k-birth 0.0/1.5. A better world model forages
+  FURTHER BELOW random walk (~20/1k). Both pilot MPC arms sat at ~0
+  (live 0.175, frozen 0.037) vs random 26.6, oracle-MPC 113, streaming-AC 175.
+
+**Mechanism (the finding):** prediction quality and greedy-control quality are
+DECOUPLED, even anti-correlated, here. Greedy 1-step model-predictive control
+confidently exploits the model's residual miscalibration; a 1-cell preference
+functional only "sees" adjacent food, so between rare adjacencies the agent
+executes confident-but-wrong moves instead of covering ground. Random walk
+stumbles onto food; a myopic exploiter of an imperfect model does not. This is
+robust to the action-selection rule (softmax A4 did not rescue it) and to seed.
+
+**Interpretation (honest, scoped):** the live-loop MECHANISM (Goal A) is intact
+— one process learns its world model in place at ~1× acting cost, and
+perception measurably improves. What E1 shows is that this mechanism, by
+itself, does NOT yield competent CONTROL under greedy 1-step MPC with a
+myopic preference. Prediction alone is not control. This does not touch the
+V-program's Goal-A result (serving/prediction); it bounds the naive embodied
+extension.
+
+**Consequence:** E2 (reward IN THE LOOP) is promoted from option to REQUIRED
+next gate — the finding is its motivation. A planning horizon (multi-step MPC)
+is a separate future-work lever. The E1 harness, world, baselines, and the
+decoupling result are the publishable artifact.
