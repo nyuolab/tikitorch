@@ -156,10 +156,14 @@ class Agent:
         seq = torch.cat([base, torch.tensor([c.ACT, c.ACT0 + a1, c.RWD])])
         lg = self.model(seq[-self.window:].unsqueeze(0))[0][-1]
         p_r1 = float(torch.softmax(lg, -1)[c.RWD0 + 1])
-        seq = torch.cat([seq, lg.argmax().view(1), torch.tensor([c.OBS])])
+        # slice-constrained argmax: imagined tokens must stay in their slot's
+        # valid range, else a stray argmax builds a malformed frame silently
+        r_tok = c.RWD0 + int(lg[c.RWD0:c.RWD0 + 2].argmax())
+        seq = torch.cat([seq, torch.tensor([r_tok, c.OBS])])
         for _ in range(c.obs_len):
-            o = self.model(seq[-self.window:].unsqueeze(0))[0][-1].argmax()
-            seq = torch.cat([seq, o.view(1)])
+            lo = self.model(seq[-self.window:].unsqueeze(0))[0][-1]
+            o = c.SYM0 + int(lo[c.SYM0:].argmax())
+            seq = torch.cat([seq, torch.tensor([o])])
         return seq, p_r1
 
     @torch.no_grad()
@@ -172,8 +176,12 @@ class Agent:
         out = []
         for a1 in range(c.K):
             imag, p_r1 = self._imagine(self.ctx, a1)
+            # window-crop the imagined context so the a2 probe length equals
+            # the H1 probe length — else H1-vs-H2 is confounded by context
+            # length (OOD 110 vs 96), not horizon
+            base2 = imag[-(self.window - 3):]
             probes = torch.stack([
-                torch.cat([imag[3:], torch.tensor([c.ACT, c.ACT0 + a2, c.RWD])])
+                torch.cat([base2, torch.tensor([c.ACT, c.ACT0 + a2, c.RWD])])
                 for a2 in range(c.K)])
             lg2 = self.model(probes)[:, -1]
             p_r2 = torch.softmax(lg2, -1)[:, c.RWD0 + 1].max()

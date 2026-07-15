@@ -1,6 +1,6 @@
 #!/bin/bash
 # _pc_e2v2_onbox.sh — E2 v2: the recalibrated factorial + planning A/B
-# (E2_SPEC "E2 v2 design"). ONE c7i.8xlarge, MAX_MINUTES=300,
+# (E2_SPEC "E2 v2 design"). ONE c7i.8xlarge, MAX_MINUTES=420,
 # PIP_EXTRA="tokenizers minatar". H2 foraging cells are the long pole (~2.5h).
 set -x
 cd "${REPO:?}"
@@ -21,19 +21,25 @@ $PY -c "import sys; sys.path[:0]=['/opt/tiki/scripts','/opt/tiki/ontogenic_learn
 F="$PY ontogenic_learner/experiments/st6_reward.py --env foraging --window 96 --delta 0.10 --biome-steps 20000"
 M="$PY ontogenic_learner/experiments/st6_reward.py --env minatar --window 256 --delta 0.05 --biome-steps 8000"
 JOBS=$(mktemp)
+# FLOORS FIRST (the readout denominators — never lose them to a backstop; the
+# v5-onbox ordering lesson), then the H2 long-poles, then the rest.
+echo "$F --mode random --steps 80000 --seed 0" >> "$JOBS"
+echo "$M --mode random --steps 40000 --seed 0" >> "$JOBS"
+echo "$F --mode frozen --objective R --steps 80000 --seed 0" >> "$JOBS"
+echo "$M --mode frozen --objective R --steps 40000 --seed 0" >> "$JOBS"
+for S in 0 1; do
+  for G in S N; do
+    echo "$F --mode agent --gate $G --objective R --horizon 2 --steps 20000 --seed $S" >> "$JOBS"
+  done
+done
 for S in 0 1; do
   for G in S N; do
     echo "$F --mode agent --gate $G --objective R --horizon 1 --steps 80000 --seed $S" >> "$JOBS"
-    echo "$F --mode agent --gate $G --objective R --horizon 2 --steps 20000 --seed $S" >> "$JOBS"
     echo "$M --mode agent --gate $G --objective R --horizon 1 --steps 40000 --seed $S" >> "$JOBS"
   done
   echo "$F --mode agent --gate S --objective O --steps 80000 --seed $S" >> "$JOBS"
   echo "$M --mode agent --gate S --objective O --steps 40000 --seed $S" >> "$JOBS"
 done
-echo "$F --mode random --steps 80000 --seed 0" >> "$JOBS"
-echo "$F --mode frozen --objective R --steps 80000 --seed 0" >> "$JOBS"
-echo "$M --mode random --steps 40000 --seed 0" >> "$JOBS"
-echo "$M --mode frozen --objective R --steps 40000 --seed 0" >> "$JOBS"
 wc -l "$JOBS"
 xargs -P 7 -I CMD bash -c 'CMD >> '"$VOUT"'/onbox_jobs.log 2>&1 || echo "JOB-FAILED: CMD" >> '"$VOUT"'/onbox_jobs.log' < "$JOBS"
 sync_s3
