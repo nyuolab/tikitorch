@@ -118,6 +118,9 @@ class Agent:
         self.gate = MarginGate(delta=args.delta)
         self.sal = RewardSalience() if args.gate == "N" else None
         self.tau_act = args.tau_act
+        self.horizon = getattr(args, "horizon", 1)
+        self.gamma = getattr(args, "gamma", 0.9)
+        self.window = args.window
         self.ctx = torch.zeros(args.window, dtype=torch.long)
 
     def push(self, frame):
@@ -143,10 +146,45 @@ class Agent:
         # reward proxy and is intentionally NOT used here.)
         return None
 
+    @torch.no_grad()
+    def _imagine(self, base, a1):
+        """Greedy imagined rollout of the frame after action a1: append
+        [ACT a1 RWD], read P(reward1) + argmax reward token, then autoregress
+        the [OBS] + obs_len cells by argmax. Returns (imagined_ctx, P(reward1)).
+        Cost = obs_len+1 forwards (the token-scale planning tax)."""
+        c = self.codec
+        seq = torch.cat([base, torch.tensor([c.ACT, c.ACT0 + a1, c.RWD])])
+        lg = self.model(seq[-self.window:].unsqueeze(0))[0][-1]
+        p_r1 = float(torch.softmax(lg, -1)[c.RWD0 + 1])
+        seq = torch.cat([seq, lg.argmax().view(1), torch.tensor([c.OBS])])
+        for _ in range(c.obs_len):
+            o = self.model(seq[-self.window:].unsqueeze(0))[0][-1].argmax()
+            seq = torch.cat([seq, o.view(1)])
+        return seq, p_r1
+
+    @torch.no_grad()
+    def score_actions_h2(self):
+        """2-step lookahead: score(a1) = P(reward1|a1) + gamma * max_a2
+        P(reward2 | imagined-frame(a1), a2). Faithful model rollout (imagines
+        the next obs frame); the token-scale cost is K*(obs_len+1) + K^2
+        forwards/step (~15x foraging, ~100x minatar vs greedy)."""
+        c = self.codec
+        out = []
+        for a1 in range(c.K):
+            imag, p_r1 = self._imagine(self.ctx, a1)
+            probes = torch.stack([
+                torch.cat([imag[3:], torch.tensor([c.ACT, c.ACT0 + a2, c.RWD])])
+                for a2 in range(c.K)])
+            lg2 = self.model(probes)[:, -1]
+            p_r2 = torch.softmax(lg2, -1)[:, c.RWD0 + 1].max()
+            out.append(p_r1 + self.gamma * float(p_r2))
+        return out
+
     def act(self):
-        scores = self.score_actions()
-        if scores is None:                                  # no reward signal -> explore
+        if self.codec.objective != "R":                     # reward-free -> random
             return int(torch.randint(0, self.codec.K, (1,)))
+        scores = (self.score_actions_h2() if self.horizon >= 2
+                  else self.score_actions())
         t = torch.tensor(scores)
         probs = torch.softmax((t - t.mean()) / self.tau_act, dim=0)
         return int(torch.multinomial(probs, 1))
@@ -280,6 +318,8 @@ if __name__ == "__main__":
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--delta", type=float, default=0.25)
     p.add_argument("--tau-act", type=float, default=0.02)
+    p.add_argument("--horizon", type=int, default=1, choices=[1, 2])
+    p.add_argument("--gamma", type=float, default=0.9)
     p.add_argument("--prelife-frames", type=int, default=8_000)
     p.add_argument("--prelife-steps", type=int, default=1_500)
     args = p.parse_args()

@@ -148,3 +148,28 @@ V4cal pattern), then re-run the factorial. Separately, MinAtar's controller <
 random re-flags that greedy 1-step MPC is the bottleneck (a planning-horizon
 variant is the other lever). Cost of v1: ~$20 — cheap to have learned the
 calibration is wrong before drawing a mechanism conclusion.
+
+## Planning-horizon A/B: built, with a token-scale cost finding (2026-07-15)
+
+The H2 controller (faithful 2-step lookahead: imagine the next obs frame
+greedily, then max over the second action's predicted reward; score =
+P(r1|a1) + γ·max_a2 P(r2)) is built (`Agent.score_actions_h2`). Measured
+per-step throughput vs greedy H1 (d128, CPU):
+  foraging  H1 59 sps  | H2 3.4 sps  (17x — imagined frame = obs_len+1 fwds)
+  minatar   H1 27 sps  | H2 0.1 sps  (270x — 100-cell board rollout)
+**FINDING: model-based planning with a GENERATIVE TOKEN world model does not
+scale** — the imagined-frame rollout is O(obs_len) fwds per candidate per ply,
+so H2 is infeasible on MinAtar's 100-token board (~99h/cell) though tractable
+on foraging (~1.6h/cell at 20k steps). Implication: if a planning horizon is
+what control needs, the substrate needs a COMPACT/LATENT world model, not a
+token one (future-work lever).
+
+## Re-run design (E2 v2, pending E2cal's calibrated δ)
+
+- **foraging** (H2 tractable): full {gate S|N} × {horizon H1|H2} × 2 seeds on
+  the R objective + O controls + floors. Tests the neuromod gate AND the
+  planning A/B (and their interaction) at the recalibrated δ.
+- **minatar** (H2 infeasible): {gate S|N} × H1 × 2 seeds on R + O controls +
+  floors, dense games emphasized (per-game report). H2 documented infeasible.
+- Same pre-registered readouts + the added horizon main-effect/interaction;
+  δ from E2cal (target ~5–15% fire).
