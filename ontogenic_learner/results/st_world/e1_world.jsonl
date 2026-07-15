@@ -1,0 +1,2 @@
+{"gate": "E1", "arm": "random", "world_seed": 0, "seed": 0, "steps": 3000, "total_return": 117.0, "ret_per_1k": 39.0, "fire_rate": 0.0, "obs_ce": 0.0, "wall_s": 0.0}
+{"gate": "E1", "arm": "oracle_mpc", "world_seed": 0, "seed": 0, "steps": 3000, "total_return": 272.0, "ret_per_1k": 90.667, "fire_rate": 0.0, "obs_ce": 0.0, "wall_s": 0.2}

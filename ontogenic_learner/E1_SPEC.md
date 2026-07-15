@@ -103,3 +103,22 @@ must be locally inferable. (iii) From-scratch birth may be the bottleneck
 (V-program always warm-started); the pre-life length gets one calibration
 cell. (iv) Compute-matching RL baselines is contentious — we publish both
 matched-compute and matched-wall, per V3 practice.
+
+## Amendments (dated, pre-launch)
+
+**A1 (2026-07-14, design-time):** OBS tiles are encoded CENTER-FIRST, so one
+forward per candidate action reads P(landing tile = food | history, action)
+at the final position — the exact greedy foraging signal with no
+autoregressive rollout (K=5 forwards/step total). The original row-major
+read-out was semantically wrong (it scored frame-tail token predictions) and
+never ran.
+
+**A2 (2026-07-14, from the oracle pilot smoke — the pre-registered
+one-redesign):** strict argmax over preference scores degenerates when all
+candidates score flat zero (no food adjacent): the agent walks its fixed
+first-argmax direction into a wall and parks, losing to random walk
+(oracle-MPC 12 vs random 39 per 1k). Fix: uniform-random tie-breaking over
+near-max scores — random-walk exploration when the signal is flat, greedy
+foraging when it is not. Post-fix pilot: oracle-MPC 90.7 vs random 39.0 per
+1k (2.3x) — the pilot bar (oracle beats random) is cleared and the
+preference functional is FROZEN.
