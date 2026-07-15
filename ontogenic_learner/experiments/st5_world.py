@@ -57,9 +57,16 @@ class World:
     SIZE = 16
 
     def __init__(self, world_seed: int, biome_steps: int = 50_000,
-                 biomes=(0, 1, 2, 0, 1, 2)):
+                 n_cycles: int = 7):
         self.gen = torch.Generator().manual_seed(world_seed)
-        self.biomes = biomes
+        # ROTATED biome order per cycle (the V4 deadband lesson, confirmed by
+        # E0-1's kill: the margin gate needs ascending-difficulty entries)
+        base = (0, 1, 2)
+        biomes = []
+        for c in range(n_cycles):
+            k = c % 3
+            biomes.extend(base[k:] + base[:k])
+        self.biomes = tuple(biomes)
         self.biome_steps = biome_steps
         self.t = 0
         self._enter_biome(0)
@@ -232,6 +239,39 @@ class Agent:
         return reward, fired, float(ce)
 
 
+def prelife(agent, args):
+    """Birth: tau-annealed cascade training on a random-walk stream in the
+    FIRST biome only (E1_SPEC: hard-from-scratch is bigram-class — the anneal
+    is load-bearing; identical across live and frozen_mpc arms via the shared
+    seed). The pre-life world is a THROWAWAY copy; the life's world is fresh."""
+    sys.path.insert(0, str(REPO / "scripts"))
+    from nanogpt_shakespeare import tau_at                    # noqa: E402
+    w = World(args.world_seed, biome_steps=10 ** 9)           # stays in biome 0
+    gen = torch.Generator().manual_seed(args.seed + 777)
+    stream = []
+    obs = w.obs()
+    for _ in range(args.prelife_frames):
+        a = int(torch.randint(0, 5, (1,), generator=gen))
+        _, obs = w.step(a)
+        stream.append(encode_frame(obs, a))
+    ids = torch.cat(stream)
+    agent.model.train()
+    for step in range(args.prelife_steps):
+        agent.model.set_tau(tau_at(step, args.prelife_steps, 0.5, True, 0.0))
+        st = int(torch.randint(0, ids.numel() - args.window - 1, (1,),
+                               generator=gen))
+        x = ids[st:st + args.window].unsqueeze(0)
+        y = ids[st + 1:st + args.window + 1].unsqueeze(0)
+        agent.engine.train_step(x, y, agent.opt, credit="cascade")
+    agent.model.set_tau(0.0)
+    agent.model.eval()
+    # reset the optimizer + gate for the life (birth machinery is not life
+    # machinery); keep the weights
+    agent.opt = torch.optim.AdamW(agent.model.parameters(), lr=args.lr,
+                                  weight_decay=0.01)
+    agent.gate = MarginGate(delta=args.delta)
+
+
 def run(args):
     torch.manual_seed(args.seed)
     OUT.mkdir(parents=True, exist_ok=True)
@@ -272,6 +312,7 @@ def run(args):
                     biome=world.biome)) + "\n")
     else:                                    # live | frozen_mpc
         agent = Agent(args)
+        prelife(agent, args)
         learn = args.arm == "live"
         for t in range(args.steps):
             r, fired, ce = agent.act_and_learn(world, learn=learn)
@@ -316,5 +357,7 @@ if __name__ == "__main__":
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--gate", choices=["margin", "excess"], default="margin")
     p.add_argument("--delta", type=float, default=0.25)
+    p.add_argument("--prelife-frames", type=int, default=20_000)
+    p.add_argument("--prelife-steps", type=int, default=3_000)
     args = p.parse_args()
     run(args)
