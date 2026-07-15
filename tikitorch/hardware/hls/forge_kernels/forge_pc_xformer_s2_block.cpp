@@ -194,17 +194,25 @@ static inline float s2_ldexp_i(float x, int n) {      // x * 2^n, x may be denor
     c.u = (c.u & 0x807FFFFFu) | ((uint32_t)e << 23);
     return c.f;
 }
-static inline float s2_exp_dyad(float x) {            // == exp(x) for x<=0, BIT-EXACT on silicon and shim
+static inline float s2_exp_dyad(float x) {            // == exp(x) for x<=0. ROM-FREE.
 #pragma HLS INLINE
+    // ★ THE 30M SILICON DIVERGENCE ROOT CAUSE (measured 2026-07-15): the old ROM path
+    // `s2_ldexp_i(S2_GEXP[fi], -octave)` read the 256-entry S2_GEXP mantissa ROM as ZERO on F2 (HLS synthesized
+    // the large `static const` array as UNINITIALISED BRAM, not an initialised ROM) -> exp(x)=0 for every x<0
+    // (a STEP function) -> softmax collapsed to ONE-HOT -> hard attention -> score gradient correctly 0 ->
+    // gQ/gK=0 -> Q/K never train -> divergence. Direct evidence: silicon exp(-0.489)=0 vs 0.613 correct; fwd
+    // ATTN==V[argmax] cos 1.0 with CORRECT scores (span ~2-3) + CORRECT scale (0.125). The whole prior chase
+    // (gp[], V-deviation, write-drop, de-pipeline, bit-exact-ldexp, scale-literal) was downstream of this: gsv=0
+    // is the CORRECT gradient of a one-hot softmax. FIX: drop the ROM; compute 2^-frac by a degree-4 poly of
+    // exp(-frac*ln2). Attention is the allowed-multiply front, so the mults are fine; every op is now either an
+    // integer bit-op or a plain float mul/add (no ROM, no silicon-approx intrinsic) -> faithful by construction.
     if (x >= 0.0f) return 1.0f;                        // s2 softmax always passes x = score - rowmax <= 0
-    float d = -x;                                       // d >= 0
-    float u = d + s2_ldexp_i(d,-2) + s2_ldexp_i(d,-3) + s2_ldexp_i(d,-4)
-                + s2_ldexp_i(d,-8) + s2_ldexp_i(d,-10); // d * log2(e), shift-add, mult-free (err ~0.02%)
+    float u = (-x) * 1.44269504f;                       // u = -x*log2(e) >= 0
     int octave = (int)u; if (octave >= 31) return 0.0f; // 2^-u underflow floor (arg < ~-21.5): true mass ~0
     float frac = u - (float)octave;                     // [0,1)
-    int fi = (int)(s2_ldexp_i(frac, 8) + 0.5f);         // round frac*256 (exponent add, no multiply)
-    if (fi > 255) fi = 255;
-    return s2_ldexp_i(S2_GEXP[fi], -octave);            // 2^(-fi/256) * 2^(-octave), bit-exact ldexp
+    float g = frac * 0.69314718f;                       // g = frac*ln2 in [0, ln2) ; 2^-frac = exp(-g)
+    float p = 1.0f + g*(-1.0f + g*(0.5f + g*(-0.16666667f + g*0.041666667f)));  // exp(-g) deg-4 Taylor, <0.2% err
+    return s2_ldexp_i(p, -octave);                      // p * 2^-octave  (p in [0.5,1]; integer-exact ldexp)
 }
 
 // ======================================================================================================
