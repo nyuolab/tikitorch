@@ -817,7 +817,12 @@ static float s2_GSV [S2_SEQ * S2_SEQ];// bwd Phase-1: per-query score gradients 
 
 static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off, int wattn_off) {
 #pragma HLS INLINE off
-    float scale = 1.0f / hls::sqrt((float)S2_DH);
+    // scale = 1/sqrt(DH). ★ `1.0f/hls::sqrt((float)DH)` MISCOMPILES on F2 -> 8.0 (=sqrt(64)) not 0.125 (MEASURED:
+    // silicon fwd ATTN == softmax(8*QK)@V at cos 1.0000; the reciprocal is inverted), a 64x over-scale that
+    // saturated the softmax to ONE-HOT (hard attention) -> gsv=0 -> gQ/gK=0 -> Q/K never train -> divergence.
+    // DH=64 -> 1/sqrt(64)=0.125 is an EXACT float literal (no intrinsic to miscompile).
+    static_assert(S2_DH == 64, "attention scale literal 0.125f assumes DH=64 (=1/sqrt(64)); update if DH changes");
+    float scale = 0.125f;
     for (int h = 0; h < S2_H; h++) {
         for (int t = 0; t < S2_SEQ; t++) {
             bload_f(buffer, wq_off + t*S2_D + h*S2_DH, s2_Qh + t*S2_DH, S2_DH);
@@ -894,7 +899,7 @@ static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
 static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off,
                         int gattn_off, int gq_off, int gk_off, int gv_off) {
 #pragma HLS INLINE off
-    float ascale = 1.0f / hls::sqrt((float)S2_DH);
+    float ascale = 0.125f;   // == 1/sqrt(DH=64); NOT 1.0f/hls::sqrt(DH) which miscompiles to 8.0 on F2 (see s2_attn_fwd)
     for (int h = 0; h < S2_H; h++) {
         for (int t = 0; t < S2_SEQ; t++) {
             bload_f(buffer, wq_off    + t*S2_D + h*S2_DH, s2_Qh + t*S2_DH, S2_DH);
