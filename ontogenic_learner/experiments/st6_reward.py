@@ -186,7 +186,10 @@ def run(args):
     env = make_env(args.env, world_seed=args.world_seed,
                    biome_steps=args.biome_steps)
     arm = f"{args.gate}{args.objective}" if args.mode == "agent" else args.mode
-    tele = (OUT / f"e2_tele_{args.env}_{arm}_w{args.world_seed}_s{args.seed}.jsonl"
+    # disambiguate tele by delta+horizon so parallel sweep cells never collide
+    # (V2b lesson): a d/h tag keeps every cell's telemetry in its own file.
+    dh = f"_d{args.delta}h{getattr(args, 'horizon', 1)}"
+    tele = (OUT / f"e2_tele_{args.env}_{arm}{dh}_w{args.world_seed}_s{args.seed}.jsonl"
             ).open("w")
     t0 = time.time()
     total_r = fires = 0
@@ -246,7 +249,9 @@ def run(args):
                 tele.flush()
     tele.close()
 
-    row = dict(gate="E2", env=args.env, arm=arm, world_seed=args.world_seed,
+    row = dict(gate="E2", env=args.env, arm=arm, delta=args.delta,
+               horizon=getattr(args, "horizon", 1),
+               world_seed=args.world_seed,
                seed=args.seed, steps=args.steps, total_return=total_r,
                ret_per_1k=round(total_r / max(args.steps, 1) * 1000, 3),
                fire_rate=round(fires / max(args.steps, 1), 4),
