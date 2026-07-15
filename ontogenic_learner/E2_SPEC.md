@@ -173,3 +173,25 @@ token one (future-work lever).
   floors, dense games emphasized (per-game report). H2 documented infeasible.
 - Same pre-registered readouts + the added horizon main-effect/interaction;
   δ from E2cal (target ~5–15% fire).
+
+## E2cal RESULT (2026-07-15): δ calibrated, both envs
+
+Fire-rate is cleanly monotone in δ (20k steps, S-gate, R-objective):
+foraging 0.25→1.8%, 0.15→5.4%, 0.10→16.0%, 0.05→23.9%, 0.01→32.0% (return
+flat ~50/1k until over-firing degrades it at 0.01 — the gating story again).
+minatar 0.25→1.5% … 0.05→14.9%, 0.01→34.6% (return identical 7.75 at every
+δ — at 20k steps the reward head hasn't differentiated actions on minatar;
+the v2 horizon + per-game report resolves horizon-vs-substrate).
+**Locked for v2: foraging δ=0.10 (16%, top of band = max modulable
+learning), minatar δ=0.05 (14.9%).**
+
+## E2 v2 design (locked): recalibrated factorial + planning A/B
+
+- foraging (δ=0.10): {S,N}×{H1,H2}×R ×2 seeds (8 cells; H1 at 80k steps, H2
+  at 20k — H1-vs-H2 compared at the MATCHED 20k prefix via telemetry) + SO
+  controls ×2 + random + frozen-R = 12 jobs.
+- minatar (δ=0.05, window 256): {S,N}×H1×R ×2 seeds + SO ×2 + random +
+  frozen-R = 8 jobs, 40k steps, per-game reporting. H2 documented infeasible
+  (270×).
+- Readouts: gate main effect, horizon main effect (foraging), gate×horizon
+  interaction, a+b assessment now that firing is calibrated; env-consistency.
