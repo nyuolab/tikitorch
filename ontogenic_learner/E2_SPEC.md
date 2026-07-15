@@ -118,3 +118,33 @@ false-result bugs):
   IS the reward-density finding, but the S-vs-N contrast is only fair on the
   dense games (breakout, space_invaders); log/report per-cell online fire-rate
   (already in tele) beside return.
+
+## E2 screen v1 RESULT (2026-07-15): INCONCLUSIVE — gate under-fired (confound)
+
+Return/1k (mean[seeds]) — foraging: random 26.6, frozen-R 39.7 |
+SO=NO 33.7, SR=NR 34.1. minatar: random 22.9, frozen-R 13.9 | all cells ~13.5.
+- **The GATE axis (a) does LITERALLY NOTHING:** NR=SR and NO=SO return
+  BIT-IDENTICALLY per seed (e.g. foraging s0 both 39.688). Root cause: the
+  margin gate δ=0.25 (tuned for the LM streams) fires only **0.1–0.9%** here —
+  after the tau-annealed birth the model predicts its own obs stream well, so
+  obs-CE surprise rarely exceeds δ. With ~no online learning, the two gates
+  have nothing to modulate and actions stay RNG-dominated (identical). The
+  neuromod mechanism is therefore UNEVALUABLE from this screen.
+- **Main effects within seed noise:** main-N +0.00/−0.11, main-R
+  +0.39/+0.04, interaction +0.00/−0.21 — all << the ±8 seed spread. The a+b
+  interaction (the design target) CANNOT be assessed while a is unevaluable.
+- **Live learning ≤ frozen birth:** frozen-R ≥ every learning cell on both
+  envs → past birth, the online kicks (what little fire there is) add nothing.
+- **MinAtar controller ≤ random** (13.5 vs 22.9); per-game, space_invaders
+  dominates (51/1k) while the sparse games sit at ~4–5 — the greedy 1-step
+  reward-MPC is myopic (E1's control finding, recurring), and reward density
+  drives everything.
+
+**Verdict: NOT a clean pass or kill — the screen is UNDER-POWERED on the gate
+axis (δ mis-calibrated → ~0 fire), so it cannot fairly test the mechanisms.**
+Pre-registered next step BEFORE any E2 mechanism claim: **E2cal — a gate-δ
+fire-rate recalibration** (sweep δ on both envs to a target ~5–15% fire, the
+V4cal pattern), then re-run the factorial. Separately, MinAtar's controller <
+random re-flags that greedy 1-step MPC is the bottleneck (a planning-horizon
+variant is the other lever). Cost of v1: ~$20 — cheap to have learned the
+calibration is wrong before drawing a mechanism conclusion.
