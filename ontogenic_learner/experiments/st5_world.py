@@ -205,20 +205,24 @@ class Agent:
         self.ctx = torch.cat([self.ctx[len(frame):], frame])
 
     @torch.no_grad()
-    def predict_obs(self, action):
-        """One forward with the candidate action appended; returns the (V,)
-        next-token distribution at the final position — semantically
-        P(next frame's CENTER tile | history, action) under the center-first
-        codec."""
-        probe = torch.cat([self.ctx[3:],           # drop the oldest [ACT]a[OBS]
-                           torch.tensor([TOK_ACT, TOK_ACTION0 + action,
-                                         TOK_OBS], dtype=torch.long)])
-        logits = self.model(probe.unsqueeze(0))[0]
-        return torch.softmax(logits[-1], dim=-1)
+    def score_actions(self):
+        """BATCHED model-predictive scoring: ONE forward of shape (5, L) —
+        all five candidate actions share the same history prefix and differ
+        only in the appended action token. 5x fewer forward CALLS than
+        per-candidate scoring (the acting bottleneck). Returns preference
+        score per action."""
+        base = self.ctx[3:]                        # drop the oldest [ACT]a[OBS]
+        probes = torch.stack([
+            torch.cat([base, torch.tensor([TOK_ACT, TOK_ACTION0 + a, TOK_OBS],
+                                          dtype=torch.long)])
+            for a in range(5)])                    # (5, L)
+        logits = self.model(probes)                # (5, L, V)
+        p_food = torch.softmax(logits[:, -1], dim=-1)[:, TOK_TILE[FOOD]]
+        return [float(x) for x in p_food]
 
     def act_and_learn(self, world, learn=True):
         """One embodied step. Returns (reward, fired, obs_ce)."""
-        scores = [preference(self.predict_obs(a)) for a in range(5)]
+        scores = self.score_actions()
         eps = torch.rand(())
         action = (int(torch.randint(0, 5, (1,))) if float(eps) < 0.05
                   else pick(scores))
