@@ -2,13 +2,16 @@
 # _pc_e2cal_onbox.sh — E2cal: gate-delta fire-rate recalibration (E2_SPEC v1
 # found delta=0.25 fires only 0.1-0.9% on these envs -> mechanisms unevaluable).
 # Sweep delta on both envs (S gate, R objective; gate is obs-only so objective
-# doesn't affect fire) to find the delta giving ~5-15% fire. ONE c7i.4xlarge,
-# MAX_MINUTES=90, PIP_EXTRA="tokenizers minatar".
+# doesn't affect fire) to find the delta giving ~5-15% fire. ONE c7i.8xlarge
+# (32 vCPU: -P 8 x OMP 4 = 32 threads — v1 died oversubscribed 2x on a 4xlarge
+# with a 90-min backstop, 0 cells done), MAX_MINUTES=180,
+# PIP_EXTRA="tokenizers minatar".
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
 VOUT=ontogenic_learner/results/st_reward
 mkdir -p "$VOUT"
+rm -f "$VOUT/e2_screen.jsonl"   # start clean (v1 rows ship in the tarball)
 export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 PYTHONPATH=/opt/tiki
 sync_s3(){ aws s3 sync "$VOUT" "$S3_RESULTS/st_reward" --only-show-errors || true; }
 ( while true; do sleep 60; sync_s3; aws s3 cp /var/log/tiki-sweep.log "$S3_RESULTS/boot.log" --only-show-errors || true; done ) &
