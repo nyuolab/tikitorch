@@ -94,3 +94,27 @@ retention, sampled zero-multiply audit.
 
 House rules throughout: pre-registration, honest-negative branches, EC2-only,
 audit coverage, cheap-pilot-before-grid.
+
+## Amendments from the pre-launch review (2026-07-15, before any run)
+
+Four confirmed factorial-validity fixes (the E1 discipline — the review hunts
+false-result bugs):
+- **A1 gate orthogonality:** the surprise gate now reads OBS-ONLY CE in both
+  objectives (new `MorphPCEngine.gate_mask`, decoupled from `loss_mask` which
+  trains obs+reward in R). Without this, R cells gated on reward-prediction
+  surprise too, leaking the objective axis into the gate axis. Regression:
+  masks-unset serve_and_learn stays bit-exact vs cascade_grads.
+- **A2 salience baseline:** the neuromod salience EMA is evaluated BEFORE the
+  AND, so the reward baseline always updates (Python short-circuit had frozen
+  it to an over-surprising-windows-only EMA).
+- **A3 clean O objective:** O = REWARD-FREE = random policy on BOTH envs. The
+  foraging obs-heuristic P(food) is itself a reward proxy; using it made O
+  env-inconsistent (heuristic on foraging, random on minatar) and foraging-O ≈
+  foraging-R. Now O is the uniform "no reward in the objective" control (SO/NO
+  are the negative controls; the R column carries the control signal).
+- **A4 minatar reporting:** report MinAtar PER-GAME, not pooled — sparse-reward
+  games (freeway/seaquest/asterix) make the R-objective reward token ~always
+  'none' → MPC ≈ random and the N gate ~never fires (near-frozen online). That
+  IS the reward-density finding, but the S-vs-N contrast is only fair on the
+  dense games (breakout, space_invaders); log/report per-cell online fire-rate
+  (already in tele) beside return.

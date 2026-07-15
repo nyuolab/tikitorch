@@ -3,12 +3,15 @@
 One process, one MorphSSM world model. The 2x2:
   GATE      S (surprise-only margin gate) | N (neuromod: surprise AND realized
             reward-salience above baseline; reward enters the SCHEDULE only)
-  OBJECTIVE O (obs-only frames; MPC uses the env obs-heuristic or acts random)
+  OBJECTIVE O (obs-only frames, REWARD-FREE objective -> random policy on both
+            envs; the clean no-reward-in-objective baseline)
           | R (frames carry a REWARD TOKEN; model predicts it; MPC preference
             = P(next reward = + | history, a_cand) -- env-agnostic)
 
-Cells: SO (=E1 baseline) | NO (a) | SR (b) | NR (a+b). Plus frozen / random
-floors per env. Primary metric = reward-return/1k (E1: prediction != control).
+Cells: SO/NO (reward-free objective = random policy, S|N-gated world-model
+learning -- the negative controls) | SR (b) | NR (a+b). Plus frozen-R / random
+floors. GATE fires on OBS-ONLY surprise (orthogonal to the objective axis).
+Primary metric = reward-return/1k (E1: prediction != control).
 
 Frame codec (action-first, causal). Token id layout per env:
   0=[ACT] 1=[OBS] 2=[RWD]  |  3..3+K-1 = action tokens  |  next 2 = reward
@@ -77,6 +80,12 @@ class Codec:
             m = m | ((y >= self.RWD0) & (y < self.SYM0))    # reward token
         return m
 
+    def obs_mask(self, y):
+        """Obs-symbol positions ONLY — the gate's surprise signal, so the
+        GATE axis stays orthogonal to the OBJECTIVE axis (the gate never sees
+        reward-prediction surprise; reported obs_ce is obs-only in both O/R)."""
+        return y >= self.SYM0
+
 
 class RewardSalience:
     """Realized-reward-salience for the neuromod gate: is |reward| on this
@@ -117,11 +126,10 @@ class Agent:
     @torch.no_grad()
     def score_actions(self):
         """Batched (K, L) forward. Objective R: P(reward=+) at the [RWD]
-        position. Objective O: P(center obs-symbol = env reward-tile) at the
-        [OBS]+1 position, or None (random) if the env has no obs-heuristic."""
+        position -> the MPC preference. Objective O: None (reward-free objective
+        -> random policy)."""
         c = self.codec
         if c.objective == "R":
-            tail = torch.tensor([c.ACT, 0, c.RWD], dtype=torch.long)   # a filled below
             probes = torch.stack([
                 torch.cat([self.ctx[3:], torch.tensor([c.ACT, c.ACT0 + a, c.RWD],
                                                       dtype=torch.long)])
@@ -129,17 +137,11 @@ class Agent:
             logits = self.model(probes)                     # (K, L, V)
             p = torch.softmax(logits[:, -1], dim=-1)[:, c.RWD0 + 1]   # P(reward=+)
             return [float(x) for x in p]
-        # objective O
-        if self.env.name == "foraging":
-            probes = torch.stack([
-                torch.cat([self.ctx[3:], torch.tensor([c.ACT, c.ACT0 + a, c.OBS],
-                                                      dtype=torch.long)])
-                for a in range(c.K)])
-            logits = self.model(probes)
-            food = c.SYM0 + self.env.FOOD_SYM
-            p = torch.softmax(logits[:, -1], dim=-1)[:, food]
-            return [float(x) for x in p]
-        return None                                         # minatar-O: no heuristic
+        # objective O = NO reward in the objective -> no reward-directed
+        # controller -> random policy (uniform on both envs; the clean
+        # "reward-free objective" baseline. The E1 obs-heuristic P(food) is a
+        # reward proxy and is intentionally NOT used here.)
+        return None
 
     def act(self):
         scores = self.score_actions()
@@ -155,24 +157,26 @@ class Agent:
         self.push(self.codec.frame(obs_sym, action, reward))
         x = self.ctx[:-1].unsqueeze(0)
         y = self.ctx[1:].unsqueeze(0)
-        self.engine.loss_mask = self.codec.learn_mask(y)
+        self.engine.loss_mask = self.codec.learn_mask(y)      # train obs(+reward)
+        self.engine.gate_mask = self.codec.obs_mask(y)        # gate on obs-only
         fired = False
         if learn:
             def fire_fn(ce):
-                surprise = self.gate(ce)
-                if self.sal is None:
-                    return surprise
-                return surprise and self.sal.salient(abs(reward))   # neuromod AND
+                salient = (self.sal.salient(abs(reward))      # EVAL FIRST so the
+                           if self.sal is not None else True)  # baseline always
+                surprise = self.gate(ce)                       # updates
+                return surprise and salient                    # neuromod AND
             _, ce, fired = self.engine.serve_and_learn(
                 x, y, opt=self.opt, fire=fire_fn)
         else:
             with torch.no_grad():
                 lg = self.model(x).reshape(-1, self.codec.vocab).float()
-                keep = self.engine.loss_mask.reshape(-1)
+                keep = self.engine.gate_mask.reshape(-1)      # obs-only, comparable
                 ce = float(F.cross_entropy(lg[keep], y.reshape(-1)[keep]))
-            if self.sal is not None:                        # keep baseline live
+            if self.sal is not None:                          # keep baseline live
                 self.sal.salient(abs(reward))
         self.engine.loss_mask = None
+        self.engine.gate_mask = None
         return reward, fired, ce
 
 

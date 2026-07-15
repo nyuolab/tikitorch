@@ -431,6 +431,11 @@ class MorphPCEngine:
                           # token positions from the world-model kick per
                           # E1_SPEC ("policy tokens carry no loss"). Applied as
                           # a mux (torch.where) on the top error -> audit-clean.
+    gate_mask = None      # optional (B,T) bool: the serve CE handed to the
+                          # surprise gate (and returned) is computed over THESE
+                          # positions, decoupled from loss_mask. E2 gates on
+                          # obs-only CE while TRAINING over obs+reward, so the
+                          # gate axis stays orthogonal to the objective axis.
 
     @torch.no_grad()
     def _top_error(self, logits, targets, caches_top, grads: bool):
@@ -538,8 +543,9 @@ class MorphPCEngine:
         code path on the same caches). Returns (logits, serve_ce, fired)."""
         logits, caches, top = self._forward_cache(ids)
         V = logits.shape[-1]
-        if self.loss_mask is not None:
-            keep = self.loss_mask.reshape(-1)
+        ce_mask = self.gate_mask if self.gate_mask is not None else self.loss_mask
+        if ce_mask is not None:
+            keep = ce_mask.reshape(-1)
             lf = logits.reshape(-1, V).float()[keep]
             ce = F.cross_entropy(lf, targets.reshape(-1)[keep]).item()
         else:

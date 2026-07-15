@@ -17,7 +17,9 @@ health(){ echo "$(date -u +%H:%M:%S) load=$(cut -d' ' -f1-3 /proc/loadavg) mem=$
 SYNC_PID=$!
 trap 'kill $SYNC_PID 2>/dev/null; sync_s3' EXIT
 die(){ echo "JOB-FAILED: $1" >> "$VOUT/onbox_jobs.log"; sync_s3; exit 1; }
+export PYTHONPATH=/opt/tiki
 $PY -c "import minatar; from minatar import Environment; Environment('breakout').reset(); print('minatar ok')" || die "minatar-import"
+$PY -c "import sys; sys.path[:0]=['/opt/tiki/scripts','/opt/tiki/ontogenic_learner/experiments']; from st6_reward import Agent; from nanogpt_shakespeare import tau_at; print('imports ok')" || die "import-chain"
 
 ST6="$PY ontogenic_learner/experiments/st6_reward.py"
 JOBS=$(mktemp)
