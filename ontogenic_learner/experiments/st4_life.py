@@ -119,9 +119,20 @@ def run(args):
     learner.eval()                          # serve dropout OFF (V4cal-locked)
     frozen.eval()
     engine = MorphPCEngine(learner)
-    opt = torch.optim.AdamW(learner.parameters(), lr=args.lr, weight_decay=0.01)
+    if args.opt == "puretropical":
+        import tikitorch.optim as ttoptim
+        # the CLOSED shift-based optimizer: lr = 2^-lr_shift; decay = shift+1.
+        # No exp_avg_sq -> the precision anchor has no importance source; the
+        # strict adversary runs anchorless (mechanism isolation).
+        opt = ttoptim.PureTropicalSGD(learner.parameters(),
+                                      lr_shift=args.lr_shift, momentum_bits=4)
+        assert args.anchor_lam == 0, "anchor needs Adam moments; use --anchor-lam 0"
+    else:
+        opt = torch.optim.AdamW(learner.parameters(), lr=args.lr,
+                                weight_decay=0.01)
     gate = MarginGate(delta=args.delta)
-    anchor = Anchor(learner, lam=args.anchor_lam)
+    anchor = (Anchor(learner, lam=args.anchor_lam)
+              if args.anchor_lam > 0 else None)
     probes = probe_windows(assets, domains, args.window)
 
     from tikitorch.audit import _make_catcher
@@ -130,7 +141,8 @@ def run(args):
     def life_config(a):
         return dict(domains=domains, era_tokens=a.era_tokens,
                     cycles=a.cycles, window=a.window, delta=a.delta,
-                    anchor_lam=a.anchor_lam, lr=a.lr,
+                    anchor_lam=a.anchor_lam, lr=a.lr, opt=a.opt,
+                    lr_shift=a.lr_shift,
                     lr_decay_every=a.lr_decay_every, seed=a.seed,
                     fire_always=a.fire_always)
 
@@ -163,7 +175,8 @@ def run(args):
             f"resume config mismatch: {st['config']} vs {life_config(args)}"
         learner.load_state_dict(st["model"])
         opt.load_state_dict(st["opt"])
-        anchor.theta = st["anchor_theta"]
+        if anchor is not None:
+            anchor.theta = st["anchor_theta"]
         gate.mu_f, gate.mu_s = st["gate"]
         gen.set_state(st["gen_state"])
         audit_gen.set_state(st["audit_state"])
@@ -199,7 +212,8 @@ def run(args):
         tmp = ck_path.with_suffix(".pt.tmp")
         torch.save(dict(
             model=learner.state_dict(), opt=opt.state_dict(),
-            anchor_theta=anchor.theta, gate=(gate.mu_f, gate.mu_s),
+            anchor_theta=(anchor.theta if anchor is not None else None),
+            gate=(gate.mu_f, gate.mu_s),
             gen_state=gen.get_state(), audit_state=audit_gen.get_state(),
             counters=(w_idx, n, fires, halvings, sum_l, sum_f, sum_ro,
                       sum_rof, fwd_eq, audited, audit_viol, audited_fired),
@@ -245,18 +259,22 @@ def run(args):
             logits, ce_l, fired = engine.serve_and_learn(
                 x, y, opt=_NoStep(opt), fire=fire_fn)
         if fired:
-            anchor.pull(learner, opt)
+            if anchor is not None:
+                anchor.pull(learner, opt)
             opt.step()
             fires += 1
             if args.lr_decay_every and fires % args.lr_decay_every == 0:
                 halvings += 1
                 for grp in opt.param_groups:
+                    if "lr_shift" in grp:
+                        grp["lr_shift"] += 1      # bit-shift decay, closed form
                     grp["lr"] = grp["lr"] / 2.0
 
         # anchor EMA on a per-WINDOW clock (review finding: per-fire tracking
         # at ~3k fires leaves theta ~= birth weights — pull-to-birth, not
         # consolidation; per-window half-life ~6.9k windows ~= 0.66M tokens)
-        anchor.track(learner)
+        if anchor is not None:
+            anchor.track(learner)
         n += 1
         # cost boundary: learner serve+kick only (V0 constant); anchor pull
         # ~O(P) adds per fire and the frozen twin/probes are instrumentation
@@ -300,6 +318,7 @@ def run(args):
     row = dict(gate="V4", tag=args.tag, domains=args.domains,
                era_tokens=args.era_tokens, cycles=args.cycles,
                seed=args.seed, delta=args.delta, anchor_lam=args.anchor_lam,
+               opt=args.opt,
                lr_decay_every=args.lr_decay_every, lr_halvings=halvings,
                n_windows=n, tokens=n * args.window,
                preq_ce=round(sum_l / n, 4),
@@ -329,6 +348,8 @@ if __name__ == "__main__":
     p.add_argument("--window", type=int, default=96)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--opt", choices=["adamw", "puretropical"], default="adamw")
+    p.add_argument("--lr-shift", type=int, default=10)
     p.add_argument("--delta", type=float, default=0.25)
     p.add_argument("--anchor-lam", type=float, default=0.01)
     p.add_argument("--lr-decay-every", type=int, default=2000)

@@ -19,11 +19,25 @@ as one computation — versus every deployed RL system's actor/learner split.*
 
 ## E-gates (each pre-registered before running, per house rule)
 
-### E0 — paper-adjacent closures (weeks; CPU boxes)
-Excess-surprise gate (margin vs a cheap difficulty estimate — fixes
-easier-domain-entry blindness); multi-seed V4 life (the single-seed
-limitation); strict shift-optimizer decay (close the last AdamW dependency).
-Kill criteria inherited from V4.
+### E0 — paper-adjacent closures (LAUNCHED 2026-07-14; CPU box)
+**E0-1 excess-surprise gate.** Difficulty estimate = online add-1 unigram CE
+(prequential-clean, O(V) memory, adds only); gate fires on the two-timescale
+margin of ce_model − ce_unigram. Test = the FIXED-order two_cycle regime
+(the deadband case the margin gate is blind to). **Pass (pre-registered):**
+excess HC(two_cycle) ≥ margin HC(two_cycle) + 0.05, AND excess stationary
+fire < 1%, AND excess HC(hard_shift) ≥ 0.9× margin's V4cal hard_shift HC
+(0.616). **Kill:** excess ≤ margin on two_cycle ⇒ unigram difficulty doesn't
+capture re-entry; E1 keeps rotation and the finding is published.
+**E0-2 multi-seed life.** V4 main-life config verbatim, seeds 1 and 2.
+**Pass:** both reproduce the V4 criteria (HC ≥ 0.5, norm-slope deceleration,
+per-cycle fire collapse). **Kill:** either fails ⇒ the V4 verdict carries a
+seed-fragility caveat.
+**E0-3 strict adversary.** PureTropicalSGD (lr = 2^-10, momentum 4 bits) +
+bit-shift decay (lr_shift+1 per 2000 fires), anchorless, fire-always
+stationary 20,833 steps — the SAME optimizer family whose 6k-step collapse
+set the horizon. **Pass:** end prequential CE ≤ start (no collapse) ⇒ the
+V4 AdamW caveat closes. **Kill:** collapse ⇒ the caveat stands; decay
+cadence retuned before any strict-config life.
 
 ### E1 — action without an actor/learner split (the decisive gate)
 **Question:** can the SAME forward pass produce an action *and* be the

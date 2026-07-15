@@ -198,6 +198,24 @@ class PureTropicalSGD(toptim.Optimizer):
         super().__init__(params, defaults)
         self._step_count = 0
 
+    def state_dict(self):
+        sd = super().state_dict()
+        sd["tt_step_count"] = self._step_count
+        return sd
+
+    def load_state_dict(self, state_dict):
+        # The base Optimizer casts state tensors to the (float) param dtype on
+        # load, which corrupts the int8 momentum counter (bit-shift decay then
+        # raises rshift-not-implemented-for-Float). Re-coerce after load, and
+        # restore the decay-phase step counter for bit-continuous resume.
+        sd = dict(state_dict)
+        self._step_count = sd.pop("tt_step_count", 0)
+        super().load_state_dict(sd)
+        for st in self.state.values():
+            mc = st.get("momentum_counter")
+            if mc is not None and mc.dtype != torch.int8:
+                st["momentum_counter"] = mc.to(torch.int8)
+
     @torch.no_grad()
     def step(self, closure=None):
         loss = None

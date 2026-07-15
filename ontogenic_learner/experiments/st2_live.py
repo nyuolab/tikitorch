@@ -86,6 +86,28 @@ class MarginGate:
         return (self.mu_f - self.mu_s) > self.delta
 
 
+class UnigramCE:
+    """Online unigram difficulty estimator (E0-1): CE of a window under
+    add-1-smoothed token frequencies accumulated over the PAST stream only
+    (prequential-clean). O(V) memory, O(T) adds per window — closure-cheap.
+    The excess gate fires on ce_model − ce_unigram, so a re-entry into an
+    intrinsically harder domain (unigram CE rises too) does not fire unless
+    the MODEL is worse than the domain's own difficulty explains."""
+
+    def __init__(self, vocab=1024):
+        self.counts = torch.ones(vocab, dtype=torch.float64)   # add-1
+        self.total = float(vocab)
+
+    def ce(self, y) -> float:
+        p = self.counts[y.reshape(-1)] / self.total
+        return float(-(p.log()).mean())
+
+    def update(self, y):
+        idx = y.reshape(-1)
+        self.counts.scatter_add_(0, idx, torch.ones_like(idx, dtype=torch.float64))
+        self.total += float(idx.numel())
+
+
 class Anchor:
     """G4 precision anchor, ported verbatim in mechanism: after grads are set,
     pull toward the slow EMA of weights, weighted by the optimizer's own
@@ -139,8 +161,10 @@ def run(args):
     frozen.eval()
     engine = MorphPCEngine(learner)
     opt = torch.optim.AdamW(learner.parameters(), lr=args.lr, weight_decay=0.01)
-    gate = (MarginGate(delta=args.delta) if args.gate == "margin"
+    gate = (MarginGate(delta=args.delta) if args.gate in ("margin", "excess")
             else SurpriseGate(gate_z=args.gate_z))
+    ug = UnigramCE(learner.output_head.out_features) if args.gate == "excess" \
+        else None
     anchor = (Anchor(learner, lam=args.anchor_lam)
               if args.arm == "gated_anchor" else None)
     learn = args.arm != "frozen"
@@ -149,7 +173,9 @@ def run(args):
     gen = torch.Generator().manual_seed(args.seed)
     # gate tag in the filename: parallel sweep cells must never share a tele
     # file (V2b lesson — three z* jobs interleaved one file)
-    gtag = (f"m{args.delta}" if args.gate == "margin" else f"z{args.gate_z}")
+    gtag = (f"m{args.delta}" if args.gate == "margin"
+            else f"x{args.delta}" if args.gate == "excess"
+            else f"z{args.gate_z}")
     if anchor is not None:
         gtag += f"_lam{args.anchor_lam}"
     if args.tag:
@@ -173,8 +199,14 @@ def run(args):
             ce_f = F.cross_entropy(
                 lf.reshape(-1, lf.shape[-1]).float(), y.reshape(-1)).item()
         if learn:
-            def fire_fn(ce):
-                return gate(ce)
+            if ug is not None:
+                ug_ce = ug.ce(y)
+
+                def fire_fn(ce, _u=ug_ce):
+                    return gate(ce - _u)          # margin on EXCESS surprise
+            else:
+                def fire_fn(ce):
+                    return gate(ce)
             if anchor is not None:
                 # two-phase: grads via fused serve (no step), anchor edit, step
                 logits, ce_l, fired = engine.serve_and_learn(
@@ -192,6 +224,8 @@ def run(args):
                 ce_l = F.cross_entropy(
                     ll.reshape(-1, ll.shape[-1]).float(), y.reshape(-1)).item()
             fired = False
+        if ug is not None:
+            ug.update(y)
         n += 1
         fires += int(fired)
         if args.lr_decay_every and fired and fires % args.lr_decay_every == 0:
@@ -223,7 +257,7 @@ def run(args):
     row = dict(gate="V2", arm=args.arm, regime=args.regime, seed=args.seed,
                gate_kind=args.gate,
                gate_z=(args.gate_z if args.gate == "z" else None),
-               delta=(args.delta if args.gate == "margin" else None),
+               delta=(args.delta if args.gate in ("margin", "excess") else None),
                anchor_lam=(args.anchor_lam if anchor is not None else None),
                lr_decay_every=args.lr_decay_every or None,
                tag=args.tag or None,
@@ -262,10 +296,11 @@ if __name__ == "__main__":
     p.add_argument("--arm", choices=["frozen", "gated", "gated_anchor"],
                    required=True)
     p.add_argument("--regime", choices=["hard_shift", "drift", "novel_vocab",
-                                        "stationary"], required=True)
+                                        "stationary", "two_cycle"],
+                   required=True)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--gate", choices=["z", "margin"], default="z")
+    p.add_argument("--gate", choices=["z", "margin", "excess"], default="z")
     p.add_argument("--gate-z", type=float, default=0.25)
     p.add_argument("--delta", type=float, default=0.5,
                    help="margin gate threshold, nats")

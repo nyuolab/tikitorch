@@ -168,6 +168,10 @@ def regime_schedule(regime, assets, era_tokens=200_000):
         return [(d, era_tokens) for d in DOMAINS]
     if regime == "stationary":
         return [("wiki", 4 * era_tokens)]
+    if regime == "two_cycle":               # FIXED order, twice: the margin
+        # gate's re-entry deadband case (E0-1) — cycle 2 revisits every domain
+        # in the same monotone-easier order that silences absolute-margin gates
+        return [(d, era_tokens) for _ in range(2) for d in DOMAINS]
     if regime == "drift":                      # rotating mixture, 2k blocks
         sched = []
         blocks = 4 * era_tokens // 2000
