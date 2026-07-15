@@ -234,6 +234,7 @@ static void bwd_dump_chip(int l, const char* dir, int is_out){
     // scrGSV ZERO => phase-1 s2_GSV write dropped; scrGSV NONZERO while gQ/gK==0 => phase-2 strided read is the hazard.
     readf(l,S2_SCR_GSV, db,(long)S2_SEQ*S2_SEQ); dump_b32(dir,l,"scrGSV", db,(long)S2_SEQ*S2_SEQ);
     readf(l,S2_SCR_PALL,db,(long)S2_SEQ*S2_SEQ); dump_b32(dir,l,"scrPALL",db,(long)S2_SEQ*S2_SEQ);
+    readf(l,S2_SCR_SC,  db,(long)S2_SEQ*S2_SEQ); dump_b32(dir,l,"scrSC",  db,(long)S2_SEQ*S2_SEQ);  // raw pre-exp scores
 }
 
 // ---- bf16 STE round (== kernel bf16_round / twin P()) ----

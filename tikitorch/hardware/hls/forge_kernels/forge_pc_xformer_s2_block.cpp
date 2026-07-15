@@ -814,6 +814,7 @@ static float s2_Ch[S2_SEQ * S2_DH];   // gK head slice (bwd)
 static float s2_Dh[S2_SEQ * S2_DH];   // gV head slice (bwd)
 static float s2_PALL[S2_SEQ * S2_SEQ];// bwd Phase-1: per-query softmax rows p_i[j] (WRITE-ONCE; Phase-2 reads)
 static float s2_GSV [S2_SEQ * S2_SEQ];// bwd Phase-1: per-query score gradients gsv_i[j] (WRITE-ONCE; Phase-2 reads)
+static float s2_SCbuf[S2_SEQ * S2_SEQ];// DIAG: head-0 raw pre-exp attention scores (dot*ascale), snapshotted to DDR
 
 static void s2_attn_fwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off, int wattn_off) {
 #pragma HLS INLINE off
@@ -925,6 +926,7 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
                 float dot = s2_dotDH(&s2_Qh[i*S2_DH], &s2_Kh[j*S2_DH]);   // == fwd score, bit-identical PRAW
                 p[j] = dot * ascale; if (p[j] > mx) mx = p[j];
             }
+            if (h == 0) for (int j = 0; j <= i; j++) s2_SCbuf[i*S2_SEQ+j] = p[j];   // DIAG: raw pre-exp scores (head 0)
             float slane[S2_LANES];
 #pragma HLS ARRAY_PARTITION variable=slane complete dim=1
             for (int l = 0; l < S2_LANES; l++) slane[l] = 0;
@@ -982,6 +984,7 @@ static void s2_attn_bwd(ap_uint<512> *buffer, int wq_off, int wk_off, int wv_off
         if (h == 0) {
             bstore_f(buffer, S2_SCR_GSV,  s2_GSV,  S2_SEQ*S2_SEQ);
             bstore_f(buffer, S2_SCR_PALL, s2_PALL, S2_SEQ*S2_SEQ);
+            bstore_f(buffer, S2_SCR_SC,   s2_SCbuf,S2_SEQ*S2_SEQ);   // DIAG: raw pre-exp scores
         }
         // ---- PHASE 2: fresh-accumulator reductions (== forward P@V pattern; NO cross-iteration RMW). ----
         // gV[j][d] = sum_{i>=j} P(p_i[j]*gATTN_i[d]) ; gK[j][d] = sum_{i>=j} gsv_i[j]*Q_i[d]  (ascending-i order).

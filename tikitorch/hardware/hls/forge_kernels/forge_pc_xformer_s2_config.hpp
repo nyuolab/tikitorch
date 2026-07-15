@@ -201,7 +201,8 @@ static const int S2_BG_END  = S2_BG_TMP  + S2_SEQ*S2_D;
 // hazard) from "scratch NONZERO but phase-2 strided read yields gQ/gK=0" (phase-2 read hazard). +512KB, negligible.
 static const int S2_SCR_GSV  = S2_AL(S2_BG_END);              // [SEQ*SEQ] head-0 s2_GSV snapshot
 static const int S2_SCR_PALL = S2_SCR_GSV + S2_SEQ*S2_SEQ;    // [SEQ*SEQ] head-0 s2_PALL snapshot
-static const int S2_SCR_END  = S2_SCR_PALL + S2_SEQ*S2_SEQ;
+static const int S2_SCR_SC   = S2_SCR_PALL + S2_SEQ*S2_SEQ;   // [SEQ*SEQ] head-0 RAW pre-exp scores (dot*ascale)
+static const int S2_SCR_END  = S2_SCR_SC + S2_SEQ*S2_SEQ;
 
 static const int S2_BUFLEN   = S2_AL(S2_SCR_END);
 
