@@ -418,3 +418,9 @@ results/v5_pmbus/; scoping amendments in V5_PMBUS_PROTOCOL.md)
   resolved as a power multiplier because the substrate's absolute power is
   at the telemetry floor — the honest statement is "learning adds ≤1 W to
   a ~4 W rail; amortized at the V4 fire-rate the addition is unmeasurable."
+
+### V4 multi-seed (E0-2, 2026-07-15): the life REPRODUCES across 3 seeds
+HC 0.602/0.547/0.567 (mean 0.572 ± 0.028, all ≥ the 0.5 bar); regret
+−2.62/−2.38/−2.46; fire 1.65/1.36/1.72%; amortized 1.006×; norm +2.2/+2.3%
+(equilibrium both); **0 audit violations across all 3 lives (3×10⁷ served
+tokens)**. The V4 single-seed caveat is CLOSED; N3 is now a 3-seed number.

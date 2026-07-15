@@ -1,0 +1,22 @@
+{"t": 0, "where": "birth", "ce_wiki": 3.9077, "ce_shakespeare": 7.7718, "ce_docs": 9.3148, "ce_code": 8.9164, "norm": 3072.62}
+{"t": 499968, "where": "era_end_0", "ce_wiki": 3.9075, "ce_shakespeare": 7.7765, "ce_docs": 9.3157, "ce_code": 8.9044, "norm": 3072.8}
+{"t": 999936, "where": "era_end_1", "ce_wiki": 4.7895, "ce_shakespeare": 5.3796, "ce_docs": 7.9594, "ce_code": 7.8744, "norm": 3123.66}
+{"t": 1499904, "where": "era_end_2", "ce_wiki": 5.0086, "ce_shakespeare": 5.4575, "ce_docs": 5.7416, "ce_code": 5.5023, "norm": 3134.06}
+{"t": 1999872, "where": "era_end_3", "ce_wiki": 5.2583, "ce_shakespeare": 5.4999, "ce_docs": 5.5999, "ce_code": 5.1202, "norm": 3135.18}
+{"t": 1999872, "where": "cycle1_snapshot"}
+{"t": 2499840, "where": "era_end_4", "ce_wiki": 5.2583, "ce_shakespeare": 5.4999, "ce_docs": 5.5999, "ce_code": 5.1202, "agree_wiki": 1.0, "agree_shakespeare": 1.0, "agree_docs": 1.0, "agree_code": 1.0, "norm": 3135.18}
+{"t": 2999808, "where": "era_end_5", "ce_wiki": 5.2758, "ce_shakespeare": 5.5072, "ce_docs": 5.5767, "ce_code": 5.0784, "agree_wiki": 0.9492, "agree_shakespeare": 0.9456, "agree_docs": 0.9261, "agree_code": 0.874, "norm": 3135.32}
+{"t": 3499776, "where": "era_end_6", "ce_wiki": 5.3394, "ce_shakespeare": 5.5153, "ce_docs": 5.452, "ce_code": 4.9215, "agree_wiki": 0.8024, "agree_shakespeare": 0.8011, "agree_docs": 0.7425, "agree_code": 0.6562, "norm": 3135.9}
+{"t": 3999744, "where": "era_end_7", "ce_wiki": 5.0963, "ce_shakespeare": 5.4419, "ce_docs": 5.4511, "ce_code": 4.9098, "agree_wiki": 0.7425, "agree_shakespeare": 0.7129, "agree_docs": 0.6432, "agree_code": 0.582, "norm": 3136.05}
+{"t": 4499712, "where": "era_end_8", "ce_wiki": 5.1169, "ce_shakespeare": 5.4289, "ce_docs": 5.3407, "ce_code": 4.8767, "agree_wiki": 0.7038, "agree_shakespeare": 0.6911, "agree_docs": 0.6156, "agree_code": 0.554, "norm": 3137.04}
+{"t": 4999680, "where": "era_end_9", "ce_wiki": 5.2242, "ce_shakespeare": 5.4469, "ce_docs": 5.281, "ce_code": 4.8165, "agree_wiki": 0.7005, "agree_shakespeare": 0.6865, "agree_docs": 0.6169, "agree_code": 0.5215, "norm": 3137.53}
+{"t": 5499648, "where": "era_end_10", "ce_wiki": 5.0628, "ce_shakespeare": 5.4048, "ce_docs": 5.2815, "ce_code": 4.8057, "agree_wiki": 0.6442, "agree_shakespeare": 0.5996, "agree_docs": 0.5404, "agree_code": 0.4756, "norm": 3137.68}
+{"t": 5999616, "where": "era_end_11", "ce_wiki": 4.9283, "ce_shakespeare": 5.3479, "ce_docs": 5.3386, "ce_code": 4.8536, "agree_wiki": 0.5833, "agree_shakespeare": 0.5374, "agree_docs": 0.4824, "agree_code": 0.4385, "norm": 3137.87}
+{"t": 6499584, "where": "era_end_12", "ce_wiki": 4.9747, "ce_shakespeare": 5.3132, "ce_docs": 5.2894, "ce_code": 4.7536, "agree_wiki": 0.6025, "agree_shakespeare": 0.5648, "agree_docs": 0.5081, "agree_code": 0.4349, "norm": 3138.2}
+{"t": 6999552, "where": "era_end_13", "ce_wiki": 4.9881, "ce_shakespeare": 5.3113, "ce_docs": 5.2766, "ce_code": 4.7314, "agree_wiki": 0.6025, "agree_shakespeare": 0.5648, "agree_docs": 0.516, "agree_code": 0.4368, "norm": 3138.28}
+{"t": 7499520, "where": "era_end_14", "ce_wiki": 4.9702, "ce_shakespeare": 5.2059, "ce_docs": 5.2848, "ce_code": 4.7553, "agree_wiki": 0.5944, "agree_shakespeare": 0.5443, "agree_docs": 0.5264, "agree_code": 0.432, "norm": 3138.81}
+{"t": 7999488, "where": "era_end_15", "ce_wiki": 4.9755, "ce_shakespeare": 5.1929, "ce_docs": 5.2717, "ce_code": 4.753, "agree_wiki": 0.5918, "agree_shakespeare": 0.5371, "agree_docs": 0.5208, "agree_code": 0.4329, "norm": 3138.98}
+{"t": 8499456, "where": "era_end_16", "ce_wiki": 4.9755, "ce_shakespeare": 5.1929, "ce_docs": 5.2717, "ce_code": 4.753, "agree_wiki": 0.5918, "agree_shakespeare": 0.5371, "agree_docs": 0.5208, "agree_code": 0.4329, "norm": 3138.98}
+{"t": 8999424, "where": "era_end_17", "ce_wiki": 4.9799, "ce_shakespeare": 5.1887, "ce_docs": 5.2612, "ce_code": 4.7522, "agree_wiki": 0.5898, "agree_shakespeare": 0.5378, "agree_docs": 0.5189, "agree_code": 0.4255, "norm": 3139.05}
+{"t": 9499392, "where": "era_end_18", "ce_wiki": 4.9799, "ce_shakespeare": 5.1887, "ce_docs": 5.2612, "ce_code": 4.7522, "agree_wiki": 0.5898, "agree_shakespeare": 0.5378, "agree_docs": 0.5189, "agree_code": 0.4255, "norm": 3139.05}
+{"t": 9999360, "where": "era_end_19", "ce_wiki": 5.0417, "ce_shakespeare": 5.1866, "ce_docs": 5.2228, "ce_code": 4.7081, "agree_wiki": 0.6038, "agree_shakespeare": 0.5602, "agree_docs": 0.5238, "agree_code": 0.4284, "norm": 3139.23}

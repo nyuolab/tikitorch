@@ -32,6 +32,12 @@ capture re-entry; E1 keeps rotation and the finding is published.
 **Pass:** both reproduce the V4 criteria (HC ≥ 0.5, norm-slope deceleration,
 per-cycle fire collapse). **Kill:** either fails ⇒ the V4 verdict carries a
 seed-fragility caveat.
+**E0-2 VERDICT (2026-07-15): PASS — V4 reproduces across 3 seeds.** HC
+0.602/0.547/0.567 (mean 0.572 ± 0.028, bar ≥0.5 ✓ all); regret −2.62/−2.38/
+−2.46 (mean −2.485 ± 0.122); fire 1.65/1.36/1.72% (mean 1.58%); amortized
+1.0063/1.0052/1.0065× (mean 1.0060×); norm +2.17/+2.33% (equilibrium); **0
+audit violations across all 3 lives.** The V4 single-seed caveat is CLOSED;
+N3 upgrades to a 3-seed number.
 **E0-1 VERDICT (2026-07-15): KILL on the self-quieting condition.** The
 excess gate met the benefit bars (hard_shift HC 0.687 ≥ 0.554 ✓; two_cycle
 HC 0.649 vs margin+0.05 = 0.648 — met by 0.001, single seed, i.e. no real

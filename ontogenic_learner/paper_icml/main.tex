@@ -390,7 +390,7 @@ equilibrium ($+2.3\%$ over the life; slope decelerates $12\times$).}
 The organism configuration (margin gate $\delta{=}0.25$, precision anchor
 $\lambda{=}0.01$ on the optimizer's own second moments, learning-rate halving
 on a fired-kick schedule) ran 104{,}160 windows in one process. Headroom
-captured: 0.602 at $1.0063\times$ serving cost. Retention is a stability--%
+captured: $0.57{\pm}0.03$ over 3 seeds ($0.602/0.547/0.567$) at $1.006\times$ serving cost. Retention is a stability--%
 plasticity \emph{trade}, reported as such: the wiki-specialist birth model
 gave up $\sim$1.1 nats of its specialty for a generalist basin 2.7 nats
 better on average, and held it with non-increasing interference across
@@ -497,8 +497,9 @@ always-on segment. (ii) \emph{Scale}: all results are at toy scale ($d{=}256$,
 BPE-1024, $\sim$1.0M parameters); our larger silicon runs surfaced an unresolved
 backward-path divergence that gates scaling. (iii) \emph{Board power}: the
 FPGA rail measurement bounds core power only; full-card and ASIC numbers are
-future instrumentation. (iv) \emph{Single seed} on the incumbent sweep and
-the life (our multi-seed evidence is at V2). (v) The margin gate is blind to
+future instrumentation. (iv) \emph{Single seed} on the incumbent sweep
+(the life is 3-seed: HC $0.57\pm0.03$, 0 audit violations across $3{\times}10^7$
+served tokens). (v) The margin gate is blind to
 easier-domain entries; difficulty normalization is unfinished.
 
 \section{Future Work}
