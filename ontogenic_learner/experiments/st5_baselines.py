@@ -85,20 +85,27 @@ def run_streaming_ac(args, world, tele):
         with torch.no_grad():
             _, v2 = net(feats(obs2, a))
         delta = r + gamma * float(v2) - v_detached
-        # grad of (log pi(a) + v + entropy bonus) -> traces
-        loss = torch.log(pi[a] + 1e-8) + v + ent * (-(pi * (pi + 1e-8).log()).sum())
+        # AC(lambda): the delta-scaled trace carries log pi(a) + v; the
+        # entropy regularizer is applied UNCONDITIONALLY (not delta-scaled,
+        # else it flips sign with delta and averages to ~0 — review fix).
+        H = -(pi * (pi + 1e-8).log()).sum()
         net.zero_grad(set_to_none=True)
-        loss.backward()
+        (torch.log(pi[a] + 1e-8) + v).backward(retain_graph=True)
         znorm = 0.0
         for zi, p in zip(z, params):
             zi.mul_(gamma * lam).add_(p.grad if p.grad is not None
                                       else torch.zeros_like(p))
             znorm += float(zi.abs().sum())
+        net.zero_grad(set_to_none=True)
+        H.backward()
+        hgrad = [p.grad.clone() if p.grad is not None else torch.zeros_like(p)
+                 for p in params]
         # ObGD-style overshoot bound: effective step <= alpha
         step = alpha / max(1.0, alpha * abs(delta) * znorm)
         with torch.no_grad():
-            for zi, p in zip(z, params):
+            for zi, p, hg in zip(z, params, hgrad):
                 p.add_(zi, alpha=step * delta)
+                p.add_(hg, alpha=alpha * ent)
         obs, last_a = obs2, a
         total_r += r
         ret_window.append(r)
@@ -150,10 +157,10 @@ def run_replay_dqn(args, world, tele):
             opt.step()
         if t % 1000 == 0:
             tgt.load_state_dict(q.state_dict())
-            if t:
-                tele.write(json.dumps(dict(t=t, ret1k=sum(ret_window[-1000:]),
-                                           biome=world.biome)) + "\n")
-                tele.flush()
+        if (t + 1) % 1000 == 0:
+            tele.write(json.dumps(dict(t=t + 1, ret1k=sum(ret_window[-1000:]),
+                                       biome=world.biome)) + "\n")
+            tele.flush()
     return total_r, sum(p.numel() for p in q.parameters()), time.time() - t0
 
 

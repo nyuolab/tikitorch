@@ -426,6 +426,11 @@ class MorphPCEngine:
 
     loss_mode = "ce"      # "ce" = exact softmax (host boundary) | "lut" =
                           # shift_softmax LUT probabilities (G5 strict rung)
+    loss_mask = None      # optional (B,T) bool: learn ONLY where True. Used by
+                          # the embodied agent (E1) to exclude policy/separator
+                          # token positions from the world-model kick per
+                          # E1_SPEC ("policy tokens carry no loss"). Applied as
+                          # a mux (torch.where) on the top error -> audit-clean.
 
     @torch.no_grad()
     def _top_error(self, logits, targets, caches_top, grads: bool):
@@ -440,7 +445,15 @@ class MorphPCEngine:
             eps = torch.softmax(logits.reshape(-1, V).float(), dim=-1)
         eps.scatter_add_(1, targets.reshape(-1, 1),
                          -torch.ones(B * T, 1, device=eps.device))
-        eps = (eps / (B * T)).to(logits.dtype)              # d(mean-CE)/d(logits)
+        if self.loss_mask is not None:
+            # mux the error to zero at excluded positions (mult-free), and take
+            # the mean over KEPT positions only
+            keep = self.loss_mask.reshape(-1, 1)
+            eps = torch.where(keep, eps, torch.zeros((), dtype=eps.dtype))
+            denom = int(self.loss_mask.sum().clamp_min(1))
+        else:
+            denom = B * T
+        eps = (eps / denom).to(logits.dtype)                # d(mean-CE)/d(logits)
         head, idx = m.output_head, caches_top["head_idx"]   # (R, V, k)
         R, D = B * T, head.in_features
         k = head.k
@@ -525,8 +538,13 @@ class MorphPCEngine:
         code path on the same caches). Returns (logits, serve_ce, fired)."""
         logits, caches, top = self._forward_cache(ids)
         V = logits.shape[-1]
-        ce = F.cross_entropy(logits.reshape(-1, V).float(),
-                             targets.reshape(-1)).item()
+        if self.loss_mask is not None:
+            keep = self.loss_mask.reshape(-1)
+            lf = logits.reshape(-1, V).float()[keep]
+            ce = F.cross_entropy(lf, targets.reshape(-1)[keep]).item()
+        else:
+            ce = F.cross_entropy(logits.reshape(-1, V).float(),
+                                 targets.reshape(-1)).item()
         fired = False
         if opt is not None:
             do = fire(ce) if callable(fire) else bool(fire)

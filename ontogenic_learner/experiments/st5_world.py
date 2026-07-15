@@ -124,8 +124,10 @@ class World:
             self.pos = (r, c)
             if self.grid[r, c] == FOOD:
                 reward = 1.0
-                self.grid[r, c] = EMPTY
-                self._spawn_food()
+                o = self.obs()               # render WITH the food underfoot
+                self.grid[r, c] = EMPTY       # ...THEN consume (matches
+                self._spawn_food()            # predict_true's landed-view)
+                return reward, o
         return reward, self.obs()
 
     def predict_true(self, action: int):
@@ -146,9 +148,15 @@ CENTER_FIRST = [4, 0, 1, 2, 3, 5, 6, 7, 8]
 
 
 def encode_frame(obs, action):
+    # ACTION-FIRST, CENTER-FIRST: [ACT] a [OBS] center t1..t8. The action that
+    # CAUSED this obs precedes it, so at the [OBS]+1 (center) target position
+    # the action token is causally IN-CONTEXT (review fix: the old obs-first
+    # codec placed a_t after the obs it produced -> action invisible to its
+    # own prediction). One forward per candidate then reads
+    # P(landing tile = food | history, a_cand) at the final position.
     tiles = [TOK_TILE[int(obs[i])] for i in CENTER_FIRST]
-    return torch.tensor([TOK_OBS] + tiles
-                        + [TOK_ACT, TOK_ACTION0 + action], dtype=torch.long)
+    return torch.tensor([TOK_ACT, TOK_ACTION0 + action, TOK_OBS] + tiles,
+                        dtype=torch.long)
 
 
 def pick(scores, gen=None):
@@ -202,7 +210,7 @@ class Agent:
         next-token distribution at the final position — semantically
         P(next frame's CENTER tile | history, action) under the center-first
         codec."""
-        probe = torch.cat([self.ctx[FRAME:],
+        probe = torch.cat([self.ctx[3:],           # drop the oldest [ACT]a[OBS]
                            torch.tensor([TOK_ACT, TOK_ACTION0 + action,
                                          TOK_OBS], dtype=torch.long)])
         logits = self.model(probe.unsqueeze(0))[0]
@@ -217,25 +225,24 @@ class Agent:
         reward, next_obs = world.step(action)
         frame = encode_frame(next_obs, action)
         self.push(frame)
-        # prequential obs-CE + gated kick on the realized frame
+        # prequential obs-CE + gated kick on the realized frame; learn ONLY at
+        # tile-target positions (E1_SPEC: policy tokens carry no loss)
         x = self.ctx[:-1].unsqueeze(0)
         y = self.ctx[1:].unsqueeze(0)
+        tile_mask = (y >= TOK_TILE[EMPTY]) & (y <= TOK_TILE[FOOD])
+        self.engine.loss_mask = tile_mask
         fired = False
         if learn:
-            if self.ug is not None:
-                ug_ce = self.ug.ce(y)
-                fire_fn = (lambda ce, _u=ug_ce: self.gate(ce - _u))
-            else:
-                fire_fn = (lambda ce: self.gate(ce))
+            fire_fn = (lambda ce: self.gate(ce))
             logits, ce, fired = self.engine.serve_and_learn(
                 x, y, opt=self.opt, fire=fire_fn)
-            if self.ug is not None:
-                self.ug.update(y)
         else:
             with torch.no_grad():
-                lg = self.model(x)
+                lg = self.model(x).reshape(-1, VOCAB).float()
+                keep = tile_mask.reshape(-1)
                 ce = float(torch.nn.functional.cross_entropy(
-                    lg.reshape(-1, VOCAB).float(), y.reshape(-1)))
+                    lg[keep], y.reshape(-1)[keep]))
+        self.engine.loss_mask = None
         return reward, fired, float(ce)
 
 
@@ -251,7 +258,19 @@ def prelife(agent, args):
     stream = []
     obs = w.obs()
     for _ in range(args.prelife_frames):
-        a = int(torch.randint(0, 5, (1,), generator=gen))
+        # ORACLE-GUIDED birth (amendment A3): a food-seeking policy over-samples
+        # the rare "food adjacent -> move onto it -> center=food" transitions the
+        # world model must learn to be action-conditional; a random walk almost
+        # never eats (270 vs 555 center-food frames in the calibration), leaving
+        # the model at the action-INDEPENDENT marginal (spread 0.000 vs 0.021).
+        # This is WORLD-MODEL SHAPING, identical across live/frozen via the
+        # shared seed -- the LIFE still tests continued GATED learning, not birth.
+        if float(torch.rand((), generator=gen)) < 0.3:
+            a = int(torch.randint(0, 5, (1,), generator=gen))
+        else:
+            sc = [1.0 if int(w.predict_true(k)[4]) == FOOD else 0.0
+                  for k in range(5)]
+            a = pick(sc, gen)
         _, obs = w.step(a)
         stream.append(encode_frame(obs, a))
     ids = torch.cat(stream)
@@ -262,7 +281,9 @@ def prelife(agent, args):
                                generator=gen))
         x = ids[st:st + args.window].unsqueeze(0)
         y = ids[st + 1:st + args.window + 1].unsqueeze(0)
+        agent.engine.loss_mask = (y >= TOK_TILE[EMPTY]) & (y <= TOK_TILE[FOOD])
         agent.engine.train_step(x, y, agent.opt, credit="cascade")
+    agent.engine.loss_mask = None
     agent.model.set_tau(0.0)
     agent.model.eval()
     # reset the optimizer + gate for the life (birth machinery is not life
@@ -313,6 +334,13 @@ def run(args):
     else:                                    # live | frozen_mpc
         agent = Agent(args)
         prelife(agent, args)
+        # warm the token context with real frames (ctx init is grid-value 0,
+        # not a stream token; burn in window//FRAME frames of random walk)
+        wgen = torch.Generator().manual_seed(args.seed + 555)
+        for _ in range(args.window // FRAME + 1):
+            a = int(torch.randint(0, 5, (1,), generator=wgen))
+            _, o = world.step(a)
+            agent.push(encode_frame(o, a))
         learn = args.arm == "live"
         for t in range(args.steps):
             r, fired, ce = agent.act_and_learn(world, learn=learn)

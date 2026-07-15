@@ -122,3 +122,23 @@ near-max scores — random-walk exploration when the signal is flat, greedy
 foraging when it is not. Post-fix pilot: oracle-MPC 90.7 vs random 39.0 per
 1k (2.3x) — the pilot bar (oracle beats random) is cleared and the
 preference functional is FROZEN.
+
+**A3 (2026-07-15, from the pilot-review harness-learnability smoke):** three
+result-corrupting harness bugs were caught by the pre-launch review and fixed
+before any spend (all three would have produced a FALSE NEGATIVE — killing
+the E1 gate on a bug, not the claim): (i) the frame codec was
+cause-after-effect (action written after the obs it produced → causally
+invisible; now ACTION-FIRST: `[ACT] a [OBS] center...`); (ii) food was
+consumed before the frame was rendered, so the realized stream showed
+center==food 56/200k times vs the oracle's view (now render-then-consume:
+555 center-food frames per 8k oracle-birth steps); (iii) policy tokens
+carried loss, violating the spec's "policy tokens carry no loss" (now a
+mux-based `loss_mask` in MorphPCEngine — audit-verified zero unwaived
+multiplies — restricts the kick, gate, and reported CE to tile-target
+positions). BIRTH POLICY: random-walk birth leaves the world model at the
+action-INDEPENDENT marginal (food-adjacency too rare: spread 0.000);
+ORACLE-GUIDED birth (eps=0.3 explore) over-samples the food-landing
+transitions and yields a correctly action-conditional model (controlled
+food-to-north probe: N=0.150 vs stay=0.043, spread 0.11). Birth is
+world-model SHAPING, identical across live/frozen via the shared seed; the
+LIFE still tests continued GATED learning. Verdict criteria unchanged.
