@@ -126,13 +126,16 @@ class Agent:
         self.policy = getattr(args, "policy", "mpc")
         self.tau_pi = getattr(args, "tau_pi", 1.0)
         self.ctx_r = torch.zeros(args.window)      # per-token frame reward
+        self.ctx_d = torch.zeros(args.window)      # per-token frame done-flag
         self.adv_baseline = 0.0                     # EMA of reward-to-go
         self.fire_always = getattr(args, "fire_always", False)
 
-    def push(self, frame, frame_reward=0.0):
+    def push(self, frame, frame_reward=0.0, frame_done=False):
         self.ctx = torch.cat([self.ctx[len(frame):], frame])
         self.ctx_r = torch.cat([self.ctx_r[len(frame):],
                                 torch.full((len(frame),), float(frame_reward))])
+        self.ctx_d = torch.cat([self.ctx_d[len(frame):],
+                                torch.full((len(frame),), float(frame_done))])
 
     @torch.no_grad()
     def score_actions(self):
@@ -221,7 +224,8 @@ class Agent:
     def step(self, learn=True):
         action = self.act()
         reward, obs_sym, done = self.env.step(action)
-        self.push(self.codec.frame(obs_sym, action, reward), frame_reward=reward)
+        self.push(self.codec.frame(obs_sym, action, reward),
+                  frame_reward=reward, frame_done=done)
         x = self.ctx[:-1].unsqueeze(0)
         y = self.ctx[1:].unsqueeze(0)
         c = self.codec
@@ -235,17 +239,22 @@ class Agent:
             idx = act_pos[0].nonzero().reshape(-1)
             if len(idx):
                 r = self.ctx_r[1:][idx]                       # frame rewards, in order
+                d = self.ctx_d[1:][idx]                       # frame done-flags
                 G = torch.zeros_like(r)
                 acc = 0.0
-                for i in range(len(r) - 1, -1, -1):           # reward-to-go
-                    acc = float(r[i]) + self.gamma * acc
-                    G[i] = acc
+                for i in range(len(r) - 1, -1, -1):           # reward-to-go; done
+                    acc = float(r[i]) + self.gamma * acc * (1.0 - float(d[i]))
+                    G[i] = acc                                # zeroes cross-episode credit
                 A = G - self.adv_baseline
                 self.adv_baseline = 0.99 * self.adv_baseline + 0.01 * float(G.mean())
                 mag = A.abs()
+                # clamp INSIDE the live branch: clamping the -99 drop-sentinel
+                # would resurrect |A|<2^-5 positions at k=-4 with sign(A<=0)=-1
+                # — a systematic negative push on every neutral action
                 k = torch.where(mag > 2 ** -5,
-                                torch.log2(mag.clamp_min(2 ** -5)).round(),
-                                torch.full_like(mag, -99.0)).clamp(-4, 2)
+                                torch.log2(mag.clamp_min(2 ** -5))
+                                .round().clamp(-4, 2),
+                                torch.full_like(mag, -99.0))
                 for j, p_ in enumerate(idx.tolist()):
                     if k[j] <= -99:
                         sgn[0, p_] = 0                        # |A| too small: drop
@@ -300,6 +309,7 @@ def run(args):
     total_r = fires = 0
     ce_sum = 0.0
     win = []
+    pi0_ent = None
 
     if args.mode == "random":
         for t in range(args.steps):
@@ -321,13 +331,22 @@ def run(args):
         ids = torch.cat(birth)
         agent.model.train()
         gb = torch.Generator().manual_seed(args.seed + 777)
+        token_pol = getattr(args, "policy", "mpc") == "token"
         for step in range(args.prelife_steps):
             agent.model.set_tau(tau_at(step, args.prelife_steps, 0.5, True, 0.0))
             st = int(torch.randint(0, ids.numel() - args.window - 1, (1,),
                                    generator=gb))
             xb = ids[st:st + args.window].unsqueeze(0)
             yb = ids[st + 1:st + args.window + 1].unsqueeze(0)
-            agent.engine.loss_mask = agent.codec.learn_mask(yb)
+            m = agent.codec.learn_mask(yb)
+            if token_pol:
+                # E3 amendment A1: behaviour-clone the random birth policy
+                # (action tokens at weight 1) so the tau_pi action marginal
+                # starts calibrated ~uniform instead of an init lottery; the
+                # frozen floor shares this birth, so comparisons stay fair
+                c0 = agent.codec
+                m = m | ((yb >= c0.ACT0) & (yb < c0.ACT0 + c0.K))
+            agent.engine.loss_mask = m
             agent.engine.train_step(xb, yb, agent.opt, credit="cascade")
         agent.engine.loss_mask = None
         agent.model.set_tau(0.0)
@@ -335,11 +354,21 @@ def run(args):
         agent.opt = torch.optim.AdamW(agent.model.parameters(), lr=args.lr,
                                       weight_decay=0.01)
         agent.gate = MarginGate(delta=args.delta)
-        # warm the ctx with real frames
+        # warm the ctx with real frames (reward/done flow into ctx_r/ctx_d so
+        # the first windows' reward-to-go and the [RWD] tokens agree)
         for _ in range(args.window // agent.codec.frame_len + 1):
             a = int(torch.randint(0, env.n_actions, (1,)))
-            r, o, _ = env.step(a)
-            agent.push(agent.codec.frame(o, a, r))
+            r, o, dn = env.step(a)
+            agent.push(agent.codec.frame(o, a, r), frame_reward=r, frame_done=dn)
+        if token_pol:
+            with torch.no_grad():                   # birth-policy audit: the
+                c0 = agent.codec                    # action-marginal entropy
+                pr = torch.cat([agent.ctx[1:], torch.tensor([c0.ACT])])
+                lg0 = agent.model(pr.unsqueeze(0))[0][-1]
+                pi0 = torch.softmax(lg0[c0.ACT0:c0.ACT0 + c0.K], dim=0)
+                pi0_ent = float(-(pi0 * pi0.clamp_min(1e-9).log()).sum())
+        else:
+            pi0_ent = None
         learn = args.mode == "agent"
         for t in range(args.steps):
             r, fired, ce = agent.step(learn=learn)
@@ -362,6 +391,7 @@ def run(args):
                ret_per_1k=round(total_r / max(args.steps, 1) * 1000, 3),
                fire_rate=round(fires / max(args.steps, 1), 4),
                obs_ce=round(ce_sum / max(args.steps, 1), 4),
+               pi0_ent=None if pi0_ent is None else round(pi0_ent, 4),
                wall_s=round(time.time() - t0, 1))
     with (OUT / "e2_screen.jsonl").open("a") as f:
         f.write(json.dumps(row) + "\n")

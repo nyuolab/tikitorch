@@ -47,6 +47,35 @@ E3 flips that rule deliberately:
 cheap). Birth: same tau-annealed prelife (action tokens unweighted during
 birth — the birth policy is random, there is nothing to reinforce).
 
+### Pre-launch amendments (adversarial review, 2026-07-16, before any run)
+
+- **A1 — birth behaviour-cloning (supersedes "action tokens unweighted during
+  birth").** Review verified empirically that leaving action tokens out of the
+  birth loss leaves the K-restricted action marginal ARBITRARY (they are only
+  pushed down as never-target softmax competitors), so tau_pi sampling starts
+  from an init lottery — a skewed start + REINFORCE cold-start positive
+  feedback could collapse pi early and read as a false substrate-KILL. Fix
+  implements the sentence's intent ("the birth policy is random"): action
+  tokens join the birth loss at weight 1, behaviour-cloning the uniform random
+  birth policy -> calibrated ~uniform start. Frozen floor shares the same
+  birth, so floor comparisons stay fair. Each run logs `pi0_ent` (post-birth
+  action-marginal entropy; uniform = ln K: foraging 1.609, minatar 1.792).
+- **A2 — done-boundary credit.** Reward-to-go now zeroes the discount across
+  episode boundaries (`acc = r_i + gamma*acc*(1-done_i)`; per-token done flags
+  ride ctx_d). Without it, minatar rewards earned after an in-window auto-reset
+  are credited to the actions that caused the death. Foraging (primary) is
+  continuing/never-done — unaffected.
+- **A3 — launch-blocker fixed.** The dyadic quantizer's `.clamp(-4,2)` was
+  applied over the -99 drop-sentinel, resurrecting |A|<2^-5 positions at
+  sgn=-1, k=-4 (a systematic "punish whatever you did" during reward droughts,
+  violating the closure declaration above). Clamp moved inside the live
+  branch; unit-tested (A=0 and tiny |A| drop; signs/clamps correct).
+- **Noted, not fixed:** minatar's effective credit horizon is ~2 frames
+  (window 256 / frame_len 105) — near-bandit REINFORCE; a minatar-negative
+  is NOT evidence against the substrate (foraging, ~7 frames/window, carries
+  the primary verdict). The warm-loop now also passes reward/done into
+  ctx_r/ctx_d (cold-start EMA seeding was reading zeros).
+
 ## Pre-registered verdict
 
 - **PASS (the substrate learns policies):** pol-always return beats frozen
