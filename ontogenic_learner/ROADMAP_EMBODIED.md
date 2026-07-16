@@ -94,6 +94,17 @@ as V4. **Kill:** if pure prediction-error learning cannot move the policy,
 the claim demotes to "perception learns in-process; control still needs a
 second process" — published as the boundary.
 
+### E2 — reward IN THE LOOP — KILL (2026-07-16, pre-registered branch)
+**VERDICT (E2_SPEC "E2 v2 RESULT"):** with the gate calibrated (E2cal) and
+fair (13–17% fire), neither mechanism produces control: nothing beats
+surprise-only in either env; frozen-birth BEATS all live cells on foraging
+(online kicks degrade control while improving prediction — E1's decoupling at
+fair firing); 2-ply planning makes it worse, not better; a+b interaction
+moot. The remaining escalation (a value estimate) reintroduces the
+actor/learner machinery the minimality claim excludes — that IS the boundary.
+E1+E2 together map it with mechanisms at every step (~$60). The V-program's
+prediction-side results are untouched. Original design below (for the record).
+
 ### E2 — reward IN THE LOOP (PROMOTED to the decisive gate by E1's kill; three mechanisms)
 **Environments (E2_ENV_DECISION.md, 2026-07-15):** run standard benchmarks
 ALONGSIDE the bespoke world through one adapter. MinAtar = ADOPT/primary

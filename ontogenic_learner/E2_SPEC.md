@@ -195,3 +195,38 @@ learning), minatar δ=0.05 (14.9%).**
   (270×).
 - Readouts: gate main effect, horizon main effect (foraging), gate×horizon
   interaction, a+b assessment now that firing is calibrated; env-consistency.
+
+## E2 v2 RESULT (2026-07-16): the pre-registered KILL — clean this time
+
+With the gate properly calibrated (fire 13–17% in S cells; the neuromod AND
+cuts it to 0.4–1.4% — the mechanism finally OPERATES), no reward mechanism
+produces control:
+- **foraging:** SO 33.7 | SR 34.2 | NR 34.1 (all ±5.7 seed spread) — nothing
+  beats surprise-only, and **frozen-R (39.7) beats every LIVE cell**: online
+  learning at fair firing DEGRADES control even though it improves prediction
+  (the E1 decoupling, reproduced at calibrated firing — the kicks perturb the
+  reward head enough to hurt the policy).
+- **minatar:** SR 13.8 | NR 13.6 | SO 13.6 | frozen 13.9 — all below random
+  22.9. The reward-MPC never learns to beat ground-covering.
+- **Gate effect ~0 at H1; NEGATIVE at H2 (−2.45).** The a+b interaction is
+  moot/negative.
+- **Planning (H2) does not rescue it:** at matched 20k, H2 ≤ H1 (SR −0.9,
+  NR −3.2) — two-ply lookahead over the learned token model amplifies, not
+  fixes, the exploitation-of-miscalibration failure.
+
+**VERDICT: KILL per the pre-registered branch** ("no cell beats {S,O} in
+either env"). Both minimal mechanisms — (a) reward-salience gating and (b)
+reward-as-prediction with greedy AND 2-ply MPC — fail to convert the fused
+prediction loop into control at these horizons. The branch's remaining
+escalation (a VALUE estimate) would reintroduce exactly the RL machinery the
+single-process minimality claim excludes — that is the boundary, not a bug.
+
+**Program-level conclusion (E1+E2, ~$60 total):** the fused serve+learn loop
+is validated for PREDICTION (the V-program stands untouched: 3-seed 10M-token
+life, 60% headroom at 1.006×) and does NOT extend to CONTROL through any
+minimal single-process mechanism tested — surprise gating, reward gating,
+reward-as-prediction, or shallow model-predictive planning. Control needs
+either (i) value learning (an actor/learner ingredient) or (ii) a latent
+world model good enough to plan through (the token-planning cost finding).
+Both are real research programs; neither is a small delta. Published as the
+mapped boundary of the paradigm.
