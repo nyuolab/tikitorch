@@ -126,7 +126,25 @@ routed errors by a scalar advantage — one scalar multiply per window; audit
 implication declared (dyadic-quantize it or waive it explicitly).
 Run (a) first: it is closure-clean and needs no new theory.
 
-### E3 — the second life (months-long persistence)
+### E3 — the correct loss (policy-as-token-prediction) — BISTABLE IGNITION (2026-07-16)
+**VERDICT (E3_SPEC "RESULTS"):** neither prereg branch as worded. Not PASS
+(polA under both floors at arm level: foraging mean 17.3 vs frozen 28.2 /
+random 36.3). Not KILL-as-attributed: the kick IS REINFORCE (one-kick
+direction test) and 3/12 policy cells IGNITED into compounding policy
+learning through the fused kick — foraging polA s1 Q4 = 44.2 (above both
+floors), s2 trap→ESCAPE→44.5, minatar polG s2 full-life 39.7 (above floors
+AND the matched-steps streaming-AC 31.9). The failure is OBJECTIVE
+COMPOSITION: the dense world-model CE (~60–200 obs positions/step) shares the
+trunk with a sparse advantage term (~99% of kicks carry none), creating a
+dark-room attractor (learned predictable dither, CE ≪ frozen, zero reward)
+that captures cold starts by luck; gate-rate is a dose (polG mostly starves
+ignition), environment geometry a gradient (minatar polA 0/3). The user's
+"correct loss" hypothesis vindicated: E1/E2's boundary was the loss, and the
+substrate learns policies when given one — reliability of IGNITION is the
+open problem (E4 candidates in E3_SPEC: intrinsic-surprise reward, advantage
+normalization, model-based birth actor, entropy bonus). ~$10.
+
+### E4 — the second life (months-long persistence)
 100M+ tokens / multi-month always-on agent on one box: organism daemon +
 V4-life config + excess-surprise gate + periodic Fisher-probe consolidation.
 Weekly probe suites; the pre-registered adversary is slow drift (the 10M
@@ -134,28 +152,31 @@ life's open tail). This is cheap (CPU/one F2) and is the artifact that makes
 the "persistent embodied agent" claim visceral — a thing that has been alive
 and learning for months, every update attributable.
 
-### E4 — the agent at the sensor (silicon)
+### E5 — the agent at the sensor (silicon)
 Port the fused loop end-to-end to the F2 kernel path (gate: the localized s2
 backward divergence); then the E1 loop on-fabric. V5's floor number feeds
 the ASIC study: the target artifact is a milliwatt-class always-plastic
 sensor-edge learner, where the GPU's 79 W stream-sitting floor is the
 comparison that matters.
 
-### E5 — collective ontogeny (fleet)
+### E6 — collective ontogeny (fleet)
 N embodied agents, disjoint experiences, firing-normalized/probe-based merge
 (V4b.1 fix). Pass = merged-beats-solo on held-out worlds WITHOUT sharing
 data. This is the fleet-experience-scaling bet, now with the V4b failure
 mode designed out rather than assumed away.
 
-### E6 — the public benchmark
+### E7 — the public benchmark
 SPJS harness (score-per-joule-per-stream) with the embodied stream tasks +
 GPU baselines, shipped as the community artifact; asymmetric honesty (the
 fabric loses columns) as the adoption mechanism.
 
 ## Sequencing and spend
 
-E0 now (≈$20, days) → E1 (the decisive gate; ≈$50-100, 2-3 weeks incl. world
-+ baselines) → E2a riding E1's harness → E3 starts the moment E1 passes
-(background, ≈$30/month) → E4 gated on the s2 fix → E5/E6 after E1+E3.
+E0 ✅($8) → E1 KILL($8) → E2 KILL($60) → E3 BISTABLE($10) — the ladder
+re-sequenced by results: the actionable next gate is an E4 DESIGN DECISION on
+ignition reliability (E3_SPEC candidates); the persistence life (E4 above)
+starts once a policy loop is reliable OR runs prediction-only on the V-config;
+silicon (E5) gated on the s2 fix; fleet/benchmark (E6/E7) after E4.
+(Renumbered 2026-07-16 when the correct-loss gate took the E3 slot.)
 Every gate keeps the V-program disciplines: pre-registration, honest-negative
 branches, adversarial pre-launch review, EC2-only compute, audit coverage.
