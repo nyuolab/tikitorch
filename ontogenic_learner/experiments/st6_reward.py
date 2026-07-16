@@ -279,11 +279,11 @@ class Agent:
                 if self.adv_norm:
                     # E4 norm: unit-scale the advantage BEFORE quantizing so
                     # small consistent signals reach weight ~1 (normalize by
-                    # the pre-update estimate, then update)
+                    # the pre-update estimate, then update from the same
+                    # pre-normalization A the kick uses)
+                    a_raw2 = float(A.pow(2).mean())
                     A = A / (self.var_ema + 1e-4) ** 0.5
-                    self.var_ema = (0.99 * self.var_ema
-                                    + 0.01 * float((G - self.adv_baseline)
-                                                   .pow(2).mean()))
+                    self.var_ema = 0.99 * self.var_ema + 0.01 * a_raw2
                 mag = A.abs()
                 # clamp INSIDE the live branch: clamping the -99 drop-sentinel
                 # would resurrect |A|<2^-5 positions at k=-4 with sign(A<=0)=-1

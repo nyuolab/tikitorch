@@ -17,9 +17,11 @@ pre-identified levers for making ignition reliable, side by side, one screen.*
 
 ## The four arms (each = E3 polA + ONE lever; no combinations this screen)
 
-1. **intr** — intrinsic surprise reward. The gate's own signal becomes reward:
-   after each serve, the window's obs-CE excess over its slow EMA (clipped at
-   0) is back-filled as intrinsic reward on the newest frame's credit channel:
+1. **intr** — intrinsic surprise reward. The model's own prediction error
+   becomes reward: after each serve, the NEWEST FRAME's per-frame obs-CE
+   excess over its slow EMA (clipped at 0) is back-filled as intrinsic reward
+   on that frame's credit channel (as built — sharper credit than the
+   window-level gate CE originally sketched; declared pre-launch):
    `r_used = r_ext + beta * max(ce - ce_ema, 0)`, beta = 0.5, ce_ema decay
    0.999. Extrinsic-only everywhere else (the [RWD] token, salience EMA, and
    ALL reported ret/1k stay extrinsic). Rationale: a surprise-seeking term

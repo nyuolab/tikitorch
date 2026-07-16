@@ -4,7 +4,7 @@
 #   intr (surprise reward b=0.5) | norm (A/sqrt var) | mb (MPC warmup 20k)
 #   | ent (2^-4 uniform pull) | ctrl (bare polA; s0-s2 = the E3 sentinel).
 # Foraging 5 seeds (primary, ent 3), minatar 3 seeds replication. 32 cells.
-# ONE c7i.16xlarge (64 vCPU): OMP 4 x P 14. MAX_MINUTES=540.
+# ONE c7i.16xlarge (64 vCPU): OMP 4 x P 14. MAX_MINUTES=600.
 # SENTINELS FIRST, then foraging primary, minatar last.
 set -x
 cd "${REPO:?}"
@@ -27,6 +27,9 @@ M="$PY ontogenic_learner/experiments/st6_reward.py --env minatar --window 256 --
 JOBS=$(mktemp)
 # SENTINELS FIRST: ctrl s0-s2 must reproduce E3 polA {0.24, 29.54, 22.02}
 for S in 0 1 2; do echo "$F --seed $S" >> "$JOBS"; done
+# longest job class (minatar mbwarm) EARLY: review sim showed queueing it last
+# leaves ~42min backstop margin; early -> makespan ~447min vs MAX_MINUTES=600
+for S in 0 1 2; do echo "$M --mb-warmup 10000 --seed $S" >> "$JOBS"; done
 for S in 3 4;   do echo "$F --seed $S" >> "$JOBS"; done
 # foraging primary arms, 5 seeds
 for S in 0 1 2 3 4; do
@@ -36,11 +39,10 @@ for S in 0 1 2 3 4; do
 done
 # ent (weakest-motivated): 3 seeds
 for S in 0 1 2; do echo "$F --ent-k -4 --seed $S" >> "$JOBS"; done
-# minatar replication, 3 seeds
+# minatar replication remainder, 3 seeds
 for S in 0 1 2; do
   echo "$M --intr-beta 0.5 --seed $S" >> "$JOBS"
   echo "$M --adv-norm --seed $S" >> "$JOBS"
-  echo "$M --mb-warmup 10000 --seed $S" >> "$JOBS"
 done
 wc -l "$JOBS"
 xargs -P 14 -I CMD bash -c 'CMD >> '"$VOUT"'/onbox_jobs.log 2>&1 || echo "JOB-FAILED: CMD" >> '"$VOUT"'/onbox_jobs.log' < "$JOBS"
