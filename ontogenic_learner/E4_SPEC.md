@@ -39,12 +39,16 @@ pre-identified levers for making ignition reliable, side by side, one screen.*
    the enumerative form of the clamped-settle P(a | reward+) posterior —
    iterative settling is only informative when clamped, and enumeration is
    its cheapest implementation at K ≤ 6. Cost: +K fwds/step for ≤ W steps.
-4. **ent** — entropy-flavoured target smoothing at action positions. Engine
-   hook mixes the action-position target toward uniform-over-the-K-slice:
-   `eps = softmax − [(1−λ)·onehot + λ·uniform_K]`, λ = 0.05, applied ONLY at
-   action positions, composed with the dyadic advantage weight. Declared the
-   weakest-motivated arm (E3's dither was NOT low-entropy); included per user
-   directive; runs at reduced seed count.
+4. **ent** — always-on uniform pull at action positions (as built; supersedes
+   the earlier multiplicative-smoothing sketch). Engine hook adds
+   `2^-4 · (softmax − uniform_K-slice)` at action positions AFTER the dyadic
+   mux, so it acts even where the advantage drops the position — droughts are
+   exactly when it must counter the world-model sculpting. Dyadic magnitude
+   (ldexp, shift-class); unit-tested: flags-off bitwise ≡ cascade (R1), the
+   pull reaches dropped positions (R2), and it raises slice entropy toward
+   ln K (R3). Declared the weakest-motivated arm (E3's dither was NOT
+   low-entropy; this partly proxies 'stay near the random policy', whose
+   floor is 36.3); included per user directive; reduced seed count.
 
 Plus **ctrl** — polA unchanged (the E3 configuration, flags off). Foraging
 seeds 0–2 must reproduce E3 polA bitwise-or-near (same code path, same seeds)
@@ -84,9 +88,8 @@ arm-level PASS/KILL on a bistable phenomenon)
 
 ## Costs & closure
 
-Engine additions: `loss_target_mix` (uniform-slice target smoothing;
-λ=0 path must stay bitwise ≡ cascade_grads — regression bar) — the dyadic
-advantage path is unchanged. Agent additions are host-side Python (intrinsic
+Engine additions: `loss_uniform_pull` (hook-off path bitwise ≡ cascade_grads
+— regression bar R1, verified) — the dyadic advantage path is unchanged. Agent additions are host-side Python (intrinsic
 backfill, variance EMA, MPC warmup mixture). Closure: the kick still receives
 only mask + sign·2^k weights + (new) a λ-mix of one-hot/uniform targets —
 uniform over K is a shift-class constant (1/K with K ∈ {5,6}: NOT a power of
