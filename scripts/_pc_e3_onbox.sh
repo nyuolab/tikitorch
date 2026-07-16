@@ -2,8 +2,10 @@
 # _pc_e3_onbox.sh — E3: the correct loss (E3_SPEC.md). Policy-as-token-
 # prediction + dyadic-advantage REINFORCE through the fused cascade kick.
 # Arms per env: polA(always) x3 seeds | polG(gated, E2cal delta) x3 |
-# frozenTok | random | streaming-AC x3 at matched steps.
-# ONE c7i.8xlarge, MAX_MINUTES=300, PIP_EXTRA="tokenizers minatar".
+# frozenTok x3 | random x3 | streaming-AC x3 at matched steps. 30 jobs.
+# ONE c7i.8xlarge, MAX_MINUTES=360, PIP_EXTRA="tokenizers minatar".
+# Wall math: polA foraging 200k @ ~70 sps(c7i) ~48min, minatar 100k @ ~31 sps
+# ~54min; 12 heavy cells at -P 8 = 2 waves ~110min + frozen/floors ~2.7h total.
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
@@ -24,16 +26,20 @@ ST6F="$PY ontogenic_learner/experiments/st6_reward.py --env foraging --window 96
 ST6M="$PY ontogenic_learner/experiments/st6_reward.py --env minatar --window 256 --delta 0.05 --biome-steps 8000 --objective R --policy token --steps 100000"
 SB="$PY ontogenic_learner/experiments/st5_baselines.py --arm streaming_ac"
 JOBS=$(mktemp)
-# floors first (never lose the denominators)
-echo "$ST6F --mode random --seed 0" >> "$JOBS"
-echo "$ST6M --mode random --seed 0" >> "$JOBS"
-echo "$ST6F --mode frozen --seed 0" >> "$JOBS"
-echo "$ST6M --mode frozen --seed 0" >> "$JOBS"
-# the question cells
+# floors first (never lose the denominators); 3 seeds — the prereg PASS bar
+# is a CI comparison vs BOTH floors, so floors need seed variance too
+for S in 0 1 2; do
+  echo "$ST6F --mode random --seed $S" >> "$JOBS"
+  echo "$ST6M --mode random --seed $S" >> "$JOBS"
+  echo "$ST6F --mode frozen --seed $S" >> "$JOBS"
+  echo "$ST6M --mode frozen --seed $S" >> "$JOBS"
+done
+# the question cells (polA + polG, both envs)
 for S in 0 1 2; do
   echo "$ST6F --mode agent --gate S --fire-always --seed $S" >> "$JOBS"
   echo "$ST6M --mode agent --gate S --fire-always --seed $S" >> "$JOBS"
   echo "$ST6F --mode agent --gate S --seed $S" >> "$JOBS"
+  echo "$ST6M --mode agent --gate S --seed $S" >> "$JOBS"
 done
 # matched-steps streaming-AC bar
 for S in 0 1 2; do
