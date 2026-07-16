@@ -129,6 +129,15 @@ class Agent:
         self.ctx_d = torch.zeros(args.window)      # per-token frame done-flag
         self.adv_baseline = 0.0                     # EMA of reward-to-go
         self.fire_always = getattr(args, "fire_always", False)
+        # E4 ignition levers (E4_SPEC; all default OFF = the E3 polA path)
+        self.intr_beta = getattr(args, "intr_beta", 0.0)   # (a) surprise reward
+        self.ce_ema = None                                  #     slow CE baseline
+        self.intr_sum = 0.0                                 #     shaped-mass audit
+        self.adv_norm = getattr(args, "adv_norm", False)   # (b) A / sqrt(var)
+        self.var_ema = 1.0                                  #     EMA of A^2
+        self.mb_warmup = getattr(args, "mb_warmup", 0)     # (c) MPC birth actor
+        self.t_step = 0                                     #     lifetime step
+        self.ent_k = getattr(args, "ent_k", None)          # (d) 2^k uniform pull
 
     def push(self, frame, frame_reward=0.0, frame_done=False):
         self.ctx = torch.cat([self.ctx[len(frame):], frame])
@@ -210,8 +219,27 @@ class Agent:
         pi = torch.softmax(lg[c.ACT0:c.ACT0 + c.K] / self.tau_pi, dim=0)
         return int(torch.multinomial(pi, 1))
 
+    @torch.no_grad()
+    def pol_entropy(self):
+        """Entropy of the current action marginal (attractor-state telemetry)."""
+        c = self.codec
+        probe = torch.cat([self.ctx[1:], torch.tensor([c.ACT])])
+        lg = self.model(probe.unsqueeze(0))[0][-1]
+        pi = torch.softmax(lg[c.ACT0:c.ACT0 + c.K] / self.tau_pi, dim=0)
+        return float(-(pi * pi.clamp_min(1e-9).log()).sum())
+
     def act(self):
         if self.policy == "token":
+            # E4 mbwarm: decaying mixture with the model-based (MPC) actor —
+            # the enumerative P(a|reward+) posterior seeds reward-directed
+            # exploration before REINFORCE has anything to compound
+            if (self.mb_warmup and self.t_step < self.mb_warmup
+                    and float(torch.rand(1)) < 1.0 - self.t_step / self.mb_warmup):
+                scores = self.score_actions()
+                if scores is not None:
+                    t = torch.tensor(scores)
+                    probs = torch.softmax((t - t.mean()) / self.tau_act, dim=0)
+                    return int(torch.multinomial(probs, 1))
             return self.act_token()
         if self.codec.objective != "R":                     # reward-free -> random
             return int(torch.randint(0, self.codec.K, (1,)))
@@ -223,6 +251,7 @@ class Agent:
 
     def step(self, learn=True):
         action = self.act()
+        self.t_step += 1
         reward, obs_sym, done = self.env.step(action)
         self.push(self.codec.frame(obs_sym, action, reward),
                   frame_reward=reward, frame_done=done)
@@ -247,6 +276,14 @@ class Agent:
                     G[i] = acc                                # zeroes cross-episode credit
                 A = G - self.adv_baseline
                 self.adv_baseline = 0.99 * self.adv_baseline + 0.01 * float(G.mean())
+                if self.adv_norm:
+                    # E4 norm: unit-scale the advantage BEFORE quantizing so
+                    # small consistent signals reach weight ~1 (normalize by
+                    # the pre-update estimate, then update)
+                    A = A / (self.var_ema + 1e-4) ** 0.5
+                    self.var_ema = (0.99 * self.var_ema
+                                    + 0.01 * float((G - self.adv_baseline)
+                                                   .pow(2).mean()))
                 mag = A.abs()
                 # clamp INSIDE the live branch: clamping the -99 drop-sentinel
                 # would resurrect |A|<2^-5 positions at k=-4 with sign(A<=0)=-1
@@ -262,6 +299,11 @@ class Agent:
                         sgn[0, p_] = 1 if A[j] > 0 else -1
                         kex[0, p_] = int(k[j])
             self.engine.loss_dyadic = (sgn, kex)
+            if self.ent_k is not None:
+                # E4 ent: always-on 2^k uniform pull at action positions
+                # (mask ⊆ loss_mask holds: act_pos was OR-ed into mask above)
+                self.engine.loss_uniform_pull = (act_pos, self.ent_k,
+                                                 c.ACT0, c.ACT0 + c.K)
         self.engine.loss_mask = mask
         self.engine.gate_mask = c.obs_mask(y)                 # gate on obs-only
         fired = False
@@ -276,8 +318,27 @@ class Agent:
                            if self.sal is not None else True)  # baseline always
                 surprise = self.gate(ce)                       # updates
                 return surprise and salient                    # neuromod AND
-            _, ce, fired = self.engine.serve_and_learn(
+            lg_serve, ce, fired = self.engine.serve_and_learn(
                 x, y, opt=self.opt, fire=fire_fn)
+            if self.intr_beta and self.policy == "token":
+                # E4 intr: the newest frame's obs surprise (excess over a slow
+                # EMA, clipped at 0) is back-filled as intrinsic CREDIT on that
+                # frame — ctx_r only; the [RWD] token, salience EMA, and all
+                # reported returns stay extrinsic (E4_SPEC)
+                flen = self.codec.frame_len
+                yl = y[0, -flen:]
+                om = yl >= self.codec.SYM0
+                with torch.no_grad():
+                    lf = lg_serve[0, -flen:].float()[om]
+                    ce_new = float(F.cross_entropy(lf, yl[om]))
+                if self.ce_ema is None:
+                    self.ce_ema = ce_new
+                excess = max(ce_new - self.ce_ema, 0.0)
+                self.ce_ema = 0.999 * self.ce_ema + 0.001 * ce_new
+                r_int = self.intr_beta * excess
+                if r_int > 0:
+                    self.ctx_r[-flen:] = self.ctx_r[-flen:] + r_int
+                    self.intr_sum += r_int
         else:
             with torch.no_grad():
                 lg = self.model(x).reshape(-1, self.codec.vocab).float()
@@ -288,6 +349,7 @@ class Agent:
         self.engine.loss_mask = None
         self.engine.gate_mask = None
         self.engine.loss_dyadic = None
+        self.engine.loss_uniform_pull = None
         return reward, fired, ce
 
 
@@ -300,6 +362,15 @@ def run(args):
     if getattr(args, "policy", "mpc") == "token":
         arm = ("polA" if getattr(args, "fire_always", False) else "polG") \
             if args.mode == "agent" else f"{args.mode}Tok"
+        # E4 lever suffix (bare polA == the E3 control/sentinel)
+        if getattr(args, "intr_beta", 0.0):
+            arm += f"_intr{args.intr_beta}"
+        if getattr(args, "adv_norm", False):
+            arm += "_norm"
+        if getattr(args, "mb_warmup", 0):
+            arm += f"_mb{args.mb_warmup}"
+        if getattr(args, "ent_k", None) is not None:
+            arm += f"_entk{args.ent_k}"
     # disambiguate tele by delta+horizon so parallel sweep cells never collide
     # (V2b lesson): a d/h tag keeps every cell's telemetry in its own file.
     dh = f"_d{args.delta}h{getattr(args, 'horizon', 1)}"
@@ -377,9 +448,14 @@ def run(args):
             ce_sum += ce
             win.append(r)
             if (t + 1) % 1000 == 0:
-                tele.write(json.dumps(dict(
+                rec = dict(
                     t=t + 1, ret1k=sum(win[-1000:]), ce=round(ce_sum / (t + 1), 4),
-                    fire_rate=round(fires / (t + 1), 4), biome=env.biome)) + "\n")
+                    fire_rate=round(fires / (t + 1), 4), biome=env.biome)
+                if agent.policy == "token":
+                    rec["piH"] = round(agent.pol_entropy(), 4)   # attractor state
+                if agent.intr_beta:
+                    rec["intr_sum"] = round(agent.intr_sum, 2)   # shaped-mass audit
+                tele.write(json.dumps(rec) + "\n")
                 tele.flush()
     tele.close()
 
@@ -392,6 +468,8 @@ def run(args):
                fire_rate=round(fires / max(args.steps, 1), 4),
                obs_ce=round(ce_sum / max(args.steps, 1), 4),
                pi0_ent=None if pi0_ent is None else round(pi0_ent, 4),
+               intr_sum=None if args.mode == "random" else round(
+                   getattr(locals().get("agent"), "intr_sum", 0.0), 2),
                wall_s=round(time.time() - t0, 1))
     with (OUT / "e2_screen.jsonl").open("a") as f:
         f.write(json.dumps(row) + "\n")
@@ -421,6 +499,11 @@ if __name__ == "__main__":
     p.add_argument("--policy", choices=["mpc", "token"], default="mpc")
     p.add_argument("--tau-pi", type=float, default=1.0)
     p.add_argument("--fire-always", action="store_true")
+    # E4 ignition levers (E4_SPEC; defaults = E3 polA exactly)
+    p.add_argument("--intr-beta", type=float, default=0.0)
+    p.add_argument("--adv-norm", action="store_true")
+    p.add_argument("--mb-warmup", type=int, default=0)
+    p.add_argument("--ent-k", type=int, default=None)
     p.add_argument("--prelife-frames", type=int, default=8_000)
     p.add_argument("--prelife-steps", type=int, default=1_500)
     args = p.parse_args()

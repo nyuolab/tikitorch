@@ -443,6 +443,15 @@ class MorphPCEngine:
                           # Applied as exponent arithmetic (torch.ldexp) + a
                           # sign/zero mux — shift-class, the same family as
                           # the pow-2 LN factors. sign=+1,k=0 == weight 1.
+    loss_uniform_pull = None
+                          # optional (mask(B,T) bool, k_lam int, lo int, hi int):
+                          # E4 'ent' lever — an ALWAYS-ON uniform pull at masked
+                          # positions, added AFTER loss_dyadic so it acts even
+                          # when the advantage drops the position (droughts are
+                          # exactly when it must act): eps += 2^k_lam *
+                          # (softmax - uniform_[lo,hi)). Shift-class via ldexp;
+                          # the 1/(hi-lo) target constant is a declared host-
+                          # side waiver (E4_SPEC). Contract: mask ⊆ loss_mask.
 
     @torch.no_grad()
     def _top_error(self, logits, targets, caches_top, grads: bool):
@@ -455,6 +464,7 @@ class MorphPCEngine:
                                 normalize="exact").clone()
         else:
             eps = torch.softmax(logits.reshape(-1, V).float(), dim=-1)
+        sm_u = eps.clone() if self.loss_uniform_pull is not None else None
         eps.scatter_add_(1, targets.reshape(-1, 1),
                          -torch.ones(B * T, 1, device=eps.device))
         if self.loss_mask is not None:
@@ -473,6 +483,14 @@ class MorphPCEngine:
             eps = torch.where(sgn < 0, -eps, eps)           # sign mux
             eps = torch.where(sgn == 0,
                               torch.zeros((), dtype=eps.dtype), eps)
+        if self.loss_uniform_pull is not None:
+            # AFTER the dyadic mux on purpose: the pull must survive dropped
+            # (A≈0) action positions — droughts are when it has to act
+            mask_u, k_lam, lo, hi = self.loss_uniform_pull
+            pull = sm_u
+            pull[:, lo:hi] = pull[:, lo:hi] - 1.0 / (hi - lo)
+            pull = torch.ldexp(pull, torch.tensor(k_lam, device=eps.device))
+            eps = torch.where(mask_u.reshape(-1, 1), eps + pull, eps)
         eps = (eps / denom).to(logits.dtype)                # d(mean-CE)/d(logits)
         head, idx = m.output_head, caches_top["head_idx"]   # (R, V, k)
         R, D = B * T, head.in_features
