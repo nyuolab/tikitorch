@@ -35,8 +35,9 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 
 from st5_world import ACTIONS, OUT, World                    # noqa: E402
+from st5_envs import make_env                                # noqa: E402
 
-NTILE = 3            # empty/wall/food
+NTILE = 3            # empty/wall/food (legacy World path)
 FDIM = 9 * NTILE + 5
 
 
@@ -48,11 +49,24 @@ def feats(obs, last_a):
     return x
 
 
+def make_feats(env):
+    """Env-generic featurizer: one-hot cell symbols + one-hot last action."""
+    D = env.obs_len * env.n_obs_sym + env.n_actions
+
+    def f(obs, last_a):
+        x = torch.zeros(D)
+        for i, t in enumerate(obs):
+            x[i * env.n_obs_sym + int(t)] = 1.0
+        x[env.obs_len * env.n_obs_sym + last_a] = 1.0
+        return x
+    return f, D
+
+
 class MLP(nn.Module):
-    def __init__(self, out_dim, h=128, two_head=False):
+    def __init__(self, out_dim, h=128, two_head=False, in_dim=FDIM):
         super().__init__()
         self.body = nn.Sequential(
-            nn.Linear(FDIM, h), nn.LayerNorm(h), nn.LeakyReLU(),
+            nn.Linear(in_dim, h), nn.LayerNorm(h), nn.LeakyReLU(),
             nn.Linear(h, h), nn.LayerNorm(h), nn.LeakyReLU())
         self.head = nn.Linear(h, out_dim)
         self.vhead = nn.Linear(h, 1) if two_head else None
@@ -64,26 +78,35 @@ class MLP(nn.Module):
 
 
 def run_streaming_ac(args, world, tele):
-    """Online AC with accumulating traces; ObGD-style bounded step."""
+    """Online AC with accumulating traces; ObGD-style bounded step.
+    `world` may be the legacy World (step->(r,obs)) or an st5_envs Env
+    (step->(r,obs,done)); K/features adapt."""
     torch.manual_seed(args.seed)
-    net = MLP(5, two_head=True)
+    generic = hasattr(world, "n_obs_sym")
+    if generic:
+        fx, fdim = make_feats(world)
+        K = world.n_actions
+    else:
+        fx, fdim, K = feats, FDIM, 5
+    net = MLP(K, two_head=True, in_dim=fdim)
     params = [p for p in net.parameters() if p.requires_grad]
     z = [torch.zeros_like(p) for p in params]                # traces
     gamma, lam, alpha, ent = 0.99, 0.8, args.lr, 0.01
-    last_a = 4
-    obs = world.obs()
+    last_a = K - 1
+    obs = world.reset() if generic else world.obs()
     total_r = 0.0
     ret_window = []
     t0 = time.time()
     for t in range(args.steps):
-        x = feats(obs, last_a)
+        x = fx(obs, last_a)
         logits, v = net(x)
         v_detached = float(v.detach())
         pi = torch.softmax(logits, -1)
         a = int(torch.multinomial(pi, 1))
-        r, obs2 = world.step(a)
+        out = world.step(a)
+        r, obs2 = (out[0], out[1])
         with torch.no_grad():
-            _, v2 = net(feats(obs2, a))
+            _, v2 = net(fx(obs2, a))
         delta = r + gamma * float(v2) - v_detached
         # AC(lambda): the delta-scaled trace carries log pi(a) + v; the
         # entropy regularizer is applied UNCONDITIONALLY (not delta-scaled,
@@ -173,15 +196,22 @@ def main():
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--biome-steps", type=int, default=50_000)
     p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--envname", choices=["world", "foraging", "minatar"],
+                   default="world")
     args = p.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    world = World(args.world_seed, biome_steps=args.biome_steps)
-    tele = (OUT / f"e1_tele_{args.arm}_w{args.world_seed}_s{args.seed}.jsonl"
+    if getattr(args, "envname", "world") == "world":
+        world = World(args.world_seed, biome_steps=args.biome_steps)
+    else:
+        world = make_env(args.envname, world_seed=args.world_seed,
+                         biome_steps=args.biome_steps)
+    tele = (OUT / f"e1_tele_{getattr(args,'envname','world')}_{args.arm}_w{args.world_seed}_s{args.seed}.jsonl"
             ).open("w")
     fn = run_streaming_ac if args.arm == "streaming_ac" else run_replay_dqn
     total_r, n_params, wall = fn(args, world, tele)
     tele.close()
-    row = dict(gate="E1", arm=args.arm, world_seed=args.world_seed,
+    row = dict(gate="E1", arm=args.arm, envname=getattr(args, "envname", "world"),
+               world_seed=args.world_seed,
                seed=args.seed, steps=args.steps, total_return=total_r,
                ret_per_1k=round(total_r / max(args.steps, 1) * 1000, 3),
                n_params=n_params, wall_s=round(wall, 1))

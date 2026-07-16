@@ -436,6 +436,13 @@ class MorphPCEngine:
                           # positions, decoupled from loss_mask. E2 gates on
                           # obs-only CE while TRAINING over obs+reward, so the
                           # gate axis stays orthogonal to the objective axis.
+    loss_dyadic = None    # optional (sign(B,T) int8 in {-1,0,+1}, k(B,T) int)
+                          # per-position error scaling by sign*2^k — the E3
+                          # dyadic ADVANTAGE weight on action-token positions
+                          # (REINFORCE-with-baseline through the cascade).
+                          # Applied as exponent arithmetic (torch.ldexp) + a
+                          # sign/zero mux — shift-class, the same family as
+                          # the pow-2 LN factors. sign=+1,k=0 == weight 1.
 
     @torch.no_grad()
     def _top_error(self, logits, targets, caches_top, grads: bool):
@@ -458,6 +465,14 @@ class MorphPCEngine:
             denom = int(self.loss_mask.sum().clamp_min(1))
         else:
             denom = B * T
+        if self.loss_dyadic is not None:
+            sgn, kexp = self.loss_dyadic
+            sgn = sgn.reshape(-1, 1)
+            kexp = kexp.reshape(-1, 1)
+            eps = torch.ldexp(eps, kexp)                    # * 2^k (shift)
+            eps = torch.where(sgn < 0, -eps, eps)           # sign mux
+            eps = torch.where(sgn == 0,
+                              torch.zeros((), dtype=eps.dtype), eps)
         eps = (eps / denom).to(logits.dtype)                # d(mean-CE)/d(logits)
         head, idx = m.output_head, caches_top["head_idx"]   # (R, V, k)
         R, D = B * T, head.in_features

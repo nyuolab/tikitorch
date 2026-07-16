@@ -122,9 +122,17 @@ class Agent:
         self.gamma = getattr(args, "gamma", 0.9)
         self.window = args.window
         self.ctx = torch.zeros(args.window, dtype=torch.long)
+        # E3 token-policy machinery
+        self.policy = getattr(args, "policy", "mpc")
+        self.tau_pi = getattr(args, "tau_pi", 1.0)
+        self.ctx_r = torch.zeros(args.window)      # per-token frame reward
+        self.adv_baseline = 0.0                     # EMA of reward-to-go
+        self.fire_always = getattr(args, "fire_always", False)
 
-    def push(self, frame):
+    def push(self, frame, frame_reward=0.0):
         self.ctx = torch.cat([self.ctx[len(frame):], frame])
+        self.ctx_r = torch.cat([self.ctx_r[len(frame):],
+                                torch.full((len(frame),), float(frame_reward))])
 
     @torch.no_grad()
     def score_actions(self):
@@ -188,7 +196,20 @@ class Agent:
             out.append(p_r1 + self.gamma * float(p_r2))
         return out
 
+    @torch.no_grad()
+    def act_token(self):
+        """E3: the model's own next-action-token distribution IS the policy.
+        One forward: probe = ctx[1:] + [ACT]; sample the action token at
+        temperature tau_pi (restricted to the K action ids)."""
+        c = self.codec
+        probe = torch.cat([self.ctx[1:], torch.tensor([c.ACT])])
+        lg = self.model(probe.unsqueeze(0))[0][-1]
+        pi = torch.softmax(lg[c.ACT0:c.ACT0 + c.K] / self.tau_pi, dim=0)
+        return int(torch.multinomial(pi, 1))
+
     def act(self):
+        if self.policy == "token":
+            return self.act_token()
         if self.codec.objective != "R":                     # reward-free -> random
             return int(torch.randint(0, self.codec.K, (1,)))
         scores = (self.score_actions_h2() if self.horizon >= 2
@@ -200,14 +221,48 @@ class Agent:
     def step(self, learn=True):
         action = self.act()
         reward, obs_sym, done = self.env.step(action)
-        self.push(self.codec.frame(obs_sym, action, reward))
+        self.push(self.codec.frame(obs_sym, action, reward), frame_reward=reward)
         x = self.ctx[:-1].unsqueeze(0)
         y = self.ctx[1:].unsqueeze(0)
-        self.engine.loss_mask = self.codec.learn_mask(y)      # train obs(+reward)
-        self.engine.gate_mask = self.codec.obs_mask(y)        # gate on obs-only
+        c = self.codec
+        mask = c.learn_mask(y)
+        if self.policy == "token":
+            # E3: action tokens join the loss, weighted by dyadic advantage
+            act_pos = (y >= c.ACT0) & (y < c.ACT0 + c.K)
+            mask = mask | act_pos
+            sgn = torch.ones_like(y, dtype=torch.int8)
+            kex = torch.zeros_like(y, dtype=torch.int32)
+            idx = act_pos[0].nonzero().reshape(-1)
+            if len(idx):
+                r = self.ctx_r[1:][idx]                       # frame rewards, in order
+                G = torch.zeros_like(r)
+                acc = 0.0
+                for i in range(len(r) - 1, -1, -1):           # reward-to-go
+                    acc = float(r[i]) + self.gamma * acc
+                    G[i] = acc
+                A = G - self.adv_baseline
+                self.adv_baseline = 0.99 * self.adv_baseline + 0.01 * float(G.mean())
+                mag = A.abs()
+                k = torch.where(mag > 2 ** -5,
+                                torch.log2(mag.clamp_min(2 ** -5)).round(),
+                                torch.full_like(mag, -99.0)).clamp(-4, 2)
+                for j, p_ in enumerate(idx.tolist()):
+                    if k[j] <= -99:
+                        sgn[0, p_] = 0                        # |A| too small: drop
+                    else:
+                        sgn[0, p_] = 1 if A[j] > 0 else -1
+                        kex[0, p_] = int(k[j])
+            self.engine.loss_dyadic = (sgn, kex)
+        self.engine.loss_mask = mask
+        self.engine.gate_mask = c.obs_mask(y)                 # gate on obs-only
         fired = False
         if learn:
             def fire_fn(ce):
+                if self.fire_always:
+                    self.gate(ce)                             # keep EMAs live
+                    if self.sal is not None:
+                        self.sal.salient(abs(reward))
+                    return True
                 salient = (self.sal.salient(abs(reward))      # EVAL FIRST so the
                            if self.sal is not None else True)  # baseline always
                 surprise = self.gate(ce)                       # updates
@@ -223,6 +278,7 @@ class Agent:
                 self.sal.salient(abs(reward))
         self.engine.loss_mask = None
         self.engine.gate_mask = None
+        self.engine.loss_dyadic = None
         return reward, fired, ce
 
 
@@ -232,6 +288,9 @@ def run(args):
     env = make_env(args.env, world_seed=args.world_seed,
                    biome_steps=args.biome_steps)
     arm = f"{args.gate}{args.objective}" if args.mode == "agent" else args.mode
+    if getattr(args, "policy", "mpc") == "token":
+        arm = ("polA" if getattr(args, "fire_always", False) else "polG") \
+            if args.mode == "agent" else f"{args.mode}Tok"
     # disambiguate tele by delta+horizon so parallel sweep cells never collide
     # (V2b lesson): a d/h tag keeps every cell's telemetry in its own file.
     dh = f"_d{args.delta}h{getattr(args, 'horizon', 1)}"
@@ -296,6 +355,7 @@ def run(args):
     tele.close()
 
     row = dict(gate="E2", env=args.env, arm=arm, delta=args.delta,
+               policy=getattr(args, "policy", "mpc"),
                horizon=getattr(args, "horizon", 1),
                world_seed=args.world_seed,
                seed=args.seed, steps=args.steps, total_return=total_r,
@@ -328,6 +388,9 @@ if __name__ == "__main__":
     p.add_argument("--tau-act", type=float, default=0.02)
     p.add_argument("--horizon", type=int, default=1, choices=[1, 2])
     p.add_argument("--gamma", type=float, default=0.9)
+    p.add_argument("--policy", choices=["mpc", "token"], default="mpc")
+    p.add_argument("--tau-pi", type=float, default=1.0)
+    p.add_argument("--fire-always", action="store_true")
     p.add_argument("--prelife-frames", type=int, default=8_000)
     p.add_argument("--prelife-steps", type=int, default=1_500)
     args = p.parse_args()
