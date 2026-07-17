@@ -192,20 +192,20 @@ life's open tail). This is cheap (CPU/one F2) and is the artifact that makes
 the "persistent embodied agent" claim visceral — a thing that has been alive
 and learning for months, every update attributable.
 
-### E5 — the agent at the sensor (silicon)
+### E6 — the agent at the sensor (silicon)
 Port the fused loop end-to-end to the F2 kernel path (gate: the localized s2
 backward divergence); then the E1 loop on-fabric. V5's floor number feeds
 the ASIC study: the target artifact is a milliwatt-class always-plastic
 sensor-edge learner, where the GPU's 79 W stream-sitting floor is the
 comparison that matters.
 
-### E6 — collective ontogeny (fleet)
+### E7 — collective ontogeny (fleet)
 N embodied agents, disjoint experiences, firing-normalized/probe-based merge
 (V4b.1 fix). Pass = merged-beats-solo on held-out worlds WITHOUT sharing
 data. This is the fleet-experience-scaling bet, now with the V4b failure
 mode designed out rather than assumed away.
 
-### E7 — the public benchmark
+### E8 — the public benchmark
 SPJS harness (score-per-joule-per-stream) with the embodied stream tasks +
 GPU baselines, shipped as the community artifact; asymmetric honesty (the
 fabric loses columns) as the adoption mechanism.
@@ -216,7 +216,7 @@ E0 ✅($8) → E1 KILL($8) → E2 KILL($60) → E3 BISTABLE($10) — the ladder
 re-sequenced by results: the actionable next gate is an E4 DESIGN DECISION on
 ignition reliability (E3_SPEC candidates); the persistence life (E4 above)
 starts once a policy loop is reliable OR runs prediction-only on the V-config;
-silicon (E5) gated on the s2 fix; fleet/benchmark (E6/E7) after E4.
+silicon (E6) gated on the s2 fix; fleet/benchmark (E7/E8) after E5.
 (Renumbered 2026-07-16 when the correct-loss gate took the E3 slot.)
 Every gate keeps the V-program disciplines: pre-registration, honest-negative
 branches, adversarial pre-launch review, EC2-only compute, audit coverage.
