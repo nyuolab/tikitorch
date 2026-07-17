@@ -52,3 +52,51 @@ measured 2.9×+, priced into any north-star accounting.
 Adversarial review before launch (focused: flag composition + w512 wall
 math), sentinel-first ordering, honest branches, EC2-only. Combos beyond
 intr+norm, β/scale sweeps, and gating re-entry stay gated on this screen.
+
+---
+
+## RESULTS (2026-07-17, box i-03d5706b92415b4a4, 12/12 cells, 0 failures, ~4.8h, ≈$22)
+
+Sentinel: ctrl-F s0 = 0.245 (Q3=0, Q4=0) — exact dark-room reproduction,
+screen quarantine-free. Data: `results/st_reward/e4b_screen.jsonl` + tele.
+
+arm | seeds ret/1k | mean | SUSTAIN | Ignite
+---|---|---|---|---
+combo foraging (w96) | 48.9 / 46.9 / 47.5 / 52.6 / 46.6 | **48.5** | **4/5** | 5/5
+combo minatar (w256) | 24.3 / 39.9 / 20.4 | **28.2** | 2/3 | 3/3
+normw512 minatar | 35.0 / 25.4 / 20.6 | 27.0 | 2/3 | 3/3
+
+(E4 baselines: intr-F 45.3 & 4/5 sus; norm-F 44.8 & 3/5; norm-M-w256 21.9 &
+2/3; ctrl-F sustained 0/5.)
+
+### Verdicts per prereg
+
+- **combo — STACK.** Foraging: sustained 4/5 ✓ AND mean 48.5 ≥ 45.3 ✓, with
+  EVERY seed (min 46.6) above both single-lever means and the tightest seed
+  spread of any arm (sd 2.5 vs norm's 8.5). Minatar: sustained 2/3 (ties
+  norm — the "> 2/3" reportability bar not met) but mean +29% (28.2 vs 21.9)
+  and s1 = 39.9 full-life — the program's best minatar cell (Q3=51, Q4=53,
+  both ≈ 60% above streaming-AC's full-life 31.9). The levers are
+  complementary as hypothesized: shaped credit supplies signal during
+  droughts, unit-scaling keeps it full-weight. The declared variance-floor
+  risk did not materialize (foraging CE ~0.47–0.51, stable; no noise
+  amplification signature).
+- **normw512 — HORIZON-MOOT** (by the letter: mean 27.0 vs the 27.4 bar,
+  sustained 2/3 ✓). Honest nuance: +23% mean over w256 is real but
+  sub-threshold, bought at the MEASURED 2.9×+ serve-cost tax — and the combo
+  at w256 achieves MORE (28.2) for FREE. The credit horizon is not minatar's
+  binder; the obs:action gradient-volume imbalance (unchanged by window)
+  remains the prime suspect. The geometry lever is dominated; retire it.
+
+### What E4b settles
+
+The program now has a RELIABLE, CHEAP policy-learning recipe on the fused
+serve+learn substrate: **policy-as-token-prediction + dyadic advantage +
+surprise credit (β=0.5) + advantage normalization, fire-always** — 4/5
+sustained above floors on foraging (mean 48.5), best-ever minatar means, at
+the unchanged 1-forward-act / 1-kick-learn budget. Honest gaps: streaming-AC
+still 2.8× ahead on foraging (138 vs 48.5) at matched steps; minatar
+sustained is 2/3, not universal; and the loop is fire-always — the
+GATING/efficiency dimension (E3 polG starved at 3% fire) is the one
+ignition-adjacent question this arc has not re-tested with the working
+recipe. That is E4c.

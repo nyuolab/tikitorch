@@ -160,7 +160,19 @@ at the same serve+learn budget. Frontier: minatar window geometry. E4b
 candidates in spec (intr+norm combo; norm+longer credit horizon; gating
 re-entry). ≈$21.
 
-### E4b/E5 — the second life (months-long persistence)
+### E4b — combo + credit horizon — STACK / HORIZON-MOOT (2026-07-17)
+**VERDICT (E4B_SPEC "RESULTS"):** combo (intr+norm) STACKS — foraging 4/5
+sustained, mean 48.5 with EVERY seed above both single-lever means (tightest
+spread of any arm); minatar mean +29% with the program-best cell (39.9
+full-life, Q3/Q4 ≈ 60% above streaming-AC). normw512 HORIZON-MOOT: +23%
+mean at a MEASURED 2.9x serve tax, dominated by the free combo — the
+credit horizon is not minatar's binder (obs:action gradient volume remains
+prime suspect). THE RECIPE: token-policy + dyadic advantage + surprise
+credit + advantage normalization, fire-always = reliable cheap policy
+learning on the fused substrate. Open: gating/efficiency (E4c), the 2.8x
+gap to streaming-AC on foraging, minatar universality. ≈$22.
+
+### E5 — the second life (months-long persistence)
 100M+ tokens / multi-month always-on agent on one box: organism daemon +
 V4-life config + excess-surprise gate + periodic Fisher-probe consolidation.
 Weekly probe suites; the pre-registered adversary is slow drift (the 10M
