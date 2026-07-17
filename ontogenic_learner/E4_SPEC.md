@@ -100,3 +100,77 @@ baseline EMA — the on-fabric story quantizes it later, waiver declared now).
 One c7i.16xlarge (64 vCPU, OMP 4 × P 14), MAX_MINUTES = 540, ~7.5h, ≈ $26.
 House rules: adversarial review before launch, sentinel-first job order,
 honest branches, EC2-only.
+
+---
+
+## RESULTS (2026-07-17, box i-045d3e0c24ede4d45, 32/32 cells, 0 failures, 6h07m, ≈$21)
+
+Data: `results/st_reward/e4_screen.jsonl` + tele (same dir; lever-suffixed arm
+names; ctrl tele supersedes E3's, verified identical on shared fields + piH
+added). Sentinel: **ctrl s0–s2 reproduce E3 polA EXACTLY** {0.245, 29.54,
+22.02} — screen quarantine-free. Live dashboard:
+https://claude.ai/code/artifact/11430f3b-a443-4e3f-bfae-09300f3dd6ce
+
+ret/1k (full life), foraging 5 seeds | seeds | mean | Ignite (max(Q3,Q4)>36.3) | sustained (post-hoc: Q3 AND Q4 > 36.3)
+---|---|---|---|---
+ctrl (E3 polA) | 0.2 / 29.5 / 22.0 / 25.3 / 31.5 | 21.7 | 4/5* | **0/5**
+**intr** | 43.2 / 46.5 / 42.4 / 48.9 / 45.4 | **45.3** | **5/5** | **4/5**
+**norm** | 41.3 / 31.0 / 48.9 / 50.6 / 52.2 | **44.8** | **5/5** | 3/5
+mbwarm | 29.9 / 31.8 / 32.7 / 18.3 / 34.7 | 29.5 | 0/5 | 0/5
+ent (3 seeds) | 36.6 / 36.9 / 40.2 | 37.9 | 3/3 | 1/3
+
+minatar 3 seeds | seeds | mean | Ignite (>23.3) | sustained
+---|---|---|---|---
+intr | 8.4 / 11.6 / 1.2 | 7.0 | 1/3 | 0/3
+norm | 20.3 / 19.2 / 26.1 | 21.9 | **3/3** | **2/3**
+mbwarm | 7.4 / 7.8 / 1.3 | 5.5 | 0/3 | 0/3
+(E3 ctrl minatar: 1.3 / 7.3 / 7.0, 0/3 by either metric.)
+
+*The frozen Ignite metric counts TRANSIENT crossings: ctrl's 4/5 are
+single-quarter biome spikes (s1 Q3=11→Q4=44; s2 Q3=45→Q4=25), which is why
+the post-hoc SUSTAINED column (declared post-hoc, both quarters) is the
+sharper discriminator: ctrl 0/5 vs intr 4/5, norm 3/5.
+
+### Verdicts per prereg
+
+- **intr — WIN** (rate 5/5 ≥ 4/5 ✓, mean 45.3 > ctrl 21.7 ✓). Audit caveat
+  reported per prereg: intrinsic mass ran CO-DOMINANT with extrinsic on
+  foraging (~1.3–1.5×), not subordinate — the returns above are extrinsic-
+  only, but the credit signal was substantially curiosity-driven.
+- **norm — WIN** (5/5 ✓, 44.8 > 21.7 ✓), including the two best single-cell
+  results of the program (50.6, 52.2) — and the only lever that moves
+  MINATAR: 3/3 Ignite, 2/3 sustained, with late-life rates (Q3 up to 47)
+  above streaming-AC's full-life 31.9 — the program's first sustained
+  above-floor policy performance on the standard benchmark. Mechanistically
+  cleanest: no shaped reward, no extra forwards, just unit-scaled advantage.
+- **mbwarm — HARM on the frozen rate metric** (0/5 vs ctrl 4/5), mean
+  UPLIFTED (29.5 > 21.7), no collapse: the decaying MPC prior is a VARIANCE
+  COMPRESSOR — it reliably prevents the dark room (worst seed 18.3 vs ctrl
+  0.2) but anchors behaviour to the model's mediocre reward posterior and
+  never compounds past random. Both tails cut.
+- **ent — formally NULL by seed count** (3 seeds cannot reach ≥4/5); 3/3
+  Ignite with mean 37.9 pinned AT the random floor (36.3) — exactly the
+  rescue-to-random behaviour predicted at design time. Prevents the trap,
+  learns nothing beyond it.
+
+### What E4 settles
+
+The dark-room attractor is FIXABLE at zero substrate cost: two independent
+levers (surprise-credit and advantage normalization) each turn E3's
+bistable coin-flip into 5/5 reliable ignition on the primary env, at the
+same 1-forward act / 1-kick learn budget. The E3 KILL-branch worry
+(substrate/kick) is now doubly dead: the same kick that dark-roomed under
+the naked composed loss sustains compounding policy learning when the
+policy term's gradient share is protected. Environment geometry remains the
+frontier: minatar's 200:2 obs:action imbalance + ~2-frame credit horizon
+yields only norm's near-floor performance — the window-geometry fix (longer
+credit horizon per window) is a design lever E4 did not touch.
+
+### E4b candidates (user decides)
+
+(a) **intr+norm combo** at 5 seeds both envs (the two WINs are mechanistically
+independent: shaped credit × protected gradient share); (b) norm + longer
+minatar credit horizon (window 512 or frame-thinned obs) targeting the
+geometry frontier; (c) gate re-entry: norm/intr under polG-style gating (E3
+showed gating starves ignition — do the levers change that?); (d) β/scale
+sweeps only if the combo disappoints.

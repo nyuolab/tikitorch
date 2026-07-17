@@ -144,7 +144,23 @@ substrate learns policies when given one — reliability of IGNITION is the
 open problem (E4 candidates in E3_SPEC: intrinsic-surprise reward, advantage
 normalization, model-based birth actor, entropy bonus). ~$10.
 
-### E4 — the second life (months-long persistence)
+### E4 — ignition reliability: four levers — TWO WINS (2026-07-17)
+**VERDICT (E4_SPEC "RESULTS"):** the dark-room attractor is FIXABLE at zero
+substrate cost. Sentinels reproduced E3 exactly (screen quarantine-free).
+**intr WIN** (surprise-credit: 5/5 foraging ignitions, mean 45.3 vs ctrl
+21.7; audit: intrinsic mass co-dominant, returns extrinsic-only) and
+**norm WIN** (unit-scaled advantage: 5/5, mean 44.8, program-best cells
+50.6/52.2, AND the only lever that moves minatar — 3/3 Ignite, 2/3
+sustained, late-life above streaming-AC's full-life). mbwarm = variance
+compressor (HARM on rate, mean uplifted — cuts both tails); ent =
+rescue-to-random (pinned at the 36.3 floor), as predicted. Post-hoc
+sustained metric: ctrl 0/5 vs intr 4/5 / norm 3/5. Two independent levers
+each turn E3's bistable coin-flip into reliable compounding policy learning
+at the same serve+learn budget. Frontier: minatar window geometry. E4b
+candidates in spec (intr+norm combo; norm+longer credit horizon; gating
+re-entry). ≈$21.
+
+### E4b/E5 — the second life (months-long persistence)
 100M+ tokens / multi-month always-on agent on one box: organism daemon +
 V4-life config + excess-surprise gate + periodic Fisher-probe consolidation.
 Weekly probe suites; the pre-registered adversary is slow drift (the 10M
