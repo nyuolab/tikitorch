@@ -197,3 +197,58 @@ NSLOTS=8 STEPS=30 ACCUM=8 XF_LR=2.6e-4 XF_WARMUP=20 LR_DECAY=0 PIPE=0 \
 ```
 
 Run logs: S3 `s2shard-20260707T200404Z` (bit-exact forward), `s2shard-20260708T104531Z` (30-step training).
+
+---
+
+## 6. ★ THE ACTUAL divergence root cause — the softmax exp ROM read as ZERO on silicon (RESOLVED 2026-07-15/16)
+
+**Date:** 2026-07-15 · **AGFI:** `agfi-0e562920e6ccbe3ab` (ROM-free-exp fix, VOCAB=8192) · **Fix commit:** `848504a`
+
+§3.3 believed the softmax was fixed by replacing `hls::exp` with the dyadic `s2_exp_dyad` (`0be81fe`), and §4
+called it "the last silicon-approximate intrinsic eliminated." **That was wrong.** `s2_exp_dyad` was *itself*
+silently broken on F2: its 256-entry `S2_GEXP` mantissa ROM — `static const float S2_GEXP[256] = {…}` — was
+synthesised by Vitis HLS as **UNINITIALISED BRAM that reads ZERO** on silicon (an initialised ROM in csim/shim).
+So `return s2_ldexp_i(S2_GEXP[fi], -octave)` returned 0 for every `x<0`, making the exp a **step function**
+(1 at the max, 0 elsewhere) → the attention softmax collapsed to **one-hot (hard argmax)** → the softmax score
+gradient is *correctly* zero → `gQ/gK` never train → Q/K frozen → the imbalanced model diverged to bpb 38.
+
+### 6.1 The measured proof chain (DDR-snapshot instrumentation, not inference)
+Every step was *measured* on silicon by snapshotting on-chip scratch to DDR (`scrGSV`/`scrPALL`/`scrSC`) and
+reading it back — not reasoned about:
+1. Forward `Q/K/V` are **bit-exact** vs the exact-math shim (cos 1.0000).
+2. Raw pre-exp scores (`scrSC`) are **correct**: ratio 1.000 vs numpy `dot*0.125`, span ~2-3 → the dot and the
+   `1/sqrt(DH)=0.125` scale are both right.
+3. For the 2nd-best key at `x=-0.489`, silicon `exp = 0` vs the correct `0.613` → step-function exp.
+4. Forward `ATTN == V[argmax]` at cos **1.0000** (hard attention); `scrPALL` one-hot (1/101 nonzero per row).
+
+**After the fix** (silicon, `agfi-0e562920e6ccbe3ab`): fwd `ATTN` cos **1.0000** to the *smooth* softmax blend,
+`scrPALL` **101/101** nonzero, `gQ/gK/gV` **nonzero** (were bit-exact 0). The exact held-LR 2.6e-4 config that
+blew up to bpb 38 now stays **bpb_ema ~13.4 bounded, monotonically descending, past the old update-125 blow-up
+point** — divergence gone.
+
+### 6.2 The fix
+Drop the ROM; compute `2^(-frac)` with a degree-4 Taylor poly of `exp(-frac*ln2)` (verified vs libm: max relerr
+0.24% on [-8,0], `exp(-0.489)=0.6135`). Attention is the allowed-multiply front, so the mults are fine; every op
+is now a plain float mul/add or integer bit-op — **no ROM, no silicon-approx intrinsic → faithful by construction.**
+
+### 6.3 The false-trail ledger — EIGHT prior AFI builds, all downstream of this
+`gsv=0` is the *correct* gradient of a one-hot softmax, so every gradient-side "fix" was fixing correct code:
+gp[] write-drop (`d333bce`), V-deviation reformulation, phase-1 de-pipeline (`22da155`), pre-transpose revert
+(`a6a7e69`); plus two **byte-identical no-ops** — bit-exact-ldexp (`2b170e5`; `hls::ldexp` is actually fine) and
+scale-literal (`a1dba0a`; `1.0f/hls::sqrt(64)` already const-folds to 0.125). What finally cracked it was
+**instrumentation over inference** (the `scrSC` score dump). **META-LESSON:** when a gradient is exactly zero,
+first check whether zero is the *correct* gradient for the (possibly degenerate) forward — trace UPSTREAM before
+touching gradient code; and **dump-verify any large `static const` LUT on F2** (it can synthesise to zeroed BRAM).
+
+### 6.4 Honest scope of THIS result
+- **Is:** the weeks-long train-then-diverge failure ROOT-CAUSED and FIXED, silicon-verified (smooth softmax +
+  nonzero attention gradients), and confirmed non-diverging under sustained training at the exact reproducing config.
+- **Is NOT (still open, separate problem):** *convergence* to low bpb. An overnight run (~1600 updates ≈ 3.3M
+  tokens) descends only bpb 13.47→13.40 — the model learns *correctly but glacially*, a property of the mult-free
+  **dyadic Adam (bounded sign-SGD)**, plus a throughput wall (~26-32 s/step). Note: `S2_K=128` is NOT the
+  throughput lever (measured 1.26×; the walls are DDR re-stream + attention MAC + driver host-tail per
+  THROUGHPUT_ROADMAP). Convergence is the next phase: optimizer strength within the mult-free constraint + the
+  correct throughput fixes.
+
+Run logs (S3): score-dump proof `s2shard-20260715T101523Z`; fix verify `s2shard-20260715T124833Z`; held-LR
+non-divergence `s2shard-20260715T130638Z`; overnight K=128 `s2shard-20260716T133033Z`.
