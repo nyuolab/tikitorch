@@ -172,6 +172,18 @@ credit + advantage normalization, fire-always = reliable cheap policy
 learning on the fused substrate. Open: gating/efficiency (E4c), the 2.8x
 gap to streaming-AC on foraging, minatar universality. ≈$22.
 
+### E4c — gating re-entry — STARVED on primary / PARTIAL on minatar (2026-07-17)
+**VERDICT (E4C_SPEC "RESULTS"):** the recipe does NOT survive aggressive
+gating on foraging: 6% fire -> sustained 0/5, mean 10.9 vs fire-always 48.5
+— kicks-per-life is the binder and fire-always remains the recipe's price
+on the primary env. Minatar at 12.7% fire reaches 81% of fire-always mean
+(sustained 1/3, two Q4 dips ON the floor) — the cross-env fire-rate
+gradient confirms the binder mechanism. Sentinel exact (4th consecutive).
+THE IGNITION ARC IS CLOSED (E3->E4->E4b->E4c, ~$85): attractor discovered,
+mechanism pinned, two fixes found, stacked recipe validated, efficiency
+limit mapped. Next phase = user decision: streaming-AC gap / minatar
+universality / delta-frontier sweep / E5 life / manuscript integration. ≈$6.
+
 ### E5 — the second life (months-long persistence)
 100M+ tokens / multi-month always-on agent on one box: organism daemon +
 V4-life config + excess-surprise gate + periodic Fisher-probe consolidation.
