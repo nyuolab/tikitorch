@@ -70,3 +70,56 @@ honest branches, EC2-only.
 β-anneal (revisit only if audits show intrinsic co-dominance harming);
 combinations of A×B winners (E5 config decision, not a new screen unless
 the user asks); w512 (retired by E4b).
+
+---
+
+## RESULTS (2026-07-17, box i-076a26726172d54e1, 37/37 cells, 0 failures, ~6.9h, ≈$24)
+
+Sentinel exact (0.245, 6th consecutive screen). Data:
+`results/st_reward/e4d_screen.jsonl` + tele.
+
+arm | foraging (mean · sustain) | minatar (mean · sustain) | fire
+---|---|---|---
+**head** | **53.3 · 3/3** (43.3/62.8/53.8) | **33.0** · 2/3 (43.4/16.1/39.3) | 1.0
+obsk-2 | 41.6 · 1/3 | 29.6 · **3/3** | 1.0
+obsk-3 | 37.4 · 1/3 | 23.6 · 3/3 | 1.0
+sub25 | 39.9 · 1/3 | 27.8 · 3/3 | 1.0
+fa25 | 35.7 · 0/3 | 23.8 · 1/3 | 0.36
+advf | 50.3 · 2/3 | 27.1 · 3/3 | 0.95–1.0
+(refs: recipe/comboA foraging 48.5 · 4/5; minatar 28.2 · 2/3; floors 36.3/23.3)
+
+### Verdicts per prereg
+
+- **No arm meets strict MECHANISM-CONFIRMED** (minatar 3/3 + mean > 28.2 +
+  clean foraging guard). obsk-2 hits the minatar clause (3/3, 29.6) but its
+  foraging sustained crashes to 1/3; the head sweeps foraging (3/3, mean
+  53.3 — NEW PROGRAM RECORD on every seed, lowest CE ~0.28) and leads the
+  minatar mean (33.0, cells 43.4/39.3 with quarters up to 69) but keeps the
+  2/3 reliability hole.
+- **The richer finding — a TWO-FACTOR mechanism map:** gradient volume is
+  the RELIABILITY binder (every volume lever → minatar sustained 3/3, but
+  means capped near floors, and foraging sustained collapses — the
+  world-model tax is real); head-sharing is the CEILING binder (the
+  separate readout unlocks record performance on both envs with NO obs tax,
+  but not reliability). The prereg's either/or was the wrong shape; both
+  factors are real and orthogonal. (A head+obsk-2 combo is the obvious
+  follow-up; out of scope per spec — combos deferred.)
+- **B1 fa25 — NOT a DEVELOPMENTAL-WIN** (foraging sustained 0/3; Q3/Q4
+  24–31 vs the 36.3 floor at 36% fire). The critical period builds but the
+  gated adulthood does not maintain at δ=0.10. One minatar seed (55/54
+  quarters at 35% fire) shows holding is possible — a δ-frontier question,
+  not closed here.
+- **B2 advf — degenerate as predicted-risk:** with intr active, ~every
+  window carries quantized advantage → fire 0.95–1.0. The sparsity premise
+  dies on its declared readout (intr densifies advantage). Returns are
+  recipe-class (foraging 50.3), i.e. it is fire-always by another name.
+- **E5 config consequence (per the approved plan):** mech_lever = HEAD
+  (dominant, no tax); fire_schedule = ALWAYS (no sparse winner — declared).
+
+### For the record
+
+The E4d screen also delivered the program's best-ever cells on both envs
+(foraging 62.8; minatar Q3 = 69 under the head) and localized minatar's
+residual unreliability to something neither gradient volume nor readout
+structure fully controls — cold-start reward luck remains a factor at 100k
+steps (head minatar s1: dark-roomish quarters 14/22 despite the head).
