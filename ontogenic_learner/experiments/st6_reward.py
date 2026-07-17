@@ -373,7 +373,7 @@ def run(args):
             arm += f"_entk{args.ent_k}"
     # disambiguate tele by delta+horizon so parallel sweep cells never collide
     # (V2b lesson): a d/h tag keeps every cell's telemetry in its own file.
-    dh = f"_d{args.delta}h{getattr(args, 'horizon', 1)}"
+    dh = f"_d{args.delta}h{getattr(args, 'horizon', 1)}w{args.window}"
     tele = (OUT / f"e2_tele_{args.env}_{arm}{dh}_w{args.world_seed}_s{args.seed}.jsonl"
             ).open("w")
     t0 = time.time()
@@ -460,6 +460,7 @@ def run(args):
     tele.close()
 
     row = dict(gate="E2", env=args.env, arm=arm, delta=args.delta,
+               window=args.window,
                policy=getattr(args, "policy", "mpc"),
                horizon=getattr(args, "horizon", 1),
                world_seed=args.world_seed,
