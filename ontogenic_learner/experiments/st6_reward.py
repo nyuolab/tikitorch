@@ -486,9 +486,21 @@ def run(args):
                 # starts calibrated ~uniform instead of an init lottery; the
                 # frozen floor shares this birth, so comparisons stay fair
                 c0 = agent.codec
-                m = m | ((yb >= c0.ACT0) & (yb < c0.ACT0 + c0.K))
+                ap = (yb >= c0.ACT0) & (yb < c0.ACT0 + c0.K)
+                if getattr(agent, "use_head", False):
+                    # E4d head arm: the policy IS the head — BC the random
+                    # birth policy THROUGH the head (review launch-blocker:
+                    # cloning into the LM head would leave the acting head
+                    # at random init, the exact A1 lottery)
+                    agent.engine.action_loss = (
+                        ap, (yb - c0.ACT0).clamp(0, c0.K - 1),
+                        torch.ones_like(yb, dtype=torch.int8),
+                        torch.zeros_like(yb, dtype=torch.int32))
+                else:
+                    m = m | ap
             agent.engine.loss_mask = m
             agent.engine.train_step(xb, yb, agent.opt, credit="cascade")
+            agent.engine.action_loss = None
         agent.engine.loss_mask = None
         agent.model.set_tau(0.0)
         agent.model.eval()

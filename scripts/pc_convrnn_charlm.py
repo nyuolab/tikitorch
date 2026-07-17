@@ -503,6 +503,12 @@ class MorphPCEngine:
             denom = int(self.loss_mask.sum().clamp_min(1))
         else:
             denom = B * T
+        if self.action_loss is not None and "act_idx" in caches_top:
+            # shared-scale normalization (E4d review): the action head's
+            # positions join the SAME mean as the LM loss, matching the
+            # shared-head design's effective per-position scale exactly —
+            # else the policy term is silently ~denom/denom_a x stronger
+            denom = denom + int(self.action_loss[0].sum().clamp_min(0))
         if self.loss_dyadic is not None:
             sgn, kexp = self.loss_dyadic
             sgn = sgn.reshape(-1, 1)
@@ -552,8 +558,7 @@ class MorphPCEngine:
             eps_a = torch.where(sa < 0, -eps_a, eps_a)
             eps_a = torch.where(sa == 0,
                                 torch.zeros((), dtype=eps_a.dtype), eps_a)
-            denom_a = int(amask.sum().clamp_min(1))
-            eps_a = (eps_a / denom_a).to(logits.dtype)
+            eps_a = (eps_a / denom).to(logits.dtype)   # SHARED denom (above)
             aidx = caches_top["act_idx"]
             ea_exp = eps_a.unsqueeze(-1).expand(R, Ka, ka)
             e_xa = torch.zeros(R, D, device=eps_a.device, dtype=eps_a.dtype)

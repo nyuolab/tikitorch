@@ -19,6 +19,12 @@ foraging 48.5 mean & 4/5 sustained; minatar 28.2 & 2/3. SUSTAINED ignition
   in-bounds by the user). Structural isolation: dark-room pressure reached
   the action marginal through the SHARED head; this blocks the last hop.
   Advantage weighting applies to the action-head error; obs loss untouched.
+  SCALE (review amendment, pre-launch): both heads normalize by the SHARED
+  learn+act denominator, matching the shared-head design's per-position
+  policy-gradient scale exactly — a head win is attributable to structure,
+  not a hidden 10-100x policy-lr boost. Birth BCs the random policy THROUGH
+  the head (review launch-blocker: the first implementation cloned into the
+  LM head and left the acting head at random init — the A1 lottery).
 
 Cells: 4 arms × (minatar ×3 PRIMARY + foraging ×3 guard) = 24.
 
