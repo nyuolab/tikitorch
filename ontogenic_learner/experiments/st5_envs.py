@@ -142,3 +142,28 @@ ENVS = {"foraging": ForagingEnv, "minatar": MinAtarEnv}
 
 def make_env(name, world_seed=0, biome_steps=20_000):
     return ENVS[name](world_seed=world_seed, biome_steps=biome_steps)
+
+
+# --------------------------------------------------------------------------- 
+# E5 life support: bit-exact env serialization (E5 plan / Plan-agent design).
+# get_state() -> opaque pickle bytes; set_state() restores in place. Both
+# wrapped worlds verified bit-exact under pickle roundtrip (FW.World holds a
+# torch.Generator — picklable, state-preserving on torch>=2.x; minatar's
+# np.random.RandomState pickles natively). Bytes live inside the torch ckpt
+# blob so torch.load never needs minatar importable at inspection time.
+
+import pickle
+
+
+def _env_get_state(self) -> bytes:
+    return pickle.dumps(self.__dict__)
+
+
+def _env_set_state(self, blob: bytes) -> None:
+    self.__dict__.update(pickle.loads(blob))
+
+
+ForagingEnv.get_state = _env_get_state
+ForagingEnv.set_state = _env_set_state
+MinAtarEnv.get_state = _env_get_state
+MinAtarEnv.set_state = _env_set_state
