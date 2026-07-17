@@ -23,8 +23,11 @@ E4 flags):*
 - **ctrl** foraging ×1 (s0) — drift sentinel only (code untouched since E4;
   must reproduce 0.245)
 
-12 cells, one c7i.16xlarge (OMP 4 × P 14 — single wave), MAX_MINUTES = 480
-(long pole = w512 minatar ≈ 2× E4's ~2.7h ≈ 5.5h), ≈ $22.
+12 cells, one c7i.16xlarge (OMP 4 × P 14 — single wave), MAX_MINUTES = 600
+(review amendment: w512 T-scaling MEASURED at 2.9–3.45× w256 — cache-spill
+superlinearity, not the 2× FLOPs guess; correct w256 anchors 5.7–8.2 ks →
+worst case ≈ 470 min), ≈ $25. The horizon fix's serve-cost tax is now a
+measured 2.9×+, priced into any north-star accounting.
 
 ## Pre-registered readout — SUSTAINED ignition is PRIMARY (the E4 metric lesson)
 

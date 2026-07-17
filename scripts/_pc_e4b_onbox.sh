@@ -1,7 +1,9 @@
 #!/bin/bash
 # _pc_e4b_onbox.sh — E4b: combo (intr+norm) + credit-horizon probe (E4B_SPEC).
 # 12 cells: ctrl-F sentinel s0 | combo-F x5 | combo-M x3 | normw512-M x3.
-# ONE c7i.16xlarge, single wave at P 14. MAX_MINUTES=480 (long pole w512 ~5.5h).
+# ONE c7i.16xlarge, single wave at P 14. MAX_MINUTES=600: review MEASURED
+# w512 T-scaling at 2.9-3.45x (cache-spill superlinear, NOT the 2x FLOPs
+# guess) => worst case ~470min; 480 was inside the breach band.
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
