@@ -332,7 +332,25 @@ class MorphPCEngine:
         logits = torch.cat(outs, 0).reshape(B, T, V)
         top = {"mask0": mask0, "ids": ids, "f_final": f_final,
                "head_idx": torch.cat(idxs, 0)}             # (B*T, V, k)
+        ah = getattr(m, "action_head", None)
+        if ah is not None:                                 # E4d second readout
+            Ka, ka = ah.out_features, ah.k
+            aidxs, aouts = [], []
+            for s in range(0, rows.shape[0], 512):
+                expanded = ah.weight + rows[s:s + 512].unsqueeze(-2)
+                vals, idx = expanded.topk(ka, dim=-1)
+                aouts.append(vals.sum(dim=-1) + ah.bias)
+                aidxs.append(idx)
+            top["act_logits"] = torch.cat(aouts, 0).reshape(B, T, Ka)
+            top["act_idx"] = torch.cat(aidxs, 0)           # (B*T, Ka, ka)
         return logits, caches, top
+
+    @torch.no_grad()
+    def act_probe_logits(self, ids: torch.Tensor):
+        """Action-head logits for an acting probe (E4d 'head' lever): one
+        forward-cache pass; returns (B, T, Ka). Cost class = one forward."""
+        _, _, top = self._forward_cache(ids)
+        return top["act_logits"]
 
     # -- adjoint pieces ------------------------------------------------------
     @staticmethod
@@ -452,6 +470,16 @@ class MorphPCEngine:
                           # (softmax - uniform_[lo,hi)). Shift-class via ldexp;
                           # the 1/(hi-lo) target constant is a declared host-
                           # side waiver (E4_SPEC). Contract: mask ⊆ loss_mask.
+    action_loss = None    # optional (mask(B,T) bool, tgt(B,T) long,
+                          # sign(B,T) int8, k(B,T) int): E4d 'head' lever — a
+                          # SEPARATE action head (model.action_head, a second
+                          # TropicalTopKModule attached post-build) whose CE
+                          # error at masked positions, dyadic-advantage-
+                          # weighted like loss_dyadic, is scattered through
+                          # its own top-k routing and SUMMED with the LM-head
+                          # error at the pre-ln_final stack output — one
+                          # network, one kick, two readouts. Ignored when the
+                          # model has no action_head.
 
     @torch.no_grad()
     def _top_error(self, logits, targets, caches_top, grads: bool):
@@ -504,6 +532,42 @@ class MorphPCEngine:
             wg.index_add_(0, flat.reshape(-1), e_exp.reshape(-1))
             head.weight.grad = wg.view(V, D)
             head.bias.grad = eps.sum(0)
+        if self.action_loss is not None and "act_idx" in caches_top:
+            # E4d second readout: the action head's dyadic-advantage-weighted
+            # CE error joins the LM-head error at the SAME hf space, before
+            # the single shared ln_final adjoint below (no double-counting)
+            amask, atgt, asgn, akex = self.action_loss
+            ah = m.action_head
+            Ka, ka = ah.out_features, ah.k
+            eps_a = torch.softmax(
+                caches_top["act_logits"].reshape(-1, Ka).float(), dim=-1)
+            eps_a.scatter_add_(1, atgt.reshape(-1, 1).clamp(0, Ka - 1),
+                               -torch.ones(R, 1, device=eps_a.device))
+            keep_a = amask.reshape(-1, 1)
+            eps_a = torch.where(keep_a, eps_a,
+                                torch.zeros((), dtype=eps_a.dtype))
+            sa = asgn.reshape(-1, 1)
+            kxa = akex.reshape(-1, 1)
+            eps_a = torch.ldexp(eps_a, kxa)
+            eps_a = torch.where(sa < 0, -eps_a, eps_a)
+            eps_a = torch.where(sa == 0,
+                                torch.zeros((), dtype=eps_a.dtype), eps_a)
+            denom_a = int(amask.sum().clamp_min(1))
+            eps_a = (eps_a / denom_a).to(logits.dtype)
+            aidx = caches_top["act_idx"]
+            ea_exp = eps_a.unsqueeze(-1).expand(R, Ka, ka)
+            e_xa = torch.zeros(R, D, device=eps_a.device, dtype=eps_a.dtype)
+            e_xa.scatter_add_(1, aidx.reshape(R, Ka * ka),
+                              ea_exp.reshape(R, Ka * ka))
+            if grads:
+                flat_a = (torch.arange(Ka, device=eps_a.device)
+                          .view(1, Ka, 1) * D + aidx)
+                wga = torch.zeros(Ka * D, device=eps_a.device,
+                                  dtype=eps_a.dtype)
+                wga.index_add_(0, flat_a.reshape(-1), ea_exp.reshape(-1))
+                ah.weight.grad = wga.view(Ka, D)
+                ah.bias.grad = eps_a.sum(0)
+            e_x = e_x + e_xa
         e = e_x.reshape(B, T, D)
         return self._norm_adj(e, caches_top["f_final"], m.ln_final, grads)
 

@@ -110,6 +110,13 @@ class Agent:
         ns = argparse.Namespace(d_model=args.d_model, n_layers=args.n_layers,
                                 kernel=7, dropout=0.0, tau=0.5, lam_min=2 ** -6)
         self.model = build_model("morphssm", self.codec.vocab, ns)
+        self.use_head = getattr(args, "action_head", False)
+        if self.use_head:
+            # E4d A4: second readout on the shared trunk — same head class as
+            # the LM head so the engine's scatter/adjoint path applies verbatim
+            from tikitorch.nn import TropicalTopKModule
+            self.model.action_head = TropicalTopKModule(
+                args.d_model, self.codec.K, k=min(8, args.d_model))
         self.model.set_tau(0.0)
         self.model.eval()
         self.engine = MorphPCEngine(self.model)
@@ -138,6 +145,14 @@ class Agent:
         self.mb_warmup = getattr(args, "mb_warmup", 0)     # (c) MPC birth actor
         self.t_step = 0                                     #     lifetime step
         self.ent_k = getattr(args, "ent_k", None)          # (d) 2^k uniform pull
+        # E4d levers (E4D_SPEC; all default OFF = the E4b recipe path)
+        self.obs_k = getattr(args, "obs_k", None)          # A1/A2 obs down-weight
+        self.obs_frac = getattr(args, "obs_frac", None)    # A3 obs subsample
+        self.obs_gen = torch.Generator().manual_seed(
+            getattr(args, "seed", 0) + 4242)               #    subsample stream
+        self.fire_anneal = getattr(args, "fire_anneal", None)  # B1 critical period
+        self.adv_fire = getattr(args, "adv_fire", False)   # B2 advantage gate
+        self.life_steps = getattr(args, "steps", 0)        #    for the anneal clock
 
     def push(self, frame, frame_reward=0.0, frame_done=False):
         self.ctx = torch.cat([self.ctx[len(frame):], frame])
@@ -215,8 +230,12 @@ class Agent:
         temperature tau_pi (restricted to the K action ids)."""
         c = self.codec
         probe = torch.cat([self.ctx[1:], torch.tensor([c.ACT])])
-        lg = self.model(probe.unsqueeze(0))[0][-1]
-        pi = torch.softmax(lg[c.ACT0:c.ACT0 + c.K] / self.tau_pi, dim=0)
+        if self.use_head:
+            lg = self.engine.act_probe_logits(probe.unsqueeze(0))[0][-1]
+            pi = torch.softmax(lg.float() / self.tau_pi, dim=0)
+        else:
+            lg = self.model(probe.unsqueeze(0))[0][-1]
+            pi = torch.softmax(lg[c.ACT0:c.ACT0 + c.K] / self.tau_pi, dim=0)
         return int(torch.multinomial(pi, 1))
 
     @torch.no_grad()
@@ -224,8 +243,12 @@ class Agent:
         """Entropy of the current action marginal (attractor-state telemetry)."""
         c = self.codec
         probe = torch.cat([self.ctx[1:], torch.tensor([c.ACT])])
-        lg = self.model(probe.unsqueeze(0))[0][-1]
-        pi = torch.softmax(lg[c.ACT0:c.ACT0 + c.K] / self.tau_pi, dim=0)
+        if self.use_head:
+            lg = self.engine.act_probe_logits(probe.unsqueeze(0))[0][-1]
+            pi = torch.softmax(lg.float() / self.tau_pi, dim=0)
+        else:
+            lg = self.model(probe.unsqueeze(0))[0][-1]
+            pi = torch.softmax(lg[c.ACT0:c.ACT0 + c.K] / self.tau_pi, dim=0)
         return float(-(pi * pi.clamp_min(1e-9).log()).sum())
 
     def act(self):
@@ -298,18 +321,48 @@ class Agent:
                     else:
                         sgn[0, p_] = 1 if A[j] > 0 else -1
                         kex[0, p_] = int(k[j])
+            if self.use_head:
+                # E4d A4: ALL policy gradient goes through the action head;
+                # the LM head's loss drops action positions (E1 rule restored
+                # — the whole point is blocking the shared-head path)
+                self.engine.action_loss = (
+                    act_pos, (y - c.ACT0).clamp(0, c.K - 1), sgn, kex)
+                mask = c.learn_mask(y)
+                sgn = torch.ones_like(y, dtype=torch.int8)
+                kex = torch.zeros_like(y, dtype=torch.int32)
+            if self.obs_k is not None:
+                # E4d A1/A2: dyadic down-weight of obs-position errors — the
+                # direct gradient-volume rebalance (~200:2 -> ~200/2^|k|:2)
+                obs_m = c.obs_mask(y)
+                kex = torch.where(obs_m,
+                                  torch.full_like(kex, self.obs_k), kex)
             self.engine.loss_dyadic = (sgn, kex)
+            has_adv = bool(((sgn != 0) & act_pos).any()) if not self.use_head \
+                else bool(((self.engine.action_loss[2] != 0) & act_pos).any())
             if self.ent_k is not None:
                 # E4 ent: always-on 2^k uniform pull at action positions
                 # (mask ⊆ loss_mask holds: act_pos was OR-ed into mask above)
                 self.engine.loss_uniform_pull = (act_pos, self.ent_k,
                                                  c.ACT0, c.ACT0 + c.K)
+        else:
+            has_adv = False
+        if self.obs_frac is not None:
+            # E4d A3: keep a seeded random fraction of obs positions in the
+            # LOSS only (gate_mask untouched -> gate CE stays comparable)
+            obs_m = c.obs_mask(y)
+            keep = torch.rand(y.shape, generator=self.obs_gen) < self.obs_frac
+            mask = mask & (~obs_m | keep)
         self.engine.loss_mask = mask
         self.engine.gate_mask = c.obs_mask(y)                 # gate on obs-only
         fired = False
         if learn:
             def fire_fn(ce):
-                if self.fire_always:
+                # E4d B1: critical period — fire-always for the first
+                # fire_anneal fraction of life, gated after
+                always = self.fire_always or (
+                    self.fire_anneal is not None
+                    and self.t_step <= self.fire_anneal * self.life_steps)
+                if always:
                     self.gate(ce)                             # keep EMAs live
                     if self.sal is not None:
                         self.sal.salient(abs(reward))
@@ -317,6 +370,12 @@ class Agent:
                 salient = (self.sal.salient(abs(reward))      # EVAL FIRST so the
                            if self.sal is not None else True)  # baseline always
                 surprise = self.gate(ce)                       # updates
+                if self.adv_fire and has_adv:
+                    # E4d B2: advantage pulses fire the kick regardless of
+                    # obs surprise — the policy-aligned gate signal (E4c:
+                    # obs surprise self-quiets exactly when policy learning
+                    # still needs kicks). Gate EMAs updated above either way.
+                    return True
                 return surprise and salient                    # neuromod AND
             lg_serve, ce, fired = self.engine.serve_and_learn(
                 x, y, opt=self.opt, fire=fire_fn)
@@ -350,6 +409,7 @@ class Agent:
         self.engine.gate_mask = None
         self.engine.loss_dyadic = None
         self.engine.loss_uniform_pull = None
+        self.engine.action_loss = None
         return reward, fired, ce
 
 
@@ -371,6 +431,16 @@ def run(args):
             arm += f"_mb{args.mb_warmup}"
         if getattr(args, "ent_k", None) is not None:
             arm += f"_entk{args.ent_k}"
+        if getattr(args, "obs_k", None) is not None:
+            arm += f"_obsk{args.obs_k}"
+        if getattr(args, "obs_frac", None) is not None:
+            arm += f"_sub{args.obs_frac}"
+        if getattr(args, "fire_anneal", None) is not None:
+            arm += f"_fa{args.fire_anneal}"
+        if getattr(args, "adv_fire", False):
+            arm += "_advf"
+        if getattr(args, "action_head", False):
+            arm += "_head"
     # disambiguate tele by delta+horizon so parallel sweep cells never collide
     # (V2b lesson): a d/h tag keeps every cell's telemetry in its own file.
     dh = f"_d{args.delta}h{getattr(args, 'horizon', 1)}w{args.window}"
@@ -432,12 +502,8 @@ def run(args):
             r, o, dn = env.step(a)
             agent.push(agent.codec.frame(o, a, r), frame_reward=r, frame_done=dn)
         if token_pol:
-            with torch.no_grad():                   # birth-policy audit: the
-                c0 = agent.codec                    # action-marginal entropy
-                pr = torch.cat([agent.ctx[1:], torch.tensor([c0.ACT])])
-                lg0 = agent.model(pr.unsqueeze(0))[0][-1]
-                pi0 = torch.softmax(lg0[c0.ACT0:c0.ACT0 + c0.K], dim=0)
-                pi0_ent = float(-(pi0 * pi0.clamp_min(1e-9).log()).sum())
+            pi0_ent = agent.pol_entropy()           # birth-policy audit
+                                                    # (head-aware)
         else:
             pi0_ent = None
         learn = args.mode == "agent"
@@ -505,6 +571,12 @@ if __name__ == "__main__":
     p.add_argument("--adv-norm", action="store_true")
     p.add_argument("--mb-warmup", type=int, default=0)
     p.add_argument("--ent-k", type=int, default=None)
+    # E4d levers (E4D_SPEC; defaults = the E4b recipe exactly)
+    p.add_argument("--obs-k", type=int, default=None)
+    p.add_argument("--obs-frac", type=float, default=None)
+    p.add_argument("--fire-anneal", type=float, default=None)
+    p.add_argument("--adv-fire", action="store_true")
+    p.add_argument("--action-head", action="store_true")
     p.add_argument("--prelife-frames", type=int, default=8_000)
     p.add_argument("--prelife-steps", type=int, default=1_500)
     args = p.parse_args()
