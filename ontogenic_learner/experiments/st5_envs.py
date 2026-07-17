@@ -167,3 +167,99 @@ ForagingEnv.get_state = _env_get_state
 ForagingEnv.set_state = _env_set_state
 MinAtarEnv.get_state = _env_get_state
 MinAtarEnv.set_state = _env_set_state
+
+
+class BabyAIEnv:
+    """E5b third world: MiniGrid/BabyAI FIXED-MISSION levels (the language
+    channel is skippable ONLY when the mission never varies — generic GoTo*
+    levels randomize their target per episode and name it only in text, so
+    they are excluded by design). Level rotation = biomes. Obs cell-symbol =
+    object TYPE (11 ids), with doors split by open/closed state (the one
+    state bit that is task-relevant in DoorKey) -> 12 symbols <= the 20
+    reserved at birth. Colors dropped (fixed missions make them decor).
+    Sparse terminal reward (1 - 0.9*steps/max) on success; episodic
+    auto-reset mid-stream with done flags (the MinAtar adapter pattern).
+    Apache-licensed pip deps (minigrid, gymnasium)."""
+
+    name = "babyai"
+    LEVELS = ("BabyAI-GoToRedBallNoDists-v0", "MiniGrid-Empty-Random-6x6-v0",
+              "MiniGrid-DoorKey-6x6-v0", "MiniGrid-FourRooms-v0")
+    n_actions = 7                                # MiniGrid Discrete(7)
+    obs_len = 49                                 # 7x7 partial view
+    # type ids 0..10 + closed-door variant = 12 symbols
+    n_obs_sym = 12
+    DOOR_TYPE = 4
+    STATE_CLOSED = (1, 2)                        # closed / locked
+
+    def __init__(self, world_seed=0, biome_steps=20_000, n_cycles=9):
+        import gymnasium as gym
+        import minigrid                          # noqa: F401 (registers envs)
+        self._gym = gym
+        base = tuple(range(len(self.LEVELS)))
+        order = []
+        for c in range(n_cycles):
+            k = c % len(base)
+            order.extend(base[k:] + base[:k])
+        self.level_order = order
+        self.biome_steps = biome_steps
+        self._seed = world_seed
+        self._t = 0
+        self._bi = 0
+        self._ep = 0
+        self._enter(0)
+
+    def _enter(self, bi):
+        self._bi = bi
+        self._lvl = self.level_order[bi % len(self.level_order)]
+        self.env = self._gym.make(self.LEVELS[self._lvl])
+        self._obs, _ = self.env.reset(seed=self._seed + bi * 1000 + self._ep)
+
+    @property
+    def biome(self):
+        return self._lvl
+
+    def _sym(self, obs):
+        img = torch.as_tensor(obs["image"], dtype=torch.long)  # (7,7,3)
+        typ = img[:, :, 0]
+        state = img[:, :, 2]
+        closed = (typ == self.DOOR_TYPE) & (
+            (state == self.STATE_CLOSED[0]) | (state == self.STATE_CLOSED[1]))
+        return torch.where(closed, torch.full_like(typ, 11),
+                           typ).reshape(-1)
+
+    def reset(self):
+        return self._sym(self._obs)
+
+    def step(self, a):
+        self._t += 1
+        if self._t % self.biome_steps == 0:      # level (biome) switch
+            self._enter(self._bi + 1)
+            return 0.0, self._sym(self._obs), False
+        obs, r, term, trunc, _ = self.env.step(int(a))
+        done = bool(term or trunc)
+        if done:
+            self._ep += 1                        # continuing stream
+            obs, _ = self.env.reset(
+                seed=self._seed + self._bi * 1000 + self._ep)
+        self._obs = obs
+        return float(r), self._sym(obs), done
+
+    def get_state(self) -> bytes:
+        import pickle
+        d = {k: v for k, v in self.__dict__.items()
+             if k not in ("env", "_gym")}
+        d["_env_pickle"] = pickle.dumps(self.env)
+        return pickle.dumps(d)
+
+    def set_state(self, blob: bytes) -> None:
+        import pickle
+        import gymnasium as gym
+        import minigrid                          # noqa: F401
+        d = pickle.loads(blob)
+        env = pickle.loads(d.pop("_env_pickle"))
+        self.__dict__.update(d)
+        self._gym = gym
+        self.env = env
+
+
+ENVS["babyai"] = BabyAIEnv
