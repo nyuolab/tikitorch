@@ -39,6 +39,7 @@ from nanogpt_shakespeare import tau_at                        # noqa: E402
 from ontogenic_learner.organism.state import (                # noqa: E402
     save_atomic, load_latest)
 from ontogenic_learner.organism.ledger import Ledger          # noqa: E402
+from st7_probes import env_digest as _env_digest              # noqa: E402
 
 
 # --------------------------------------------------------------------------
@@ -223,7 +224,7 @@ class LifeAgent(Agent):
             ce_ema=self.ce_ema, intr_sum=self.intr_sum,
             t_step=self.t_step, cur=self._cur,
             env_states={n: e.get_state() for n, e in self.envs.items()},
-            env_digests={n: hashlib.sha256(e.get_state()).hexdigest()[:16]
+            env_digests={n: _env_digest(e)
                          for n, e in self.envs.items()},
             obs_gen=self.obs_gen.get_state(),
         )
