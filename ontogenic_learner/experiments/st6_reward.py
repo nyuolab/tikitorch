@@ -153,6 +153,8 @@ class Agent:
         self.fire_anneal = getattr(args, "fire_anneal", None)  # B1 critical period
         self.adv_fire = getattr(args, "adv_fire", False)   # B2 advantage gate
         self.life_steps = getattr(args, "steps", 0)        #    for the anneal clock
+        # PRE5-A: the world model is its own critic (tail-credit bootstrap)
+        self.wm_value = getattr(args, "wm_value", False)
 
     def push(self, frame, frame_reward=0.0, frame_done=False):
         self.ctx = torch.cat([self.ctx[len(frame):], frame])
@@ -275,6 +277,19 @@ class Agent:
     def step(self, learn=True):
         action = self.act()
         self.t_step += 1
+        v_tail = 0.0
+        if self.wm_value and self.policy == "token":
+            # PRE5-A wmv: ONE probe forward reads the model's own forecast
+            # P(reward+ | ctx, a) — prediction reused as the value estimate
+            # (no TD, no value head; the E2 score machinery, single action).
+            # Geometric persistence bootstrap: v = p+ / (1 - gamma).
+            c0 = self.codec
+            with torch.no_grad():
+                probe = torch.cat([self.ctx[3:], torch.tensor(
+                    [c0.ACT, c0.ACT0 + action, c0.RWD], dtype=torch.long)])
+                lg = self.model(probe.unsqueeze(0))[0][-1]
+                p_plus = float(torch.softmax(lg.float(), -1)[c0.RWD0 + 1])
+            v_tail = p_plus / (1.0 - self.gamma)
         reward, obs_sym, done = self.env.step(action)
         self.push(self.codec.frame(obs_sym, action, reward),
                   frame_reward=reward, frame_done=done)
@@ -293,10 +308,12 @@ class Agent:
                 r = self.ctx_r[1:][idx]                       # frame rewards, in order
                 d = self.ctx_d[1:][idx]                       # frame done-flags
                 G = torch.zeros_like(r)
-                acc = 0.0
-                for i in range(len(r) - 1, -1, -1):           # reward-to-go; done
+                acc = v_tail                                  # wmv tail (0 unless
+                for i in range(len(r) - 1, -1, -1):           # --wm-value); the
                     acc = float(r[i]) + self.gamma * acc * (1.0 - float(d[i]))
-                    G[i] = acc                                # zeroes cross-episode credit
+                    G[i] = acc                                # loop's (1-done) gate
+                                                              # cuts the tail on
+                                                              # episode boundaries
                 A = G - self.adv_baseline
                 self.adv_baseline = 0.99 * self.adv_baseline + 0.01 * float(G.mean())
                 if self.adv_norm:
@@ -441,6 +458,8 @@ def run(args):
             arm += "_advf"
         if getattr(args, "action_head", False):
             arm += "_head"
+        if getattr(args, "wm_value", False):
+            arm += "_wmv"
     # disambiguate tele by delta+horizon so parallel sweep cells never collide
     # (V2b lesson): a d/h tag keeps every cell's telemetry in its own file.
     dh = f"_d{args.delta}h{getattr(args, 'horizon', 1)}w{args.window}"
@@ -589,6 +608,7 @@ if __name__ == "__main__":
     p.add_argument("--fire-anneal", type=float, default=None)
     p.add_argument("--adv-fire", action="store_true")
     p.add_argument("--action-head", action="store_true")
+    p.add_argument("--wm-value", action="store_true")
     p.add_argument("--prelife-frames", type=int, default=8_000)
     p.add_argument("--prelife-steps", type=int, default=1_500)
     args = p.parse_args()
