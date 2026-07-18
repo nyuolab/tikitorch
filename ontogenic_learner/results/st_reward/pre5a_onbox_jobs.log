@@ -1,0 +1,13 @@
+[E2] foraging/polA/w0/s0: ret/1k 0.245 fire 1.0 ce 0.0293
+[E2] foraging/polA_intr0.5_norm_obsk-2_head/w0/s0: ret/1k 47.805 fire 1.0 ce 0.2511
+[E2] foraging/polA_intr0.5_norm_obsk-2_head/w0/s1: ret/1k 78.105 fire 1.0 ce 0.2833
+[E2] foraging/polA_intr0.5_norm_obsk-2_head/w0/s2: ret/1k 48.94 fire 1.0 ce 0.2961
+[E2] minatar/polA_intr0.5_norm_obsk-2_head/w0/s2: ret/1k 28.82 fire 1.0 ce 0.2664
+[E2] minatar/polA_intr0.5_norm_obsk-2_head/w0/s1: ret/1k 38.88 fire 1.0 ce 0.2621
+[E2] minatar/polA_intr0.5_norm_obsk-2_head/w0/s0: ret/1k 41.77 fire 1.0 ce 0.2582
+[E2] foraging/polA_intr0.5_norm_head_wmv/w0/s2: ret/1k 43.28 fire 1.0 ce 0.2653
+[E2] foraging/polA_intr0.5_norm_head_wmv/w0/s1: ret/1k 43.84 fire 1.0 ce 0.2811
+[E2] foraging/polA_intr0.5_norm_head_wmv/w0/s0: ret/1k 45.325 fire 1.0 ce 0.3212
+[E2] minatar/polA_intr0.5_norm_head_wmv/w0/s2: ret/1k 21.84 fire 1.0 ce 0.2807
+[E2] minatar/polA_intr0.5_norm_head_wmv/w0/s0: ret/1k 25.46 fire 1.0 ce 0.2843
+[E2] minatar/polA_intr0.5_norm_head_wmv/w0/s1: ret/1k 40.29 fire 1.0 ce 0.2787

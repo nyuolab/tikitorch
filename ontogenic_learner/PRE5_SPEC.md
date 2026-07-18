@@ -73,3 +73,33 @@ launch BOTH boxes together (A ~3h, S ~11h) → sustained analysis vs bars →
 winners fold into E5_SPEC mechanically → roadmap + memory. Two-box state:
 the launcher's run.env is snapshotted per box; monitors track S3 prefixes
 directly; both boxes self-terminate.
+
+---
+
+## PRE5-A RESULTS (2026-07-18, box i-09016e959a638d92e, 13/13, 0 failures, ~3.6h, ≈$11)
+
+Sentinel exact (0.245, 7th consecutive screen).
+Data: `results/st_reward/pre5a_screen.jsonl` + tele.
+
+arm | foraging (mean · SUS) | minatar (mean · SUS)
+---|---|---
+**headobsk** | **58.3 · 2/3** (47.8/**78.1**/48.9) | **36.5 · 3/3** (41.8/38.9/28.8)
+wmv | 44.1 · 2/3 | 29.2 · 2/3
+(head refs: 53.3 · 3/3 | 33.0 · 2/3; bars: headobsk = minatar 3/3 & ≥33 &
+foraging ≥48 ✓✓✓; wmv = foraging ≥64 ✗)
+
+- **headobsk — WIN on its full bar.** The ceiling lever (separate readout)
+  and the reliability lever (mild obs down-weight) COMPOSE: minatar 3/3
+  sustained at mean 36.5 (above streaming-AC's matched-steps 31.9), foraging
+  mean 58.3 with the program's best-ever cell (78.1). E4d's strict
+  reliability+performance standard is finally met — by the two-factor
+  combination the E4d verdict predicted. → joins the E5 config
+  (mech_lever = headobsk).
+- **wmv — NULL.** 44.1 foraging (below the 64 bar AND below head-alone),
+  29.2 minatar (marginal no-harm miss), at the declared 4× serve cost.
+  The geometric-persistence value readout does not close the sAC gap:
+  either window truncation is not the binding mechanism, or a cruder-than-
+  needed bootstrap (early p⁺ miscalibration feeds the baseline). Published
+  as the honest negative; does NOT join E5. The sAC gap remains attributed
+  to per-step TD credit vs windowed REINFORCE, now with one competing
+  explanation eliminated.

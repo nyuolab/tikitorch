@@ -13,8 +13,9 @@ integration novelty; no non-BP-rule claims).*
 - Agent: st6_reward.Agent recipe (token-policy + dyadic advantage + intr
   β=0.5 + adv-norm), d128/4L, window 96, tau=0 serve. Firing schedule =
   ALWAYS (E4d: no sparse winner — fa25 fails maintenance, advf degenerate).
-  Mechanism lever = HEAD (E4d: dominant on both envs, program records,
-  no obs tax; strict 3/3 minatar reliability remains open).
+  Mechanism lever = HEADOBSK (PRE5-A WIN: head + obs-k -2 compose — minatar
+  3/3 sustained at 36.5 > streaming-AC, foraging 58.3 incl. the 78.1 record;
+  wmv NULL at 4x cost, does not join).
 - UnifiedCodec: shared [ACT][OBS][RWD] + shared action block K=7 (union incl.
   MiniGrid; each env renormalizes over its own K_env) + shared reward block +
   DISJOINT obs-symbol blocks: foraging(3) | minatar(11) | babyai(reserved,
