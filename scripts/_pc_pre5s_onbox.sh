@@ -1,7 +1,8 @@
 #!/bin/bash
 # _pc_pre5s_onbox.sh — PRE5-S: scaling (d256 x lr grid) + context axis at the
 # head config (PRE5_SPEC). 19 cells, single wave P22 on c7i.24xlarge (96 vCPU).
-# MAX_MINUTES=780 (long pole d256 minatar ~10h at 4x d128 walls).
+# MAX_MINUTES=960 (review: MEASURED d128 head minatar walls are 2.95-3.05h
+# -> 4x = ~12h = 720min; 780 left 12% margin incl. bootstrap; 960 is the fix).
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
