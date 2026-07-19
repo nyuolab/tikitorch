@@ -120,12 +120,12 @@ cat > /usr/local/bin/e5-sync <<'SY'
 #!/bin/bash
 exec 9>/var/lock/e5-sync; flock -n 9 || exit 0
 cd /opt/tiki/life 2>/dev/null || exit 0
-aws s3 cp status.json "$S3P/status.json" --only-show-errors 2>/dev/null
-aws s3 cp tele.jsonl "$S3P/tele.jsonl" --only-show-errors 2>/dev/null
-aws s3 cp probes.jsonl "$S3P/probes.jsonl" --only-show-errors 2>/dev/null
-aws s3 sync ledger "$S3P/ledger" --only-show-errors 2>/dev/null
-L=$(cat ckpt/LATEST 2>/dev/null); [ -n "$L" ] && aws s3 cp "ckpt/$L" "$S3P/latest.pt" --only-show-errors 2>/dev/null
-aws s3 cp /var/log/e5-wd.log "$S3P/wd.log" --only-show-errors 2>/dev/null
+aws s3 cp status.json "\$S3P/status.json" --only-show-errors 2>/dev/null
+aws s3 cp tele.jsonl "\$S3P/tele.jsonl" --only-show-errors 2>/dev/null
+aws s3 cp probes.jsonl "\$S3P/probes.jsonl" --only-show-errors 2>/dev/null
+aws s3 sync ledger "\$S3P/ledger" --only-show-errors 2>/dev/null
+L=\$(cat ckpt/LATEST 2>/dev/null); [ -n "\$L" ] && aws s3 cp "ckpt/\$L" "\$S3P/latest.pt" --only-show-errors 2>/dev/null
+aws s3 cp /var/log/e5-wd.log "\$S3P/wd.log" --only-show-errors 2>/dev/null
 SY
 chmod +x /usr/local/bin/e5-sync
 echo "*/5 * * * * root S3P=\$S3P /usr/local/bin/e5-sync" > /etc/cron.d/e5sync
