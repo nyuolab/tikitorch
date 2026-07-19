@@ -613,11 +613,23 @@ def main():
                    ckpt_every_steps=500, ckpt_every_secs=3600,
                    d_model=64, n_layers=2)
     life = Life(a.workdir, cfg)
-    if not (a.resume and life.resume()):
+    resumed = a.resume and life.resume()
+    total = life.total_eras * cfg["era_steps"]
+    if resumed and life.life_step >= total and a.max_steps is None:
+        # completed life under systemd Restart=always: IDLE, don't churn
+        # (the daemon's idle-not-exit precedent; ledger stays clean)
+        print(f"[E5] life COMPLETE at {life.life_step}/{total} — idling")
+        while True:
+            time.sleep(300)
+            (life.wd / "status.json").write_text(json.dumps(dict(
+                ts=int(time.time()), step=life.life_step,
+                era=life.era_idx, env=life.agent.cur,
+                state="complete-idle",
+                resumes=life.counters["resumes"])))
+    if not resumed:
         life.birth()
     life.live(max_steps=a.max_steps)
-    print(f"[E5] life at step {life.life_step}/"
-          f"{life.total_eras * cfg['era_steps']} "
+    print(f"[E5] life at step {life.life_step}/{total} "
           f"(era {life.era_idx}, {life.agent.cur}); "
           f"resumes={life.counters['resumes']}")
 
