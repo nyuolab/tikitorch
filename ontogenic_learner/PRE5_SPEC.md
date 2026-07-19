@@ -103,3 +103,39 @@ foraging ≥48 ✓✓✓; wmv = foraging ≥64 ✗)
   as the honest negative; does NOT join E5. The sAC gap remains attributed
   to per-step TD credit vs windowed REINFORCE, now with one competing
   explanation eliminated.
+
+---
+
+## PRE5-S RESULTS (2026-07-19, box i-0c67af2dba8683eb4, 13 full + 6 truncated rows, ≈$70)
+
+**Incident, declared:** the 960-min backstop fired with the six d256-minatar
+cells at 96–97k/100k steps — the d256×w256 compound wall (>5.4× d128)
+exceeded even the review-raised estimate. The 60s sync preserved telemetry;
+verdicts below use the delivered 96%+ trajectories with the truncation
+stated. (Monitor gap also found: a fully-GC'd instance reads "unknown," not
+"terminated" — fixed in the next monitor.) Sentinel exact (8th screen).
+
+cell | foraging | minatar
+---|---|---
+d256 lr 5e-4 | **85.5** (68.7/82.6/105.2) | 25.6 (trunc.)
+d256 lr 1e-3 | 52.7 (flat vs d128) | **35.4** · 3/3 SUS (trunc.)
+d128 w256/w512 (context) | 25.9 (≪ 53.3) | 27.7 (< 33.0)
+(d128-head refs 53.3 / 33.0; bars: foraging ≥66.6 ✓ at 5e-4; minatar ≥41.3 ✗)
+
+- **SCALE-HELPS, not SCALE-WINS → the life stays d128** (mechanical bar).
+  Foraging scales spectacularly (+60% at the SCALED lr — s1 = 105.2, the
+  program record; at the old lr d256 is FLAT: the lr-control arm was
+  load-bearing, exactly the declared confound). Minatar scales modestly
+  (+7% at 1e-3; and note the best lr FLIPS by env — 5e-4 foraging, 1e-3
+  minatar — declared). headobsk at d128 (36.5) already beats d256-head
+  (35.4) on minatar at ~4× less compute.
+- **CONTEXT — NULL/harm at this tier, both envs.** Retired.
+- Paper points: (i) the 77k→297k foraging curve with the lr interaction;
+  (ii) the honest "capacity is not minatar's binder; readout structure is"
+  line now has scale evidence; (iii) d256+5e-4+headobsk is the untested
+  "big agent" combo — noted, not run.
+
+## PRE5 CLOSED — the E5 configuration, final
+
+d128/4L · headobsk (action head + obs-k −2) · intr β=0.5 · adv-norm ·
+fire-always · window 96 · lr 1e-3 · the frozen env trio · life budget ≤$75.
