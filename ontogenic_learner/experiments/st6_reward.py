@@ -581,7 +581,8 @@ def run(args):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--env", choices=["foraging", "minatar"], required=True)
+    p.add_argument("--env", choices=["foraging", "minatar", "babyai"],
+                   required=True)
     p.add_argument("--mode", choices=["agent", "frozen", "random"],
                    default="agent")
     p.add_argument("--gate", choices=["S", "N"], default="S")
