@@ -272,11 +272,13 @@ def agent_args(cfg: dict):
         prelife_steps=cfg["prelife_steps"],
         intr_beta=cfg["intr_beta"], adv_norm=cfg["adv_norm"], mb_warmup=0,
         ent_k=None,
-        obs_k=(-2 if lever == "obsk-2" else -3 if lever == "obsk-3" else None),
+        obs_k=(-2 if lever in ("obsk-2", "headobsk") else
+               -3 if lever == "obsk-3" else None),
         obs_frac=(0.25 if lever == "sub25" else None),
         fire_anneal=(cfg["fire_anneal_frac"] if fire == "anneal" else None),
         adv_fire=(fire == "advfire"),
-        action_head=(lever == "head"),
+        action_head=(lever in ("head", "headobsk")),
+        wm_value=False,
         delta_by={"foraging": cfg["delta_foraging"],
                   "minatar": cfg["delta_minatar"],
                   "babyai": cfg["delta_minatar"]},
@@ -309,6 +311,8 @@ class Life:
         self.win = []
         self.counters = dict(resumes=0, incidents=0, probes=0)
         self.probe_gen = torch.Generator().manual_seed(cfg["seed"] + 999)
+        self.probe_windows = None            # lazy-frozen at first suite
+        self.snap_actions = None             # end-of-cycle-1 action snapshot
 
     # -- era math ----------------------------------------------------------
     def era_env(self, era: int) -> str:
@@ -334,6 +338,7 @@ class Life:
             ledger_seq=self.ledger.seq,
             counters=dict(self.counters), hashes=dict(self.hashes),
             config=dict(self.cfg),
+            snap_actions=self.snap_actions,
         )
 
     def save(self, tag="periodic"):
@@ -365,6 +370,7 @@ class Life:
         self.ledger.seq = max(self.ledger.seq, blob["ledger_seq"])
         self.counters = dict(blob["counters"])
         self.counters["resumes"] = self.counters.get("resumes", 0) + 1
+        self.snap_actions = blob.get("snap_actions")
         # telemetry dedupe (st4 pattern): drop rows logged past the ckpt
         if self.tele.exists():
             rows = [json.loads(l) for l in self.tele.read_text().splitlines()]
@@ -451,9 +457,42 @@ class Life:
             self.ledger.append("LR", step=self.life_step, lr=lr,
                                halvings=halvings)
 
+    def run_probes(self):
+        """The 6h retention/transfer suite (E5_SPEC): clone-isolated, life-
+        clock frozen, rng-guarded. Rows -> probes.jsonl; snapshot at the
+        first suite after cycle 1 completes."""
+        import st7_probes as P
+        t0 = time.time()
+        h0 = P.state_hash(self)
+        if self.probe_windows is None:
+            pw_path = self.wd / "probe_windows.pt"
+            if pw_path.exists():
+                self.probe_windows = torch.load(pw_path, weights_only=False)
+            else:
+                self.probe_windows = P.generate_windows(
+                    self.codec, self.cfg, n_windows=16, window=self.cfg["window"])
+                torch.save(self.probe_windows, pw_path)
+        a = P.suite_a(self.agent.model, self.codec, self.probe_windows)
+        b = P.suite_b(self.agent, self.cfg, steps=1_000)
+        acts, agree = P.suite_c(None, self.agent, self.probe_windows,
+                                snapshot=self.snap_actions)
+        cyc_done = self.era_idx // len(self.cfg["env_order"])
+        if self.snap_actions is None and cyc_done >= 1:
+            self.snap_actions = acts                   # end-of-cycle-1 snapshot
+        assert h0 == P.state_hash(self), "probe suite mutated the life"
+        self.counters["probes"] += 1
+        row = dict(t=self.life_step, era=self.era_idx, env=self.agent.cur,
+                   wall_s=round(time.time() - t0, 1),
+                   a=a, b=b, agree=agree)
+        with (self.wd / "probes.jsonl").open("a") as f:
+            f.write(json.dumps(row) + "\n")
+        self.ledger.append("PROBE", step=self.life_step,
+                           n=self.counters["probes"],
+                           wall_s=row["wall_s"])
+
     # -- the loop ----------------------------------------------------------
     def live(self, max_steps=None):
-        t_ckpt = t_beat = time.time()
+        t_ckpt = t_beat = t_probe = time.time()
         t0 = time.time()
         cfg = self.cfg
         total = self.total_eras * cfg["era_steps"]
@@ -510,11 +549,17 @@ class Life:
                     or now - t_ckpt > cfg["ckpt_every_secs"]):
                 self.save()
                 t_ckpt = now
+            if (cfg["probe_every_hours"]
+                    and now - t_probe > cfg["probe_every_hours"] * 3600):
+                self.run_probes()
+                t_probe = time.time()
             if now - t_beat > cfg["heartbeat_secs"]:
                 (self.wd / "status.json").write_text(json.dumps(dict(
-                    step=self.life_step, era=self.era_idx,
+                    ts=int(now), step=self.life_step, era=self.era_idx,
                     env=self.agent.cur, wall_h=round((now - t0) / 3600, 2),
-                    sps=round(self.life_step / max(now - t0, 1), 1))))
+                    sps=round(self.life_step / max(now - t0, 1), 1),
+                    probes=self.counters["probes"],
+                    resumes=self.counters["resumes"])))
                 t_beat = now
             if (cfg["budget_wall_hours"]
                     and (now - t0) / 3600 > cfg["budget_wall_hours"]):
