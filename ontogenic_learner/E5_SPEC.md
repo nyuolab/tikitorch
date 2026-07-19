@@ -106,3 +106,28 @@ equal resume), kill-during-ckpt-write (LATEST fallback), SIGSTOP (watchdog
 <15 min), S3-only resume, probe duty <5%, telemetry shakedown + dark-room
 floor calibration, throughput → single-factor era rescale → freeze this
 spec's absolute numbers. All gates pass → launch the life.
+
+---
+
+## E5b RESULT (2026-07-19, 9/9 cells, 0 failures, ≈$3): BABYAI JOINS THE LIFE
+
+Unanimous on BOTH inclusion conditions, all 3 seeds: recipe (headobsk)
+2.74/3.05/2.46 ret/1k (mean 2.75 = 2.4× the random floor 1.14 — real policy
+traction on sparse terminal-only reward through windowed REINFORCE) and
+obs-CE 0.081–0.091 vs frozen 0.50–0.59 (clean world-model learning). Birth
+calibration at K=7 confirmed (pi0H ≈ ln 7). Data:
+`results/st_reward/e5b_screen.jsonl`. The full life runs babyai_enabled with
+the arrival at cycle 6: cycles 0–5 = (foraging, minatar) pairs, cycles 6–9 =
+rotated triples → 24 eras, 12M steps (~+20% budget, within cap).
+
+## PILOT (running, i-087583fd254577a2f) — drill scoreboard so far
+
+kill-9 mid-era ✓ (systemd resume, RESUME event, tele continuity) ·
+SIGSTOP watchdog ✓ (restart <12 min, resumes=2) · S3 recovery artifact ✓
+(latest.pt uploads + torch-loads after the live-patched heredoc fix,
+launcher fixed dfcc810) · probe duty ✓ (87s/suite at 1h cadence ≈ 2.4%) ·
+throughput 41–79 sps blended (full life ≈ 2–3 days ≈ $20–30, NO era
+rescale needed) · FIRST SCIENCE: era-0→2 foraging catastrophically
+interfered (probe CE ≈ 21, clone returns ≈ 0–3) while minatar excels
+(CE 0.27–2.3, clones to 118) — the era-3 revisit recovery is the live
+RETAIN readout; the full life measures whether revisits cheapen.

@@ -29,7 +29,8 @@ pilot = dict(era_steps=100_000, biome_steps=25_000, cycles=4,
 full = dict(era_steps=500_000, biome_steps=125_000, cycles=10,
             probe_every_hours=6.0, ckpt_every_steps=50_000,
             ckpt_every_secs=900, budget_wall_hours=380.0,
-            mech_lever="headobsk", fire_schedule="always")
+            mech_lever="headobsk", fire_schedule="always",
+            babyai_enabled=True, babyai_from_cycle=6)
 cfg = pilot if "$LIFE" == "pilot" else full
 json.dump(cfg, open(sys.argv[1], "w"), indent=1)
 print("cfg:", "$LIFE", cfg)

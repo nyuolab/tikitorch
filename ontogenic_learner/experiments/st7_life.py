@@ -296,9 +296,13 @@ class Life:
         self.ledger = Ledger(str(self.wd / "ledger"))
         self.tele = (self.wd / "tele.jsonl")
         self.hashes = dict(config=config_hash(cfg), env_code=env_code_hash())
+        names = list(cfg["env_order"])
+        if cfg.get("babyai_enabled"):
+            names.append("babyai")          # third world: built at birth,
+                                            # eras join at babyai_from_cycle
         envs = {n: make_env(n, world_seed=cfg["world_seed"],
                             biome_steps=cfg["biome_steps"])
-                for n in cfg["env_order"]}
+                for n in names}
         self.codec = UnifiedCodec(envs, babyai_syms=cfg["babyai_syms"])
         self.args = agent_args(cfg)
         self.agent = LifeAgent(envs, self.args, self.codec)
@@ -315,15 +319,35 @@ class Life:
         self.snap_actions = None             # end-of-cycle-1 action snapshot
 
     # -- era math ----------------------------------------------------------
+    def _cycle_of_era(self, era: int):
+        """-> (cycle, offset, order) under the third-world arrival: cycles
+        before babyai_from_cycle are (foraging, minatar) pairs; cycles from it
+        are triples with babyai appended (E5_SPEC: the arrival is
+        pre-registered; base-env era counts are unchanged)."""
+        base = list(self.cfg["env_order"])
+        arrive = (self.cfg["babyai_from_cycle"]
+                  if self.cfg.get("babyai_enabled") else 10 ** 9)
+        pre = min(self.cfg["cycles"], arrive) * len(base)
+        if era < pre:
+            cyc, off = divmod(era, len(base))
+            return cyc, off, base
+        cyc2, off = divmod(era - pre, len(base) + 1)
+        return arrive + cyc2, off, base + ["babyai"]
+
     def era_env(self, era: int) -> str:
-        order = self.cfg["env_order"]
-        cyc, off = divmod(era, len(order))
-        rot = order[cyc % len(order):] + order[:cyc % len(order)]
+        cyc, off, order = self._cycle_of_era(era)
+        r = cyc % len(order)
+        rot = order[r:] + order[:r]
         return rot[off]
 
     @property
     def total_eras(self):
-        return self.cfg["cycles"] * len(self.cfg["env_order"])
+        base = len(self.cfg["env_order"])
+        arrive = (self.cfg["babyai_from_cycle"]
+                  if self.cfg.get("babyai_enabled") else 10 ** 9)
+        pre_cycles = min(self.cfg["cycles"], arrive)
+        post_cycles = max(0, self.cfg["cycles"] - arrive)
+        return pre_cycles * base + post_cycles * (base + 1)
 
     # -- checkpointing -----------------------------------------------------
     def capture(self) -> dict:
@@ -445,7 +469,7 @@ class Life:
         return True
 
     def apply_lr(self):
-        cyc_done = self.era_idx // len(self.cfg["env_order"])
+        cyc_done = self._cycle_of_era(self.era_idx)[0]
         halvings = min(cyc_done // self.cfg["lr_halve_every_cycles"],
                        (self.cfg["lr_floor_div"] - 1).bit_length())
         if halvings != self.halvings:
