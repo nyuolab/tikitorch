@@ -184,39 +184,101 @@ mechanism pinned, two fixes found, stacked recipe validated, efficiency
 limit mapped. Next phase = user decision: streaming-AC gap / minatar
 universality / delta-frontier sweep / E5 life / manuscript integration. ≈$6.
 
-### E5 — the second life (months-long persistence)
-100M+ tokens / multi-month always-on agent on one box: organism daemon +
-V4-life config + excess-surprise gate + periodic Fisher-probe consolidation.
-Weekly probe suites; the pre-registered adversary is slow drift (the 10M
-life's open tail). This is cheap (CPU/one F2) and is the artifact that makes
-the "persistent embodied agent" claim visceral — a thing that has been alive
-and learning for months, every update attributable.
+### E5 — the second life — RUNNING (i-025e8e11ff3107bd2, born 2026-07-19)
+Pilot (800k, 8 eras): ALL 7 drill gates green; science preview = the
+interference seesaw (CE 0.6↔25 by residency at anchor-none), SAVINGS with
+overshoot (revisit relearns faster and higher than first life), and the
+policy-vs-world-model RETENTION DISSOCIATION (space_invaders clone 166 at
+CE 25.8) — the two-readout architecture measures CLS-like structure
+directly. The full life: 24 eras / 12M steps / 3 worlds (BabyAI arrives
+cycle 6, gate passed unanimously), ~3 days, ~$30, Goal-B bars pre-registered
+(RETAIN / NO-RELAPSE / STABILITY / TRANSFER / OPS). Report at completion.
 
-### E6 — the agent at the sensor (silicon)
-Port the fused loop end-to-end to the F2 kernel path (gate: the localized s2
-backward divergence); then the E1 loop on-fabric. V5's floor number feeds
-the ASIC study: the target artifact is a milliwatt-class always-plastic
-sensor-edge learner, where the GPU's 79 W stream-sitting floor is the
-comparison that matters.
+## THE END GOAL (locked framing, 2026-07-20): DIGITAL ONTOGENY
 
-### E7 — collective ontogeny (fleet)
-N embodied agents, disjoint experiences, firing-normalized/probe-based merge
-(V4b.1 fix). Pass = merged-beats-solo on held-out worlds WITHOUT sharing
-data. This is the fleet-experience-scaling bet, now with the V4b failure
-mode designed out rather than assumed away.
+A continually-running experiential organism on the PC compute fabric —
+birth, development, sleep-like consolidation, death-resistance, and
+LIFETIME CAPABILITY GAIN — that scales the way LLMs scale, but in the
+EXPERIENCE dimension rather than the shuffled-token dimension. The field's
+convergent goal (Sutton/Silver era-of-experience; Alberta Plan); our novel
+path = substrate-native (fused serve+learn as silicon physics, audited
+closure, bit-exact resumability) with the equivalence receipts to train
+real sequence models. The crux, measured by our own pilot: LLMs get
+monotone accumulation by SHUFFLING TIME AWAY (i.i.d. batches); a life meets
+the world in order and pays the interference seesaw — but shows SAVINGS,
+biology's accumulation mechanism. The E6 arc turns the seesaw into a
+ratchet, then measures the scaling law. Claim guardrails extend here:
+"digital ontogeny" with operational, measured properties — never sentience/
+agency inflation; "biologically inspired constraints" phrasing stands.
 
-### E8 — the public benchmark
-SPJS harness (score-per-joule-per-stream) with the embodied stream tasks +
-GPU baselines, shipped as the community artifact; asymmetric honesty (the
-fabric loses columns) as the adoption mechanism.
+### E6 — the ratchet arc (seesaw → monotone accumulation)
+
+**E6-C — consolidation (the highest-leverage gate, ~$50).** A second
+10-cycle life with weights-class consolidation arms vs the running
+anchor-none baseline: (a) anchor-all-weak from birth (V4 machinery, lam
+sweep {.003,.01,.03}); (b) two-timescale weights (fast + slow-EMA serving
+blend); (c) the E5 drift-tripwire policy as a control. MEMORY-CLASS
+DISCIPLINE, declared: CLS-style experience REPLAY is excluded (reservoirs
+= an experience memory class; the E-program's minimality line) —
+consolidation here is weights-class only (a second weight copy = same
+memory class as momentum, the V4 precedent). If weights-only consolidation
+cannot ratchet, THAT is the finding: the measured price of the
+no-experience-replay constraint. **Bars:** RATCHET = revisit recovery cost
+non-increasing across cycles 3→10 AND era-peak trend positive AND
+final-cycle sustained-above-floors in BOTH resident worlds, beating the
+anchor-none baseline on all three. KILL branch published as the
+constraint's price.
+
+**E6-G — generalization pressure (~$40).** The pilot flag: lived
+competence 80–116 vs fresh-world clones ≤31 — adaptation, not
+generalization. Adapter + gate screen for XLand-MiniGrid task
+DISTRIBUTIONS (ENV_DECISION_2's designated env; task diversity is the
+anti-memorization pressure), then distribution-eras in a life. **Bar:**
+fresh-instance clone returns ≥50% of lived returns on the distribution
+world (closing the instance-specificity gap by half). Prior art engaged:
+task-diversity-vs-continual-RL (arXiv 2606.00880).
+
+**E6-S — the EXPERIENCE SCALING LAW (the flagship-grade object, ~$150-300
+phased).** LLM scaling laws plot loss vs i.i.d. tokens; nobody has
+published capability vs ORDERED, LIVED, revisit-structured experience for
+an embodied continual learner — let alone with an energy axis. The grid:
+lives at cycles {2, 4, 10, 20} × d_model {128, 256} × (later) fabric
+replication tiles, each with the E6-C winner's consolidation config;
+capability = the probe-matrix composite (end-of-life per-world sustained
+returns + revisit-cost trend + zero-shot transfer), joules via the
+V3-calibrated op-count proxy until silicon. **Bars:** EXISTENCE = at least
+one config shows monotone capability-vs-lifetime with non-increasing
+revisit costs (the ratchet at scale); SHAPE = the curve's exponent/knee
+reported however it falls (a flat curve at all configs = the honest
+negative: experiential scaling needs ingredients we don't have — also
+publishable). lr-rescale-with-scale is a declared axis (PRE5's lesson).
+
+### E7 — the agent at the sensor + REPLICATION-AS-GROWTH (silicon)
+(was E6.) Port the fused agent loop to the F2 kernel path (gate: the
+localized s2 backward divergence); then the measured LINEAR kernel
+replication on F2 becomes the CAPACITY-GROWTH mechanism: the organism gets
+physically larger as it accumulates — tiles added at constant per-tile
+energy, no retraining event. Hardware scale-out AS ontogeny; V5's energy
+floor feeds the ASIC study; the E6-S grid gains its tiles axis here.
+
+### E8 — collective ontogeny (fleet)
+(was E7.) N organisms, disjoint lives, weights-only merge (V4b.1 fix);
+pass = merged-beats-solo on held-out worlds without sharing experience.
+
+### E9 — the public benchmark
+(was E8.) The SPJS harness + the experience-scaling-law protocol as a
+community benchmark: capability-per-joule-per-lifetime, with our honest
+asymmetric columns.
 
 ## Sequencing and spend
 
-E0 ✅($8) → E1 KILL($8) → E2 KILL($60) → E3 BISTABLE($10) — the ladder
-re-sequenced by results: the actionable next gate is an E4 DESIGN DECISION on
-ignition reliability (E3_SPEC candidates); the persistence life (E4 above)
-starts once a policy loop is reliable OR runs prediction-only on the V-config;
-silicon (E6) gated on the s2 fix; fleet/benchmark (E7/E8) after E5.
-(Renumbered 2026-07-16 when the correct-loss gate took the E3 slot.)
+E0✅ → E1 KILL → E2 KILL → E3 BISTABLE → E4 TWO WINS → E4b STACK →
+E4c STARVED → E4d TWO-FACTOR → PRE5 (headobsk + SCALE-HELPS + docs) →
+E5 pilot✅ + LIFE RUNNING → E6-C consolidation (~$50) → E6-G generalization
+(~$40) → E6-S the experience scaling law (~$150-300 phased) → E7 silicon +
+replication-as-growth (gated on the s2 fix) → E8 fleet → E9 benchmark.
+Cumulative through E5: ~$220. House disciplines unchanged: prereg,
+adversarial review, sentinels, honest branches, EC2-only, claim guardrails.
+(Renumbered 2026-07-20 when the ratchet arc took the E6 slot.)
 Every gate keeps the V-program disciplines: pre-registration, honest-negative
 branches, adversarial pre-launch review, EC2-only compute, audit coverage.
