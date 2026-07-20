@@ -32,7 +32,8 @@ import torch
 import torch.optim as toptim
 
 __all__ = ["SignSGD", "TropicalSGD", "PureTropicalSGD", "TropicalLion", "TropicalAdam",
-           "FrexpMagnitudeSGD", "CountAgreementSGD", "ExponentEMAAdam", "PerLayerStepSGD"]
+           "FrexpMagnitudeSGD", "CountAgreementSGD", "ExponentEMAAdam", "PerLayerStepSGD",
+           "EFTropicalSGD"]
 
 
 def _arshift(x: torch.Tensor, bits: int) -> torch.Tensor:
@@ -853,4 +854,160 @@ class PerLayerStepSGD(toptim.Optimizer):
                 step = table[shift.to(torch.long)]                  # scalar pow2
                 p.add_(torch.sign(g) * step, alpha=-1.0)
                 st["shift"], st["prev"], st["streak"] = shift, layerdir, streak
+        return loss
+
+
+class EFTropicalSGD(toptim.Optimizer):
+    """Error-feedback tropical SGD — the closed base optimizer that cures the
+    :class:`PureTropicalSGD` long-horizon collapse without leaving the fabric.
+
+    The collapse of naked sign-SGD on our sparse, bursty, non-stationary regime
+    has two root causes; this optimizer addresses both with add/shift/compare only:
+
+      1. **Biased compression.** ``sign(g)`` discards the routed integer magnitude,
+         so a weak-but-consistent gradient is thrown away while zero-mean noise
+         still moves the weight (a random walk whose variance grows with fires).
+         FIX — a conserved fixed-point RESIDUAL ``e``: accumulate the
+         power-of-two-scaled gradient and apply one unit step only once ``|e|``
+         crosses the step threshold, keeping the remainder. This is per-coordinate
+         error feedback (Karimireddy et al., ICML 2019), closed form: noise
+         accumulates to ~0 and never crosses threshold (denoising); a small
+         persistent gradient eventually does (unbiased in the limit).
+      2. **Magnitude runaway.** FIX — an optional state-free soft-bound
+         ``clamp(w, ±bound)`` (a comparator), the anti-runaway that a conserved
+         residual alone does not provide.
+
+    A saturating consolidation counter ``c`` (int16) grows with consistent
+    directional movement — a metaplastic 'stiffness'/importance that
+    ``DyadicAnchor`` reads to drive a multiply-free, Adam-free precision anchor,
+    retiring the ``exp_avg_sq`` dependency of the EWC-shaped anchor.
+
+    ``lr_shift`` is the step resolution (``step = 2^-lr_shift``) and is the knob
+    the harness' bit-shift lr-decay increments. With ``ef=False`` this degrades to
+    naked sign-SGD (the ablation baseline).
+
+    Closed: pow2 scale (shift), sign, compare/``where``, subtract, int add/clamp,
+    ``_arshift``. Zero DSP — the same class as ``FrexpMagnitudeSGD``/``CountAgreementSGD``.
+    """
+
+    def __init__(self, params, lr_shift=10, ef=True, bound=0.0, c_max=63,
+                 c_leak_every=0, resid_leak_shift=0,
+                 adapt=False, adapt_span=4, adapt_smin=3, adapt_smax=16,
+                 momentum=False, mom_bits=4):
+        if not 0 <= c_max <= 32767:
+            raise ValueError("c_max must fit int16")
+        if not 0 <= mom_bits <= 6:
+            raise ValueError("mom_bits must be in [0, 6] (int8 counter safety)")
+        defaults = dict(lr_shift=lr_shift, ef=ef, bound=bound, c_max=c_max,
+                        c_leak_every=c_leak_every, resid_leak_shift=resid_leak_shift,
+                        adapt=adapt, adapt_span=adapt_span, adapt_smin=adapt_smin,
+                        adapt_smax=adapt_smax, momentum=momentum, mom_bits=mom_bits,
+                        lr=2.0 ** -lr_shift)
+        super().__init__(params, defaults)
+        self._step_count = 0
+        self._K = adapt_smax
+
+    def state_dict(self):
+        sd = super().state_dict()
+        sd["tt_step_count"] = self._step_count
+        return sd
+
+    def load_state_dict(self, state_dict):
+        # Base Optimizer casts state to the (float) param dtype on load, which
+        # corrupts the int16 counter; re-coerce afterwards (cf. PureTropicalSGD).
+        sd = dict(state_dict)
+        self._step_count = sd.pop("tt_step_count", 0)
+        super().load_state_dict(sd)
+        for st in self.state.values():
+            for k, dt in (("c", torch.int16), ("m", torch.int8),
+                          ("eref", torch.int32)):
+                t = st.get(k)
+                if t is not None and t.dtype != dt:
+                    st[k] = t.to(dt)
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+        self._step_count += 1
+        for group in self.param_groups:
+            lr_shift = group["lr_shift"]
+            ef, bound, c_max = group["ef"], group["bound"], group["c_max"]
+            c_leak_every, rls = group["c_leak_every"], group["resid_leak_shift"]
+            adapt = group["adapt"]
+            span, smin, smax = group["adapt_span"], group["adapt_smin"], group["adapt_smax"]
+            momentum, m_bits = group["momentum"], group["mom_bits"]
+            step0 = 2.0 ** -lr_shift                          # pow2 scalar = a bit-shift
+            do_leak = c_leak_every > 0 and self._step_count % c_leak_every == 0
+            m_max = (1 << m_bits) - 1 if m_bits > 0 else 0
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                g = p.grad
+                st = self.state[p]
+                if "c" not in st:
+                    st["c"] = torch.zeros_like(p, dtype=torch.int16)
+                    if ef:
+                        st["e"] = torch.zeros_like(p)
+                    if adapt:
+                        st["eref"] = torch.zeros_like(p, dtype=torch.int32)
+                    if momentum:
+                        st["m"] = torch.zeros_like(p, dtype=torch.int8)
+                c = st["c"]
+
+                # --- accumulated evidence (error feedback conserves magnitude) ---
+                acc = (st["e"] + g * step0) if ef else g      # pow2 scale = shift
+
+                # --- step DIRECTION (optional temporal counter momentum) ---
+                if momentum:
+                    m = st["m"]
+                    m.add_(torch.sign(acc).to(torch.int8))    # accumulate sign evidence
+                    if do_leak:
+                        m.copy_((m.abs() >> 1) * m.sign().to(torch.int8))
+                    m.clamp_(-m_max, m_max)
+                    direction = torch.where(m != 0, m.sign().to(p.dtype),
+                                            torch.sign(acc))
+                else:
+                    direction = torch.sign(acc)
+
+                # --- step SIZE (optional frexp adaptive step = closed 1/sqrt(v)) ---
+                if adapt:
+                    _, tier = torch.frexp(acc)                # int exponent; 0 where acc==0
+                    eref = st["eref"]
+                    nz = tier != 0
+                    eref = eref + torch.where(nz, _arshift(tier - eref, 3),
+                                              torch.zeros_like(eref))   # int EMA of the tier
+                    st["eref"] = eref
+                    rel = (tier - eref).clamp(-span, span)    # bigger-than-usual -> bigger step
+                    shift = (lr_shift - rel).clamp(smin, smax).to(torch.long)
+                    step = _pow2_table(self._K, p.device, p.dtype)[shift]   # ROM gather
+                else:
+                    step = step0
+
+                # --- fire threshold + apply ---
+                if ef:
+                    thr = step if adapt else step0
+                    fire = acc.abs() >= thr                   # step only when evidence >= step
+                    applied = torch.where(fire, direction * step,
+                                          torch.zeros_like(acc))    # {sign|mom} x pow2 = shift
+                    p.add_(applied, alpha=-1.0)               # descent along -g
+                    e = acc - applied                         # conserve the remainder
+                    if rls > 0:
+                        e = e - e * (2.0 ** -rls)             # optional dyadic leak (bounds e)
+                    st["e"] = e
+                else:
+                    applied = torch.where(g != 0, direction * step,
+                                          torch.zeros_like(g))
+                    p.add_(applied, alpha=-1.0)
+
+                # metaplastic consolidation counter: += sign(step) where a step landed
+                c.add_(torch.sign(applied).to(torch.int16))
+                if do_leak:
+                    c.copy_((c.abs() >> 1) * c.sign().to(torch.int16))
+                c.clamp_(-c_max, c_max)
+
+                if bound > 0:
+                    p.clamp_(-bound, bound)                   # state-free anti-runaway
         return loss

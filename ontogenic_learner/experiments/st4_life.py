@@ -55,7 +55,8 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 from pc_convrnn_charlm import MorphPCEngine                 # noqa: E402
 from st1_streams import DOMAINS, OUT, load_assets, load_ckpt  # noqa: E402
-from st2_live import Anchor, MarginGate, _NoStep, oracle_ces  # noqa: E402
+from st2_live import (Anchor, DyadicAnchor, PrecisionAnchor,  # noqa: E402
+                      MarginGate, _NoStep, oracle_ces)
 
 LN2 = math.log(2)
 KICK_COST = 0.38
@@ -119,20 +120,42 @@ def run(args):
     learner.eval()                          # serve dropout OFF (V4cal-locked)
     frozen.eval()
     engine = MorphPCEngine(learner)
+    import tikitorch.optim as ttoptim
     if args.opt == "puretropical":
-        import tikitorch.optim as ttoptim
-        # the CLOSED shift-based optimizer: lr = 2^-lr_shift; decay = shift+1.
-        # No exp_avg_sq -> the precision anchor has no importance source; the
-        # strict adversary runs anchorless (mechanism isolation).
+        # CLOSED shift-based: lr = 2^-lr_shift; decay = shift+1. sign + int8 counter.
         opt = ttoptim.PureTropicalSGD(learner.parameters(),
                                       lr_shift=args.lr_shift, momentum_bits=4)
-        assert args.anchor_lam == 0, "anchor needs Adam moments; use --anchor-lam 0"
+    elif args.opt == "eftropical":
+        # CLOSED error-feedback (cures the fire-always collapse).
+        opt = ttoptim.EFTropicalSGD(learner.parameters(), lr_shift=args.lr_shift,
+                                    ef=not args.no_ef, bound=args.ef_bound)
+    elif args.opt == "hybrid":
+        # CLOSED parity-hunt base: error feedback + frexp adaptive step
+        # (Adam's 1/sqrt(v) surrogate) + optional temporal counter momentum.
+        opt = ttoptim.EFTropicalSGD(learner.parameters(), lr_shift=args.lr_shift,
+                                    ef=not args.no_ef, bound=args.ef_bound,
+                                    adapt=not args.no_adapt, momentum=args.momentum)
     else:
-        opt = torch.optim.AdamW(learner.parameters(), lr=args.lr,
-                                weight_decay=0.01)
+        opt = torch.optim.AdamW(learner.parameters(), lr=args.lr, weight_decay=0.01)
+
+    # --- consolidation anchor (the retention/Goal-B leg) ---
+    kind = args.anchor
+    if kind == "auto":                              # preserve prior defaults
+        kind = ("adam" if args.opt == "adamw" and args.anchor_lam > 0
+                else "dyadic" if args.opt == "eftropical" and args.anchor_lam > 0
+                else "none")
+    if kind == "adam":
+        assert args.opt == "adamw", "adam anchor needs AdamW exp_avg_sq"
+        anchor = Anchor(learner, lam=args.anchor_lam)
+    elif kind == "dyadic":
+        assert args.opt in ("eftropical", "hybrid"), \
+            "dyadic anchor needs the optimizer's 'c' counter"
+        anchor = DyadicAnchor(learner, k0=args.anchor_k0)
+    elif kind == "precision":                       # base-agnostic: reads p.grad
+        anchor = PrecisionAnchor(learner, k0=args.anchor_k0)
+    else:
+        anchor = None
     gate = MarginGate(delta=args.delta)
-    anchor = (Anchor(learner, lam=args.anchor_lam)
-              if args.anchor_lam > 0 else None)
     probes = probe_windows(assets, domains, args.window)
 
     from tikitorch.audit import _make_catcher
@@ -144,7 +167,9 @@ def run(args):
                     anchor_lam=a.anchor_lam, lr=a.lr, opt=a.opt,
                     lr_shift=a.lr_shift,
                     lr_decay_every=a.lr_decay_every, seed=a.seed,
-                    fire_always=a.fire_always)
+                    fire_always=a.fire_always, anchor=a.anchor,
+                    ef_bound=a.ef_bound, no_ef=a.no_ef, no_adapt=a.no_adapt,
+                    momentum=a.momentum, anchor_k0=a.anchor_k0)
 
     ck_dir = OUT / "ckpts"
     ck_dir.mkdir(parents=True, exist_ok=True)
@@ -310,6 +335,10 @@ def run(args):
                   f"({time.time()-t0:.0f}s) preq {sum_l/n:.4f} "
                   f"fire {fires/n:.4f} lr {opt.param_groups[0]['lr']:.2e}",
                   flush=True)
+        if args.max_windows and n >= args.max_windows:
+            print(f"[V4/{args.tag}] --max-windows {args.max_windows} reached; "
+                  f"stopping (pre-cut mode)", flush=True)
+            break
     tele.close()
     probe_log.close()
 
@@ -348,8 +377,24 @@ if __name__ == "__main__":
     p.add_argument("--window", type=int, default=96)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--opt", choices=["adamw", "puretropical"], default="adamw")
+    p.add_argument("--opt", choices=["adamw", "puretropical", "eftropical",
+                                     "hybrid"], default="adamw")
+    p.add_argument("--anchor", choices=["auto", "none", "adam", "dyadic",
+                                        "precision"], default="auto",
+                   help="consolidation anchor; 'auto' = prior per-opt default")
     p.add_argument("--lr-shift", type=int, default=10)
+    p.add_argument("--ef-bound", type=float, default=0.0,
+                   help="EFTropicalSGD soft-bound magnitude (0 = off)")
+    p.add_argument("--no-ef", action="store_true",
+                   help="ablate error feedback (EFTropicalSGD -> naked sign-SGD)")
+    p.add_argument("--no-adapt", action="store_true",
+                   help="hybrid: ablate the frexp adaptive step")
+    p.add_argument("--momentum", action="store_true",
+                   help="hybrid: enable temporal counter momentum")
+    p.add_argument("--anchor-k0", type=int, default=7,
+                   help="Dyadic/Precision anchor base pull shift (larger = weaker)")
+    p.add_argument("--max-windows", type=int, default=0,
+                   help="cap served windows (pre-cut mode; 0 = full life)")
     p.add_argument("--delta", type=float, default=0.25)
     p.add_argument("--anchor-lam", type=float, default=0.01)
     p.add_argument("--lr-decay-every", type=int, default=2000)

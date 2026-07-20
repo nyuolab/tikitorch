@@ -1,0 +1,10 @@
+{"t": 0, "where": "birth", "ce_wiki": 3.9077, "ce_shakespeare": 7.7718, "ce_docs": 9.3148, "ce_code": 8.9164, "norm": 3072.62}
+{"t": 79968, "where": "era_end_0", "ce_wiki": 3.9073, "ce_shakespeare": 7.7717, "ce_docs": 9.3148, "ce_code": 8.9164, "norm": 3072.62}
+{"t": 159936, "where": "era_end_1", "ce_wiki": 3.9496, "ce_shakespeare": 7.4053, "ce_docs": 9.1224, "ce_code": 8.7648, "norm": 3072.63}
+{"t": 239904, "where": "era_end_2", "ce_wiki": 4.1552, "ce_shakespeare": 7.2611, "ce_docs": 8.2544, "ce_code": 7.4832, "norm": 3072.89}
+{"t": 319872, "where": "era_end_3", "ce_wiki": 4.3357, "ce_shakespeare": 7.2324, "ce_docs": 7.8473, "ce_code": 6.6554, "norm": 3073.15}
+{"t": 319872, "where": "cycle1_snapshot"}
+{"t": 399840, "where": "era_end_4", "ce_wiki": 4.3357, "ce_shakespeare": 7.2324, "ce_docs": 7.8473, "ce_code": 6.6554, "agree_wiki": 1.0, "agree_shakespeare": 1.0, "agree_docs": 1.0, "agree_code": 1.0, "norm": 3073.15}
+{"t": 479808, "where": "era_end_5", "ce_wiki": 4.3831, "ce_shakespeare": 7.1924, "ce_docs": 7.7324, "ce_code": 6.555, "agree_wiki": 0.8496, "agree_shakespeare": 0.8141, "agree_docs": 0.8053, "agree_code": 0.8385, "norm": 3073.22}
+{"t": 559776, "where": "era_end_6", "ce_wiki": 4.4074, "ce_shakespeare": 7.1742, "ce_docs": 7.6961, "ce_code": 6.4928, "agree_wiki": 0.8086, "agree_shakespeare": 0.7718, "agree_docs": 0.7669, "agree_code": 0.8154, "norm": 3073.25}
+{"t": 639744, "where": "era_end_7", "ce_wiki": 4.4074, "ce_shakespeare": 7.1742, "ce_docs": 7.6961, "ce_code": 6.4928, "agree_wiki": 0.8086, "agree_shakespeare": 0.7718, "agree_docs": 0.7669, "agree_code": 0.8154, "norm": 3073.25}

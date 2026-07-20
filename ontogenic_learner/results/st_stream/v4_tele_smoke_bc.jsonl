@@ -1,0 +1,3 @@
+{"t": 96, "domain": "wiki", "ce_l": 3.7282, "ce_f": 3.7282, "fired": true, "fires": 1, "halvings": 0, "fire_rate": 1.0, "norm": 3072.62, "lr": 0.001}
+{"t": 1824, "domain": "wiki", "ce_l": 4.752, "ce_f": 4.7501, "fired": true, "fires": 2, "halvings": 0, "fire_rate": 0.1053, "norm": 3072.63, "lr": 0.001}
+{"t": 1920, "domain": "wiki", "ce_l": 3.5958, "ce_f": 3.5799, "fired": false, "fires": 2, "halvings": 0, "fire_rate": 0.1, "norm": 3072.63, "lr": 0.001}

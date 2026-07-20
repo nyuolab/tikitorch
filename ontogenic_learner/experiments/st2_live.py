@@ -133,6 +133,114 @@ class Anchor:
             self.theta[n].mul_(self.ema).add_(p.detach(), alpha=1 - self.ema)
 
 
+class DyadicAnchor:
+    """Adam-free precision anchor for :class:`tikitorch.optim.EFTropicalSGD` —
+    retires the ``exp_avg_sq`` dependency of :class:`Anchor`. Importance is the
+    optimizer's own saturating consolidation counter ``c`` (metaplastic
+    stiffness, Laborieux/Querlioz-flavoured), and BOTH the pull and the slow
+    weight-EMA are multiply-free (frexp tier + pow2-table gather + dyadic EMA),
+    so the whole retention leg is closed / zero-DSP.
+
+      pull  (on fire, direct weight update; stronger for consolidated weights):
+            shift = clamp(k0 - tier(|c|), shift_min, shift_max)
+            w -= (w - theta) * 2^-shift
+      track (every window, physical clock — the correct staleness clock):
+            theta += (w - theta) * 2^-ema_shift
+    """
+
+    def __init__(self, model, k0=7, max_accel=4, shift_min=3, shift_max=20,
+                 ema_shift=13):
+        self.k0, self.ma = k0, max_accel
+        self.smin, self.smax, self.ema_shift = shift_min, shift_max, ema_shift
+        self.theta = {n: p.detach().clone() for n, p in model.named_parameters()}
+        self._K = shift_max
+        self._tab = None
+
+    def _pow2(self, device, dtype):
+        if self._tab is None or self._tab.device != device:
+            self._tab = torch.tensor([2.0 ** -k for k in range(self._K + 1)],
+                                     device=device, dtype=dtype)   # ROM, built from floats
+        return self._tab
+
+    @torch.no_grad()
+    def pull(self, model, opt):
+        for n, p in model.named_parameters():
+            c = opt.state.get(p, {}).get("c")
+            if c is None:
+                continue
+            _, tier = torch.frexp(c.abs().to(p.dtype))            # ~log2|c|; 0 where c==0
+            tier = tier.clamp(0, self.ma)
+            shift = (self.k0 - tier).clamp(self.smin, self.smax).to(torch.long)
+            step = self._pow2(p.device, p.dtype)[shift]           # gather 2^-shift
+            p.add_((p.detach() - self.theta[n]) * step, alpha=-1.0)   # w -= (w-theta)*2^-shift
+
+    @torch.no_grad()
+    def track(self, model):
+        s = 2.0 ** -self.ema_shift                                # pow2 scalar = shift
+        for n, p in model.named_parameters():
+            self.theta[n].add_((p.detach() - self.theta[n]) * s)  # dyadic EMA
+
+
+class PrecisionAnchor:
+    """Adam-free precision anchor whose importance is a CLOSED estimate of Fisher
+    information from the routed gradient's OWN statistics.
+
+    Fixes the two importance failures we measured: DyadicAnchor used displacement
+    (movement counter) and over-damped (HC 0.18 -> 0.004); Anchor used Adam's
+    exp_avg_sq (needs multiplies; went stale under sparse firing in V4b). Fisher
+    ~ E[g^2], so log-importance ~ E[log|g|]: we accumulate the routed gradient's
+    frexp magnitude tier into a bounded per-weight counter pi with a mild dyadic
+    leak (Fisher sums across tasks; the leak lets stale stiffness fade after a
+    domain switch). Weights that consistently receive large routed error are the
+    important ones and get pulled harder toward the slow anchor.
+
+      pull  (on fire): read p.grad; pi += max(tier(|g|)-floor, 0) - pi>>leak;
+            w -= (w - theta) * 2^-(k0 - tier(pi))          (stronger for high precision)
+      track (every window, physical clock): theta += (w - theta) * 2^-ema_shift
+    Fully closed / zero-DSP: frexp, int add/compare/clamp/shift, pow2-table gather.
+    """
+
+    def __init__(self, model, k0=8, max_accel=6, shift_min=3, shift_max=22,
+                 ema_shift=13, pi_floor=-14, pi_leak_shift=4, pi_max=1 << 16):
+        self.k0, self.ma = k0, max_accel
+        self.smin, self.smax, self.ema_shift = shift_min, shift_max, ema_shift
+        self.pi_floor, self.pi_leak_shift, self.pi_max = pi_floor, pi_leak_shift, pi_max
+        self.theta = {n: p.detach().clone() for n, p in model.named_parameters()}
+        self.pi = {n: torch.zeros_like(p, dtype=torch.int32)
+                   for n, p in model.named_parameters()}
+        self._K = shift_max
+        self._tab = None
+
+    def _pow2(self, device, dtype):
+        if self._tab is None or self._tab.device != device:
+            self._tab = torch.tensor([2.0 ** -k for k in range(self._K + 1)],
+                                     device=device, dtype=dtype)     # ROM
+        return self._tab
+
+    @torch.no_grad()
+    def pull(self, model, opt):
+        for n, p in model.named_parameters():
+            if p.grad is None:
+                continue
+            _, tier = torch.frexp(p.grad)                          # magnitude tier of |g|
+            contrib = (tier - self.pi_floor).clamp_min(0)          # >=0, grows with |g|
+            pi = self.pi[n] + contrib
+            pi = pi - (pi >> self.pi_leak_shift)                   # dyadic leak (bounds + forgets)
+            pi = pi.clamp(0, self.pi_max)
+            self.pi[n] = pi
+            _, imp = torch.frexp(pi.to(p.dtype))                   # ~log2(precision), 0 at pi=0
+            imp = imp.clamp(0, self.ma)
+            shift = (self.k0 - imp).clamp(self.smin, self.smax).to(torch.long)
+            step = self._pow2(p.device, p.dtype)[shift]
+            p.add_((p.detach() - self.theta[n]) * step, alpha=-1.0)   # pull ∝ precision
+
+    @torch.no_grad()
+    def track(self, model):
+        s = 2.0 ** -self.ema_shift
+        for n, p in model.named_parameters():
+            self.theta[n].add_((p.detach() - self.theta[n]) * s)   # dyadic weight EMA
+
+
 def oracle_ces():
     o = {}
     for line in (OUT / "v1_streams.jsonl").open():
