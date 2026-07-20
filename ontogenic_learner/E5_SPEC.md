@@ -131,3 +131,21 @@ rescale needed) · FIRST SCIENCE: era-0→2 foraging catastrophically
 interfered (probe CE ≈ 21, clone returns ≈ 0–3) while minatar excels
 (CE 0.27–2.3, clones to 118) — the era-3 revisit recovery is the live
 RETAIN readout; the full life measures whether revisits cheapen.
+
+## Mid-life declared intervention (2026-07-20 ~19:40 UTC, ledgered via INCIDENT + this note)
+
+At ~3.9M steps the probe-isolation assert FIRED and crashed the process
+(systemd resumed cleanly; INCIDENT in journal). Root cause, reproduced
+locally: the full life's probe suites include BabyAI cells (the pilot's
+did not) and the canonical digest's deep walk reached (a) the SHARED
+gymnasium EnvSpec registry object, which gym.make mutates when
+constructing probe envs, and (b) ctypes library loaders where hasattr
+probing dlopens. Fix: BabyAIEnv digested by FUNCTIONAL state only
+(counters, grid encode, agent pos/dir, np_random bit-generator state) —
+implemented in st7_probes.py ONLY, so the env-code hash (st5_envs+
+st5_world) is untouched and the running life's resume assert holds.
+Battery re-verified locally with babyai cells (witness idempotent +
+invariant + post-probe continuation). Hot-patched on-box via SSM +
+service restart (resume from ckpt); suites 1-2 unaffected (pre-arrival);
+suite 3 was lost to the crash. The assert did its job: fail-loud beats
+silent contamination.

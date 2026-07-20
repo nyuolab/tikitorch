@@ -211,14 +211,35 @@ def canonical_bytes(obj, depth=0) -> bytes:
     if isinstance(obj, (list, tuple)):
         return b"[" + b",".join(canonical_bytes(v, depth + 1)
                                 for v in obj) + b"]"
-    if hasattr(obj, "get_state") and "RandomState" in type(obj).__name__:
+    if type(obj).__name__ == "RandomState":
         return repr(obj.get_state()).encode()
+    if type(obj).__name__ in ("EnvSpec", "WrapperSpec"):
+        # gymnasium registry metadata is SHARED across env instances and is
+        # mutated by gym.make — it is not life state (the leak that fired
+        # the isolation assert mid-life when probe envs were constructed)
+        return b"<gym-spec>"
+    if type(obj).__name__ == "Generator" and "numpy" in type(obj).__module__:
+        return obj.bit_generator.state.__repr__().encode()
     if hasattr(obj, "__dict__"):
         return canonical_bytes(vars(obj), depth + 1)
     return repr(obj).encode()
 
 
+def _babyai_functional(env):
+    """BabyAIEnv digested by FUNCTIONAL state only: the generic deep walk
+    reaches shared gym registry objects (mutated by gym.make) and even
+    ctypes loaders (where hasattr dlopens) — none of it is life state."""
+    u = env.env.unwrapped
+    return (env._t, env._bi, env._lvl, env._ep, env._seed,
+            u.step_count, tuple(int(x) for x in u.agent_pos),
+            int(u.agent_dir), u.grid.encode().tobytes(),
+            repr(u.np_random.bit_generator.state))
+
+
 def env_digest(env) -> str:
+    if type(env).__name__ == "BabyAIEnv":
+        return hashlib.sha256(
+            canonical_bytes(_babyai_functional(env))).hexdigest()[:16]
     return hashlib.sha256(canonical_bytes(env)).hexdigest()[:16]
 
 
