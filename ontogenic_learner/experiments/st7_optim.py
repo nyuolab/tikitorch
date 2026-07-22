@@ -65,8 +65,11 @@ class _IDBDBase(torch.optim.Optimizer):
         self._step_count += 1
         for group in self.param_groups:
             for p in group["params"]:
-                if p.grad is None:
-                    continue
+                if p.grad is None or not torch.isfinite(p.grad).all():
+                    continue    # inf/NaN grads would NaN beta via raw/N
+                                # (review finding: Autostep bound is finite-
+                                # gradient-conditional); skip, let nan_guard
+                                # handle the upstream cause
                 st = self.state[p]
                 if not st:
                     self._init_state(p, st)

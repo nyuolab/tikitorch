@@ -111,3 +111,37 @@ digests unchanged.
 ## Cost ledger (band authorized ~$200+)
 Tier-1 2 × c7i.xlarge × ~44h ≈ $16 · Tier-2 8 × c7i.2xlarge × ~25-30h ≈
 $75-110 · Tier-3 ≈ $65-80 → total ≈ $160-210.
+
+## Pre-launch review amendments (12 confirmed findings, 2026-07-23; all
+frozen BEFORE launch — the bars below supersede ambiguous phrasings above)
+
+- **P1 FROZEN**: the bar quantity is the unweighted mean over {foraging,
+  minatar} of the env-level life-mean NON-RESIDENT probe obs-CE (babyai
+  non-resident CE reported separately, pre-/post-arrival split; the amp
+  number is descriptive only). WIN = arm mean ≥30% below base, with P2.
+- **P2 FROZEN + computable**: primary = suite-A obs-CE on the babyai cells
+  from any suite landing in [first babyai era, +1 era] (st7_screen p2ce);
+  where no suite lands there, the offline eval on the first-babyai-era END
+  ckpt (ckpt_era/, windows regenerated deterministically, n_windows=16).
+  Bar: ≤ 2.0 on ≥1 babyai cell.
+- **P4 DECLARED**: 1.4 is an absolute bar calibrated on the E5b 100k-step
+  birth cohort, applied to 250k-step era-means (dilution direction:
+  conservative). Complete eras only (0.95 × all-era max buckets).
+- **P6 FROZEN**: descriptive endpoint (entropy-family WIN runs through
+  P4+P5); collapse = piH<0.01, recovery = any later bucket >0.1; screen
+  table reports WORST-case (max) collapse fraction across seeds.
+- **IDBD birth divergence DECLARED**: IDBD arms run the prelife with
+  meta-adaptation active (the arm is the whole treatment); birth weights
+  are arm-specific; birth identity holds only among adamw-based arms
+  (base/anchor/ent-*/head-renorm share it bitwise). PRE-COMMITTED: any
+  Tier-3 confirm of an IDBD winner forces a plain-AdamW prelife so the
+  confirm attributes the win to the in-life mechanism.
+- **Ops fixes landed**: watchdog boot-grace + missing-status-not-stale
+  (the dropped E5 guard would have reboot-looped fresh boxes — BLOCKER);
+  branch cfg auto-adoption on restart (branch lives are restart-safe with
+  the original unit line); probe wall-clock persisted in the ckpt (restart
+  churn cannot starve suites) + mid-suite status touches; atomic
+  status.json writes; nonfinite-grad skip in all IDBD steps; nan_guard
+  gates the time-cadence save (a poisoned state can never be persisted);
+  incident restore now re-asserts BOTH the era's env (the wrong-world fix
+  covers nan_guard too) and the schedule lr (halvings=-1 → apply_lr).

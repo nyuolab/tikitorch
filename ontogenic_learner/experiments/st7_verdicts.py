@@ -93,10 +93,14 @@ def retain_rotation_aligned(eras):
 
 
 def arrival_ignition(eras, bar=1.4):
-    """P4: any babyai era with era-mean ret1k >= bar (50% of the E5b birth
-    cohort's 2.75)."""
+    """P4: any COMPLETE babyai era with era-mean ret1k >= bar (bar frozen:
+    absolute, calibrated on the E5b 100k-step birth cohort; conservative on
+    250k eras — declared in E6_SPEC). Completeness vs the ALL-era max so an
+    in-progress babyai era cannot self-certify."""
+    full = max(len(v) for v in eras.values())
     b = [(e, sum(x["ret1k"] for x in v) / len(v))
-         for e, v in eras.items() if v[0]["env"] == "babyai"]
+         for e, v in eras.items()
+         if v[0]["env"] == "babyai" and len(v) >= 0.95 * full]
     if not b:
         return dict(applicable=False)
     ign = [(e, round(m, 3)) for e, m in b if m >= bar]

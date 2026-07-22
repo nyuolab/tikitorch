@@ -456,6 +456,7 @@ class Life:
         self.ledger.seq = max(self.ledger.seq, blob["ledger_seq"])
         self.counters = dict(blob["counters"])
         self.snap_actions = blob.get("snap_actions")
+        self.last_probe_wall = blob.get("last_probe_wall")
         self.cfg["branch_schedule"] = schedule
         self.cfg["branch_start_era"] = self.era_idx + 1
         if schedule == "scrambled":
@@ -521,6 +522,7 @@ class Life:
             counters=dict(self.counters), hashes=dict(self.hashes),
             config=dict(self.cfg),
             snap_actions=self.snap_actions,
+            last_probe_wall=getattr(self, "last_probe_wall", None),
         )
 
     def save(self, tag="periodic"):
@@ -561,6 +563,7 @@ class Life:
         self.counters = dict(blob["counters"])
         self.counters["resumes"] = self.counters.get("resumes", 0) + 1
         self.snap_actions = blob.get("snap_actions")
+        self.last_probe_wall = blob.get("last_probe_wall")
         # telemetry dedupe (st4 pattern): drop rows logged past the ckpt
         if self.tele.exists():
             rows = [json.loads(l) for l in self.tele.read_text().splitlines()]
@@ -629,6 +632,13 @@ class Life:
                            vocab=a.codec.vocab)
         self.save(tag="birth")
 
+    def write_status(self, payload: dict):
+        """Atomic status.json (review finding: the watchdog + s3 sync read
+        it every few minutes; truncate-then-write shows torn JSON)."""
+        tmp = self.wd / "status.json.tmp"
+        tmp.write_text(json.dumps(payload))
+        os.replace(tmp, self.wd / "status.json")
+
     # -- guards ------------------------------------------------------------
     def nan_guard(self) -> bool:
         finite = all(torch.isfinite(p).all() for p in
@@ -643,9 +653,20 @@ class Life:
                                step=self.life_step)
             blob = load_latest(str(self.wd / "ckpt"))
             if blob is not None:
-                self.agent.restore(blob["agent"])
+                self._restore_incident(blob)
             return False
         return True
+
+    def _restore_incident(self, blob):
+        """Shared incident-restore: agent + the two re-asserts BOTH restore
+        paths need (review finding: the wrong-world fix must cover nan_guard
+        too, and the restored opt carries a stale lr under cycle decay)."""
+        self.agent.restore(blob["agent"])
+        want = self.era_env(min(self.era_idx, self.total_eras - 1))
+        if self.agent.cur != want:
+            self.agent.switch_env(want)
+        self.halvings = -1              # force apply_lr to re-assert
+        self.apply_lr()
 
     def apply_lr(self):
         mode = self.cfg.get("lr_decay", "cycle")
@@ -684,7 +705,7 @@ class Life:
         except Exception:
             st = {}
         st.update(ts=int(t0), state="probe")
-        (self.wd / "status.json").write_text(json.dumps(st))
+        self.write_status(st)
         h0 = P.state_hash(self)
         if self.probe_windows is None:
             pw_path = self.wd / "probe_windows.pt"
@@ -703,6 +724,7 @@ class Life:
             self.snap_actions = acts                   # end-of-cycle-1 snapshot
         assert h0 == P.state_hash(self), "probe suite mutated the life"
         self.counters["probes"] += 1
+        self.last_probe_wall = time.time()
         row = dict(t=self.life_step, era=self.era_idx, env=self.agent.cur,
                    wall_s=round(time.time() - t0, 1),
                    a=a, b=b, agree=agree)
@@ -714,7 +736,8 @@ class Life:
 
     # -- the loop ----------------------------------------------------------
     def live(self, max_steps=None):
-        t_ckpt = t_beat = t_probe = time.time()
+        t_ckpt = t_beat = time.time()
+        t_probe = getattr(self, "last_probe_wall", None) or time.time()
         t0 = time.time()
         cfg = self.cfg
         total = self.total_eras * cfg["era_steps"]
@@ -744,15 +767,9 @@ class Life:
                                    err=repr(ex)[:200], step=self.life_step)
                 blob = load_latest(str(self.wd / "ckpt"))
                 if blob is not None:
-                    self.agent.restore(blob["agent"])
-                    # the restored blob may predate this era's switch_env —
-                    # re-assert the CURRENT era's world or the life continues
-                    # in the wrong env under this era's label (found by the
-                    # E6 scrambled-branch drill; latent since E5)
-                    want = self.era_env(min(self.era_idx,
-                                            self.total_eras - 1))
-                    if self.agent.cur != want:
-                        self.agent.switch_env(want)
+                    # shared restore: wrong-world + stale-lr re-asserts
+                    # (found by the E6 scrambled-branch drill; latent E5)
+                    self._restore_incident(blob)
                     torch.rand(1)                          # POISON_SKIP splice
                     self.ledger.append("POISON_SKIP", step=self.life_step)
                 continue
@@ -786,19 +803,20 @@ class Life:
             now = time.time()
             if (self.life_step % cfg["ckpt_every_steps"] == 0
                     or now - t_ckpt > cfg["ckpt_every_secs"]):
-                self.save()
+                if self.nan_guard():        # never persist a poisoned state
+                    self.save()
                 t_ckpt = now
             if (cfg["probe_every_hours"]
                     and now - t_probe > cfg["probe_every_hours"] * 3600):
                 self.run_probes()
                 t_probe = time.time()
             if now - t_beat > cfg["heartbeat_secs"]:
-                (self.wd / "status.json").write_text(json.dumps(dict(
+                self.write_status(dict(
                     ts=int(now), step=self.life_step, era=self.era_idx,
                     env=self.agent.cur, wall_h=round((now - t0) / 3600, 2),
                     sps=round(self.life_step / max(now - t0, 1), 1),
                     probes=self.counters["probes"],
-                    resumes=self.counters["resumes"])))
+                    resumes=self.counters["resumes"]))
                 t_beat = now
             if (cfg["budget_wall_hours"]
                     and (now - t0) / 3600 > cfg["budget_wall_hours"]):
@@ -826,6 +844,14 @@ def main():
     cfg = dict(DEFAULTS)
     if a.config:
         cfg.update(json.loads(Path(a.config).read_text()))
+    # branch identity (review finding): a restarted branch life must adopt
+    # the BRANCHED cfg (branch keys + recomputed hash), or resume refuses /
+    # a lingering --branch-from re-roots. The branch cfg wins when present.
+    bcfg = Path(a.workdir) / "e6_branch_cfg.json"
+    if bcfg.exists():
+        cfg = dict(DEFAULTS)
+        cfg.update(json.loads(bcfg.read_text()))
+        a.branch_from = None            # never re-root an existing branch
     if a.smoke:
         cfg.update(era_steps=1_000, biome_steps=250, cycles=2,
                    prelife_frames=400, prelife_steps=60,

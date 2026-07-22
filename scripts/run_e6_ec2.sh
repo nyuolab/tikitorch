@@ -144,14 +144,18 @@ for s in \$SEEDS; do systemctl enable --now e6life@\$s; done
 cat > /usr/local/bin/e6-watchdog <<'WD'
 #!/bin/bash
 exec 9>/var/lock/e6-wd; flock -n 9 || exit 0
+# boot grace: births + pip + first heartbeats take a while (review BLOCKER:
+# the E5 [ -f ] guard was dropped -> fresh boots reboot-looped)
+up=\$(cut -d. -f1 /proc/uptime); [ "\$up" -lt 2700 ] && exit 0
 now=\$(date +%s)
 all_stale=1
 for d in /opt/tiki/life-s*; do
   [ -d "\$d" ] || continue
   s=\${d##*-s}
   ST="\$d/status.json"
-  ts=0
-  [ -f "\$ST" ] && ts=\$(python3 -c "import json;print(int(json.load(open('\$ST'))['ts']))" 2>/dev/null || echo 0)
+  # missing status = pre-heartbeat life: not stale, no restart vote
+  [ -f "\$ST" ] || { all_stale=0; continue; }
+  ts=\$(python3 -c "import json;print(int(json.load(open('\$ST'))['ts']))" 2>/dev/null || stat -c %Y "\$ST" 2>/dev/null || echo 0)
   age=\$((now - ts))
   if [ \$age -gt 1800 ]; then
     echo "\$(date) restart s\$s (age \$age)" >> /var/log/e6-wd.log
@@ -176,6 +180,7 @@ for d in /opt/tiki/life-s*; do
   aws s3 cp probes.jsonl "\$S3P/s\$s/probes.jsonl" --only-show-errors 2>/dev/null
   aws s3 sync ledger "\$S3P/s\$s/ledger" --only-show-errors 2>/dev/null
   [ -d ckpt_era ] && aws s3 sync ckpt_era "\$S3P/s\$s/ckpt_era" --only-show-errors 2>/dev/null
+  [ -f probe_windows.pt ] && aws s3 cp probe_windows.pt "\$S3P/s\$s/probe_windows.pt" --only-show-errors 2>/dev/null
   L=\$(cat ckpt/LATEST 2>/dev/null); [ -n "\$L" ] && aws s3 cp "ckpt/\$L" "\$S3P/s\$s/latest.pt" --only-show-errors 2>/dev/null
 done
 aws s3 cp /var/log/e6-wd.log "\$S3P/wd.log" --only-show-errors 2>/dev/null

@@ -31,6 +31,18 @@ def life_endpoints(d):
             late[v[0]["env"]] = round(sum(x["ret1k"] for x in v) / len(v), 2)
     bad = [e for e in led if any(k in str(e.get("event", "")).upper()
                                  for k in ("NAN", "POISON", "INCIDENT"))]
+    # P2 plasticity-intact: min babyai probe obs-CE seen at/after the first
+    # babyai era's START and no later than one era past its END (suite read;
+    # the era-ckpt offline eval is the fallback when no suite lands there)
+    first_baby = min((e for e, v in eras.items()
+                      if v[0]["env"] == "babyai"), default=None)
+    p2 = None
+    if first_baby is not None:
+        vals = [c["obs_ce"] for s_ in probes
+                if first_baby <= s_.get("era", -1) <= first_baby + 1
+                for k, c in s_.get("a", {}).items()
+                if k.startswith("babyai")]
+        p2 = round(min(vals), 3) if vals else None
     return dict(
         retain_em={env: f"{r['passes']}/{r['total']}"
                    for env, r in rem.items() if r["total"]},
@@ -41,6 +53,7 @@ def life_endpoints(d):
         ignite_max=ai.get("max_era_mean"),
         seesaw_amp=sa["mean_amp"],
         nonres=sa["nonresident_mean"],
+        p2_baby_ce=p2,
         pih_frac={env: r["frac_collapsed"] for env, r in pf.items()},
         pih_collapse={env: r["first_unrecovered_collapse_era"]
                       for env, r in pf.items()},
@@ -80,21 +93,30 @@ def main():
         arms.setdefault(r["arm"], []).append(r)
     base = arms.get(args.base, [])
     base_amp = agg([r["seesaw_amp"] for r in base])
+
+    def nonres_movable(r):
+        vals = [r["nonres"].get(e) for e in ("foraging", "minatar")]
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    base_nr = agg([nonres_movable(r) for r in base])
     base_late = {}
     for r in base:
         for env, v in r["late_ret"].items():
             base_late.setdefault(env, []).append(v)
     base_late = {e: agg(v) for e, v in base_late.items()}
 
-    print(f"{'arm':14s} {'n':>2s} {'seesaw':>8s} {'dAmp%':>7s} "
-          f"{'ignite':>7s} {'pih_frac(min)':>14s} {'late_ret (d% vs base)':>28s} "
-          f"{'inc':>4s}")
+    print(f"{'arm':14s} {'n':>2s} {'nonresCE':>9s} {'dNonres%':>9s} "
+          f"{'seesaw':>8s} {'ignite':>7s} {'p2ce':>6s} {'pih_frac(max)':>14s} "
+          f"{'late_ret (d% vs base)':>28s} {'inc':>4s}")
     for arm, rs in sorted(arms.items()):
         amp = agg([r["seesaw_amp"] for r in rs])
-        d_amp = (round(100 * (amp - base_amp) / base_amp, 1)
-                 if base_amp and amp is not None else None)
+        nr = agg([nonres_movable(r) for r in rs])
+        d_nr = (round(100 * (nr - base_nr) / base_nr, 1)
+                if base_nr and nr is not None else None)
         ign = sum(bool(r["ignite"]) for r in rs)
-        pf = min((min(r["pih_frac"].values()) for r in rs
+        p2v = agg([r.get("p2_baby_ce") for r in rs])
+        pf = max((max(r["pih_frac"].values()) for r in rs
                   if r["pih_frac"]), default=None)
         lr_parts = []
         for env in sorted(base_late):
@@ -103,9 +125,9 @@ def main():
                 lr_parts.append(
                     f"{env[:4]}:{vals} ({round(100 * (vals - base_late[env]) / base_late[env], 1):+}%)")
         inc = sum(r["incidents"] for r in rs)
-        print(f"{arm:14s} {len(rs):>2d} {amp!s:>8s} {d_amp!s:>7s} "
-              f"{ign}/{len(rs):<5d} {pf!s:>14s} {' '.join(lr_parts):>28s} "
-              f"{inc:>4d}")
+        print(f"{arm:14s} {len(rs):>2d} {nr!s:>9s} {d_nr!s:>9s} "
+              f"{amp!s:>8s} {ign}/{len(rs):<5d} {p2v!s:>6s} {pf!s:>14s} "
+              f"{' '.join(lr_parts):>28s} {inc:>4d}")
     print(f"\nwrote {out} ({len(rows)} lives)")
 
 
