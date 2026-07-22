@@ -145,6 +145,9 @@ class UnifiedCodec:
         r = torch.tensor([self.RWD, self.RWD0 + (1 if reward > 0 else 0)],
                          dtype=torch.long)
         obs = torch.tensor([self.OBS], dtype=torch.long)
+        perm = getattr(self, "obs_perm", {}).get(self.cur)
+        if perm is not None:                # E6 scrambled-obs branch control
+            obs_sym = perm[obs_sym]
         cells = obs_sym + self.sym_base[self.cur]
         return torch.cat([a, r, obs, cells])
 
@@ -396,6 +399,8 @@ class Life:
                             biome_steps=cfg["biome_steps"])
                 for n in names}
         self.codec = UnifiedCodec(envs, babyai_syms=cfg["babyai_syms"])
+        if cfg.get("branch_scramble_seed") is not None:
+            self._install_scramble()
         self.args = agent_args(cfg)
         self.agent = LifeAgent(envs, self.args, self.codec, cfg)
         if cfg.get("retain_era_ckpts"):
@@ -411,6 +416,58 @@ class Life:
         self.probe_gen = torch.Generator().manual_seed(cfg["seed"] + 999)
         self.probe_windows = None            # lazy-frozen at first suite
         self.snap_actions = None             # end-of-cycle-1 action snapshot
+
+    # -- E6 branch mode (Tier-3 novelty-attribution control) ---------------
+    def _install_scramble(self):
+        """Permute babyai's obs symbols (pseudo-novelty: same statistics,
+        broken semantics). Codec-level only — env code + digests untouched.
+        Permutes the ACTUAL block (the codec sizes babyai by its real
+        n_obs_sym, not the cfg reservation — permuting the reservation
+        overflowed the vocab; caught by the branch drill)."""
+        n = self.codec.vocab - self.codec.sym_base["babyai"]
+        g = torch.Generator().manual_seed(self.cfg["branch_scramble_seed"])
+        self.codec.obs_perm = {"babyai": torch.randperm(n, generator=g)}
+
+    def branch_init(self, path: str, schedule: str):
+        """One-shot: adopt a foreign ckpt (e.g. a Tier-1 replicate's era
+        ckpt) as this life's root. NO config-hash assert — that is the
+        point — but the era-structure/science keys must match the source.
+        Writes the branched cfg to <workdir>/e6_branch_cfg.json; subsequent
+        resumes use THAT file (normal identity path from here on)."""
+        import hashlib as _h
+        raw = Path(path).read_bytes()
+        blob = torch.load(path, map_location="cpu", weights_only=False)
+        src = blob["config"]
+        for k in ("era_steps", "cycles", "env_order", "babyai_from_cycle",
+                  "babyai_enabled", "d_model", "n_layers", "window",
+                  "mech_lever", "seed", "world_seed"):
+            assert src.get(k) == self.cfg.get(k), \
+                f"branch cfg mismatch on {k}: {src.get(k)} != {self.cfg.get(k)}"
+        self.agent.restore(blob["agent"])
+        self.life_step = blob["life_step"]
+        self.era_idx = blob["era_idx"]
+        self.halvings = blob["halvings"]
+        self.fires = blob["fires"]
+        self.total_return = blob["total_return"]
+        self.ce_sum = blob["ce_sum"]
+        self.win = list(blob["win_tail"])
+        torch.set_rng_state(blob["rng"]["torch"])
+        self.probe_gen.set_state(blob["rng"]["probe"])
+        self.ledger.seq = max(self.ledger.seq, blob["ledger_seq"])
+        self.counters = dict(blob["counters"])
+        self.snap_actions = blob.get("snap_actions")
+        self.cfg["branch_schedule"] = schedule
+        self.cfg["branch_start_era"] = self.era_idx + 1
+        if schedule == "scrambled":
+            self.cfg["branch_scramble_seed"] = self.cfg["seed"] + 31415
+            self._install_scramble()
+        self.hashes["config"] = config_hash(self.cfg)
+        (self.wd / "e6_branch_cfg.json").write_text(json.dumps(self.cfg))
+        self.ledger.append("BRANCH", src=os.path.basename(path),
+                           src_sha=_h.sha256(raw).hexdigest()[:16],
+                           schedule=schedule, step=self.life_step,
+                           start_era=self.cfg["branch_start_era"])
+        self.save(tag="branch_root")
 
     # -- era math ----------------------------------------------------------
     def _cycle_of_era(self, era: int):
@@ -432,7 +489,14 @@ class Life:
         cyc, off, order = self._cycle_of_era(era)
         r = cyc % len(order)
         rot = order[r:] + order[:r]
-        return rot[off]
+        name = rot[off]
+        # E6 branch control: 'familiar' fills the novelty slots with an extra
+        # rotation-world residency (the control twin of the natural arrival)
+        if (self.cfg.get("branch_schedule") == "familiar"
+                and name == "babyai"
+                and era >= (self.cfg.get("branch_start_era") or 0)):
+            return self.cfg["env_order"][cyc % len(self.cfg["env_order"])]
+        return name
 
     @property
     def total_eras(self):
@@ -681,6 +745,14 @@ class Life:
                 blob = load_latest(str(self.wd / "ckpt"))
                 if blob is not None:
                     self.agent.restore(blob["agent"])
+                    # the restored blob may predate this era's switch_env —
+                    # re-assert the CURRENT era's world or the life continues
+                    # in the wrong env under this era's label (found by the
+                    # E6 scrambled-branch drill; latent since E5)
+                    want = self.era_env(min(self.era_idx,
+                                            self.total_eras - 1))
+                    if self.agent.cur != want:
+                        self.agent.switch_env(want)
                     torch.rand(1)                          # POISON_SKIP splice
                     self.ledger.append("POISON_SKIP", step=self.life_step)
                 continue
@@ -746,6 +818,10 @@ def main():
     p.add_argument("--resume", action="store_true")
     p.add_argument("--smoke", action="store_true")
     p.add_argument("--max-steps", type=int, default=None)
+    p.add_argument("--branch-from", default=None,
+                   help="ckpt path: adopt as branch root (E6 Tier-3)")
+    p.add_argument("--branch-schedule", default="novel",
+                   choices=["novel", "familiar", "scrambled"])
     a = p.parse_args()
     cfg = dict(DEFAULTS)
     if a.config:
@@ -757,6 +833,9 @@ def main():
                    d_model=64, n_layers=2)
     life = Life(a.workdir, cfg)
     resumed = a.resume and life.resume()
+    if a.branch_from and not resumed and life.life_step == 0:
+        life.branch_init(a.branch_from, a.branch_schedule)
+        resumed = True                      # branch root replaces birth
     total = life.total_eras * cfg["era_steps"]
     if resumed and life.life_step >= total and a.max_steps is None:
         # completed life under systemd Restart=always: IDLE, don't churn
