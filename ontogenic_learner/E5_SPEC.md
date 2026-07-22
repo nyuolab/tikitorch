@@ -221,3 +221,22 @@ idle-loop engages on the resume path). Ended state complete-idle at 12M.
 Binaries (final 8 ckpts + LATEST + latest.pt + src.tar.gz) remain at
 s3://tiki-sweep-739966866637/e5/e5-full-20260719T205131Z/ (ckpt_final/).
 Box terminated post-archive. The 12M-step organism state = ckpt-000012000000.pt.
+
+### Post-hoc verification: Suite-C agreement=1.0 is REAL (adversarial-review demand, 2026-07-22)
+
+The referee-pass flagged agree=1.0 (all cells, all suites from t=2.2M) as
+possible probe artifact. Verified from ckpt-000012000000.pt with windows
+regenerated deterministically from the ckpt config (shape fingerprint
+match 10/10 cells): (a) the 12M model reproduces agreement 1.0 against the
+era-4 snapshot — fresh process, no cache in the path (engine _forward_cache
+is not memoized; every in-life reading was live); (b) SENSITIVITY: row-
+permuting action_head drops agreement to 0.0 on every cell — the probe can
+read any value; (c) MARGIN AUDIT: top1-top2 logit margins on the real model
+are 19.3 min / 23-37 median — which is why sigma=0.5 weight noise flips
+nothing. VERDICT: the greedy action backbone on the frozen probe contexts
+is bitwise-stable from era 4 (2.2M) to death (12M); all later behavioral
+change (foraging 27->64, minatar records, entropy oscillations) lives in
+the SAMPLING ENVELOPE around a frozen argmax skeleton (20-logit margins at
+the life's tau still leave piH~1.0-1.5). Re-dates the critical window: the
+decision skeleton froze ~2.2M steps, 5M before the arrival tested it.
+Scope: 460 pre-registered probe positions, 10 cells; lived contexts differ.
