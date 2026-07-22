@@ -32,7 +32,8 @@ sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from pc_convrnn_charlm import MorphPCEngine, build_model      # noqa: E402
-from st2_live import MarginGate                               # noqa: E402
+from st2_live import MarginGate, Anchor                       # noqa: E402
+from st7_optim import build_life_opt, _AnchorOpt              # noqa: E402
 from st5_envs import make_env                                 # noqa: E402
 from st6_reward import Agent                                  # noqa: E402
 from nanogpt_shakespeare import tau_at                        # noqa: E402
@@ -67,6 +68,19 @@ DEFAULTS = dict(
     budget_wall_hours=0.0,         # 0 = uncapped; >0 = graceful idle at cap
     # reserved third world (capacity allocated at birth even if unused)
     babyai_syms=20, babyai_from_cycle=6, babyai_enabled=False,
+    # ---- E6 arms (every default reproduces E5 bitwise; E6_SPEC) ----------
+    optimizer="adamw",             # adamw | idbd-adam | idbd-dyadic | idbd-sgd
+    lr_decay="cycle",              # cycle | none (IDBD arms) | fixed (control)
+    lr_fixed_div=8,
+    theta_meta=0.01, idbd_beta_min=-6.0, idbd_beta_max=2.0,
+    idbd_lambda_h=1.0, idbd_hyst=0.25,
+    anchor="none", anchor_lam=0.01, anchor_ema=0.9999, anchor_clamp=100.0,
+    act_eps=0.0,                   # ent-floor: acting-time epsilon-mix
+    ent_k=None,                    # ent-pull: 2^k action-head uniform pull
+    head_renorm_M=0.0,             # head-renorm: target top1-top2 margin
+    retain_era_ckpts=False, ckpt_keep=8, tele_margin=False,
+    # branch mode (Tier-3 novelty-attribution control)
+    branch_schedule=None, branch_start_era=None, branch_scramble_seed=None,
 )
 
 
@@ -147,11 +161,12 @@ class UnifiedCodec:
 # --------------------------------------------------------------------------
 
 class LifeAgent(Agent):
-    def __init__(self, envs: dict, args, codec: UnifiedCodec):
+    def __init__(self, envs: dict, args, codec: UnifiedCodec, cfg: dict):
         self.envs = envs
         self._cur = list(envs.keys())[0]
         super().__init__(envs[self._cur], args)
         self.codec = codec                  # replace the per-env codec
+        self.cfg = cfg
         # rebuild model/opt for the UNIFIED vocab (Agent.__init__ built for
         # the single-env codec; the life needs the full shared space)
         ns = argparse.Namespace(d_model=args.d_model, n_layers=args.n_layers,
@@ -165,8 +180,21 @@ class LifeAgent(Agent):
         self.model.set_tau(0.0)
         self.model.eval()
         self.engine = MorphPCEngine(self.model)
-        self.opt = torch.optim.AdamW(self.model.parameters(), lr=args.lr,
-                                     weight_decay=0.01)
+        self.opt = build_life_opt(self.model.parameters(), cfg)
+        # E6 arms (E6_SPEC; every default reproduces the E5 path)
+        self.anchor = None
+        if cfg.get("anchor", "none") == "adam":
+            assert cfg.get("optimizer", "adamw") == "adamw", \
+                "anchor reads Adam's exp_avg_sq"
+            self.anchor = Anchor(self.model, lam=cfg["anchor_lam"],
+                                 ema=cfg["anchor_ema"],
+                                 clamp=cfg["anchor_clamp"])
+            self.opt = _AnchorOpt(self.opt, self.anchor, self.model)
+        self.act_eps = cfg.get("act_eps", 0.0)
+        self.act_ent_k = (cfg.get("ent_k") if self.use_head else None)
+        self.head_renorm_M = cfg.get("head_renorm_M", 0.0)
+        self.head_m_ema = None              # top1-top2 margin EMA (gauge)
+        self._tele_margin = cfg.get("tele_margin", False)
 
     # -- world switching ---------------------------------------------------
     @property
@@ -192,10 +220,20 @@ class LifeAgent(Agent):
         probe = torch.cat([self.ctx[1:], torch.tensor([c.ACT])])
         if self.use_head:
             lg = self.engine.act_probe_logits(probe.unsqueeze(0))[0][-1]
-            pi = torch.softmax(lg[:k_env].float() / self.tau_pi, dim=0)
+            lgk = lg[:k_env].float()
         else:
             lg = self.model(probe.unsqueeze(0))[0][-1]
-            pi = torch.softmax(lg[c.ACT0:c.ACT0 + k_env] / self.tau_pi, dim=0)
+            lgk = lg[c.ACT0:c.ACT0 + k_env].float()
+        if (self.head_renorm_M or self._tele_margin) and k_env >= 2:
+            v2 = lgk.topk(2).values             # free margin gauge (E6 tele)
+            m = float(v2[0] - v2[1])
+            self.head_m_ema = (m if self.head_m_ema is None
+                               else 0.99 * self.head_m_ema + 0.01 * m)
+        pi = torch.softmax(lgk / self.tau_pi, dim=0)
+        if self.act_eps:
+            # ent-floor arm: scale-independent exploration floor; preserves
+            # argmax and the one-multinomial-per-act RNG contract (E6_SPEC)
+            pi = (1.0 - self.act_eps) * pi + self.act_eps / k_env
         return int(torch.multinomial(pi, 1))
 
     @torch.no_grad()
@@ -210,6 +248,53 @@ class LifeAgent(Agent):
             lg = self.model(probe.unsqueeze(0))[0][-1]
             pi = torch.softmax(lg[c.ACT0:c.ACT0 + k_env] / self.tau_pi, dim=0)
         return float(-(pi * pi.clamp_min(1e-9).log()).sum())
+
+    @torch.no_grad()
+    def pol_entropy_act(self):
+        """Entropy of the ACTED distribution (post eps-mix) — piH_act tele.
+        pol_entropy stays raw for E5 comparability."""
+        c = self.codec
+        k_env = c.ENV_K[self._cur]
+        probe = torch.cat([self.ctx[1:], torch.tensor([c.ACT])])
+        if self.use_head:
+            lg = self.engine.act_probe_logits(probe.unsqueeze(0))[0][-1]
+            pi = torch.softmax(lg[:k_env].float() / self.tau_pi, dim=0)
+        else:
+            lg = self.model(probe.unsqueeze(0))[0][-1]
+            pi = torch.softmax(lg[c.ACT0:c.ACT0 + k_env] / self.tau_pi, dim=0)
+        pi = (1.0 - self.act_eps) * pi + self.act_eps / k_env
+        return float(-(pi * pi.clamp_min(1e-9).log()).sum())
+
+    # -- the one E6 hook: pull routing, head renorm, anchor track ----------
+    def step(self, learn=True):
+        if self.act_ent_k is not None and learn:
+            self.engine.action_uniform_pull = (
+                self.act_ent_k, 0, self.codec.ENV_K[self._cur])
+        try:
+            r, fired, ce = super().step(learn=learn)
+        finally:
+            self.engine.action_uniform_pull = None
+        if learn and fired and self.head_renorm_M and self.use_head:
+            self._head_renorm()
+        if learn and self.anchor is not None:
+            self.anchor.track(self.model)   # per-step clock (st4 per-window)
+        return r, fired, ce
+
+    @torch.no_grad()
+    def _head_renorm(self):
+        """head-renorm arm: uniform contraction of every action-head row
+        toward the ensemble-mean row until the margin EMA sits at target M.
+        Argmax-preserving to first order (all rows move toward the SAME
+        vector); per-step application keeps lambda ~= 1."""
+        if self.head_m_ema is None or self.head_m_ema <= self.head_renorm_M:
+            return
+        lam = self.head_renorm_M / self.head_m_ema
+        ah = self.model.action_head
+        wbar = ah.weight.mean(dim=0, keepdim=True)
+        bbar = ah.bias.mean()
+        ah.weight.mul_(lam).add_((1.0 - lam) * wbar)
+        ah.bias.mul_(lam).add_((1.0 - lam) * bbar)
+        self.head_m_ema = self.head_renorm_M
 
     # -- full state capture (E5_SPEC 15-item blob, agent part) -------------
     def state(self) -> dict:
@@ -227,6 +312,9 @@ class LifeAgent(Agent):
             env_digests={n: _env_digest(e)
                          for n, e in self.envs.items()},
             obs_gen=self.obs_gen.get_state(),
+            anchor_theta=(None if self.anchor is None else
+                          {n: t.clone() for n, t in self.anchor.theta.items()}),
+            head_m_ema=self.head_m_ema,
         )
 
     def restore(self, blob: dict):
@@ -250,6 +338,10 @@ class LifeAgent(Agent):
         for n, e in self.envs.items():
             e.set_state(blob["env_states"][n])
         self.obs_gen.set_state(blob["obs_gen"])
+        if self.anchor is not None and blob.get("anchor_theta") is not None:
+            for n, t in blob["anchor_theta"].items():
+                self.anchor.theta[n].copy_(t)
+        self.head_m_ema = blob.get("head_m_ema")
 
 
 # --------------------------------------------------------------------------
@@ -305,7 +397,9 @@ class Life:
                 for n in names}
         self.codec = UnifiedCodec(envs, babyai_syms=cfg["babyai_syms"])
         self.args = agent_args(cfg)
-        self.agent = LifeAgent(envs, self.args, self.codec)
+        self.agent = LifeAgent(envs, self.args, self.codec, cfg)
+        if cfg.get("retain_era_ckpts"):
+            (self.wd / "ckpt_era").mkdir(parents=True, exist_ok=True)
         self.life_step = 0
         self.era_idx = 0
         self.halvings = 0
@@ -367,10 +461,18 @@ class Life:
 
     def save(self, tag="periodic"):
         path = save_atomic(self.capture(), str(self.wd / "ckpt"),
-                           self.life_step)
+                           self.life_step, keep=self.cfg.get("ckpt_keep", 8))
         self.ledger.append("CHECKPOINT", step=self.life_step, tag=tag,
                            path=os.path.basename(path),
                            env_digests=self.agent.state()["env_digests"])
+        if self.cfg.get("retain_era_ckpts") and tag in ("era_end", "birth"):
+            # hardlink survives the keep-N prune; zero disk until it does
+            name = (f"era{self.era_idx:03d}-{self.life_step:012d}.pt"
+                    if tag == "era_end" else "era_birth.pt")
+            try:
+                os.link(path, self.wd / "ckpt_era" / name)
+            except FileExistsError:
+                pass
         return path
 
     def resume(self) -> bool:
@@ -408,6 +510,9 @@ class Life:
     def birth(self):
         a, cfg = self.agent, self.cfg
         env = a.env
+        if isinstance(a.opt, _AnchorOpt):
+            a.opt = a.opt.opt       # prelife runs UNANCHORED (birth identity
+                                    # with base; theta re-anchors post-birth)
         torch.manual_seed(cfg["seed"])
         birth_frames = []
         for _ in range(cfg["prelife_frames"]):
@@ -439,8 +544,18 @@ class Life:
         a.engine.loss_mask = None
         a.model.set_tau(0.0)
         a.model.eval()
-        a.opt = torch.optim.AdamW(a.model.parameters(), lr=cfg["lr"],
-                                  weight_decay=0.01)
+        inner = build_life_opt(a.model.parameters(), cfg)
+        if a.anchor is not None:
+            # re-anchor to the POST-birth weights (a birth-weight theta would
+            # fight the whole life's learning from step one)
+            a.anchor = Anchor(a.model, lam=cfg["anchor_lam"],
+                              ema=cfg["anchor_ema"], clamp=cfg["anchor_clamp"])
+            a.opt = _AnchorOpt(inner, a.anchor, a.model)
+        else:
+            a.opt = inner
+        if cfg.get("lr_decay") == "fixed":
+            for g in a.opt.param_groups:
+                g["lr"] = cfg["lr"] / cfg["lr_fixed_div"]
         a.gate = MarginGate(delta=self.args.delta_by[a.cur])
         for _ in range(cfg["window"] // a.codec.frame_len + 1):
             act = int(torch.randint(0, env.n_actions, (1,)))
@@ -469,6 +584,17 @@ class Life:
         return True
 
     def apply_lr(self):
+        mode = self.cfg.get("lr_decay", "cycle")
+        if mode == "none":
+            return                          # IDBD arms: alpha owns the schedule
+        if mode == "fixed":                 # Tier-3 lr-matched ratchet control
+            lr = self.cfg["lr"] / self.cfg["lr_fixed_div"]
+            if self.agent.opt.param_groups[0]["lr"] != lr:
+                for g in self.agent.opt.param_groups:
+                    g["lr"] = lr
+                self.ledger.append("LR", step=self.life_step, lr=lr,
+                                   halvings=-1)
+            return
         cyc_done = self._cycle_of_era(self.era_idx)[0]
         halvings = min(cyc_done // self.cfg["lr_halve_every_cycles"],
                        (self.cfg["lr_floor_div"] - 1).bit_length())
@@ -487,6 +613,14 @@ class Life:
         first suite after cycle 1 completes."""
         import st7_probes as P
         t0 = time.time()
+        # watchdog-safe under multi-life packing: suites contend for CPU and
+        # can stall the heartbeat — declare the probe state first (E6)
+        try:
+            st = json.loads((self.wd / "status.json").read_text())
+        except Exception:
+            st = {}
+        st.update(ts=int(t0), state="probe")
+        (self.wd / "status.json").write_text(json.dumps(st))
         h0 = P.state_hash(self)
         if self.probe_windows is None:
             pw_path = self.wd / "probe_windows.pt"
@@ -558,14 +692,23 @@ class Life:
             if len(self.win) > 1000:
                 self.win = self.win[-1000:]
             if self.life_step % 1000 == 0:
+                row = dict(
+                    t=self.life_step, era=self.era_idx,
+                    env=self.agent.cur, ret1k=sum(self.win),
+                    ce=round(self.ce_sum / self.life_step, 4),
+                    fire=round(self.fires / self.life_step, 4),
+                    piH=round(self.agent.pol_entropy(), 4),
+                    intr=round(self.agent.intr_sum, 1),
+                    biome=int(self.agent.env.biome))
+                if self.agent.act_eps:
+                    row["piH_act"] = round(self.agent.pol_entropy_act(), 4)
+                if self.agent.head_m_ema is not None:
+                    row["margin"] = round(self.agent.head_m_ema, 2)
+                opt = self.agent.opt
+                if hasattr(opt, "beta_mean"):
+                    row["idbd_b"] = round(opt.beta_mean(), 3)
                 with self.tele.open("a") as f:
-                    f.write(json.dumps(dict(
-                        t=self.life_step, era=self.era_idx,
-                        env=self.agent.cur, ret1k=sum(self.win),
-                        ce=round(self.ce_sum / self.life_step, 4),
-                        fire=round(self.fires / self.life_step, 4),
-                        piH=round(self.agent.pol_entropy(), 4),
-                        intr=round(self.agent.intr_sum, 1))) + "\n")
+                    f.write(json.dumps(row) + "\n")
             if self.life_step % cfg["nan_check_every"] == 0:
                 self.nan_guard()
             now = time.time()
