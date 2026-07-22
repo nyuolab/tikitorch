@@ -470,6 +470,17 @@ class MorphPCEngine:
                           # (softmax - uniform_[lo,hi)). Shift-class via ldexp;
                           # the 1/(hi-lo) target constant is a declared host-
                           # side waiver (E4_SPEC). Contract: mask ⊆ loss_mask.
+    action_uniform_pull = None
+                          # optional (k_lam int, lo int, hi int): E6 'ent-pull'
+                          # arm — the uniform pull ROUTED TO THE ACTION HEAD
+                          # (loss_uniform_pull hits the LM head's [ACT0,ACT0+K)
+                          # rows, which under the headobsk recipe is NOT the
+                          # head the agent acts with). Applied at action_loss-
+                          # masked positions over the head's [lo,hi) logits,
+                          # AFTER the dyadic sign-mux (must survive dropped
+                          # A≈0 positions): eps_a += 2^k_lam*(softmax-uniform).
+                          # Same host-side-constant waiver as loss_uniform_pull.
+                          # Ignored unless action_loss is set.
     action_loss = None    # optional (mask(B,T) bool, tgt(B,T) long,
                           # sign(B,T) int8, k(B,T) int): E4d 'head' lever — a
                           # SEPARATE action head (model.action_head, a second
@@ -547,6 +558,8 @@ class MorphPCEngine:
             Ka, ka = ah.out_features, ah.k
             eps_a = torch.softmax(
                 caches_top["act_logits"].reshape(-1, Ka).float(), dim=-1)
+            sm_a = (eps_a.clone()
+                    if self.action_uniform_pull is not None else None)
             eps_a.scatter_add_(1, atgt.reshape(-1, 1).clamp(0, Ka - 1),
                                -torch.ones(R, 1, device=eps_a.device))
             keep_a = amask.reshape(-1, 1)
@@ -558,6 +571,14 @@ class MorphPCEngine:
             eps_a = torch.where(sa < 0, -eps_a, eps_a)
             eps_a = torch.where(sa == 0,
                                 torch.zeros((), dtype=eps_a.dtype), eps_a)
+            if self.action_uniform_pull is not None:
+                # AFTER the dyadic mux (same rationale as loss_uniform_pull:
+                # the pull must survive dropped A≈0 positions)
+                k_lam_a, lo_a, hi_a = self.action_uniform_pull
+                sm_a[:, lo_a:hi_a] = sm_a[:, lo_a:hi_a] - 1.0 / (hi_a - lo_a)
+                sm_a = torch.ldexp(sm_a,
+                                   torch.tensor(k_lam_a, device=eps_a.device))
+                eps_a = torch.where(keep_a, eps_a + sm_a, eps_a)
             eps_a = (eps_a / denom).to(logits.dtype)   # SHARED denom (above)
             aidx = caches_top["act_idx"]
             ea_exp = eps_a.unsqueeze(-1).expand(R, Ka, ka)

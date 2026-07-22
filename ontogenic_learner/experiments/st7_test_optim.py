@@ -208,3 +208,71 @@ if __name__ == "__main__":
     test_anchor_opt()
     test_builder()
     print("ALL OPTIM UNITS GREEN")
+
+
+def test_action_uniform_pull():
+    """Engine E6 field: with action_loss set, action_uniform_pull (a) leaves
+    the LM head's grads bitwise unchanged, (b) adds the softmax-minus-uniform
+    term to the action head's grad, (c) repeated kicks on a saturated head
+    raise its softmax entropy."""
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "..", "..", "scripts"))
+    from pc_convrnn_charlm import MorphPCEngine, build_model
+    from tikitorch.nn import TropicalTopKModule
+    import argparse
+    torch.manual_seed(11)
+    V, D, K, B, T = 24, 32, 7, 1, 16
+    ns = argparse.Namespace(d_model=D, n_layers=2, kernel=7, dropout=0.0,
+                            tau=0.5, lam_min=2 ** -6)
+    model = build_model("morphssm", V, ns)
+    model.action_head = TropicalTopKModule(D, K, k=8)
+    with torch.no_grad():                       # saturate the head
+        model.action_head.weight.mul_(0.0).add_(
+            torch.randn_like(model.action_head.weight) * 0.02)
+        model.action_head.weight[3].add_(1.0)   # one dominant row
+    model.set_tau(0.0); model.eval()
+    eng = MorphPCEngine(model)
+    x = torch.randint(0, V, (B, T))
+    y = torch.randint(0, V, (B, T))
+    amask = torch.zeros(B, T, dtype=torch.bool); amask[0, ::4] = True
+    atgt = torch.randint(0, K, (B, T))
+    asgn = torch.ones(B, T, dtype=torch.int8)
+    akex = torch.zeros(B, T, dtype=torch.long)
+
+    def kick(pull):
+        eng.action_loss = (amask, atgt, asgn, akex)
+        eng.action_uniform_pull = pull
+        opt = torch.optim.SGD(model.parameters(), lr=0.0)  # grads only
+        eng.serve_and_learn(x, y, opt=opt, fire=lambda *a, **k: True)
+        eng.action_loss = None; eng.action_uniform_pull = None
+        return {n: (p.grad.clone() if p.grad is not None else None)
+                for n, p in model.named_parameters()}
+
+    g_off = kick(None)
+    g_on = kick((-2, 0, K))
+    assert torch.equal(g_off["output_head.weight"], g_on["output_head.weight"]), \
+        "LM head grads changed by action pull"
+    assert not torch.equal(g_off["action_head.weight"],
+                           g_on["action_head.weight"]), "pull inert on head"
+    # (c) entropy rises under repeated pulled kicks with a real optimizer
+    def head_entropy():
+        with torch.no_grad():
+            lg = model.action_head(torch.randn(64, D) * 0.1)
+            pi = torch.softmax(lg.float(), -1)
+            return float(-(pi * pi.clamp_min(1e-9).log()).sum(-1).mean())
+    h0 = head_entropy()
+    opt = torch.optim.SGD(model.parameters(), lr=5e-2)
+    for _ in range(200):
+        eng.action_loss = (amask, atgt, asgn * 0, akex)  # sgn=0: advantage off,
+        eng.action_uniform_pull = (2, 0, K)              # pull alone drives it
+        eng.serve_and_learn(x, y, opt=opt, fire=lambda *a, **k: True)
+    eng.action_loss = None; eng.action_uniform_pull = None
+    h1 = head_entropy()
+    assert h1 > h0 + 0.1, f"entropy did not rise ({h0:.3f} -> {h1:.3f})"
+    print("PASS action_uniform_pull (LM untouched, head moved, entropy up)")
+
+
+if __name__ == "__main__":
+    test_action_uniform_pull()
+    print("ALL ENGINE UNITS GREEN")
