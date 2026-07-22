@@ -22,7 +22,8 @@ SEEDS="${SEEDS:-0 1 2}"
 OMP="${OMP:-2}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_e6_state"; mkdir -p "$STATE_DIR"
-STATE_FILE="$STATE_DIR/${ARM}-${LIFE}.env"
+BATCH="${BATCH:-}"
+STATE_FILE="$STATE_DIR/${ARM}-${LIFE}${BATCH:+-$BATCH}.env"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 acct(){ aws_ sts get-caller-identity --query Account --output text; }
 
@@ -73,7 +74,7 @@ cmd_launch(){
   [ -f "$STATE_FILE" ] && { echo "state exists for ${ARM}-${LIFE}; terminate + rm first"; exit 1; }
   local ACCT BUCKET AMI TAG S3P UD IID
   ACCT="$(acct)"; BUCKET="tiki-sweep-${ACCT}"
-  TAG="e6-${ARM}-${LIFE}-$(date -u +%Y%m%dT%H%M%SZ)"
+  TAG="e6-${ARM}-${LIFE}${BATCH:+-$BATCH}-$(date -u +%Y%m%dT%H%M%SZ)"
   S3P="s3://${BUCKET}/e6/${TAG}"
   git -C "$PROJECT_DIR" archive --format=tar.gz -o "$STATE_DIR/src.tar.gz" HEAD
   for f in ontogenic_learner/experiments/st7_life.py \
