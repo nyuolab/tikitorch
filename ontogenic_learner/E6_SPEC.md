@@ -145,3 +145,18 @@ frozen BEFORE launch — the bars below supersede ambiguous phrasings above)
   gates the time-cadence save (a poisoned state can never be persisted);
   incident restore now re-asserts BOTH the era's env (the wrong-world fix
   covers nan_guard too) and the schedule lr (halvings=-1 → apply_lr).
+
+## Launch-time amendments (2026-07-22, user-authorized expanded budget)
+- Sentinel fired: 3-packed c7i.2xlarge ran 18-25 sps < the 60 bar → screen
+  fleet on c7i.4xlarge (OMP 4); the slow base box was terminated and base
+  relaunched on the same class as every other arm (probe suites are
+  wall-clocked — box-class uniformity keeps suite density comparable
+  across arms; the seed-extension boxes run 2 lives vs the primaries' 3,
+  declared as a within-arm density difference, second-order).
+- SEEDS EXPANDED: screen n=5 per arm (seeds 0-4; family bars re-read as
+  ignition ≥3/5 etc. — the ≥2/3 phrasing scales as ≥60% of seeds);
+  Tier-1 n=4 baseline (seeds 0[=E5],1,2,3); lrfixed control launched
+  immediately (independent of screen winners).
+- Cost restatement: screen 16 boxes ≈ $190 + Tier-1 3 boxes ≈ $40 +
+  lrfixed ≈ $18 + Tier-3 remainder ≈ $50-70 → ≈ $300-320 total
+  (user: "we can spend more if faster or more robust", 2026-07-22).
