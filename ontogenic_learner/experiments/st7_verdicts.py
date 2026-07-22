@@ -29,6 +29,145 @@ def load_jsonl(path):
         return [json.loads(l) for l in f if l.strip()]
 
 
+# ---------------------------------------------------------------------------
+# E6 endpoints (E6_SPEC; importable — st7_screen.py consumes these)
+# ---------------------------------------------------------------------------
+
+def retain_era_mean(eras):
+    """P3 primary (fixed metrology): revisit era-mean >= 0.8 * previous
+    visit's era-mean, per env. No quarter/game confound by construction."""
+    by_env = {}
+    for e, v in eras.items():
+        by_env.setdefault(v[0]["env"], []).append((e, v))
+    out = {}
+    for env, visits in by_env.items():
+        full = max(len(v) for _, v in visits)
+        rows = []
+        for (ea, va), (eb, vb) in zip(visits, visits[1:]):
+            if len(vb) < 0.95 * full or len(va) < 0.95 * full:
+                continue
+            ma = sum(x["ret1k"] for x in va) / len(va)
+            mb = sum(x["ret1k"] for x in vb) / len(vb)
+            rows.append(dict(prev_era=ea, era=eb, prev_mean=round(ma, 2),
+                             mean=round(mb, 2), vacuous=(ma <= 0),
+                             ok=(mb >= 0.8 * ma)))
+        real = [r for r in rows if not r["vacuous"]]
+        out[env] = dict(rows=rows,
+                        passes=sum(r["ok"] for r in real),
+                        total=len(real))
+    return out
+
+
+def retain_rotation_aligned(eras):
+    """P3 robustness: per-(env, biome) means compared across consecutive
+    visits — kills the biome/game rotation confound by construction.
+    Requires the E6 tele 'biome' field; returns {} on E5-era tele."""
+    if not any("biome" in r for v in eras.values() for r in v[:1]):
+        return {}
+    by_env = {}
+    for e, v in eras.items():
+        by_env.setdefault(v[0]["env"], []).append((e, v))
+    out = {}
+    for env, visits in by_env.items():
+        full = max(len(v) for _, v in visits)
+        rows = []
+        for (ea, va), (eb, vb) in zip(visits, visits[1:]):
+            if len(vb) < 0.95 * full or len(va) < 0.95 * full:
+                continue
+            def bm(v):
+                d = {}
+                for x in v:
+                    d.setdefault(x.get("biome", -1), []).append(x["ret1k"])
+                return {b: sum(xs) / len(xs) for b, xs in d.items()}
+            ba, bb = bm(va), bm(vb)
+            common = sorted(set(ba) & set(bb))
+            per = {b: dict(prev=round(ba[b], 2), now=round(bb[b], 2),
+                           ok=(bb[b] >= 0.8 * ba[b]) if ba[b] > 0 else None)
+                   for b in common}
+            judged = [p for p in per.values() if p["ok"] is not None]
+            rows.append(dict(prev_era=ea, era=eb, biomes=per,
+                             passes=sum(p["ok"] for p in judged),
+                             total=len(judged)))
+        out[env] = rows
+    return out
+
+
+def arrival_ignition(eras, bar=1.4):
+    """P4: any babyai era with era-mean ret1k >= bar (50% of the E5b birth
+    cohort's 2.75)."""
+    b = [(e, sum(x["ret1k"] for x in v) / len(v))
+         for e, v in eras.items() if v[0]["env"] == "babyai"]
+    if not b:
+        return dict(applicable=False)
+    ign = [(e, round(m, 3)) for e, m in b if m >= bar]
+    return dict(applicable=True, bar=bar, ignite=bool(ign),
+                first_ignite_era=(ign[0][0] if ign else None),
+                max_era_mean=round(max(m for _, m in b), 3),
+                era_means={e: round(m, 3) for e, m in b})
+
+
+def seesaw_amplitude(probes):
+    """P1: per suite, mean non-resident probe obs-CE minus mean resident;
+    plus the life-mean non-resident CE per env (the consolidation target)."""
+    rows, nonres = [], {}
+    for s in probes:
+        res_env = s.get("env")
+        cells = s.get("a", {})
+        res = [c["obs_ce"] for k, c in cells.items()
+               if k.startswith(res_env)]
+        non = [c["obs_ce"] for k, c in cells.items()
+               if not k.startswith(res_env)]
+        if not res or not non:
+            continue
+        rows.append(dict(t=s["t"], era=s.get("era"), env=res_env,
+                         resident=round(sum(res) / len(res), 3),
+                         nonresident=round(sum(non) / len(non), 3),
+                         amp=round(sum(non) / len(non)
+                                   - sum(res) / len(res), 3)))
+        for k, c in cells.items():
+            env = k.split(":")[0]
+            if env != res_env:
+                nonres.setdefault(env, []).append(c["obs_ce"])
+    return dict(suites=rows,
+                mean_amp=round(sum(r["amp"] for r in rows)
+                               / max(len(rows), 1), 3),
+                nonresident_mean={e: round(sum(v) / len(v), 3)
+                                  for e, v in nonres.items()})
+
+
+def pih_floor(tele, collapse_eps=0.01, recover_eps=0.1):
+    """P6: per-env fraction of 1k-buckets with piH < eps; the era of first
+    UNRECOVERED collapse (no later bucket > recover_eps); min era-mean piH.
+    piH_act reported beside when present (ent-floor arm)."""
+    out = {}
+    for key in ("piH", "piH_act"):
+        envs = {}
+        for r in tele:
+            if key in r:
+                envs.setdefault(r["env"], []).append(r)
+        res = {}
+        for env, rows in envs.items():
+            vals = [r[key] for r in rows]
+            frac = sum(v < collapse_eps for v in vals) / len(vals)
+            collapse_era = None
+            for i, r in enumerate(rows):
+                if r[key] < collapse_eps and all(
+                        x[key] <= recover_eps for x in rows[i:]):
+                    collapse_era = r["era"]
+                    break
+            era_means = {}
+            for r in rows:
+                era_means.setdefault(r["era"], []).append(r[key])
+            res[env] = dict(
+                frac_collapsed=round(frac, 4),
+                first_unrecovered_collapse_era=collapse_era,
+                min_era_mean=round(min(sum(v) / len(v)
+                                       for v in era_means.values()), 4))
+        if res:
+            out[key] = res
+    return out
+
+
 def theil_sen(ys):
     pts = [(i, y) for i, y in enumerate(ys) if math.isfinite(y)]
     if len(pts) < 2:
@@ -150,6 +289,31 @@ def main():
     resumes = [e for e in led if "RESUME" in str(e.get("event", "")).upper()]
     print(f"ledger events {len(led)}, seq strictly monotonic={mono}, "
           f"resume events={len(resumes)}, probes suites={len(probes)}")
+
+    print("\n=== E6 ENDPOINTS ===")
+    rem = retain_era_mean(eras)
+    for env, r in rem.items():
+        print(f"[P3 era-mean {env}] {r['passes']}/{r['total']} revisits pass")
+    rra = retain_rotation_aligned(eras)
+    for env, rows in rra.items():
+        tot = sum(r["total"] for r in rows)
+        ok = sum(r["passes"] for r in rows)
+        print(f"[P3 rotation-aligned {env}] {ok}/{tot} biome-visits pass")
+    ai = arrival_ignition(eras)
+    if ai.get("applicable"):
+        print(f"[P4 ignition] ignite={ai['ignite']} "
+              f"first_era={ai['first_ignite_era']} "
+              f"max_era_mean={ai['max_era_mean']}")
+    sa = seesaw_amplitude(probes)
+    print(f"[P1 seesaw] mean_amp={sa['mean_amp']} "
+          f"nonresident_mean={sa['nonresident_mean']}")
+    pf = pih_floor(tele)
+    for key, envs_ in pf.items():
+        for env, r in envs_.items():
+            print(f"[P6 {key} {env}] frac<0.01={r['frac_collapsed']} "
+                  f"unrecovered_collapse_era="
+                  f"{r['first_unrecovered_collapse_era']} "
+                  f"min_era_mean={r['min_era_mean']}")
 
 
 if __name__ == "__main__":
