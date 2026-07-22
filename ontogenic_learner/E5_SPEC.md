@@ -149,3 +149,75 @@ invariant + post-probe continuation). Hot-patched on-box via SSM +
 service restart (resume from ckpt); suites 1-2 unaffected (pre-arrival);
 suite 3 was lost to the crash. The assert did its job: fail-loud beats
 silent contamination.
+
+---
+
+## FULL LIFE RESULT (2026-07-22, i-025e8e11ff3107bd2, 12,000,000 steps, 24 eras, 3 worlds, ~44h wall ≈ $8 box + probes; data: results/e5_full/)
+
+**The organism lived its whole specified life**: one birth, 24 eras (10 foraging
+/ 10 minatar pairs-then-triples / 4 babyai from cycle 6), envs never reset,
+9 clone-isolated probe suites, 546-event single-sequence ledger, 3 in-life
+resumes (deliberate kill-9 drill; probe-isolation incident; hot-patch restart)
++ 1 benign post-completion systemd restart (first-completion exit wart —
+idle-loop engages on the resume path). Ended state complete-idle at 12M.
+
+### Pre-registered Goal-B verdicts (st7_verdicts.py, choices declared in-file)
+
+- **RETAIN — foraging PASS**: 6/9 revisits clear the Q1≥0.8·prevQ4 bar;
+  recovery-cost series [24,1,2,1,inf,2,1,10,1], Theil-Sen slope 0.000 →
+  non-increasing holds. The one inf chases era-8's outlier-high Q4.
+- **RETAIN — minatar FAIL as written, mechanism identified**: cost series
+  [1,1,1,1,62,146,126,190,475] increasing. Decomposition: (a) eras 10-13 =
+  the ENTROPY-COLLAPSE window (piH→0.000 while resident); (b) the bar's
+  quarter targets are game-confounded (biome rotation phase shifts across
+  eras — sameQ diffs show large ± swings tracking WHICH game sits in Q1/Q4).
+  Era-mean series 14.2→26.7→54.8→41.8→54.2→18.2→12.7→29.1→43.3→37.1: the
+  collapse window and the post-arrival recovery, not monotone forgetting.
+  Published per prereg as bounded-horizon adaptation + the mechanism story.
+- **RETAIN — babyai VACUOUS** (prior-visit return 0 → bar undefined).
+- **NO-RELAPSE PASS**: 0 DARKROOM incidents in 12M steps.
+- **STABILITY PASS (scoped)**: 0 nan/poison/incident events; ||W|| plateau
+  322-328 (1.9% spread) over the final 155k steps at fire-always
+  (wnorm_final_window.json). Early-life wnorm history not retained (keep-8);
+  plateau claim scoped to the final window + the incident-free ledger.
+- **TRANSFER (as measured)**: zero-shot era-entry 44.6/1k on minatar (era 1,
+  off foraging-only weights) vs 0.0 on babyai (era 14ff) — dense-reward
+  worlds inherit through the shared head, sparse-episodic ones don't.
+- **OPS PASS**: ledger seq strictly monotonic across 546 events and all
+  resumes; deliberate kill-9 survived (week-1 drill); 9/9 probe suites
+  isolation-clean after the d220ed9 fix (suite 3 lost to the incident).
+
+### The life's headline science (detail in the tele/probes series)
+
+1. **THE ARRIVAL (era 14, 7M steps)**: novel world at mature weights →
+   policy NEVER ignites (ret 0.0, piH=0.000 exactly, all 2M lived babyai
+   steps across 4 eras) while the world model ACQUIRES the world in one era
+   (probe obs-CE 21.3→0.21 at lr0/8). Cause measured: tropical action-head
+   saturation → zero acting entropy → no exploration → zero goal contact →
+   sparse-episodic REINFORCE has nothing to bite. The critical-period
+   phenomenon, emergent, with the metrology lesson: read acquisition off
+   PROBES, not live CE (deterministic-policy stream is a narrow slice).
+2. **ENTROPY AS THE THIRD FACTOR**: minatar piH 0.000 through era 13 (worst
+   era, 12.7) → restored to 0.41-1.26 across the babyai era WITHOUT minatar
+   residency (trunk movement re-mixes context-conditioned logits) → record
+   quarters (87.9 era 15, 141.7 era 22) → decays again 1.15→0.59→0.00 by
+   era 22. Novelty exposure is a measurable, transient entropy restorative;
+   saturation pressure reclaims it in ~3 cycles at fire-always. E6 gains
+   entropy homeostasis beside gradient volume + head-sharing.
+3. **THE SEESAW ENDURES; THE RATCHET IS BEHAVIORAL**: resident world reads
+   probe CE 0.2-2, non-resident ~19-21 all life (late amplitude ~19-20 vs
+   early ~21-25, only mildly shrunken); re-entry recovery near-instant
+   (babyai revisit entry live-CE 0.453 < prior exit 0.458). Meanwhile
+   RETURNS climb late-life: foraging's three best eras are its last three
+   (52.6, 64.4, 51.1 vs birth 43.2), minatar recovers post-collapse.
+   Storage is displaced, reacquisition is cheap, skill persists in the
+   policy: the CLS-like split the E6-C consolidation gate attacks.
+4. **Two-way dissociation closed-loop**: foraging out-of-residency = WM
+   fragile/policy robust (probe CE 1.5→21.4 while clone returns rose);
+   babyai arrival = WM plastic/policy frozen. Same substrate, opposite
+   assignments — the split follows the SIGNAL (dense vs sparse reward,
+   surprise-rich vs familiar obs), not the module.
+
+Binaries (final 8 ckpts + LATEST + latest.pt + src.tar.gz) remain at
+s3://tiki-sweep-739966866637/e5/e5-full-20260719T205131Z/ (ckpt_final/).
+Box terminated post-archive. The 12M-step organism state = ckpt-000012000000.pt.
