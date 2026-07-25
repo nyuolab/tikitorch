@@ -261,3 +261,28 @@ separately declared checkpoint-onset intervention and is not an E6-C endpoint.
    era-14 arrival failure → era-15 cross-task restoration, same eras as
    E5 — restoration now n=2). Familiar + scrambled branches run; the
    novel arm = the source life's own lived continuation.
+
+## BRANCH CONTROL RESULT (2026-07-25, three arms from Tier-1 s3's
+end-of-era-13 entropy-lock ckpt; the pre-registered falsifier)
+
+era-15 minatar acting entropy (the restoration readout), after era 14 as:
+- **natural babyai** (novel, learnable): piH 0.668 — RESTORED (ret era14 = 0.0)
+- **familiar foraging** (extra residency): piH **0.016 — NOT restored**
+  (despite healthy era-14 performance, ret 37.5, and despite era-15 minatar
+  still scoring 42.8 on its locked deterministic policy)
+- **scrambled babyai** (permuted obs symbols — novel statistics, broken
+  semantics, unlearnable: era-14 ret 0.0, piH 0.0): piH **0.779 — RESTORED**,
+  ≈ the natural branch.
+
+**VERDICT (per the frozen bar): the "novelty restores entropy" attribution
+in its semantic form is REFUTED-AS-REGISTERED and REFINED** — restoration
+occurred in a non-learnable branch, so learnable novel structure is NOT
+required; mere passage/era-boundary is ALSO insufficient (familiar arm).
+The causal ingredient is the SURPRISE LOAD itself: a high-CE input stream
+driving large world-model (trunk) adaptation re-mixes the head's
+context-conditioned logits and restores exploration elsewhere. This
+CONFIRMS the trunk-movement mechanism hypothesized in the E5 analysis and
+kills the romantic reading. n=1 per arm (one source ckpt); replicable from
+the other Tier-1 seeds' ckpts if the claim is elevated. Language rule:
+"surprise-driven entropy restoration", not "novelty therapy", and
+"homeostasis" remains banned (peer-review point 2 upheld by data).
