@@ -20,6 +20,8 @@ ARM="${ARM:-base}"
 LIFE="${LIFE:-screen}"
 SEEDS="${SEEDS:-0 1 2}"
 OMP="${OMP:-2}"
+BRANCH_FROM_S3="${BRANCH_FROM_S3:-}"
+BRANCH_SCHEDULE="${BRANCH_SCHEDULE:-novel}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="$PROJECT_DIR/.tiki_e6_state"; mkdir -p "$STATE_DIR"
 BATCH="${BATCH:-}"
@@ -36,6 +38,8 @@ arm_overlay(){
     idbd-sgd)    echo '{"optimizer":"idbd-sgd","lr_decay":"none"}' ;;
     ent-floor)   echo '{"act_eps":0.05}' ;;
     ent-pull)    echo '{"ent_k":-3}' ;;
+    ent-pull-weak) echo '{"ent_k":-4}' ;;
+    ent-pull-full) echo '{"ent_k":-3}' ;;
     head-renorm) echo '{"head_renorm_M":4.0}' ;;
     lrfixed)     echo '{"lr_decay":"fixed","lr_fixed_div":8}' ;;
     *) echo "FATAL: unknown ARM=$ARM" >&2; exit 1 ;;
@@ -109,6 +113,7 @@ exec > /var/log/e6-boot.log 2>&1
 set -x
 S3P="${s3p}"
 SEEDS="${SEEDS}"
+BRANCH_FROM_S3="${BRANCH_FROM_S3}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/e6-boot.log "\$S3P/boot.log" --only-show-errors || true; }
 trap up EXIT
 export DEBIAN_FRONTEND=noninteractive
@@ -123,13 +128,14 @@ up
 mkdir -p /opt/tiki && cd /opt/tiki
 aws s3 cp "\$S3P/src.tar.gz" . && tar xzf src.tar.gz
 for s in \$SEEDS; do aws s3 cp "\$S3P/e6-s\$s.json" /opt/tiki/e6-s\$s.json; done
+[ -n "\$BRANCH_FROM_S3" ] && aws s3 cp "\$BRANCH_FROM_S3" /opt/tiki/branch_root.pt
 up
 cat > /etc/systemd/system/e6life@.service <<'UNIT'
 [Unit]
 Description=E6 life seed %i (st7_life)
 After=network-online.target
 [Service]
-ExecStart=/opt/venv/bin/python -u /opt/tiki/ontogenic_learner/experiments/st7_life.py --workdir /opt/tiki/life-s%i --config /opt/tiki/e6-s%i.json --resume
+ExecStart=/opt/venv/bin/python -u /opt/tiki/ontogenic_learner/experiments/st7_life.py --workdir /opt/tiki/life-s%i --config /opt/tiki/e6-s%i.json --resume ${BRANCH_FROM_S3:+--branch-from /opt/tiki/branch_root.pt --branch-schedule ${BRANCH_SCHEDULE}}
 WorkingDirectory=/opt/tiki
 Environment=PYTHONPATH=/opt/tiki
 Environment=OMP_NUM_THREADS=${OMP}
