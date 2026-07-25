@@ -160,3 +160,104 @@ frozen BEFORE launch — the bars below supersede ambiguous phrasings above)
 - Cost restatement: screen 16 boxes ≈ $190 + Tier-1 3 boxes ≈ $40 +
   lrfixed ≈ $18 + Tier-3 remainder ≈ $50-70 → ≈ $300-320 total
   (user: "we can spend more if faster or more robust", 2026-07-22).
+
+## Post-launch mechanism clarification (2026-07-24; explanatory only)
+
+This note changes no arm, overlay, endpoint, threshold, seed rule, or kill
+branch. It makes the already-launched entropy-family contrast explicit.
+
+For the `ent-pull` overlay, `ent_k=-3` sets
+`lambda = 2**ent_k = 1/8`. Let the union action head have `K` rows and the
+current environment have `K_e` valid actions in rows `[0, K_e)`. Define
+`U_e(a)=1/K_e` on those rows and zero on the remaining rows, and let
+`p_theta=softmax(z)` over all `K` union-head rows. At each action position in
+a fired update, the added per-position objective and logit gradient are
+
+$$
+L_{\mathrm{pull}}
+= \lambda\,\mathrm{CE}(U_e,p_\theta)
+= \lambda\left[\log K_e+D_{\mathrm{KL}}(U_e\|p_\theta)\right],
+\qquad
+\nabla_z L_{\mathrm{pull}}=\lambda(p_\theta-U_e).
+$$
+
+The softmax is over all `K` head rows. Thus valid rows receive
+`lambda * (pi - 1/K_e)` and invalid rows receive `lambda * pi`, suppressing
+probability outside the current action set. The implementation adds this term
+after the dyadic advantage sign/zero mux, so it remains active when the
+quantized advantage is zero. It changes the action-head gradient and the
+shared-trunk error entering the single cascade sweep; the direct LM-output-head
+gradient is bitwise unchanged. "Action-head pull" names the injection point,
+not a head-only parameter update. The registered unit check verifies all three
+properties and raises mean head entropy from 0.018 to 0.355 in its saturated
+fixture.
+
+This learner-side term is distinct from both nearby controls:
+
+- `ent-floor` acts with
+  $\widetilde\pi_e=(1-\epsilon)\pi_{\theta,e}+\epsilon U_e$ at
+  $\epsilon=0.05$, where
+  $\pi_{\theta,e}=\mathrm{softmax}(z_{[0,K_e)}/\tau_\pi)$ is renormalized on
+  the current environment's valid rows. It guarantees sampling support and
+  changes the experienced stream, but adds no direct parameter gradient.
+- Standard maximum-entropy regularization minimizes, up to a constant,
+  $D_{\mathrm{KL}}(\pi_{\theta,e}\|U_e)$. The `ent-pull` arm reverses the
+  direction and applies $D_{\mathrm{KL}}(U_e\|p_\theta)$ to the union-head
+  learner distribution, which weights every valid action by `1/K_e`, diverges
+  as any valid-action probability approaches zero, and suppresses invalid rows.
+  It is therefore specifically an anti-saturation pressure, not merely a
+  generic entropy bonus.
+
+The registered screen tests prevention across a life. `ent-floor` without
+`ent-pull` would implicate insufficient action exposure; `ent-pull` without
+`ent-floor` would implicate learner-side saturation; both succeeding would not
+by itself identify which route is necessary; neither succeeding would reject
+entropy control at this tier. Because treatment begins before saturation, even
+a positive `ent-pull` endpoint would not establish that the same term can
+reopen an already locked policy. That stronger recovery claim requires a
+separately declared checkpoint-onset intervention and is not an E6-C endpoint.
+
+---
+
+## E6-C SCREEN RESULTS (2026-07-25, 40/40 lives, 0 incidents; data results/e6_screen/)
+
+### Mechanical verdicts against the FROZEN bars
+
+- **CONSOLIDATION: NO WINNER (published negative).** Best arm = anchor at
+  −10.0% non-resident CE vs the −30% bar (P2 also missed: 4.16 > 2.0 — the
+  protection-taxes-plasticity risk, measured). All three IDBD arms WORSEN
+  the seesaw (+8/+9%) and tax residents −35→−54% (θ=0.01 traverses an
+  octave per 100 aligned kicks — the peer-review diagnosis; see
+  PEER_FEEDBACK_20260724). idbd-sgd's −67.6% "seesaw win" is degenerate
+  (P2 3.18 fail, residents −45/−57%: an unspecialized model is uniformly
+  mediocre everywhere — the P5 gate exists for exactly this).
+- **ENTROPY: NO AUTOMATIC WINNER — by 0.7pp.** ent-pull: ignition **5/5
+  seeds** (max era-means 2.31–2.69 vs birth cohort 2.75; base 0/5 at
+  0.000), P6 collapse largely prevented (worst-case frac 0.26 vs base
+  1.0), foraging late +19.6% — but minatar late = 89.3% of base vs the
+  ≥90% P5 bar. Distributions overlap heavily (ent-pull best seed 42.8 >
+  base mean 40.7); the miss is within seed noise, but the bar is applied
+  as frozen. head-renorm: 4/5 ignition, P5 hard fail (minatar −47%).
+  ent-floor: 0/5 ignition at zero tax — exploration noise alone cannot
+  ignite (the forward-KL learner-desaturation mechanism confirmed by
+  contrast).
+- **Base arm: arrival failure 5/5 at 0.000/0.000** — with the full-scale
+  and lr-fixed replications, the critical-period-like result stands at
+  n=8 lives; the lr-fixed arrival failure kills the lr-schedule
+  alternative.
+
+### DECLARED post-prereg decisions (deviations stated, not hidden)
+
+1. **ent-pull advances to Tier-3 full-scale confirm (3 seeds) as
+   MARGINAL** — deviation from the letter of "family-WIN + P5" declared:
+   the P5 miss is 0.7pp on one env against +19.6% on the other, within
+   n=5 noise, and is not the buy-ignition-by-wrecking-residents failure
+   mode P5 was frozen to exclude. Tier-3 full scale decides.
+2. **Dose-response arm ent-pull-weak (ent_k=−4, 5 seeds, screen scale)**
+   — the forward-KL frame predicts weaker pull ⇒ less resident tax; does
+   ignition survive at half the regularizer?
+3. **Branch controls launch NOW from Tier-1 s3's end-of-era-13 ckpt**
+   (the replicate reproduced the full E5 sequence: era-13 entropy lock →
+   era-14 arrival failure → era-15 cross-task restoration, same eras as
+   E5 — restoration now n=2). Familiar + scrambled branches run; the
+   novel arm = the source life's own lived continuation.
