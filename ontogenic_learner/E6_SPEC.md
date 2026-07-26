@@ -342,3 +342,27 @@ ratchet = negative (bffc62c).
   the organism; the arm prices the constraint).
 - Metric rule (Sol): %-slope retired for compounding claims; quoted growth
   numbers now have committed derivations (results/e6_screen/growth_check).
+
+## D1 SHADOWING TEST RESULT (2026-07-26, two branches from Tier-1 s3;
+derivation results/e6_d1/)
+
+Instantaneous CE through the 50k-step SERVE-ONLY revisit windows:
+- foraging revisit: flat 18.6 the whole window (zero drift); on unfreeze
+  -> 1.1 -> 0.7-0.8 within ~2k steps.
+- minatar revisit: flat 22.3 the whole window; on unfreeze -> 8.1 -> 0.4
+  within ~3k steps.
+- Behavior split rides again: minatar's frozen policy scored 167/1k
+  constant (the frozen skeleton runs open-loop); foraging's decayed 13->1
+  (its scoring depends on online WM adaptation).
+
+**VERDICT (per the frozen bar): NOT SHADOWING — FAST RELEARNING.**
+Serve-only exposure recovers NOTHING (the displacement is weight-level,
+not contextual masking), yet gradient-on recovery erases a ~20-nat
+displacement in 1-3k steps (~100x faster than initial acquisition:
+features/subspace preserved, output mapping displaced, remapping nearly
+free WITH updates and impossible WITHOUT). Kills the cheap remedy class
+(context-conditioned calibration/temperatures — registered map) and
+selects the structural class: slow-trunk/fast-adapter splits, sparse
+experts, surprise-gated route allocation, or low-rank historical-subspace
+protection. D2 (order-by-width) + D3 (mechanism probes) now discriminate
+WITHIN that class.
