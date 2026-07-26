@@ -286,3 +286,24 @@ kills the romantic reading. n=1 per arm (one source ckpt); replicable from
 the other Tier-1 seeds' ckpts if the claim is elevated. Language rule:
 "surprise-driven entropy restoration", not "novelty therapy", and
 "homeostasis" remains banned (peer-review point 2 upheld by data).
+
+## LR-MATCHED RATCHET CONTROL RESULT (2026-07-25, full 12M life at fixed
+lr0/8; the second pre-registered E5-claim control)
+
+- Foraging era means: 74.3(birth!), 40.4, 28.4, 47.2, 40.1, 59.9, 53.7,
+  49.5, 64.5, 39.6 — second-half +16% vs first-half, but the BIRTH era is
+  the lifetime max; mid-life dip then partial recovery. Minatar: second
+  half −17% (era-13-class collapse then partial recovery). Babyai: 0.0 in
+  all four eras (arrival failure schedule-independent, again).
+- **Combined verdict across n=3 full lives (E5, Tier-1 s3, lrfixed): the
+  E5 "behavioral ratchet" is NOT ROBUST — one clean late-life climb (E5
+  seed 0), one mid-life peak (s3), one mixed (lrfixed).** The lr schedule
+  is not the sole driver (a mild second-half foraging gain survives at
+  fixed lr), but "capability climbs with age" dies as a general claim.
+  What survives, and is still non-trivial: NO late-life collapse under
+  12M steps of fire-always plasticity in any life — stability without
+  decay — plus seed-dependent trajectories. Language: "late-life
+  capability is MAINTAINED; accumulation remains undelivered" — the E6-C
+  conclusion (consolidation family negative) restated from the
+  behavioral side, and the honest setup for what E6-S must actually
+  measure.
