@@ -79,6 +79,8 @@ DEFAULTS = dict(
     ent_k=None,                    # ent-pull: 2^k action-head uniform pull
     head_renorm_M=0.0,             # head-renorm: target top1-top2 margin
     retain_era_ckpts=False, ckpt_keep=8, tele_margin=False,
+    freeze_first_steps=0,          # E6-D shadowing test: serve-only window
+                                   # at the start of REVISIT eras
     # branch mode (Tier-3 novelty-attribution control)
     branch_schedule=None, branch_start_era=None, branch_scramble_seed=None,
 )
@@ -486,6 +488,23 @@ class Life:
         cyc2, off = divmod(era - pre, len(base) + 1)
         return arrive + cyc2, off, base + ["babyai"]
 
+    def _is_revisit(self, era: int) -> bool:
+        env = self.era_env(era)
+        return any(self.era_env(e) == env for e in range(era))
+
+    def _freeze_active(self) -> bool:
+        """E6-D shadowing test: pure function of the era clock (resume- and
+        branch-safe — no state). Serve-only for the first freeze_first_steps
+        of every REVISIT era; first visits always learn."""
+        n = self.cfg.get("freeze_first_steps", 0)
+        if not n:
+            return False
+        era = min(self.life_step // self.cfg["era_steps"],
+                  self.total_eras - 1)
+        if not self._is_revisit(era):
+            return False
+        return (self.life_step - era * self.cfg["era_steps"]) < n
+
     def era_env(self, era: int) -> str:
         cyc, off, order = self._cycle_of_era(era)
         r = cyc % len(order)
@@ -759,8 +778,9 @@ class Life:
                 if nxt != self.agent.cur:
                     self.agent.switch_env(nxt)
                 self.apply_lr()
+            frozen = self._freeze_active()
             try:
-                r, fired, ce = self.agent.step(learn=True)
+                r, fired, ce = self.agent.step(learn=not frozen)
             except Exception as ex:                       # env incident
                 self.counters["incidents"] += 1
                 self.ledger.append("INCIDENT", kind="env_exception",
@@ -789,6 +809,8 @@ class Life:
                     piH=round(self.agent.pol_entropy(), 4),
                     intr=round(self.agent.intr_sum, 1),
                     biome=int(self.agent.env.biome))
+                if frozen:
+                    row["frozen"] = 1
                 if self.agent.act_eps:
                     row["piH_act"] = round(self.agent.pol_entropy_act(), 4)
                 if self.agent.head_m_ema is not None:

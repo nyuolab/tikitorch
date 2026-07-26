@@ -307,3 +307,38 @@ lr0/8; the second pre-registered E5-claim control)
   conclusion (consolidation family negative) restated from the
   behavioral side, and the honest setup for what E6-S must actually
   measure.
+
+---
+
+## E6-D — THE COMPOUNDING DISCRIMINATOR (prereg DRAFT->frozen at D1 launch;
+peer-review round 2 design, PEER_FEEDBACK_20260726)
+
+Sequenced BEFORE E6-S (which is deferred until D1-D3 classify the
+interference). Subsystem-specific causal frame adopted: WM seesaw =
+ordering first; policy compounding = task structure first; lifetime
+ratchet = negative (bffc62c).
+
+- **D1 SHADOWING TEST (launching now, ~$5):** freeze_first_steps=50_000
+  (serve-only window at REVISIT era starts; pure era-clock function,
+  resume/branch-safe; flags-off bitwise + drills green). Branches from the
+  COMPLETED Tier-1 s3 life: era002-end ckpt -> era-3 foraging revisit
+  frozen; era004-end -> era-5 minatar revisit frozen. The source's own
+  lived eras 3/5 are the unfrozen controls (zero cost). BAR: live CE
+  recovery to <=2x resident level WITHIN the frozen 50k (no updates) =>
+  SHADOWED (contextual recalibration); no recovery until unfreeze =>
+  FAST RELEARNING (features preserved, mapping rebuilt). Return read
+  beside CE; frozen buckets tagged in tele.
+- **D2 ORDER-BY-WIDTH:** recorded-stream WM-only replay (exact multiset,
+  blocked vs interleaved) x d{128,256,512} x 3 seeds + on-policy
+  era-granularity sweep beside it (multiset cannot be held fixed
+  on-policy; declared). Build after the ent-pull confirms land.
+- **D3 MECHANISM PROBES:** cross-world gradient cosine, top-k route
+  overlap, hidden lin-probe retention, recovery half-life.
+- **D4 TASK RICHNESS:** compositional XLand subset (later tasks require
+  earlier skills); acquisition AUC vs from-scratch, worst-skill floor,
+  breadth, zero-shot. THEN E6-S: >=3 widths, held-out width/lifetime
+  prediction = the bar for the word "law"; normalized composite primary.
+- **Replay-as-diagnostic-oracle arm** accepted (replay stays excluded from
+  the organism; the arm prices the constraint).
+- Metric rule (Sol): %-slope retired for compounding claims; quoted growth
+  numbers now have committed derivations (results/e6_screen/growth_check).
