@@ -366,3 +366,19 @@ selects the structural class: slow-trunk/fast-adapter splits, sparse
 experts, surprise-gated route allocation, or low-rank historical-subspace
 protection. D2 (order-by-width) + D3 (mechanism probes) now discriminate
 WITHIN that class.
+
+## DOSE-RESPONSE RESULT (2026-07-26, ent_k=-4 x 5 seeds):
+## ent-pull-weak = THE E6-C WINNER, under the ORIGINAL frozen bars
+
+ignition 5/5 (P4 ✓) · late returns foraging +26.1%, minatar 93.0% of base
+(P5 ✓ both envs) · piH worst-case collapse frac 0.43 (vs base 1.0) ·
+non-resident CE unchanged (-0.2%: entropy repair does NOT touch the
+seesaw — orthogonal mechanisms, as the family split predicted).
+**ENTROPY-FAMILY WIN, no deviation required** — the forward-KL theory's
+dose prediction (weaker pull => smaller tax, ignition retained) confirmed;
+taxes monotone in pull strength, foraging actually improves at the weaker
+dose. Note: the arrival-window babyai probe read (p2ce 16.2) is a suite-
+cadence artifact to resolve against the era-ckpt offline eval in the final
+analysis (P2 gates P1, not the entropy win). Tier-3: 3 full-scale
+ent_k=-4 confirms launch alongside the running ent_k=-3 fulls (which now
+double as full-scale dose-response).
