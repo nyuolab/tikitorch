@@ -42,6 +42,7 @@ arm_overlay(){
     ent-pull-full) echo '{"ent_k":-3}' ;;
     head-renorm) echo '{"head_renorm_M":4.0}' ;;
     lrfixed)     echo '{"lr_decay":"fixed","lr_fixed_div":8}' ;;
+    shadow)      echo '{"freeze_first_steps":50000}' ;;
     *) echo "FATAL: unknown ARM=$ARM" >&2; exit 1 ;;
   esac
 }
