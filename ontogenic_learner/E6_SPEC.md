@@ -382,3 +382,19 @@ cadence artifact to resolve against the era-ckpt offline eval in the final
 analysis (P2 gates P1, not the entropy win). Tier-3: 3 full-scale
 ent_k=-4 confirms launch alongside the running ent_k=-3 fulls (which now
 double as full-scale dose-response).
+
+## TIER-3 FULL-SCALE IGNITION CONFIRM (2026-07-27): 3/3 UNANIMOUS
+
+ent-pull (ent_k=-3) full-scale lives (12M steps, arrival at 7M with 2x the
+screen's saturation history): era-14 means 2.346 / 2.251 / 2.289 vs the
+1.4 bar (birth cohort 2.75; base full-scale lives 0.000 x4 + lrfixed
+0.000), acting entropy 1.83-1.88 throughout the arrival. **The SUSTAINED
+bar (>=2/3 seeds at full scale) is met unanimously: a mature agent under
+the forward-KL anti-saturation pull acquires a novel sparse-reward world
+at ~82-85% of newborn efficiency.** The causal chain is complete and
+each link independently replicated: pathology (n=8) -> mechanism
+(saturation; surprise-load restoration) -> cure (dose-calibrated
+forward-KL) -> boundary (acquisition, not accumulation — the seesaw is
+untouched by the cure and belongs to E6-D/E6-S). Remaining: ent_k=-4
+full-scale P5 reads (~2 days) for the winner's tax at scale; then E6
+RESULTS + arc close.
