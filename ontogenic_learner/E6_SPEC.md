@@ -398,3 +398,18 @@ forward-KL) -> boundary (acquisition, not accumulation — the seesaw is
 untouched by the cure and belongs to E6-D/E6-S). Remaining: ent_k=-4
 full-scale P5 reads (~2 days) for the winner's tax at scale; then E6
 RESULTS + arc close.
+
+## WINNER FULL-SCALE ARRIVAL (2026-07-28): ABOVE-NEWBORN, 3/3
+
+ent-pull-weak (ent_k=-4) full-scale arrival eras: 3.117 / 3.367 / 3.019
+(mean 3.17 = ~115% of the birth cohort's 2.75; every seed above newborn;
+every seed above every ent_k=-3 seed's 2.25-2.35; piH 1.72-1.80).
+**POSITIVE MATURITY TRANSFER, measured**: with exploration unblocked at
+the calibrated dose, seven million steps of mature representation makes
+the agent a BETTER learner of the novel sparse-reward world than a
+newborn — the inversion of the arrival pathology, and the first measured
+instance of the maturity advantage the program's thesis always implied.
+Dose-response at full scale is monotone in the right direction (weaker
+pull => higher arrival return: less regularizer drag on the freshly
+learnable head). Remaining: winner lives complete (~1 day) for the
+full-scale P5 tax + revisit series; then E6 RESULTS.
