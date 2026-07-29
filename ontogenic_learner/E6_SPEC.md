@@ -519,3 +519,29 @@ adopted — these hedges override any looser phrasing above)
   the learner-vs-actor dissociation, dose monotonicity at both scales,
   the saturation mechanism, the orthogonality boundary, the retraction
   hygiene, the lr-alternative kill, and the process claims.
+
+## NEWBORN MICRO-GRID RESULT (2026-07-29, 20 lives, ~$10) — THE INVERSION
+## ATTRIBUTION CORRECTED (the skeptic's demanded control, run same-day)
+
+{lr0, lr0/8} x {untreated, ent_k=-4} x 5 seeds (world_seed=seed — fresh
+worlds, unlike the world_seed-0-only historical cohort):
+untreated/lr0 2.08 mean (1.22-2.42) · pull/lr0 3.35 (2.87-4.47) ·
+untreated/lr0-8 2.94 · pull/lr0-8 3.00. Treated adult (full scale): 3.17.
+
+**CORRECTED CLAIMS (supersede "positive maturity transfer" / "adult beats
+newborn" everywhere):**
+1. The PATHOLOGY INVERSION stands, untouched: untreated adult 0.000 (n=8)
+   -> treated adult ~3.17. The cure works.
+2. The pull helps NEWBORNS too (+61% over matched untreated) — it is a
+   general acquisition enhancer, not maturity-specific.
+3. Under matched treatment, MATURITY IS NEUTRAL: treated adult 3.17 ~=
+   treated newborns 3.00-3.35 (parity within noise). Against the E5
+   backdrop — where maturity was FATAL — the correct headline is: **the
+   forward-KL cure ABOLISHES THE AGE PENALTY; it does not grant an age
+   bonus.** No positive maturity transfer is claimed.
+4. The historical 2.75 denominator was world_seed-0 flattered; fresh-world
+   newborn variance is large (1.2-4.5 across 20 cells). All prior
+   above-newborn statements are RETRACTED in favor of this grid.
+5. Bonus: gentle lr alone (lr0/8) also substantially helps fresh sparse-
+   reward acquisition (2.08->2.94) — untreated-newborn baselines are
+   optimizer-sensitive; matched-treatment comparisons only, henceforth.
