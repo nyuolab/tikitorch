@@ -413,3 +413,69 @@ Dose-response at full scale is monotone in the right direction (weaker
 pull => higher arrival return: less regularizer drag on the freshly
 learnable head). Remaining: winner lives complete (~1 day) for the
 full-scale P5 tax + revisit series; then E6 RESULTS.
+
+---
+
+# E6 RESULTS — THE RATCHET ARC, CLOSED (2026-07-29)
+
+~65 lives, ~$650, 7 days launch-to-close. Every verdict below is
+pre-registered (bars frozen before launch; the two declared deviations are
+marked), replicated, and derived from committed artifacts
+(results/e6_screen/, results/e6_tier3/, results/e5_full/, E6_SPEC sections
+above in chronological order).
+
+## The causal chain (the arc's spine)
+
+1. **PATHOLOGY (n=8 lives):** a mature agent under the E5 recipe NEVER
+   ignites a novel sparse-reward world — return exactly 0.0, acting
+   entropy exactly 0.000, at half AND full scale, cycle-decayed AND fixed
+   lr. Mechanism located: action-head logit saturation (E5: margins
+   19-37, argmax bitwise-frozen from 2.2M steps).
+2. **MECHANISM of the one natural recovery (branch falsifier):** cross-
+   task entropy restoration is caused by SURPRISE LOAD driving trunk
+   adaptation — scrambled-obs (unlearnable) restores it (0.779 ≈ natural
+   0.668), extra-familiar residency does not (0.016). "Novelty therapy"
+   refuted-as-registered.
+3. **CURE (forward-KL anti-saturation, ent_k):** the training-time
+   uniform-target pull on the action head — gradient of λ·CE(U,π), the
+   FORWARD KL direction that punishes near-zero action probabilities —
+   ignites the mature agent; the acting-time ε-floor (0/5) proves the
+   desaturation must reach the LEARNER, not the actor.
+4. **DOSE (ent_k=-4 = the winner):** screen ENTROPY-WIN under the original
+   frozen bars (ignition 5/5; P5 both envs; piH collapse frac 0.43 vs
+   base 1.0); taxes monotone in pull strength.
+5. **INVERSION (the headline):** at full scale the treated adult BEATS the
+   newborn: arrival eras 3.12/3.37/3.02 (mean ~115% of the 2.75 birth
+   cohort), and **12/12 winner babyai eras above the newborn mean** across
+   all revisits — positive maturity transfer, measured, stable, slightly
+   ratcheting within the third world (ws0 ends at its lifetime-best 3.38).
+6. **FULL-SCALE P5 (SUSTAINED >=2/3):** foraging 3/3 (47.0/42.4/47.8 vs
+   baseline 38.1 = ~120%); minatar 2/3 (104%/106%; ws0's 36% is an era-22
+   rotation outlier — its own era-20 = 57.0; baseline seeds' own finals
+   range 19-51). Residual life-mean minatar tax ~10-15% = the cure's
+   declared price at this dose.
+7. **BOUNDARY:** the cure buys ACQUISITION, not ACCUMULATION — seesaw
+   untouched (-0.2%); D1 branch-freeze: the seesaw is weight-level
+   displacement with preserved features (serve-only recovers nothing;
+   gradient-on recovers ~20 nats in 1-3k steps). Consolidation family:
+   pre-registered negative (anchor -10% vs -30% bar + P2 plasticity tax;
+   IDBD all-flavors negative at theta=0.01, octave-per-100-kicks
+   diagnosis). Ratchet: NOT ROBUST across n=3 baseline lives; the robust
+   claim is MAINTENANCE WITHOUT COLLAPSE.
+
+## Language locked for the papers
+"critical-period-LIKE pathology, fully inverted by a forward-KL
+anti-saturation regularizer"; "surprise-driven entropy restoration";
+"late-life capability maintained; cross-world accumulation open (E6-D)";
+never "novelty therapy"/"homeostasis"/"biologically plausible rule".
+External review (GPT Sol) materially shaped: the KL-direction frame, the
+dose-response design, the D1 discriminator, the retraction hygiene.
+
+## What E6 hands to E6-D / E6-S
+Structural remedy class selected by D1 (slow-trunk/fast-adapter, sparse
+experts, surprise-gated routes, low-rank subspace protection); D2
+order-by-width recorded-stream replay + D3 mechanism probes next; E6-S
+deferred behind them, with the normalized-competence composite and the
+held-out-scale bar. The organism now: durable, cure-carrying, above-
+newborn on arrival — still does not compound across worlds. That is the
+next arc's single question.
