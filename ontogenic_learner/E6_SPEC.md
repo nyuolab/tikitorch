@@ -479,3 +479,43 @@ deferred behind them, with the normalized-competence composite and the
 held-out-scale bar. The organism now: durable, cure-carrying, above-
 newborn on arrival — still does not compound across worlds. That is the
 next arc's single question.
+
+## POST-CLOSE ADVERSARIAL AMENDMENTS (2026-07-29 synthesis skeptic; all
+adopted — these hedges override any looser phrasing above)
+
+- **INVERSION language**: "above an UNTREATED newborn cohort (n=3 net
+  seeds, world_seed=0 only, no regularizer, lr0 — the repurposed E5b gate
+  screen)" until the newborn micro-grid lands ({lr0, lr0/8} x {no-pull,
+  ent_k=-4} x 5 seeds; launching now, ~$10). Defense already in hand: the
+  dose gradient (ent_k=-3 arrivals 2.25-2.35 < newborn 2.75) argues the
+  pull is net DRAG during fresh acquisition — but that is extrapolation,
+  not a control.
+- **Horizon-matched audit RETRACTED pending re-derivation**: the adult's
+  first-100k window is level-0-only (125k biome blocks at full scale) vs
+  the newborn's 4-level mix (25k blocks) — must be re-derived
+  level-matched (the micro-grid uses 25k blocks and fixes this too).
+- **"12/12" decomposed**: 3/3 arrival eras (the transfer readout; Welch
+  p~0.06, rank p~0.10 at n=3v3) + 9/9 revisit eras (retention;
+  non-independent within lives).
+- **Level-composition qualifier**: winner babyai returns come mostly from
+  GoToRedBall + Empty (DoorKey/FourRooms 0.01-0.30/1k) — "acquires the
+  world" scoped accordingly.
+- **P5**: keep the registered 2/3-with-failure-counted framing; "rotation
+  outlier" language dropped unless substantiated by the rotation-aligned
+  table (epf_s1 also shows low late-minatar eras).
+- **Branch mechanism confound acknowledged**: both restored arms were
+  zero-env-reward eras while the familiar arm kept dense reward — the
+  trunk-remixing route is not yet separated from withdrawal of
+  reward-driven head reinforcement. 4th arm registered (scrambled +
+  FROZEN action head, from 3 source ckpts, ~$10): frozen-head entropy
+  restoration => trunk route confirmed. Until then: "surprise-driven
+  entropy restoration (one instrumented life)".
+- **D1 scope**: "both tested revisit types of one instrumented life
+  (early eras 3/5)"; remedy-class kill claimed for this signature.
+- **Consolidation negative scope**: always "at the tested settings (IDBD
+  theta=0.01; anchor lambda=0.01) at this tier"; the registered retry map
+  is OPEN, cited wherever the negative is quoted.
+- Surviving clean (verbatim from the referee pass): the pathology n=8-10,
+  the learner-vs-actor dissociation, dose monotonicity at both scales,
+  the saturation mechanism, the orthogonality boundary, the retraction
+  hygiene, the lr-alternative kill, and the process claims.
