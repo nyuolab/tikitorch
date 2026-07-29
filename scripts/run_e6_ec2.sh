@@ -43,6 +43,10 @@ arm_overlay(){
     head-renorm) echo '{"head_renorm_M":4.0}' ;;
     lrfixed)     echo '{"lr_decay":"fixed","lr_fixed_div":8}' ;;
     shadow)      echo '{"freeze_first_steps":50000}' ;;
+    nb-base)     echo '{}' ;;
+    nb-pull)     echo '{"ent_k":-4}' ;;
+    nb-lo)       echo '{"lr":0.000125}' ;;
+    nb-lopull)   echo '{"lr":0.000125,"ent_k":-4}' ;;
     *) echo "FATAL: unknown ARM=$ARM" >&2; exit 1 ;;
   esac
 }
@@ -64,7 +68,13 @@ full = dict(era_steps=500_000, biome_steps=125_000, cycles=10,
             mech_lever="headobsk", fire_schedule="always",
             babyai_enabled=True, babyai_from_cycle=6,
             retain_era_ckpts=True, tele_margin=True)
-base = screen if "$LIFE" == "screen" else full
+micro = dict(era_steps=100_000, biome_steps=25_000, cycles=1,
+             env_order=["babyai"], probe_every_hours=0.0,
+             ckpt_every_steps=50_000, ckpt_every_secs=3600,
+             budget_wall_hours=24.0, mech_lever="headobsk",
+             fire_schedule="always", retain_era_ckpts=True,
+             tele_margin=True)
+base = micro if "$LIFE" == "micro" else screen if "$LIFE" == "screen" else full
 for s in "$SEEDS".split():
     cfg = dict(base); cfg.update(overlay)
     cfg.update(seed=int(s), world_seed=int(s))
