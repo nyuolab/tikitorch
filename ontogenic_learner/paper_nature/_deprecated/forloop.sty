@@ -1,9 +1,0 @@
-% Minimal forloop-compatible implementation (local vendored shim; interface
-% per the standard forloop package: \forloop[step]{counter}{init}{cond}{body}).
-\NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{forloop}[2026/07/14 v1.0 minimal forloop shim]
-\newcommand{\forloop}[5][1]{%
-  \setcounter{#2}{#3}%
-  \@whilesw\ifnum#4\fi{#5\addtocounter{#2}{#1}}%
-}
-\endinput

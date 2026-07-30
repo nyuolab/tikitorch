@@ -1,9 +1,0 @@
-{"gate": "V1_identity", "ckpt": "/opt/tiki/results/pc_convrnn/ckpts/m1_s1_cascade_s0.pt", "val_ce": 4.033911016252306, "val_bpb": 2.0273, "banked_bpb": 2.0273, "ok": true}
-{"gate": "V1_oracle", "domain": "wiki", "frozen_ce": 3.9548966619703503, "oracle_ce": 3.900352848900689, "headroom_nats": 0.05454381306966116, "headroom_bits": 0.0787, "steps": 2500, "wall_s": 5522.0}
-{"gate": "V1_oracle", "domain": "code", "frozen_ce": 9.327043851216635, "oracle_ce": 2.4077228440178766, "headroom_nats": 6.919321007198758, "headroom_bits": 9.9825, "steps": 4000, "wall_s": 8488.9}
-{"gate": "V1_oracle", "domain": "docs", "frozen_ce": 9.016071107652452, "oracle_ce": 2.9932421843210855, "headroom_nats": 6.022828923331367, "headroom_bits": 8.6891, "steps": 4000, "wall_s": 8505.2}
-{"gate": "V1_oracle", "domain": "shakespeare", "frozen_ce": 8.022386444939507, "oracle_ce": 3.360524707370334, "headroom_nats": 4.661861737569172, "headroom_bits": 6.7256, "steps": 4000, "wall_s": 8554.4}
-{"gate": "V1_headroom", "regime": "hard_shift", "headroom_bits_per_tok": 6.369, "bar": ">=0.3", "admissible": true}
-{"gate": "V1_headroom", "regime": "drift", "headroom_bits_per_tok": 6.369, "bar": ">=0.3", "admissible": true}
-{"gate": "V1_headroom", "regime": "novel_vocab", "headroom_bits_per_tok": 3.6441, "bar": ">=0.3", "admissible": true}
-{"gate": "V1_headroom", "regime": "stationary", "headroom_bits_per_tok": 0.0787, "bar": "<0.15 (control)", "admissible": true}

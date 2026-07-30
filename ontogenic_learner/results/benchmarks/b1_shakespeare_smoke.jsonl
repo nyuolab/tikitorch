@@ -1,7 +1,0 @@
-{"seed": 0, "arm": "iid_ceiling", "val_bpc": 2.9716, "updates": 600}
-{"seed": 0, "arm": "stream_cascade", "val_bpc": 3.7171, "updates": 150}
-{"seed": 0, "arm": "stream_rehearsal", "val_bpc": 3.6976, "updates": 150}
-{"seed": 0, "arm": "stream_two_speed", "val_bpc": 4.4487, "updates": 72}
-{"arm": "iid_ceiling", "event": "sample", "text": "eamy that noth fopod;\nTo me\nGidt; whell, the cwllike thath beronut what is turtes.\n\nSIOHINY:\nThe them, toogh war work him; E hacleness these hand cownad.\n\nCLORHIET:\nWhat bit blire as know\n;\nWhall the hawelly deaver then,\nAnd grill her to that bekent 'Twhald noser, and onen I lever;\nI'll atwith shaic"}
-{"arm": "stream_two_speed", "event": "sample", "text": ",i ke neraa:hlyerrs\netSo-ne Uy veet fn oisrelcigee.\nisnwh a'r  rn \nsvil e S hniI o sht   ese a nayoao  ncefroswrn- yoams\n\nQi?utrie, aaoe oe\ne,yoeifeyi\noeuafaioei\ns uun!rr toI r deld eir ree ta w ehu\nU dn av kdoedaesa\nesgooooIwaliaa , iiuroe shea\nstCeA.oIHnSaf\nodi i na, No\nsog'wnaue ysa vai!eer n d\nw"}
-{"event": "bars", "bigram_floor_bpc": 3.5806, "repo_bars": {"bf16_golden_transformer_bpb": 3.07, "nanogpt_class_bpc": "~2.0-2.1"}}

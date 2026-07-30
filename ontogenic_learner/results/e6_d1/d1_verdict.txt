@@ -1,6 +1,0 @@
-foraging-revisit: frozen-window instantaneous CE first5=[18.57, 18.74, 18.62, 18.64, 18.51] last5=[18.69, 18.56, 18.58, 18.76, 18.63] mean=18.64
-  post-unfreeze first10 CE=[1.12, 0.66, 0.81, 0.81, 0.81, 0.81, 0.81, 0.81, 0.66, 0.81]
-  frozen ret1k first/last: 13 / 1
-minatar-revisit: frozen-window instantaneous CE first5=[22.27, 22.29, 22.31, 22.32, 22.34] last5=[22.27, 22.28, 22.3, 22.32, 22.33] mean=22.30
-  post-unfreeze first10 CE=[8.06, 1.18, 0.67, 0.41, 0.67, 0.41, 0.41, 0.41, 0.41, 0.41]
-  frozen ret1k first/last: 167 / 167

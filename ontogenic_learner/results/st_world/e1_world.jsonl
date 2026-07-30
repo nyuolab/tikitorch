@@ -1,6 +1,0 @@
-{"gate": "E1", "arm": "random", "world_seed": 0, "seed": 0, "steps": 80000, "total_return": 2130.0, "ret_per_1k": 26.625, "fire_rate": 0.0, "obs_ce": 0.0, "wall_s": 1.6}
-{"gate": "E1", "arm": "oracle_mpc", "world_seed": 0, "seed": 0, "steps": 80000, "total_return": 9062.0, "ret_per_1k": 113.275, "fire_rate": 0.0, "obs_ce": 0.0, "wall_s": 10.6}
-{"gate": "E1", "arm": "replay_dqn", "world_seed": 0, "seed": 0, "steps": 80000, "total_return": 3579.0, "ret_per_1k": 44.737, "n_params": 21893, "wall_s": 55.2}
-{"gate": "E1", "arm": "streaming_ac", "world_seed": 0, "seed": 0, "steps": 80000, "total_return": 13990.0, "ret_per_1k": 174.875, "n_params": 22022, "wall_s": 134.5}
-{"gate": "E1", "arm": "live", "world_seed": 0, "seed": 0, "steps": 80000, "total_return": 14.0, "ret_per_1k": 0.175, "fire_rate": 0.0001, "obs_ce": 0.7355, "wall_s": 2048.9}
-{"gate": "E1", "arm": "frozen_mpc", "world_seed": 0, "seed": 0, "steps": 80000, "total_return": 3.0, "ret_per_1k": 0.037, "fire_rate": 0.0, "obs_ce": 0.751, "wall_s": 2065.8}

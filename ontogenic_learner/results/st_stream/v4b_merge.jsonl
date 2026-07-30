@@ -1,5 +1,0 @@
-{"gate": "V4b", "arm": "base", "ce_wiki": 3.9077, "ce_shakespeare": 7.7718, "ce_docs": 9.3148, "ce_code": 8.9164, "ce_mean": 7.4777}
-{"gate": "V4b", "arm": "riderA", "ce_wiki": 5.0402, "ce_shakespeare": 5.9811, "ce_docs": 5.2474, "ce_code": 5.012, "ce_mean": 5.3202}
-{"gate": "V4b", "arm": "riderB", "ce_wiki": 4.8782, "ce_shakespeare": 6.0973, "ce_docs": 6.1326, "ce_code": 5.5492, "ce_mean": 5.6643}
-{"gate": "V4b", "arm": "naive_avg", "ce_wiki": 4.8263, "ce_shakespeare": 6.0242, "ce_docs": 5.7837, "ce_code": 5.4222, "ce_mean": 5.5141}
-{"gate": "V4b", "arm": "fisher", "ce_wiki": 5.3749, "ce_shakespeare": 6.3299, "ce_docs": 5.9328, "ce_code": 5.5641, "ce_mean": 5.8004}

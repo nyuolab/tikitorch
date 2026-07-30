@@ -1,9 +1,0 @@
-[E2] babyai/randomTok/w0/s0: ret/1k 1.272 fire 0.0 ce 0.0
-[E2] babyai/randomTok/w0/s1: ret/1k 1.082 fire 0.0 ce 0.0
-[E2] babyai/randomTok/w0/s2: ret/1k 1.061 fire 0.0 ce 0.0
-[E2] babyai/frozenTok/w0/s2: ret/1k 1.394 fire 0.0 ce 0.5887
-[E2] babyai/frozenTok/w0/s1: ret/1k 1.304 fire 0.0 ce 0.558
-[E2] babyai/frozenTok/w0/s0: ret/1k 0.917 fire 0.0 ce 0.4965
-[E2] babyai/polA_intr0.5_norm_obsk-2_head/w0/s1: ret/1k 3.052 fire 1.0 ce 0.0915
-[E2] babyai/polA_intr0.5_norm_obsk-2_head/w0/s0: ret/1k 2.736 fire 1.0 ce 0.0847
-[E2] babyai/polA_intr0.5_norm_obsk-2_head/w0/s2: ret/1k 2.465 fire 1.0 ce 0.0813
