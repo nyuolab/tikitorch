@@ -148,8 +148,17 @@ policy ignites in every seed. The pull is the gradient of
 $\lambda\,\mathrm{CE}(U,\pi)$ --- the \emph{forward}
 Kullback--Leibler direction $D_{\mathrm{KL}}(U\Vert\pi)$, which diverges as
 any action's probability approaches zero and therefore concentrates its
-restoring force exactly on saturation; it is one shift-class term in the
-existing learning pass, costing no additional forward computation. Dose
+restoring force exactly on saturation. The term itself is inherited, not
+new: it is label smoothing's gradient\cite{szegedy2016}, the KL form of
+DreamerV3's `unimix'\cite{hafner2023dreamer}, and the log-barrier
+regularizer of ref.~\citenum{agarwal2021pg}; the maximum-entropy
+tradition\cite{ziebart2008,haarnoja2018sac} and the confidence
+penalty\cite{pereyra2017} use the \emph{reverse} direction, whose
+restoring force does not concentrate on dying
+actions\cite{meister2020}. What is new here is the isolation of the
+direction as the operative ingredient of a plasticity rescue, and the
+locus: it is one shift-class term in the existing learning pass, costing
+no additional forward computation. Dose
 matters monotonically: at $\lambda=2^{-3}$ ignition costs resident-world
 performance; at $2^{-4}$ the screen's no-tax bar is met in both resident
 worlds (Fig.~\ref{fig:dose}).
@@ -177,9 +186,9 @@ The cure leaves cross-world interference untouched (non-resident world-model
 probe error changes by $-0.2\%$; Fig.~\ref{fig:seesaw}): acquisition and
 accumulation are mechanistically orthogonal. Two further pre-registered
 results locate the remaining frontier precisely. First, protection-type
-consolidation fails its bars: an elastic-weight anchor reduces non-resident
+consolidation fails its bars: an elastic-weight anchor\cite{kirkpatrick2017} reduces non-resident
 error by only 10\% against a 30\% bar while taxing novel-world plasticity,
-and per-weight meta-learned step sizes (three IDBD variants at
+and per-weight meta-learned step sizes (three IDBD\cite{sutton1992} variants at
 $\theta{=}0.01$) worsen both sides --- a scoped negative with a registered
 retry map, since our own review diagnosed the tested meta-rate as
 pathologically fast. Second, a branch-freeze discriminator classified the
@@ -206,7 +215,21 @@ policy retains mastered skills open-loop while the world model's storage is
 displaced beneath it. And a \emph{causal account of the closing window}:
 saturation-driven, surprise-restorable, and abolishable by one forward-KL
 term at the learner --- with the honest boundary that this solves
-acquisition, not accumulation.
+acquisition, not accumulation. We position these claims carefully against
+their neighbours. Loss of plasticity and its remedies are established
+\cite{dohare2024,sokar2023,nikishin2023,juliani2024}; to our knowledge no
+reported cure reaches \emph{parity with a fresh network} on new-task
+acquisition under matched treatment, as here. Critical-period analyses in
+artificial networks treat closure as effectively
+irreversible\cite{achille2019}; we reopen a closed window with a loss
+term rather than surgery or resets --- an analogy, not a mechanism claim,
+to biological reopening\cite{pizzorusso2002}. Suppression-versus-erasure
+and savings phenomena are known\cite{davari2022,hetherington1989}; our
+contribution is the zero-gradient discriminator that separates them in a
+live organism and the quantified $\sim$100$\times$ savings. And
+surprise-driven exploration is the premise of intrinsic
+motivation\cite{burda2019}; the scrambled$\approx$natural cross-task
+restoration dissociation has, to our knowledge, no located precedent.
 
 We are explicit about scope. The worlds are small and the skills mostly
 disjoint; per-skill competence is the right unit, and ``acquires the world''
@@ -301,5 +324,46 @@ are orthogonal); the elastic-weight anchor's modest reduction fails its
 pre-registered bar.}
 \label{fig:seesaw}
 \end{figure}
+
+\begin{thebibliography}{99}
+\bibitem{szegedy2016} Szegedy, C. et al. Rethinking the Inception
+architecture for computer vision. \emph{CVPR} (2016).
+\bibitem{hafner2023dreamer} Hafner, D. et al. Mastering diverse domains
+through world models. \emph{arXiv:2301.04104} (2023).
+\bibitem{agarwal2021pg} Agarwal, A., Kakade, S., Lee, J. \& Mahajan, G.
+On the theory of policy gradient methods. \emph{JMLR} \textbf{22} (2021).
+\bibitem{ziebart2008} Ziebart, B. et al. Maximum entropy inverse
+reinforcement learning. \emph{AAAI} (2008).
+\bibitem{haarnoja2018sac} Haarnoja, T. et al. Soft actor--critic.
+\emph{ICML} (2018).
+\bibitem{pereyra2017} Pereyra, G. et al. Regularizing neural networks by
+penalizing confident output distributions. \emph{ICLR workshop} (2017).
+\bibitem{meister2020} Meister, C., Salesky, E. \& Cotterell, R.
+Generalized entropy regularization. \emph{ACL} (2020).
+\bibitem{dohare2024} Dohare, S. et al. Loss of plasticity in deep
+continual learning. \emph{Nature} \textbf{632} (2024).
+\bibitem{sokar2023} Sokar, G. et al. The dormant neuron phenomenon in
+deep reinforcement learning. \emph{ICML} (2023).
+\bibitem{nikishin2023} Nikishin, E. et al. Deep reinforcement learning
+with plasticity injection. \emph{NeurIPS} (2023).
+\bibitem{juliani2024} Juliani, A. \& Ash, J. A study of plasticity loss
+in on-policy deep reinforcement learning. \emph{NeurIPS} (2024).
+\bibitem{achille2019} Achille, A., Rovere, M. \& Soatto, S. Critical
+learning periods in deep networks. \emph{ICLR} (2019).
+\bibitem{pizzorusso2002} Pizzorusso, T. et al. Reactivation of ocular
+dominance plasticity in the adult visual cortex. \emph{Science}
+\textbf{298} (2002).
+\bibitem{davari2022} Davari, M. et al. Probing representation forgetting
+in supervised and unsupervised continual learning. \emph{CVPR} (2022).
+\bibitem{hetherington1989} Hetherington, P. \& Seidenberg, M. Is there
+`catastrophic interference' in connectionist networks? \emph{CogSci}
+(1989).
+\bibitem{burda2019} Burda, Y. et al. Exploration by random network
+distillation. \emph{ICLR} (2019).
+\bibitem{kirkpatrick2017} Kirkpatrick, J. et al. Overcoming catastrophic
+forgetting in neural networks. \emph{PNAS} \textbf{114} (2017).
+\bibitem{sutton1992} Sutton, R. S. Adapting bias by gradient descent: an
+incremental version of delta-bar-delta. \emph{AAAI} (1992).
+\end{thebibliography}
 
 \end{document}
