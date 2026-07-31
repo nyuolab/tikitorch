@@ -36,7 +36,8 @@ static const acc_t ML_POS_INF = acc_t( 2147483647LL);
 // --- throughput knobs (compile-time; default = the validated baseline) ---
 // TT_WIDE_LANES: lanes per cycle in the max-plus projection (PJ) and LM head
 // reductions. 8 = baseline. 16/32/64 widen the add+compare tree (more LUT, needs
-// mp_buf/wh_buf banked). MUST divide ML_D (=128). Bit-exact for any value: the
+// mp_buf/wh_buf banked). MUST divide ML_D (128 by default; 512 under -DML_D=512
+// — 8 divides both). Bit-exact for any value: the
 // balanced strict-'>' tree always keeps the lowest index among equal maxima.
 #ifndef TT_WIDE_LANES
 #define TT_WIDE_LANES 8

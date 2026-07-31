@@ -13,8 +13,10 @@ hardware/schedule bug, not an init mismatch.
 Layout (config B, all offsets/counts in int32 WORDS; verified against
 forge_buffer_morph_lm.hpp lines 83-178):
 
-    ML_D = ML_V = ML_L_SEQ = 128, ML_N_LAYERS = 4, ML_K = 7,
-    ML_LOG2_D = 7, ML_DIL_CAP = 64.
+    ML_D (env ML_D, default 128; 512 for the larger build) with ML_LOG2_D =
+    log2(ML_D); ML_V = ML_L_SEQ = 128, ML_N_LAYERS = 4, ML_K = 7, ML_DIL_CAP = 64.
+    The numeric comments beside the STRIDE_*/WORDS_* below are the ML_D=128
+    values; every expression is symbolic in ML_D so ML_D=512 rederives them.
 
 Weight regions get small int16-range values (-4..4, matching the reference
 validator's rng.integers(-4, 5)); the kernel reads each weight word as
@@ -31,12 +33,21 @@ import struct
 import sys
 
 # ---- Shape constants (config B) — mirror forge_buffer_morph_lm.hpp exactly ----
-ML_D        = 128
+# ML_D is build-time selectable in the kernel (-DML_D=512, default 128). The
+# driver imports this module, so it MUST agree with the kernel's ML_D or the
+# staged buffer layout silently corrupts. Read it from env ML_D (the same knob
+# the build passes) so generator and kernel stay in lockstep; default 128 =>
+# the deployed sentinel layout, byte-identical to the AFI buffer. ML_LOG2_D is
+# DERIVED (never a standalone literal), matching the header's ml_ilog2(ML_D).
+# ML_V (vocab) and ML_L_SEQ (window) are SEPARATE constants and stay 128.
+ML_D        = int(os.environ.get("ML_D", "128"))
+assert ML_D >= 16 and (ML_D & (ML_D - 1)) == 0, "ML_D must be a power of two >= 16"
 ML_V        = 128
 ML_L_SEQ    = 128
 ML_N_LAYERS = 4
 ML_K        = 7
-ML_LOG2_D   = 7
+ML_LOG2_D   = ML_D.bit_length() - 1        # 128 -> 7, 512 -> 9
+assert (1 << ML_LOG2_D) == ML_D
 ML_DIL_CAP  = 64
 
 # ---- BATCH parallelism (mirror header TT_BATCH / ML_BATCH_N) ----
@@ -219,8 +230,8 @@ def main(argv):
     nbytes = write_bin(out, buf)
     assert nbytes == ML_BUFFER_BYTES, (nbytes, ML_BUFFER_BYTES)
     sys.stderr.write(
-        "wrote %s: %d words, %d bytes (ML_BUFFER_WORDS=%d) ML_BATCH=%d seed=%d\n"
-        % (out, len(buf), nbytes, ML_BUFFER_WORDS, ML_BATCH, seed))
+        "wrote %s: %d words, %d bytes (ML_BUFFER_WORDS=%d) ML_D=%d ML_LOG2_D=%d ML_BATCH=%d seed=%d\n"
+        % (out, len(buf), nbytes, ML_BUFFER_WORDS, ML_D, ML_LOG2_D, ML_BATCH, seed))
     sys.stderr.write(
         "  OFF_TOKENS=%d OFF_TARGETS=%d OFF_CFG=%d OFF_CE_LUT=%d (loss_kind=%d zshift=%d)\n"
         % (OFF_TOKENS, OFF_TARGETS, OFF_CFG, OFF_CE_LUT, CFG_LOSS_KIND, CFG_CE_ZSHIFT))
