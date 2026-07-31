@@ -1,0 +1,8 @@
+The IP .xci for this D=512 package are REGENERATED from build/scripts/gen_ip.tcl
+(vivado -mode batch -source gen_ip.tcl -tclargs <this dir>) with the D=512 params:
+  axi_bram_ctrl_{dma,krn}  MEM_DEPTH 262144 (16 MB, was 32768/2 MB)
+  axi_crossbar_dma         NUM_MI 1, M00 ADDR_WIDTH 24 (16 MB, was NUM_MI 4 / 21)
+  axi_register_slice_{light,dma}  unchanged from the D=128 package
+The D=128 package (../../cl_forge_morph_lm) keeps its committed 2 MB .xci; the
+stale flat copies were removed here so a wrong-param IP can never be read (the CL
+synth tcl reads design/ip/<module>/<module>.xci — the subdirs gen_ip creates).

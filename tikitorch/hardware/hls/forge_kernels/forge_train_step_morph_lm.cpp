@@ -214,12 +214,35 @@ static int do_fwd_loss(int32_t* buffer, int b, int m, int token, int target, int
     static int32_t wh_buf[WORDS_W_HEAD];
     static int32_t ce_lut[WORDS_CE_LUT];
 #endif
-#if TT_WIDE_LANES > 8
+#if TT_WIDE_LANES > 8 && ML_D < 512
     // Bank the projection/head weight arrays so the widened reductions get
     // TT_WIDE_LANES contiguous reads/cycle (else the wide tree bottlenecks on
     // a single memory port). Default (8) leaves the baseline mapping untouched.
+    // At ML_D>=512 the D512 block below OWNS mp_buf/wh_buf banking+URAM (a second
+    // ARRAY_PARTITION on the same array would be a duplicate-pragma error), so this
+    // path is disabled there — the D=128 sentinel (ML_D<512) is unaffected.
 #pragma HLS ARRAY_PARTITION variable=mp_buf cyclic factor=TT_WIDE_LANES dim=1
 #pragma HLS ARRAY_PARTITION variable=wh_buf cyclic factor=TT_WIDE_LANES dim=1
+#endif
+#if ML_D >= 512
+    // --- D>=512 TIMING + AREA (A3 reduced-clock build) ------------------------
+    // The out-proj weight mp_buf at D=512 is 4*512*512 = 1,048,576 words (4 MB)
+    // and wh_buf is 128*512 words (256 KB). As single deep BRAM arrays they
+    // (a) push BRAM to 85% of one SLR and (b) put the giant array's cascaded
+    // BRAM output-mux tree on the max-plus read->add->compare path — the
+    // dominant contributor to the 11.425 ns csynth critical path (target 4.0).
+    // Move BOTH to URAM (registered output => deterministic, short read timing;
+    // frees BRAM well under one SLR; URAM was 0% used) and cyclic-partition by
+    // the 16-word (512-bit) wide-AXI burst width so BOTH the 16-wide burst_load
+    // WRITE and the TT_WIDE_LANES(=8)-wide PJ_I/HEAD_D READ are bank-conflict-
+    // free across registered URAM banks. This is a STORAGE-PRIMITIVE + BANKING
+    // change only — the arithmetic (add/compare/shift, strict-'>' tie-break) is
+    // byte-identical, so the CSIM fused golden still validates bit-for-bit.
+    // Fully #if'd out at the D=128 sentinel (ML_D<512) => that RTL is unchanged.
+#pragma HLS ARRAY_PARTITION variable=mp_buf cyclic factor=16 dim=1
+#pragma HLS ARRAY_PARTITION variable=wh_buf cyclic factor=16 dim=1
+#pragma HLS BIND_STORAGE   variable=mp_buf type=RAM_T2P impl=URAM
+#pragma HLS BIND_STORAGE   variable=wh_buf type=RAM_T2P impl=URAM
 #endif
 #ifndef TT_RESIDENT_W
     if (reload) {
