@@ -1,0 +1,5521 @@
++ true
+++ date +%s
++ echo TS=1785521879
+TS=1785521879
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521881
+TS=1785521881
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521882
+TS=1785521882
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521883
+TS=1785521883
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521884
+TS=1785521884
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521886
+TS=1785521886
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521887
+TS=1785521887
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521888
+TS=1785521888
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521889
+TS=1785521889
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521891
+TS=1785521891
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521892
+TS=1785521892
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521893
+TS=1785521893
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521894
+TS=1785521894
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521896
+TS=1785521896
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521897
+TS=1785521897
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521898
+TS=1785521898
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521899
+TS=1785521899
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521901
+TS=1785521901
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521902
+TS=1785521902
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521903
+TS=1785521903
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521904
+TS=1785521904
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521905
+TS=1785521905
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521907
+TS=1785521907
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521908
+TS=1785521908
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521909
+TS=1785521909
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521911
+TS=1785521911
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521912
+TS=1785521912
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521913
+TS=1785521913
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521914
+TS=1785521914
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521915
+TS=1785521915
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521917
+TS=1785521917
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521918
+TS=1785521918
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521919
+TS=1785521919
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521920
+TS=1785521920
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521922
+TS=1785521922
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521923
+TS=1785521923
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521924
+TS=1785521924
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521925
+TS=1785521925
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521926
+TS=1785521926
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521928
+TS=1785521928
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521929
+TS=1785521929
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521930
+TS=1785521930
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521931
+TS=1785521931
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521933
+TS=1785521933
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521934
+TS=1785521934
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521935
+TS=1785521935
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521936
+TS=1785521936
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521938
+TS=1785521938
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521939
+TS=1785521939
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521940
+TS=1785521940
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521941
+TS=1785521941
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521943
+TS=1785521943
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521944
+TS=1785521944
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521945
+TS=1785521945
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521946
+TS=1785521946
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521947
+TS=1785521947
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521949
+TS=1785521949
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521950
+TS=1785521950
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521951
+TS=1785521951
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521952
+TS=1785521952
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521954
+TS=1785521954
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521955
+TS=1785521955
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521956
+TS=1785521956
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521957
+TS=1785521957
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521959
+TS=1785521959
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521960
+TS=1785521960
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521961
+TS=1785521961
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521962
+TS=1785521962
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521964
+TS=1785521964
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521965
+TS=1785521965
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521966
+TS=1785521966
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521967
+TS=1785521967
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521968
+TS=1785521968
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521970
+TS=1785521970
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521971
+TS=1785521971
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521972
+TS=1785521972
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521973
+TS=1785521973
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521975
+TS=1785521975
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521976
+TS=1785521976
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521977
+TS=1785521977
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521978
+TS=1785521978
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521980
+TS=1785521980
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521981
+TS=1785521981
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521982
+TS=1785521982
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521983
+TS=1785521983
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521984
+TS=1785521984
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521986
+TS=1785521986
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521987
+TS=1785521987
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521988
+TS=1785521988
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521989
+TS=1785521989
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521991
+TS=1785521991
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521992
+TS=1785521992
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521993
+TS=1785521993
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521994
+TS=1785521994
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521995
+TS=1785521995
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521998
+TS=1785521998
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785521999
+TS=1785521999
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522000
+TS=1785522000
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522002
+TS=1785522002
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522003
+TS=1785522003
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522004
+TS=1785522004
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522005
+TS=1785522005
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522006
+TS=1785522006
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522008
+TS=1785522008
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522009
+TS=1785522009
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522010
+TS=1785522010
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522011
+TS=1785522011
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522013
+TS=1785522013
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522014
+TS=1785522014
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522015
+TS=1785522015
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522016
+TS=1785522016
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522017
+TS=1785522017
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522019
+TS=1785522019
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522020
+TS=1785522020
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522021
+TS=1785522021
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522023
+TS=1785522023
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522024
+TS=1785522024
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522025
+TS=1785522025
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522026
+TS=1785522026
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522027
+TS=1785522027
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522029
+TS=1785522029
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522030
+TS=1785522030
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522031
+TS=1785522031
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522032
+TS=1785522032
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522034
+TS=1785522034
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522035
+TS=1785522035
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522036
+TS=1785522036
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522037
+TS=1785522037
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522038
+TS=1785522038
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522040
+TS=1785522040
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522041
+TS=1785522041
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522042
+TS=1785522042
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522043
+TS=1785522043
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522045
+TS=1785522045
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522046
+TS=1785522046
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522047
+TS=1785522047
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522048
+TS=1785522048
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522050
+TS=1785522050
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522051
+TS=1785522051
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522052
+TS=1785522052
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522053
+TS=1785522053
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522055
+TS=1785522055
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522056
+TS=1785522056
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522057
+TS=1785522057
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522058
+TS=1785522058
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522059
+TS=1785522059
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522061
+TS=1785522061
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522062
+TS=1785522062
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522063
+TS=1785522063
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522064
+TS=1785522064
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522066
+TS=1785522066
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522067
+TS=1785522067
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522068
+TS=1785522068
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522069
+TS=1785522069
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522071
+TS=1785522071
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522072
+TS=1785522072
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522073
+TS=1785522073
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522074
+TS=1785522074
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522076
+TS=1785522076
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522077
+TS=1785522077
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522078
+TS=1785522078
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522079
+TS=1785522079
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522080
+TS=1785522080
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522082
+TS=1785522082
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522083
+TS=1785522083
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522084
+TS=1785522084
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522085
+TS=1785522085
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522087
+TS=1785522087
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522088
+TS=1785522088
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522089
+TS=1785522089
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522090
+TS=1785522090
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522092
+TS=1785522092
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522093
+TS=1785522093
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522094
+TS=1785522094
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522095
+TS=1785522095
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522096
+TS=1785522096
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522098
+TS=1785522098
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522099
+TS=1785522099
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522100
+TS=1785522100
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522101
+TS=1785522101
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522103
+TS=1785522103
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522104
+TS=1785522104
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522105
+TS=1785522105
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522106
+TS=1785522106
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522107
+TS=1785522107
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522109
+TS=1785522109
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522110
+TS=1785522110
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522111
+TS=1785522111
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522112
+TS=1785522112
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522114
+TS=1785522114
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522115
+TS=1785522115
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522116
+TS=1785522116
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522117
+TS=1785522117
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522119
+TS=1785522119
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522120
+TS=1785522120
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522121
+TS=1785522121
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522122
+TS=1785522122
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522124
+TS=1785522124
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522125
+TS=1785522125
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522126
+TS=1785522126
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522127
+TS=1785522127
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522129
+TS=1785522129
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522130
+TS=1785522130
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522131
+TS=1785522131
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522132
+TS=1785522132
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522134
+TS=1785522134
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522135
+TS=1785522135
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522136
+TS=1785522136
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522137
+TS=1785522137
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522138
+TS=1785522138
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522140
+TS=1785522140
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522141
+TS=1785522141
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522142
+TS=1785522142
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522143
+TS=1785522143
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522145
+TS=1785522145
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522146
+TS=1785522146
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522147
+TS=1785522147
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522148
+TS=1785522148
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522149
+TS=1785522149
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522151
+TS=1785522151
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522152
+TS=1785522152
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522153
+TS=1785522153
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522155
+TS=1785522155
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522156
+TS=1785522156
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522157
+TS=1785522157
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522158
+TS=1785522158
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522159
+TS=1785522159
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522161
+TS=1785522161
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522162
+TS=1785522162
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522163
+TS=1785522163
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522164
+TS=1785522164
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522166
+TS=1785522166
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522167
+TS=1785522167
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522168
+TS=1785522168
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522169
+TS=1785522169
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522171
+TS=1785522171
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522172
+TS=1785522172
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522173
+TS=1785522173
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522174
+TS=1785522174
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522176
+TS=1785522176
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522177
+TS=1785522177
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522179
+TS=1785522179
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522180
+TS=1785522180
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522181
+TS=1785522181
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522182
+TS=1785522182
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522184
+TS=1785522184
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522185
+TS=1785522185
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522186
+TS=1785522186
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522187
+TS=1785522187
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522189
+TS=1785522189
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522190
+TS=1785522190
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522191
+TS=1785522191
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522192
+TS=1785522192
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522193
+TS=1785522193
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522195
+TS=1785522195
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522196
+TS=1785522196
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522197
+TS=1785522197
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522198
+TS=1785522198
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522200
+TS=1785522200
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522201
+TS=1785522201
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522202
+TS=1785522202
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522203
+TS=1785522203
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522204
+TS=1785522204
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522206
+TS=1785522206
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522207
+TS=1785522207
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522208
+TS=1785522208
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522210
+TS=1785522210
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522211
+TS=1785522211
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522212
+TS=1785522212
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522213
+TS=1785522213
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522215
+TS=1785522215
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522216
+TS=1785522216
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522217
+TS=1785522217
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522218
+TS=1785522218
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522219
+TS=1785522219
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522221
+TS=1785522221
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522222
+TS=1785522222
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522223
+TS=1785522223
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522224
+TS=1785522224
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522226
+TS=1785522226
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522227
+TS=1785522227
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522228
+TS=1785522228
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522229
+TS=1785522229
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522230
+TS=1785522230
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522232
+TS=1785522232
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522233
+TS=1785522233
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522234
+TS=1785522234
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522235
+TS=1785522235
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522237
+TS=1785522237
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522238
+TS=1785522238
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522239
+TS=1785522239
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522240
+TS=1785522240
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522242
+TS=1785522242
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522243
+TS=1785522243
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522244
+TS=1785522244
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522246
+TS=1785522246
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522247
+TS=1785522247
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522248
+TS=1785522248
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522249
+TS=1785522249
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522250
+TS=1785522250
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522252
+TS=1785522252
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522253
+TS=1785522253
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522254
+TS=1785522254
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522255
+TS=1785522255
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522257
+TS=1785522257
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522258
+TS=1785522258
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522259
+TS=1785522259
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522260
+TS=1785522260
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522261
+TS=1785522261
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522263
+TS=1785522263
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522264
+TS=1785522264
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522265
+TS=1785522265
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522266
+TS=1785522266
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522268
+TS=1785522268
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522269
+TS=1785522269
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522270
+TS=1785522270
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522271
+TS=1785522271
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522273
+TS=1785522273
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522274
+TS=1785522274
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522275
+TS=1785522275
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522276
+TS=1785522276
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522278
+TS=1785522278
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522279
+TS=1785522279
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522280
+TS=1785522280
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522281
+TS=1785522281
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522282
+TS=1785522282
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522284
+TS=1785522284
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522285
+TS=1785522285
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522286
+TS=1785522286
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522287
+TS=1785522287
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522289
+TS=1785522289
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522290
+TS=1785522290
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522291
+TS=1785522291
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522292
+TS=1785522292
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522293
+TS=1785522293
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522295
+TS=1785522295
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522296
+TS=1785522296
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522297
+TS=1785522297
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522298
+TS=1785522298
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522300
+TS=1785522300
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522301
+TS=1785522301
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522302
+TS=1785522302
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522303
+TS=1785522303
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522304
+TS=1785522304
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522306
+TS=1785522306
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522307
+TS=1785522307
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522308
+TS=1785522308
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522310
+TS=1785522310
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522311
+TS=1785522311
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522312
+TS=1785522312
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522313
+TS=1785522313
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522315
+TS=1785522315
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522316
+TS=1785522316
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522317
+TS=1785522317
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522318
+TS=1785522318
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522319
+TS=1785522319
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522321
+TS=1785522321
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522322
+TS=1785522322
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 3 watts
+   Average: 3 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522324
+TS=1785522324
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522325
+TS=1785522325
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522326
+TS=1785522326
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522327
+TS=1785522327
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522328
+TS=1785522328
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522330
+TS=1785522330
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522331
+TS=1785522331
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522332
+TS=1785522332
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522334
+TS=1785522334
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522335
+TS=1785522335
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522336
+TS=1785522336
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522337
+TS=1785522337
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522338
+TS=1785522338
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522340
+TS=1785522340
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522341
+TS=1785522341
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522342
+TS=1785522342
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522343
+TS=1785522343
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522345
+TS=1785522345
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522346
+TS=1785522346
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522347
+TS=1785522347
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522348
+TS=1785522348
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522349
+TS=1785522349
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522351
+TS=1785522351
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522352
+TS=1785522352
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522353
+TS=1785522353
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522355
+TS=1785522355
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522356
+TS=1785522356
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522357
+TS=1785522357
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522358
+TS=1785522358
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522359
+TS=1785522359
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522361
+TS=1785522361
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522362
+TS=1785522362
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522363
+TS=1785522363
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522364
+TS=1785522364
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522366
+TS=1785522366
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522367
+TS=1785522367
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522368
+TS=1785522368
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522369
+TS=1785522369
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522371
+TS=1785522371
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522372
+TS=1785522372
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522373
+TS=1785522373
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522374
+TS=1785522374
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522375
+TS=1785522375
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522377
+TS=1785522377
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522378
+TS=1785522378
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522379
+TS=1785522379
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522380
+TS=1785522380
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522382
+TS=1785522382
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522383
+TS=1785522383
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522384
+TS=1785522384
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522385
+TS=1785522385
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522386
+TS=1785522386
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522388
+TS=1785522388
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522389
+TS=1785522389
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522390
+TS=1785522390
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522391
+TS=1785522391
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522393
+TS=1785522393
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522394
+TS=1785522394
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522395
+TS=1785522395
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522396
+TS=1785522396
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522398
+TS=1785522398
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522399
+TS=1785522399
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522400
+TS=1785522400
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522401
+TS=1785522401
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522403
+TS=1785522403
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522404
+TS=1785522404
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522405
+TS=1785522405
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522406
+TS=1785522406
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522408
+TS=1785522408
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522409
+TS=1785522409
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522410
+TS=1785522410
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522411
+TS=1785522411
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522413
+TS=1785522413
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522414
+TS=1785522414
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522415
+TS=1785522415
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522416
+TS=1785522416
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522417
+TS=1785522417
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522419
+TS=1785522419
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522420
+TS=1785522420
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522421
+TS=1785522421
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522422
+TS=1785522422
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522424
+TS=1785522424
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522425
+TS=1785522425
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522426
+TS=1785522426
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522427
+TS=1785522427
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522428
+TS=1785522428
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522430
+TS=1785522430
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522431
+TS=1785522431
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522432
+TS=1785522432
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522434
+TS=1785522434
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522435
+TS=1785522435
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522436
+TS=1785522436
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522437
+TS=1785522437
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522438
+TS=1785522438
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522440
+TS=1785522440
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522441
+TS=1785522441
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522442
+TS=1785522442
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522443
+TS=1785522443
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522445
+TS=1785522445
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522446
+TS=1785522446
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522447
+TS=1785522447
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522448
+TS=1785522448
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522449
+TS=1785522449
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522451
+TS=1785522451
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522452
+TS=1785522452
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522453
+TS=1785522453
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522454
+TS=1785522454
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522456
+TS=1785522456
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522457
+TS=1785522457
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522458
+TS=1785522458
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522459
+TS=1785522459
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522460
+TS=1785522460
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522462
+TS=1785522462
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522463
+TS=1785522463
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522464
+TS=1785522464
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522466
+TS=1785522466
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522467
+TS=1785522467
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522468
+TS=1785522468
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522469
+TS=1785522469
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522470
+TS=1785522470
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522472
+TS=1785522472
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522473
+TS=1785522473
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522474
+TS=1785522474
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522475
+TS=1785522475
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522477
+TS=1785522477
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522478
+TS=1785522478
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522479
+TS=1785522479
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522481
+TS=1785522481
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522482
+TS=1785522482
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522483
+TS=1785522483
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522484
+TS=1785522484
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522486
+TS=1785522486
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522487
+TS=1785522487
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522488
+TS=1785522488
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522489
+TS=1785522489
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522491
+TS=1785522491
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522492
+TS=1785522492
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522493
+TS=1785522493
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522494
+TS=1785522494
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522496
+TS=1785522496
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522497
+TS=1785522497
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522498
+TS=1785522498
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522499
+TS=1785522499
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts
++ sleep 1
++ true
+++ date +%s
++ echo TS=1785522501
+TS=1785522501
++ grep -iE 'Vccint|Last measured|Average|Max measured|power'
++ /usr/local/bin/fpga-describe-local-image -S 0 -M
+Power consumption (Vccint):
+   Last measured: 4 watts
+   Average: 4 watts
+   Max measured: 4 watts

@@ -1,0 +1,3 @@
+ARM=idle_r3 T_START=1785522503
+{"arm":"idle","t_start":1785522504.0353491,"t_end":1785522644.197393,"dur_s":140.16204380989075,"kicks":0,"steps_per_kick":0,"tokens":0,"tok_s":0.0,"n_update_kicks":0,"wcrc":9856645203440722904,"init_wcrc":9856645203440722904,"preds16":[],"serve_is_frozen_mode3":true,"note":"core-rail Vccint only; NOT full-card PMBus"}
+ARM=idle_r3 T_END=1785522644 ITERS=1

@@ -1,0 +1,74 @@
++ echo '###### D=512 FEASIBILITY SUMMARY (target 250 MHz / 4.0 ns) ######'
+###### D=512 FEASIBILITY SUMMARY (target 250 MHz / 4.0 ns) ######
++ echo '--- Timing (Estimated vs Target) ---'
+--- Timing (Estimated vs Target) ---
++ grep -iE 'Target|Estimated|CP |clock' forge_train_step_morph_lm_proj/solution1/syn/report/forge_train_step_morph_lm_csynth.rpt
++ head -20
+* Solution:       solution1 (Vivado IP Flow Target)
+* Target device:  xcvu47p-fsvh2892-2L-e
+    |  Clock |  Target | Estimated | Uncertainty|
++ echo '--- Resource (Utilization Estimates: DSP MUST be 0) ---'
+--- Resource (Utilization Estimates: DSP MUST be 0) ---
++ grep -iE 'DSP|BRAM|URAM|LUT|FF|Utilization|Total|Available|SLICE' forge_train_step_morph_lm_proj/solution1/syn/report/forge_train_step_morph_lm_csynth.rpt
++ head -60
+* Solution:       solution1 (Vivado IP Flow Target)
+    |  Latency (cycles) |  Latency (absolute) |  Interval | Pipeline|
+        |                         |              |  Latency (cycles) |  Latency (absolute) |  Interval | Pipeline|
+== Utilization Estimates
+|         Name        | BRAM_18K|  DSP |    FF   |   LUT   | URAM|
+|DSP                  |        -|     -|        -|        -|    -|
+|Total                |     1144|     0|    32119|    91669|    0|
+|Available SLR        |     1344|  3008|   869120|   434560|  320|
+|Utilization SLR (%)  |       85|     0|        3|       21|    0|
+|Available            |     4032|  9024|  2607360|  1303680|  960|
+|Utilization (%)      |       28|     0|        1|        7|    0|
+    |         Instance        |     Module    | BRAM_18K| DSP|   FF  |  LUT  | URAM|
+    |Total                    |               |     1144|   0|  31967|  91545|    0|
+    * DSP: 
+    |          Variable Name          | Operation| DSP| FF| LUT| Bitwidth P0| Bitwidth P1|
+    |Total                            |          |   0|  0|  41|          33|           3|
+    |                Name               | LUT| Input Size| Bits| Total Bits|
+    |Total                              |  83|         18|   12|         26|
+    |                 Name                 | FF | LUT| Bits| Const Bits|
+    |buffer_r_read_reg_1014                |  64|   0|   64|          0|
+    |Total                                 | 152|   0|  155|          3|
++ echo '--- Per-loop latency + Initiation Interval (II) table ---'
+--- Per-loop latency + Initiation Interval (II) table ---
++ awk '/Loop Name|Latency|Initiation Interval|Trip Count|Pipelined/{p=1} p{print} /Utilization Estimates/{p=0}' forge_train_step_morph_lm_proj/solution1/syn/report/forge_train_step_morph_lm_csynth.rpt
++ head -120
++ Latency: 
+    * Summary: 
+    +---------+---------+----------+----------+-----+-----+---------+
+    |  Latency (cycles) |  Latency (absolute) |  Interval | Pipeline|
+    |   min   |   max   |    min   |    max   | min | max |   Type  |
+    +---------+---------+----------+----------+-----+-----+---------+
+    |        ?|        ?|         ?|         ?|    ?|    ?|       no|
+    +---------+---------+----------+----------+-----+-----+---------+
+
+    + Detail: 
+        * Instance: 
+        +-------------------------+--------------+---------+---------+----------+----------+-----+-----+---------+
+        |                         |              |  Latency (cycles) |  Latency (absolute) |  Interval | Pipeline|
+        |         Instance        |    Module    |   min   |   max   |    min   |    max   | min | max |   Type  |
+        +-------------------------+--------------+---------+---------+----------+----------+-----+-----+---------+
+        |grp_do_train_run_fu_544  |do_train_run  |        ?|        ?|         ?|         ?|    ?|    ?|       no|
+        +-------------------------+--------------+---------+---------+----------+----------+-----+-----+---------+
+
+        * Loop: 
+        N/A
+
+
+
+================================================================
+== Utilization Estimates
++ echo '--- DSP=0 assertion ---'
+--- DSP=0 assertion ---
+++ grep -iE '^\|[[:space:]]*DSP' forge_train_step_morph_lm_proj/solution1/syn/report/forge_train_step_morph_lm_csynth.rpt
+++ head -1
++ DLINE='|DSP                  |        -|     -|        -|        -|    -|'
++ echo 'DSP row: |DSP                  |        -|     -|        -|        -|    -|'
+DSP row: |DSP                  |        -|     -|        -|        -|    -|
++ echo '|DSP                  |        -|     -|        -|        -|    -|'
++ grep -qE '[1-9]'
++ echo 'OK: DSP appears 0'
+OK: DSP appears 0
