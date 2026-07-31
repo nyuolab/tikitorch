@@ -19,10 +19,12 @@ set ml_d 512
 if {[info exists ::env(ML_D)]} { set ml_d $::env(ML_D) }
 set clk_ns 6.0
 if {[info exists ::env(TT_CLK_NS)]} { set clk_ns $::env(TT_CLK_NS) }
-puts "D512 driver: -DML_D=$ml_d ; target_period_ns=$clk_ns"
+set extra ""
+if {[info exists ::env(TT_BUILD_FLAGS)]} { set extra $::env(TT_BUILD_FLAGS) }
+puts "D512 driver: -DML_D=$ml_d $extra ; target_period_ns=$clk_ns"
 
 open_project -reset $proj_dir
-add_files forge_train_step_morph_lm.cpp -cflags "-DML_D=$ml_d"
+add_files forge_train_step_morph_lm.cpp -cflags "-DML_D=$ml_d $extra"
 
 open_solution -reset solution1
 set_top $top

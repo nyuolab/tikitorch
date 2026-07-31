@@ -28,6 +28,7 @@ MAX_MINUTES="${MAX_MINUTES:-90}"
 ROLE="${ROLE:-tiki-sweep-runner}"
 ML_D="${ML_D:-512}"                                    # this driver is D=512
 TT_CLK_NS="${TT_CLK_NS:-6.0}"                          # REDUCED target (ns): 6.0=~166MHz, 8.0=125MHz
+TT_BUILD_FLAGS="${TT_BUILD_FLAGS:-}"                    # extra -D cflags (e.g. the deployed champion resident-weight config)
 KTOP="${KTOP:-forge_train_step_morph_lm}"
 KTCL="${KTCL:-synth_morph_lm_d512.tcl}"                # the D=512 reduced-clock driver
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -40,7 +41,7 @@ render_user_data(){ local s3_src="$1" s3_results="$2"; cat <<UDEOF
 shutdown -h +${MAX_MINUTES} "tiki morph-lm d${ML_D} recsynth deadline" || true
 exec > /var/log/tiki-morphlm-recsynth.log 2>&1
 set -x
-S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; ML_D="${ML_D}"; TT_CLK_NS="${TT_CLK_NS}"; KTOP="${KTOP}"; KTCL="${KTCL}"
+S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; ML_D="${ML_D}"; TT_CLK_NS="${TT_CLK_NS}"; KTOP="${KTOP}"; KTCL="${KTCL}"; TT_BUILD_FLAGS="${TT_BUILD_FLAGS}"
 export HOME=/root
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-morphlm-recsynth.log "\$S3_RESULTS/boot.log" --only-show-errors || true; }
 trap up EXIT
@@ -51,7 +52,7 @@ for s in /opt/Xilinx/Vitis_HLS/*/settings64.sh /opt/Xilinx/Vitis/*/settings64.sh
 VHLS="\$(command -v vitis_hls || ls /opt/Xilinx/Vitis_HLS/*/bin/vitis_hls 2>/dev/null | head -1)"
 echo "VITIS_HLS=\$VHLS"; up
 cd /opt/tiki/tikitorch/hardware/hls/forge_kernels
-export ML_D="\$ML_D"; export TT_CLK_NS="\$TT_CLK_NS"; export CSYNTH_ONLY=1
+export ML_D="\$ML_D"; export TT_CLK_NS="\$TT_CLK_NS"; export CSYNTH_ONLY=1; export TT_BUILD_FLAGS="\$TT_BUILD_FLAGS"
 echo "=== recsynth \$KTOP ML_D=\$ML_D TT_CLK_NS=\$TT_CLK_NS START \$(date -u) ==="
 "\$VHLS" -f "\$KTCL" 2>&1 | tail -80
 echo "=== recsynth \$KTOP done \$(date -u) ==="
