@@ -37,6 +37,11 @@ PKG_REL="${PKG_REL:-tikitorch/hardware/hdk/cl_forge_morph_lm_d512}"
 KERNEL_TCL="${KERNEL_TCL:-synth_morph_lm_d512.tcl}"      # HLS the D=512 kernel (forces -DML_D=512)
 KERNEL_PROJ="${KERNEL_PROJ:-forge_train_step_morph_lm_proj}"
 ML_D="${ML_D:-512}"
+# the DEPLOYED champion config: weights resident in URAM. REQUIRED for d512 timing
+# closure -- recsynth measured plain -DML_D=512 at 12.9 ns (gmem carried deps in the
+# backward loops) vs 4.38 ns with these flags (gmem II violations 34->6, DSP=0,
+# URAM 189%/SLR = the all-SLR floorplan). Do NOT build plain.
+TT_BUILD_FLAGS="${TT_BUILD_FLAGS:--DTT_RESIDENT_W -DTT_ONCHIP_GRAD -DTT_URAM_W}"
 TT_CLK_NS="${TT_CLK_NS:-6.0}"                            # HLS scheduling target for the kernel
 CLOCK_RECIPE_A="${CLOCK_RECIPE_A:-}"                     # AFI main clock recipe; EMPTY -> shell default. SET per recsynth.
 DO_REGISTER="${DO_REGISTER:-1}"                          # 1 -> create-fpga-image on the box after the DCP
@@ -99,7 +104,7 @@ shutdown -h +${MAX_MINUTES} "tiki-morphlm-d512-afibuild deadline" || true
 exec > /var/log/tiki-afibuild.log 2>&1
 set -x
 S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"; BUCKET="${bucket}"; TAG="${tag}"
-CL="${CL}"; PKG_REL="${PKG_REL}"; KERNEL_TCL="${KERNEL_TCL}"; KERNEL_PROJ="${KERNEL_PROJ}"
+CL="${CL}"; PKG_REL="${PKG_REL}"; KERNEL_TCL="${KERNEL_TCL}"; KERNEL_PROJ="${KERNEL_PROJ}"; TT_BUILD_FLAGS="${TT_BUILD_FLAGS}"
 ML_D="${ML_D}"; TT_CLK_NS="${TT_CLK_NS}"; CLOCK_RECIPE_A="${CLOCK_RECIPE_A}"
 DO_REGISTER="${DO_REGISTER}"; AFI_NAME="${AFI_NAME}"; REGION="${REGION}"
 up(){ command -v aws >/dev/null 2>&1 && aws s3 cp /var/log/tiki-afibuild.log "\$S3_RESULTS/build.log" --only-show-errors || true; }
@@ -127,7 +132,7 @@ for i in 1 2 3; do aws s3 cp "\$S3_SRC" src.tar.gz && break; sleep 10; done
 tar xzf src.tar.gz
 # --- 1. HLS the D=512 kernel -> RTL (forces -DML_D=512, reduced TT_CLK_NS) ---
 cd /opt/tiki/tikitorch/hardware/hls/forge_kernels
-export ML_D="\$ML_D"; export TT_CLK_NS="\$TT_CLK_NS"
+export ML_D="\$ML_D"; export TT_CLK_NS="\$TT_CLK_NS"; export TT_BUILD_FLAGS="\$TT_BUILD_FLAGS"
 VHLS="\$(command -v vitis_hls || ls /opt/Xilinx/Vitis_HLS/*/bin/vitis_hls 2>/dev/null | head -1)"
 echo "=== HLS \$KERNEL_TCL (ML_D=\$ML_D TT_CLK_NS=\$TT_CLK_NS) START \$(date -u) ==="; "\$VHLS" -f "\$KERNEL_TCL" 2>&1 | tail -30
 KVDIR="/opt/tiki/tikitorch/hardware/hls/forge_kernels/\$KERNEL_PROJ/solution1/syn/verilog"
