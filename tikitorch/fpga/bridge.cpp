@@ -291,7 +291,13 @@ int tt_fpga_run(void* h, const char* entry, void* buf, int mode,
     fpga_pci_poke(ctx->bar0, TT_ADDR_ARG2, (uint32_t)a2);
     fpga_pci_poke(ctx->bar0, TT_ADDR_ARG3, (uint32_t)a3);
     fpga_pci_poke(ctx->bar0, TT_ADDR_AP_CTRL, TT_AP_START);
-    for (long spin = 0; spin < 200000000L; ++spin) {
+    // Spin cap ~= wall-clock ceiling on ONE kick (each peek ~1.5us PCIe read ->
+    // 200M spins ~= 5-7 min). Long fused whole-run kicks (d512 at 125 MHz:
+    // ~0.21 s/step -> 2000 steps ~= 7 min) legitimately exceed it: override
+    // with TT_KICK_SPIN (spins, not seconds).
+    long spin_cap = 200000000L;
+    { const char* s = std::getenv("TT_KICK_SPIN"); if (s && *s) { long v = atol(s); if (v > 0) spin_cap = v; } }
+    for (long spin = 0; spin < spin_cap; ++spin) {
         uint32_t ctrl = 0;
         fpga_pci_peek(ctx->bar0, TT_ADDR_AP_CTRL, &ctrl);
         if (ctrl & TT_AP_DONE) {

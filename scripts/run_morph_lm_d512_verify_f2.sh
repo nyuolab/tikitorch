@@ -114,7 +114,9 @@ g++ -O2 -std=c++17 -fPIC -shared -DTT_FPGA_PCI \
 sudo \$FC -S 0 || true
 sudo \$FL -S 0 -I "\$AGFI" -F || die "load-afi"
 sleep 5; sudo \$FD -S 0 | tee /tmp/img.txt; up
-export TIKITORCH_FPGA_LIB=/tmp/_libtikifpga_pci.so TT_CLKGEN_BRINGUP=1 TT_FUSED_STEPS=30
+# TT_KICK_SPIN: the 2000-step fused kick runs ~7 min; the default 200M-spin
+# poll cap (~5-7 min) timed it out on the first attempt. 2G spins ~= 50-70 min.
+export TIKITORCH_FPGA_LIB=/tmp/_libtikifpga_pci.so TT_CLKGEN_BRINGUP=1 TT_FUSED_STEPS=30 TT_KICK_SPIN=2000000000
 sudo -E python3 "\$DRV" /tmp/buffer_init.bin > /tmp/silicon_fused.jsonl 2>/tmp/silicon_fused.err || die "silicon-kat-run"
 cat /tmp/silicon_fused.jsonl /tmp/silicon_fused.err
 aws s3 cp /tmp/silicon_fused.jsonl "\$S3_RESULTS/silicon_fused.jsonl" --only-show-errors
