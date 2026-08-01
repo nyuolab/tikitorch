@@ -13,7 +13,7 @@ foreach f [list \
     ${HDK_IP_SRC_DIR}/cl_axi_register_slice_light/cl_axi_register_slice_light.xci \
     ${HDK_IP_SRC_DIR}/cl_axi_clock_converter_light/cl_axi_clock_converter_light.xci \
   ] {
-  if {[file exists $f]} { read_ip $f }
+  if {[file exists $f]} { read_ip $f } else { error "v3 CLKGEN dep IP MISSING (cl_ip tree unbuilt / HDK drift / LFS pointer — did hdk_setup.sh run?): $f" }
 }
 read_ip $::env(CL_DIR)/design/ip/axi_register_slice_light/axi_register_slice_light.xci
 read_ip $::env(CL_DIR)/design/ip/axi_bram_ctrl_dma/axi_bram_ctrl_dma.xci
@@ -24,8 +24,13 @@ read_ip $::env(CL_DIR)/design/ip/axi_register_slice_dma/axi_register_slice_dma.x
 read_ip $::env(CL_DIR)/design/ip/axi_register_slice_krn/axi_register_slice_krn.xci
 read_ip $::env(CL_DIR)/design/ip/mld512_pcis_cdc/mld512_pcis_cdc.xci
 read_ip $::env(CL_DIR)/design/ip/mld512_ocl_cdc/mld512_ocl_cdc.xci
-generate_target all [get_ips]
-synth_ip [get_ips]
+# Generate/synth ONLY the nine self-owned CL IPs (the S1-proven pattern): the
+# HDK clkgen dep IPs above are pre-built and read-only — a blanket [get_ips]
+# would OOC-resynthesize them (version-lock/staleness failure paths the proven
+# flows never exercised).
+set own_ips [list axi_register_slice_light axi_bram_ctrl_dma axi_bram_ctrl_krn axi_crossbar_dma axi_crossbar_krn axi_register_slice_dma axi_register_slice_krn mld512_pcis_cdc mld512_ocl_cdc]
+generate_target all [get_ips $own_ips]
+synth_ip [get_ips $own_ips]
 print "Reading user constraints"
 read_xdc [ list ${constraints_dir}/cl_synth_user.xdc ${constraints_dir}/cl_timing_user.xdc ]
 set_property PROCESSING_ORDER LATE [get_files cl_synth_user.xdc]

@@ -44,7 +44,7 @@ PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"
 REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null || echo us-east-1)}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-z1d.2xlarge}"            # AWS-recommended Vivado build instance
 AMI="${AMI:-ami-092fc5deb8f3c0f7d}"                       # FPGA Developer AMI (Vivado+Vitis+aws-fpga)
-MAX_MINUTES="${MAX_MINUTES:-360}"                         # D=512 all-SLR P&R is longer; 6h backstop
+MAX_MINUTES="${MAX_MINUTES:-480}"                         # D=512 all-SLR P&R ~4h measured; 8h backstop (2h→4h headroom)
 CL="${CL:-cl_forge_morph_lm_d512}"
 PKG_REL="${PKG_REL:-tikitorch/hardware/hdk/cl_forge_morph_lm_d512}"
 KERNEL_TCL="${KERNEL_TCL:-synth_morph_lm_d512.tcl}"      # HLS the D=512 kernel (forces -DML_D=512)
@@ -55,7 +55,7 @@ ML_D="${ML_D:-512}"
 # backward loops) vs 4.38 ns with these flags (gmem II violations 34->6, DSP=0,
 # URAM 189%/SLR = the all-SLR floorplan). Do NOT build plain.
 TT_BUILD_FLAGS="${TT_BUILD_FLAGS:--DTT_RESIDENT_W -DTT_ONCHIP_GRAD -DTT_URAM_W}"
-TT_CLK_NS="${TT_CLK_NS:-4.0}"                            # HLS target = the FIXED 250 MHz clk_main_a0 (see CLOCK note above)
+TT_CLK_NS="${TT_CLK_NS:-4.0}"                            # HLS SCHEDULING target (kept at the verified 4.0ns schedule; the v3 CL clocks the kernel at clk_extra_a1=125MHz/8ns — over-pipelined is harmless, and the gate keeps guarding regressions)
 CLOCK_RECIPE_A="${CLOCK_RECIPE_A:-A1}"                   # A1 -> clk_extra_a1 = 125 MHz (the user-design clock; AWS_CLK_GEN in the CL). A0 -> 62.5 MHz relief knob.
 DO_REGISTER="${DO_REGISTER:-1}"                          # 1 -> create-fpga-image on the box after the DCP
 AFI_NAME="${AFI_NAME:-cl_forge_morph_lm_d512}"
@@ -168,7 +168,7 @@ for cand in CL_TEMPLATE cl_template cl_dram_hbm_dma cl_dram_dma cl_mem_perf; do
   hit="\$(find "\$AF" -path "*/\$cand/build/scripts/aws_build_dcp_from_cl.py" 2>/dev/null | head -1)"
   [ -n "\$hit" ] && { TPL="\$(cd "\$(dirname "\$hit")/../.." && pwd)"; break; }
 done
-[ -z "\$TPL" ] && { echo "FATAL: no CL template found"; shutdown -h now; }
+[ -z "\$TPL" ] && { echo "FATAL: no CL template found"; up; shutdown -h now; exit 1; }
 echo "TEMPLATE=\$TPL"
 CLROOT="/opt/tiki/CL/\$CL"; mkdir -p "\$CLROOT"
 cp -r "\$TPL"/. "\$CLROOT"/
@@ -182,7 +182,9 @@ cp "\$KVDIR"/*.v "\$CLROOT"/design/ 2>/dev/null || true
 up
 # --- 3. gen IP (two 4 MB URAM banks, 1->2 crossbars both sides) ---
 echo "=== gen_ip START \$(date -u) ==="
-vivado -mode batch -source "\$CLROOT/build/scripts/gen_ip.tcl" -tclargs "\$CLROOT/design/ip" 2>&1 | tail -30
+vivado -mode batch -source "\$CLROOT/build/scripts/gen_ip.tcl" -tclargs "\$CLROOT/design/ip" > /tmp/gen_ip.log 2>&1; GENRC=\$?
+tail -30 /tmp/gen_ip.log; aws s3 cp /tmp/gen_ip.log "\$S3_RESULTS/gen_ip.log" --only-show-errors || true
+if [ "\$GENRC" != "0" ]; then echo "GEN_IP FAILED rc=\$GENRC — aborting before synth/P&R"; echo "rc=\$GENRC" | aws s3 cp - "\$S3_RESULTS/GEN_IP_FAIL" --only-show-errors || true; up; shutdown -h now; exit 1; fi
 ls -la "\$CLROOT/design/ip" 2>&1 | head -20; up
 # --- 4. synth + P&R (FAIL-FAST at synth before the long all-SLR P&R) ---
 export CL_DIR="\$CLROOT"
