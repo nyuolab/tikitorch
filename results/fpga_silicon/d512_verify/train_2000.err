@@ -1,0 +1,2 @@
+[tt] clkgen: MMCM_A locked (0x00000001); SYS_RST cleared (readback 0x00000000, writable[9:0]=0x000 expect 0x000) — user domain live
+silicon FUSED: 2000 steps in ONE kick, wall 418.3963 s, 612 tok/s (256000 tokens, fwd+bwd+signsgd entirely on fabric)
