@@ -161,11 +161,30 @@ constexpr int WORDS_MB       = ML_N_LAYERS * ML_D;          // out-proj bias    
 constexpr int WORDS_W_HEAD   = ML_V * ML_D;                 // LM head            [v][d]
 
 // Gradient accumulators (one per weight region, same sizes):
+#if ML_D >= 512
+// D>=512: the buffer G sections are CULLED (zero words). Grads live ONLY in
+// the on-chip g_*_oc arrays: under TT_RESIDENT_W+TT_ONCHIP_GRAD (mandatory at
+// this width, enforced below) NO code path reads or writes buffer grads —
+// do_signsgd uses signsgd_region_oc, the grad-zero runs on-chip, and the
+// grad flush at the end of do_train_run is guarded !TT_RESIDENT_W. Culling
+// drops 4.58 MB so the D=512 buffer (7.69 MB) fits the 8 MB staging window
+// (axi_bram_ctrl caps at 65536 lines = 4 MB/bank; the CL banks two of them).
+// The D=128 layout below is UNTOUCHED (deployed-AFI ABI, sentinel-exact).
+#if !defined(TT_ONCHIP_GRAD) || !defined(TT_RESIDENT_W)
+#error "ML_D>=512 requires -DTT_RESIDENT_W -DTT_ONCHIP_GRAD (buffer G sections are culled to fit the 8MB staging window; non-resident builds would silently not train)"
+#endif
+constexpr int WORDS_G_EMBED  = 0;
+constexpr int WORDS_G_MH     = 0;
+constexpr int WORDS_G_MP     = 0;
+constexpr int WORDS_G_MB     = 0;
+constexpr int WORDS_G_W_HEAD = 0;
+#else
 constexpr int WORDS_G_EMBED  = WORDS_EMBED;
 constexpr int WORDS_G_MH     = WORDS_MH;
 constexpr int WORDS_G_MP     = WORDS_MP;
 constexpr int WORDS_G_MB     = WORDS_MB;
 constexpr int WORDS_G_W_HEAD = WORDS_W_HEAD;
+#endif
 
 // Per-sequence region STRIDES (one sequence's worth of words). Under TT_BATCH
 // the buffer holds ML_BATCH_N of each of these back-to-back; sequence b lives at
@@ -261,6 +280,13 @@ constexpr int OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) / 16) * 16;  // host-
 
 constexpr int ML_BUFFER_WORDS = OFF_CE_LUT    + WORDS_CE_LUT;
 constexpr int ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4;
+#if ML_D >= 512
+// D>=512 staging window: two 4 MB axi_bram_ctrl banks = 8 MB total (see
+// cl_forge_morph_lm_d512.sv). The G-culled 7.69 MB layout MUST fit it.
+// (#if'd so the D=128 sentinel's preprocessed source stays byte-identical.)
+static_assert(ML_BUFFER_BYTES <= (8 << 20),
+              "D>=512 buffer must fit the 8 MB (two-bank) staging window");
+#endif
 
 // =============================================================================
 // 16-word (512-bit AXI burst) alignment guard — FAILS THE BUILD, not the bitstream.

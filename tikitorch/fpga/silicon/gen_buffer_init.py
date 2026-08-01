@@ -74,11 +74,18 @@ WORDS_MH       = ML_N_LAYERS * ML_D * ML_K   # 3584
 WORDS_MP       = ML_N_LAYERS * ML_D * ML_D   # 65536
 WORDS_MB       = ML_N_LAYERS * ML_D          # 512
 WORDS_W_HEAD   = ML_V * ML_D                 # 16384
-WORDS_G_EMBED  = WORDS_EMBED
-WORDS_G_MH     = WORDS_MH
-WORDS_G_MP     = WORDS_MP
-WORDS_G_MB     = WORDS_MB
-WORDS_G_W_HEAD = WORDS_W_HEAD
+if ML_D >= 512:
+    # D>=512 CULLS the buffer G sections (0 words) — grads are on-chip-only
+    # (the header #errors unless TT_RESIDENT_W+TT_ONCHIP_GRAD at this width),
+    # dropping 4.58 MB so the 7.69 MB D=512 buffer fits the CL's 8 MB
+    # two-bank staging window. Mirrors forge_buffer_morph_lm.hpp EXACTLY.
+    WORDS_G_EMBED = WORDS_G_MH = WORDS_G_MP = WORDS_G_MB = WORDS_G_W_HEAD = 0
+else:
+    WORDS_G_EMBED  = WORDS_EMBED
+    WORDS_G_MH     = WORDS_MH
+    WORDS_G_MP     = WORDS_MP
+    WORDS_G_MB     = WORDS_MB
+    WORDS_G_W_HEAD = WORDS_W_HEAD
 WORDS_TAP_IDX  = ML_BATCH * STRIDE_TAP_IDX
 WORDS_PROJ_IDX = ML_BATCH * STRIDE_PROJ_IDX
 WORDS_AD_HEAD  = ML_BATCH * STRIDE_AD_HEAD
@@ -116,6 +123,10 @@ OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) // 16) * 16
 
 ML_BUFFER_WORDS = OFF_CE_LUT + WORDS_CE_LUT
 ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4
+# D>=512 staging window is 8 MB (two 4 MB axi_bram_ctrl banks) — see
+# cl_forge_morph_lm_d512.sv; the G-culled layout must fit it.
+assert ML_D < 512 or ML_BUFFER_BYTES <= (8 << 20), \
+    "D>=512 buffer must fit the 8 MB (two-bank) staging window"
 
 # Per-sequence offset helpers (mirror off_tokens_b / off_targets_b in the header).
 def off_tokens_b(b):  return OFF_TOKENS  + b * STRIDE_TOKENS

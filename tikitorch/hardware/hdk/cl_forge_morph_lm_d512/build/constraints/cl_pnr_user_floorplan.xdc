@@ -3,12 +3,15 @@
 #
 # PARALLEL to the D=128 sentinel floorplan (../../cl_forge_morph_lm, NK=4,
 # WNS -0.173 ns), which is untouched. At D=512 there is exactly ONE kernel
-# instance (KINST[0]) but its footprint spans all three SLRs:
-#   * 16 MB staging URAM (BUF_URAM)         ~= 456 URAM blocks
-#   * kernel-internal weight URAM (mp_buf 4 MB + wh_buf 0.25 MB, from the
-#     #if ML_D>=512 BIND_STORAGE in forge_train_step_morph_lm.cpp)  ~= 122 URAM
-#   -> ~578 URAM of the device's 960 (per-SLR budget is only ~320), so the single
-#      instance MUST span SLR0+SLR1+SLR2. Hence one pblock, all clock regions.
+# instance (KINST[0]) but its footprint spans all three SLRs (v2 two-bank):
+#   * 8 MB staging URAM (2 x 4 MB BANK[b].BUF_URAM)       ~= 256 URAM blocks
+#   * kernel-internal URAM (resident weights + on-chip grads under the
+#     champion flags; MEASURED at csynth, forge_train_step 4.0 ns run) = 605
+#   -> 861 of the device's 960 URAM (per-SLR budget is only ~320), so the
+#      single instance MUST span SLR0+SLR1+SLR2. Hence one pblock, all clock
+#      regions. 861/960 = 90% URAM: if placement fails on URAM, the next lever
+#      is 64b-packing the kernel's two 4 MB int32 arrays (mp_buf/g_mp_oc,
+#      ~2.25x width waste in 72b URAM lines -> kernel ~605 -> ~350).
 #
 # As in the D=128 package, the RS_DMA / RS_OCL register slices are EXCLUDED from
 # the kernel pblock so they float to the SLR boundaries and Vivado routes the
@@ -37,7 +40,9 @@
 
 create_pblock pb_k0
 add_cells_to_pblock pb_k0 [get_cells -hier -regexp {.*KINST\[0\]\..*}]
-remove_cells_from_pblock pb_k0 [get_cells -hier -regexp {.*KINST\[0\]\.RS_(DMA|OCL).*}]
+# RS_OCL sits at KINST[0] level; RS_DMA is per-bank (KINST[0].BANK[b].RS_DMA in
+# the v2 two-bank design) — both float to the SLR boundaries (reg-to-reg Laguna).
+remove_cells_from_pblock pb_k0 [get_cells -hier -regexp {.*KINST\[0\]\.(BANK\[[0-9]+\]\.)?RS_(DMA|OCL).*}]
 # Full user area SLR0 (Y0-3) + SLR1 (Y4-7) + SLR2 (Y8-11), all columns X0-X7.
 # TODO: tighten per the first P&R utilization report (shell-reserved regions).
 resize_pblock pb_k0 -add {CLOCKREGION_X0Y0:CLOCKREGION_X7Y11}

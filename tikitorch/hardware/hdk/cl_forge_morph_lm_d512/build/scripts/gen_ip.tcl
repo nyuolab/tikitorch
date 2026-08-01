@@ -4,23 +4,38 @@ create_project -in_memory -part $part
 # 1. OCL AXI4-Lite register slice (32b)
 create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name axi_register_slice_light -dir $ipdir
 set_property -dict [list CONFIG.PROTOCOL {AXI4LITE} CONFIG.ADDR_WIDTH {32} CONFIG.DATA_WIDTH {32}] [get_ips axi_register_slice_light]
-# 2. DMA-PCIS AXI4 BRAM controller (512b, ID16, external single-port, 16MB @ D=512)
-#    MEM_DEPTH 32768 (2MB) -> 262144 (16MB): 262144 x 512b lines = 16 MB.
+# 2. DMA-PCIS AXI4 BRAM controller (512b, ID16, external single-port, 4MB/bank).
+#    MEM_DEPTH 65536 = the IP's MAXIMUM (262144 was out of range — the reason
+#    for the two-bank v2). 65536 x 512b lines = 4 MB; the CL instantiates one
+#    per bank (2 banks = 8 MB staging).
 create_ip -name axi_bram_ctrl -vendor xilinx.com -library ip -module_name axi_bram_ctrl_dma -dir $ipdir
-set_property -dict [list CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {16} CONFIG.PROTOCOL {AXI4} CONFIG.BMG_INSTANCE {EXTERNAL} CONFIG.SINGLE_PORT_BRAM {1} CONFIG.MEM_DEPTH {262144} CONFIG.ECC_TYPE {0} CONFIG.READ_LATENCY {1} CONFIG.SUPPORTS_NARROW_BURST {1}] [get_ips axi_bram_ctrl_dma]
-# 3. kernel-side AXI4 BRAM controller (512b, ID1); MEM_DEPTH 32768 -> 262144 (16MB)
+set_property -dict [list CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {16} CONFIG.PROTOCOL {AXI4} CONFIG.BMG_INSTANCE {EXTERNAL} CONFIG.SINGLE_PORT_BRAM {1} CONFIG.MEM_DEPTH {65536} CONFIG.ECC_TYPE {0} CONFIG.READ_LATENCY {1} CONFIG.SUPPORTS_NARROW_BURST {1}] [get_ips axi_bram_ctrl_dma]
+# 3. kernel-side AXI4 BRAM controller (512b, ID1, 4MB/bank; one per bank)
 create_ip -name axi_bram_ctrl -vendor xilinx.com -library ip -module_name axi_bram_ctrl_krn -dir $ipdir
-set_property -dict [list CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {1} CONFIG.PROTOCOL {AXI4} CONFIG.BMG_INSTANCE {EXTERNAL} CONFIG.SINGLE_PORT_BRAM {1} CONFIG.MEM_DEPTH {262144} CONFIG.ECC_TYPE {0} CONFIG.READ_LATENCY {1} CONFIG.SUPPORTS_NARROW_BURST {1}] [get_ips axi_bram_ctrl_krn]
-# 4. DMA-PCIS crossbar: 1 SI -> 1 MI (512b AXI4, ID16). ONE 16 MB window from
-#    0x0100_0000 (NK=1 at D=512). NUM_MI MUST match the CL localparam NK.
-#    M00 ADDR_WIDTH 21 (2MB) -> 24 (16MB).
+set_property -dict [list CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {1} CONFIG.PROTOCOL {AXI4} CONFIG.BMG_INSTANCE {EXTERNAL} CONFIG.SINGLE_PORT_BRAM {1} CONFIG.MEM_DEPTH {65536} CONFIG.ECC_TYPE {0} CONFIG.READ_LATENCY {1} CONFIG.SUPPORTS_NARROW_BURST {1}] [get_ips axi_bram_ctrl_krn]
+# 4. DMA-PCIS crossbar: 1 SI -> 2 MI (512b AXI4, ID16). Two 4 MB bank windows,
+#    CONTIGUOUS from 0x0100_0000 (host sees one 8 MB buffer). NUM_MI MUST match
+#    the CL localparam NB (=2).
 create_ip -name axi_crossbar -vendor xilinx.com -library ip -module_name axi_crossbar_dma -dir $ipdir
 set_property -dict [list \
-  CONFIG.NUM_SI {1} CONFIG.NUM_MI {1} \
+  CONFIG.NUM_SI {1} CONFIG.NUM_MI {2} \
   CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {16} CONFIG.ADDR_WIDTH {64} \
   CONFIG.CONNECTIVITY_MODE {SAMD} CONFIG.STRATEGY {2} \
-  CONFIG.M00_A00_BASE_ADDR {0x0000000001000000} CONFIG.M00_A00_ADDR_WIDTH {24} \
+  CONFIG.M00_A00_BASE_ADDR {0x0000000001000000} CONFIG.M00_A00_ADDR_WIDTH {22} \
+  CONFIG.M01_A00_BASE_ADDR {0x0000000001400000} CONFIG.M01_A00_ADDR_WIDTH {22} \
 ] [get_ips axi_crossbar_dma]
+# 5. kernel-side crossbar: 1 SI -> 2 MI (512b AXI4, ID1). The kernel's single
+#    m_axi gmem emits absolute addresses from base 0x0100_0000 (bridge.cpp
+#    TT_BUFFER_ADDR poked into the s_axilite pointer regs), so the bank decode
+#    uses the SAME bases as the DMA side. NUM_MI MUST match the CL NB (=2).
+create_ip -name axi_crossbar -vendor xilinx.com -library ip -module_name axi_crossbar_krn -dir $ipdir
+set_property -dict [list \
+  CONFIG.NUM_SI {1} CONFIG.NUM_MI {2} \
+  CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {1} CONFIG.ADDR_WIDTH {64} \
+  CONFIG.CONNECTIVITY_MODE {SAMD} CONFIG.STRATEGY {2} \
+  CONFIG.M00_A00_BASE_ADDR {0x0000000001000000} CONFIG.M00_A00_ADDR_WIDTH {22} \
+  CONFIG.M01_A00_BASE_ADDR {0x0000000001400000} CONFIG.M01_A00_ADDR_WIDTH {22} \
+] [get_ips axi_crossbar_krn]
 # 6. Full-AXI4 register slice on each crossbar MI -> BRAM_CTL_DMA path. Placed in
 #    the kernel's SLR pblock so the crossbar(shared)->slice(kernel SLR) crossing
 #    is reg-to-reg (Laguna) instead of a combinational SLL hop (the recurring
@@ -29,7 +44,7 @@ create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name a
 set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {16} CONFIG.ADDR_WIDTH {64} \
   CONFIG.REG_AW {1} CONFIG.REG_W {1} CONFIG.REG_B {1} CONFIG.REG_AR {1} CONFIG.REG_R {1}] [get_ips axi_register_slice_dma]
 puts "=== generated IPs ==="
-foreach ip {axi_register_slice_light axi_bram_ctrl_dma axi_bram_ctrl_krn axi_crossbar_dma axi_register_slice_dma} {
+foreach ip {axi_register_slice_light axi_bram_ctrl_dma axi_bram_ctrl_krn axi_crossbar_dma axi_crossbar_krn axi_register_slice_dma} {
   generate_target {synthesis} [get_ips $ip]
   puts "$ip OK"
 }

@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_morph_lm_d512_afi.sh — FULL D=512 AFI build (A3 reduced-clock) for the config-B
 # MorphSSM-LM training kernel: HLS(-DML_D=512) -> scaffold cl_forge_morph_lm_d512 CL
-# -> gen IP (16 MB URAM, NK=1) -> synth -> P&R -> DCP tarball -> create-fpga-image.
+# -> gen IP (two 4 MB URAM banks = 8 MB staging, NK=1) -> synth -> P&R -> DCP -> create-fpga-image.
 #
 # THE USER-RUN STEP. Forked from run_pc_afi_build.sh (EC2 mechanics: z1d build box,
 # source->S3, IAM profile, continuous log upload, shutdown backstop, self-terminate,
@@ -176,7 +176,7 @@ mkdir -p "\$CLROOT/build/constraints"; cp -f "/opt/tiki/\$PKG_REL/build/constrai
 cp "\$KVDIR"/*.v "\$CLROOT"/design/ 2>/dev/null || true
 { echo "== CL design =="; ls -la "\$CLROOT/design"; echo "== build/scripts =="; ls -la "\$CLROOT/build/scripts"; } | aws s3 cp - "\$S3_RESULTS/cl_layout.txt" --only-show-errors || true
 up
-# --- 3. gen IP (16 MB URAM, NK=1 crossbar) ---
+# --- 3. gen IP (two 4 MB URAM banks, 1->2 crossbars both sides) ---
 echo "=== gen_ip START \$(date -u) ==="
 vivado -mode batch -source "\$CLROOT/build/scripts/gen_ip.tcl" -tclargs "\$CLROOT/design/ip" 2>&1 | tail -30
 ls -la "\$CLROOT/design/ip" 2>&1 | head -20; up

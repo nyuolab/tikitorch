@@ -8,17 +8,21 @@ is accepted). Nothing here edits the D=128 package.
 
 ## Why a separate package (from the HDK width-prep report, wf_007d5672)
 
-The D=512 training buffer is **12.25 MB** (vs 1.66 MB at D=128), so one kernel
-needs a **16 MB** staging URAM — larger than a single SLR's ~11.25 MB URAM
-budget. That forces, versus the D=128 package:
+The D=512 training buffer is **7.69 MB** after the v2 G-section cull (grads are
+on-chip-only under the mandatory TT_RESIDENT_W+TT_ONCHIP_GRAD; the un-culled
+12.25 MB layout needed a 16 MB window that was impossible — `axi_bram_ctrl`
+caps at 65536 lines = 4 MB, and 456 staging URAM on top of the kernel's 605
+exceeds the device's 960). It ships as **two 4 MB banks** (8 MB contiguous to
+the host), each at the D=128-proven controller geometry. That forces, versus
+the D=128 package:
 
 | delta | D=128 | D=512 | where |
 |---|---|---|---|
 | replication NK | 4 | **1** | `design/cl_forge_morph_lm_d512.sv` localparam |
-| staging URAM | 2 MB | **16 MB** | `BUF_URAM` MEMORY_SIZE 16777216→134217728 bits, ADDR_WIDTH 15→18 |
+| staging URAM | 2 MB | **2 × 4 MB banks** | per-bank `BANK[b].BUF_URAM` MEMORY_SIZE 33554432 bits, ADDR_WIDTH 16; DMA + kernel-side 1→2 crossbars |
 | URAM line select | `[20:6]` | **`[23:6]`** | `BUF_URAM` addra/addrb |
 | BRAM-ctl addr decode | `[20:0]` | **`[23:0]`** | BRAM_CTL_DMA/KRN s_axi_a{w,r}addr, bram_{a,b}_addr |
-| `axi_bram_ctrl` MEM_DEPTH | 32768 | **262144** | `build/scripts/gen_ip.tcl` |
+| `axi_bram_ctrl` MEM_DEPTH | 32768 | **65536** (IP max, per bank) | `build/scripts/gen_ip.tcl` |
 | `axi_crossbar_dma` | NUM_MI 4, M0x AW 21 | **NUM_MI 1, M00 AW 24** | `build/scripts/gen_ip.tcl` |
 | floorplan | 4 SLR-local pblocks | **1 all-SLR pblock** | `build/constraints/cl_pnr_user_floorplan.xdc` |
 

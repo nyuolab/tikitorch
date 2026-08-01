@@ -2,32 +2,44 @@
 // cl_forge_morph_lm_d512.sv — D=512 SINGLE-KERNEL MorphSSM-LM training CL.
 //
 // PARALLEL to cl_forge_morph_lm.sv (the DEPLOYED D=128 NK=4 sentinel, agfi-0433...,
-// which stays byte-identical). This D=512 variant is the A3 reduced-clock build:
-// the D=512 training buffer is 12.25 MB (vs 1.66 MB at D=128), so a single kernel
-// needs a 16 MB staging URAM — larger than one SLR's URAM budget — forcing NK 4->1
-// and an ALL-SLR floorplan (see cl_pnr_user_floorplan.xdc). Deltas vs the D=128
-// package (all from the HDK width-prep report, wf_007d5672):
-//   * NK 4 -> 1 (one kernel; the 16 MB URAM cannot be replicated per-SLR)
-//   * BUF_URAM 2 MB -> 16 MB (MEMORY_SIZE bits 16777216 -> 134217728,
-//       ADDR_WIDTH 15 -> 18, address line-select [20:6] -> [23:6])
-//   * BRAM-controller address decode [20:0] -> [23:0] (16 MB window)
-//   * axi_bram_ctrl MEM_DEPTH 32768 -> 262144  (gen_ip.tcl)
-//   * axi_crossbar_dma 1 SI -> 1 MI, M00 ADDR_WIDTH 21 -> 24, 16 MB window (gen_ip.tcl)
+// which stays byte-identical). This D=512 variant is the A3 build. TWO-BANK v2:
+// the original single 16 MB window was IMPOSSIBLE — axi_bram_ctrl caps at
+// MEM_DEPTH 65536 (= 4 MB at 512b), and 16 MB of staging URAM (456 blocks) on
+// top of the kernel's measured 605 exceeds the device's 960. Instead the D=512
+// buffer layout CULLS its dead gradient sections (grads are on-chip-only under
+// the mandatory TT_RESIDENT_W+TT_ONCHIP_GRAD; forge_buffer_morph_lm.hpp) down
+// to 7.69 MB, which fits an 8 MB staging window built as TWO 4 MB banks — each
+// bank at the D=128-proven controller geometry (just deeper: 32768 -> 65536).
+// Deltas vs the D=128 package:
+//   * NK 4 -> 1 (one kernel), NB = 2 staging banks
+//   * per-bank BUF_URAM 4 MB (MEMORY_SIZE 33554432 bits, ADDR_WIDTH 16,
+//       line-select [21:6]); 2 banks = 8 MB total (256 URAM blocks)
+//   * per-bank BRAM-controller address decode [21:0] (4 MB window each)
+//   * axi_bram_ctrl MEM_DEPTH 32768 -> 65536 (the IP's max)  (gen_ip.tcl)
+//   * axi_crossbar_dma 1 SI -> 2 MI: M00 0x0100_0000, M01 0x0140_0000, both
+//     22-bit (4 MB) windows — host sees ONE contiguous 8 MB buffer (gen_ip.tcl)
+//   * NEW axi_crossbar_krn 1 SI -> 2 MI (ID1): the kernel's single m_axi gmem
+//     (which emits absolute addresses at base 0x0100_0000 — bridge.cpp
+//     TT_BUFFER_ADDR) is decoded to the two kernel-side controllers with the
+//     SAME bases as the DMA side. AXI bursts never cross a 4 KB boundary, so
+//     no burst straddles the 4 MB bank seam.
 //
-//   sh_cl_dma_pcis (512b AXI4, ID16) --[xbar_dma 1->1, 16 MB window]-->
-//        axi_bram_ctrl_dma -> URAM port A
+//   sh_cl_dma_pcis (512b AXI4, ID16) --[xbar_dma 1->2]--> per-bank
+//        RS_DMA -> axi_bram_ctrl_dma -> URAM port A
 //   ocl (AXI4-Lite) --[reg slice]--> kernel s_axilite control
-//   kernel m_axi gmem (512b) -> axi_bram_ctrl_krn -> URAM port B
+//   kernel m_axi gmem (512b) --[xbar_krn 1->2]--> per-bank
+//        axi_bram_ctrl_krn -> URAM port B
 //
-// Address map (host-visible), NK=1:
-//   DMA-PCIS staging window : 0x0100_0000  (16 MB)
+// Address map (host-visible):
+//   DMA-PCIS staging window : 0x0100_0000  (8 MB contiguous, 2 x 4 MB banks)
 //   OCL control window      : 0x0000_0000  (64 KB)
-// The axi_bram_ctrl masks the low 24 bits -> 512b line index = addr[23:6].
+// Each axi_bram_ctrl masks the low 22 bits -> 512b line index = addr[21:6].
 // PCIM unused. 2026 F2 HDK port family: ocl_cl_* in / cl_ocl_* out.
-// The kernel itself (forge_train_step_morph_lm, -DML_D=512) moves its own
-// out-proj/head weight arrays to URAM via #if ML_D>=512 guards — that URAM is
-// INTERNAL to the kernel and adds to the per-SLR URAM budget the floorplan must
-// satisfy (hence the all-SLR pblock).
+// The kernel itself (forge_train_step_morph_lm, -DML_D=512) holds its resident
+// weights + on-chip grads in URAM via #if ML_D>=512 guards — that URAM (605
+// blocks measured at csynth) is INTERNAL to the kernel; with the 256-block
+// staging total = 861/960 device URAM, spanning all SLRs (hence the all-SLR
+// pblock; see cl_pnr_user_floorplan.xdc).
 // =============================================================================
 
 `include "cl_forge_morph_lm_defines.vh"
@@ -46,13 +58,15 @@ module cl_forge_morph_lm_d512
 `include "unused_pcim_template.inc"
 
   // -------------------------------------------------------------------------
-  // Replication factor = 1 at D=512. The single 16 MB staging URAM already
-  // exceeds one SLR's URAM budget (~320 blocks = 11.25 MB) and, with the
-  // kernel's own D=512 weight URAM, spans all three SLRs — so there is no room
-  // to replicate. (The D=128 sentinel runs NK=4 at 2 MB/kernel.)
-  // MUST match axi_crossbar_dma NUM_MI (=1) in gen_ip.tcl.
+  // Replication factor = 1 at D=512 (the kernel's own 605-block URAM footprint
+  // spans all three SLRs — no room to replicate; the D=128 sentinel runs NK=4
+  // at 2 MB/kernel). NB = 2 staging BANKS of 4 MB each (axi_bram_ctrl caps at
+  // 65536 lines): the DMA crossbar decodes host addresses across them and the
+  // kernel-side crossbar does the same for the kernel's single m_axi.
+  // NB MUST match axi_crossbar_dma AND axi_crossbar_krn NUM_MI in gen_ip.tcl.
   // -------------------------------------------------------------------------
   localparam int NK = 1;
+  localparam int NB = 2;
 
   assign cl_sh_id0 = `CL_SH_ID0;
   assign cl_sh_id1 = `CL_SH_ID1;
@@ -158,26 +172,26 @@ module cl_forge_morph_lm_d512
   end
 
   // =========================================================================
-  // DMA-PCIS crossbar: 1 SI (shell dma_pcis) -> NK MI (staging URAM windows).
-  // AXI4, 512b, ID16. MI i decoded at base 0x0100_0000 + i*0x20_0000 (2 MB).
+  // DMA-PCIS crossbar: 1 SI (shell dma_pcis) -> NB MI (staging URAM banks).
+  // AXI4, 512b, ID16. Bank b decoded at base 0x0100_0000 + b*0x40_0000 (4 MB).
   // =========================================================================
-  logic [NK*16-1:0]  xd_awid;    logic [NK*64-1:0]  xd_awaddr;
-  logic [NK*8-1:0]   xd_awlen;   logic [NK*3-1:0]   xd_awsize;
-  logic [NK*2-1:0]   xd_awburst; logic [NK-1:0]     xd_awlock;
-  logic [NK*4-1:0]   xd_awcache; logic [NK*3-1:0]   xd_awprot;
-  logic [NK-1:0]     xd_awvalid; logic [NK-1:0]     xd_awready;
-  logic [NK*512-1:0] xd_wdata;   logic [NK*64-1:0]  xd_wstrb;
-  logic [NK-1:0]     xd_wlast;   logic [NK-1:0]     xd_wvalid;  logic [NK-1:0] xd_wready;
-  logic [NK*16-1:0]  xd_bid;     logic [NK*2-1:0]   xd_bresp;
-  logic [NK-1:0]     xd_bvalid;  logic [NK-1:0]     xd_bready;
-  logic [NK*16-1:0]  xd_arid;    logic [NK*64-1:0]  xd_araddr;
-  logic [NK*8-1:0]   xd_arlen;   logic [NK*3-1:0]   xd_arsize;
-  logic [NK*2-1:0]   xd_arburst; logic [NK-1:0]     xd_arlock;
-  logic [NK*4-1:0]   xd_arcache; logic [NK*3-1:0]   xd_arprot;
-  logic [NK-1:0]     xd_arvalid; logic [NK-1:0]     xd_arready;
-  logic [NK*16-1:0]  xd_rid;     logic [NK*512-1:0] xd_rdata;
-  logic [NK*2-1:0]   xd_rresp;   logic [NK-1:0]     xd_rlast;
-  logic [NK-1:0]     xd_rvalid;  logic [NK-1:0]     xd_rready;
+  logic [NB*16-1:0]  xd_awid;    logic [NB*64-1:0]  xd_awaddr;
+  logic [NB*8-1:0]   xd_awlen;   logic [NB*3-1:0]   xd_awsize;
+  logic [NB*2-1:0]   xd_awburst; logic [NB-1:0]     xd_awlock;
+  logic [NB*4-1:0]   xd_awcache; logic [NB*3-1:0]   xd_awprot;
+  logic [NB-1:0]     xd_awvalid; logic [NB-1:0]     xd_awready;
+  logic [NB*512-1:0] xd_wdata;   logic [NB*64-1:0]  xd_wstrb;
+  logic [NB-1:0]     xd_wlast;   logic [NB-1:0]     xd_wvalid;  logic [NB-1:0] xd_wready;
+  logic [NB*16-1:0]  xd_bid;     logic [NB*2-1:0]   xd_bresp;
+  logic [NB-1:0]     xd_bvalid;  logic [NB-1:0]     xd_bready;
+  logic [NB*16-1:0]  xd_arid;    logic [NB*64-1:0]  xd_araddr;
+  logic [NB*8-1:0]   xd_arlen;   logic [NB*3-1:0]   xd_arsize;
+  logic [NB*2-1:0]   xd_arburst; logic [NB-1:0]     xd_arlock;
+  logic [NB*4-1:0]   xd_arcache; logic [NB*3-1:0]   xd_arprot;
+  logic [NB-1:0]     xd_arvalid; logic [NB-1:0]     xd_arready;
+  logic [NB*16-1:0]  xd_rid;     logic [NB*512-1:0] xd_rdata;
+  logic [NB*2-1:0]   xd_rresp;   logic [NB-1:0]     xd_rlast;
+  logic [NB-1:0]     xd_rvalid;  logic [NB-1:0]     xd_rready;
 
   axi_crossbar_dma XBAR_DMA (
     .aclk    (clk_main_a0),
@@ -288,11 +302,26 @@ module cl_forge_morph_lm_d512
     logic         krn_rlast,   krn_rvalid, krn_rready;
     logic         krn_irq;
 
-    // BRAM-port wires (per instance, 2 ports of the URAM)
-    logic        bram_a_rst, bram_a_en;   logic [63:0] bram_a_we;
-    logic [23:0] bram_a_addr;             logic [511:0] bram_a_wrdata, bram_a_rddata;  // [20:0]->[23:0]: 16 MB window
-    logic        bram_b_rst, bram_b_en;   logic [63:0] bram_b_we;
-    logic [23:0] bram_b_addr;             logic [511:0] bram_b_wrdata, bram_b_rddata;  // [20:0]->[23:0]: 16 MB window
+    // ---- kernel-side crossbar M nets: XBAR_KRN 1 SI -> NB MI (one per bank).
+    // ID width 1 (the kernel's single-ID m_axi); bank b decoded at
+    // 0x0100_0000 + b*0x40_0000, same bases as the DMA-side crossbar.
+    logic [NB-1:0]     kb_awid;    logic [NB*64-1:0]  kb_awaddr;
+    logic [NB*8-1:0]   kb_awlen;   logic [NB*3-1:0]   kb_awsize;
+    logic [NB*2-1:0]   kb_awburst; logic [NB-1:0]     kb_awlock;
+    logic [NB*4-1:0]   kb_awcache; logic [NB*3-1:0]   kb_awprot;
+    logic [NB-1:0]     kb_awvalid; logic [NB-1:0]     kb_awready;
+    logic [NB*512-1:0] kb_wdata;   logic [NB*64-1:0]  kb_wstrb;
+    logic [NB-1:0]     kb_wlast;   logic [NB-1:0]     kb_wvalid;  logic [NB-1:0] kb_wready;
+    logic [NB-1:0]     kb_bid;     logic [NB*2-1:0]   kb_bresp;
+    logic [NB-1:0]     kb_bvalid;  logic [NB-1:0]     kb_bready;
+    logic [NB-1:0]     kb_arid;    logic [NB*64-1:0]  kb_araddr;
+    logic [NB*8-1:0]   kb_arlen;   logic [NB*3-1:0]   kb_arsize;
+    logic [NB*2-1:0]   kb_arburst; logic [NB-1:0]     kb_arlock;
+    logic [NB*4-1:0]   kb_arcache; logic [NB*3-1:0]   kb_arprot;
+    logic [NB-1:0]     kb_arvalid; logic [NB-1:0]     kb_arready;
+    logic [NB-1:0]     kb_rid;     logic [NB*512-1:0] kb_rdata;
+    logic [NB*2-1:0]   kb_rresp;   logic [NB-1:0]     kb_rlast;
+    logic [NB-1:0]     kb_rvalid;  logic [NB-1:0]     kb_rready;
 
     // ---- per-instance reset synchronizer (async assert / sync deassert) ----
     // The shell reset is a single high-fanout net; driving each replicated
@@ -429,11 +458,102 @@ module cl_forge_morph_lm_d512
       .m_axi_gmem_RREADY  (krn_rready)
     );
 
-    // ---- SLR-crossing register slice: crossbar MI i -> (reg) -> BRAM_CTL_DMA.
-    // Lives in this instance's pblock (KINST[gi].*), so the long hop from the
-    // shared crossbar (STRATEGY=2, registered outputs) to here is reg-to-reg and
-    // Vivado can route it through Laguna. Fixes the inter-SLR -1.75 ns failure
-    // into BRAM_CTL_DMA's bram_addr/bram_wrdata input registers.
+    // ---- kernel-side crossbar: kernel m_axi gmem -> NB bank controllers.
+    // The kernel emits absolute addresses from base 0x0100_0000 (bridge.cpp
+    // pokes the s_axilite buffer pointer once); this crossbar decodes bank 0
+    // at 0x0100_0000 and bank 1 at 0x0140_0000 (22-bit windows), mirroring
+    // XBAR_DMA. Lives inside the kernel pblock (talks only to in-pblock
+    // endpoints). STRATEGY=2 registered outputs.
+    axi_crossbar_krn XBAR_KRN (
+      .aclk    (clk_main_a0),
+      .aresetn (rst_n_local),
+      .s_axi_awid    (krn_awid),
+      .s_axi_awaddr  (krn_awaddr),
+      .s_axi_awlen   (krn_awlen),
+      .s_axi_awsize  (krn_awsize),
+      .s_axi_awburst (krn_awburst),
+      .s_axi_awlock  (krn_awlock[0]),
+      .s_axi_awcache (krn_awcache),
+      .s_axi_awprot  (krn_awprot),
+      .s_axi_awqos   (krn_awqos),
+      .s_axi_awvalid (krn_awvalid),
+      .s_axi_awready (krn_awready),
+      .s_axi_wdata   (krn_wdata),
+      .s_axi_wstrb   (krn_wstrb),
+      .s_axi_wlast   (krn_wlast),
+      .s_axi_wvalid  (krn_wvalid),
+      .s_axi_wready  (krn_wready),
+      .s_axi_bid     (krn_bid),
+      .s_axi_bresp   (krn_bresp),
+      .s_axi_bvalid  (krn_bvalid),
+      .s_axi_bready  (krn_bready),
+      .s_axi_arid    (krn_arid),
+      .s_axi_araddr  (krn_araddr),
+      .s_axi_arlen   (krn_arlen),
+      .s_axi_arsize  (krn_arsize),
+      .s_axi_arburst (krn_arburst),
+      .s_axi_arlock  (krn_arlock[0]),
+      .s_axi_arcache (krn_arcache),
+      .s_axi_arprot  (krn_arprot),
+      .s_axi_arqos   (krn_arqos),
+      .s_axi_arvalid (krn_arvalid),
+      .s_axi_arready (krn_arready),
+      .s_axi_rid     (krn_rid),
+      .s_axi_rdata   (krn_rdata),
+      .s_axi_rresp   (krn_rresp),
+      .s_axi_rlast   (krn_rlast),
+      .s_axi_rvalid  (krn_rvalid),
+      .s_axi_rready  (krn_rready),
+
+      .m_axi_awid    (kb_awid),
+      .m_axi_awaddr  (kb_awaddr),
+      .m_axi_awlen   (kb_awlen),
+      .m_axi_awsize  (kb_awsize),
+      .m_axi_awburst (kb_awburst),
+      .m_axi_awlock  (kb_awlock),
+      .m_axi_awcache (kb_awcache),
+      .m_axi_awprot  (kb_awprot),
+      .m_axi_awregion(),
+      .m_axi_awqos   (),
+      .m_axi_awvalid (kb_awvalid),
+      .m_axi_awready (kb_awready),
+      .m_axi_wdata   (kb_wdata),
+      .m_axi_wstrb   (kb_wstrb),
+      .m_axi_wlast   (kb_wlast),
+      .m_axi_wvalid  (kb_wvalid),
+      .m_axi_wready  (kb_wready),
+      .m_axi_bid     (kb_bid),
+      .m_axi_bresp   (kb_bresp),
+      .m_axi_bvalid  (kb_bvalid),
+      .m_axi_bready  (kb_bready),
+      .m_axi_arid    (kb_arid),
+      .m_axi_araddr  (kb_araddr),
+      .m_axi_arlen   (kb_arlen),
+      .m_axi_arsize  (kb_arsize),
+      .m_axi_arburst (kb_arburst),
+      .m_axi_arlock  (kb_arlock),
+      .m_axi_arcache (kb_arcache),
+      .m_axi_arprot  (kb_arprot),
+      .m_axi_arregion(),
+      .m_axi_arqos   (),
+      .m_axi_arvalid (kb_arvalid),
+      .m_axi_arready (kb_arready),
+      .m_axi_rid     (kb_rid),
+      .m_axi_rdata   (kb_rdata),
+      .m_axi_rresp   (kb_rresp),
+      .m_axi_rlast   (kb_rlast),
+      .m_axi_rvalid  (kb_rvalid),
+      .m_axi_rready  (kb_rready)
+    );
+
+    // ---- Per-bank staging: RS_DMA -> BRAM_CTL_DMA -> URAM port A;
+    //                        XBAR_KRN MI -> BRAM_CTL_KRN -> URAM port B.
+    // The RS_DMA slice lives in the kernel pblock's exclusion set (floats to
+    // the SLR boundary) so the hop from the shared crossbar (STRATEGY=2,
+    // registered outputs) is reg-to-reg through Laguna — same fix as the
+    // D=128 -1.75 ns inter-SLR failure into BRAM_CTL_DMA's input registers.
+    for (genvar gb = 0; gb < NB; gb++) begin : BANK
+
     logic [15:0]  rsd_awid, rsd_arid, rsd_bid, rsd_rid;
     logic [63:0]  rsd_awaddr, rsd_araddr;
     logic  [7:0]  rsd_awlen, rsd_arlen;
@@ -447,48 +567,54 @@ module cl_forge_morph_lm_d512
     logic         rsd_wlast, rsd_wvalid, rsd_wready;
     logic         rsd_bvalid, rsd_bready, rsd_rlast, rsd_rvalid, rsd_rready;
 
+    // BRAM-port wires (this bank's URAM, 2 ports)
+    logic        bram_a_rst, bram_a_en;   logic [63:0] bram_a_we;
+    logic [21:0] bram_a_addr;             logic [511:0] bram_a_wrdata, bram_a_rddata;  // 4 MB bank window
+    logic        bram_b_rst, bram_b_en;   logic [63:0] bram_b_we;
+    logic [21:0] bram_b_addr;             logic [511:0] bram_b_wrdata, bram_b_rddata;  // 4 MB bank window
+
     axi_register_slice_dma RS_DMA (
       .aclk    (clk_main_a0),
       .aresetn (rst_n_local),
-      .s_axi_awid    (xd_awid[gi*16 +: 16]),
-      .s_axi_awaddr  (xd_awaddr[gi*64 +: 64]),
-      .s_axi_awlen   (xd_awlen[gi*8 +: 8]),
-      .s_axi_awsize  (xd_awsize[gi*3 +: 3]),
-      .s_axi_awburst (xd_awburst[gi*2 +: 2]),
-      .s_axi_awlock  (xd_awlock[gi]),
-      .s_axi_awcache (xd_awcache[gi*4 +: 4]),
-      .s_axi_awprot  (xd_awprot[gi*3 +: 3]),
+      .s_axi_awid    (xd_awid[gb*16 +: 16]),
+      .s_axi_awaddr  (xd_awaddr[gb*64 +: 64]),
+      .s_axi_awlen   (xd_awlen[gb*8 +: 8]),
+      .s_axi_awsize  (xd_awsize[gb*3 +: 3]),
+      .s_axi_awburst (xd_awburst[gb*2 +: 2]),
+      .s_axi_awlock  (xd_awlock[gb]),
+      .s_axi_awcache (xd_awcache[gb*4 +: 4]),
+      .s_axi_awprot  (xd_awprot[gb*3 +: 3]),
       .s_axi_awregion(4'h0),
       .s_axi_awqos   (4'h0),
-      .s_axi_awvalid (xd_awvalid[gi]),
-      .s_axi_awready (xd_awready[gi]),
-      .s_axi_wdata   (xd_wdata[gi*512 +: 512]),
-      .s_axi_wstrb   (xd_wstrb[gi*64 +: 64]),
-      .s_axi_wlast   (xd_wlast[gi]),
-      .s_axi_wvalid  (xd_wvalid[gi]),
-      .s_axi_wready  (xd_wready[gi]),
-      .s_axi_bid     (xd_bid[gi*16 +: 16]),
-      .s_axi_bresp   (xd_bresp[gi*2 +: 2]),
-      .s_axi_bvalid  (xd_bvalid[gi]),
-      .s_axi_bready  (xd_bready[gi]),
-      .s_axi_arid    (xd_arid[gi*16 +: 16]),
-      .s_axi_araddr  (xd_araddr[gi*64 +: 64]),
-      .s_axi_arlen   (xd_arlen[gi*8 +: 8]),
-      .s_axi_arsize  (xd_arsize[gi*3 +: 3]),
-      .s_axi_arburst (xd_arburst[gi*2 +: 2]),
-      .s_axi_arlock  (xd_arlock[gi]),
-      .s_axi_arcache (xd_arcache[gi*4 +: 4]),
-      .s_axi_arprot  (xd_arprot[gi*3 +: 3]),
+      .s_axi_awvalid (xd_awvalid[gb]),
+      .s_axi_awready (xd_awready[gb]),
+      .s_axi_wdata   (xd_wdata[gb*512 +: 512]),
+      .s_axi_wstrb   (xd_wstrb[gb*64 +: 64]),
+      .s_axi_wlast   (xd_wlast[gb]),
+      .s_axi_wvalid  (xd_wvalid[gb]),
+      .s_axi_wready  (xd_wready[gb]),
+      .s_axi_bid     (xd_bid[gb*16 +: 16]),
+      .s_axi_bresp   (xd_bresp[gb*2 +: 2]),
+      .s_axi_bvalid  (xd_bvalid[gb]),
+      .s_axi_bready  (xd_bready[gb]),
+      .s_axi_arid    (xd_arid[gb*16 +: 16]),
+      .s_axi_araddr  (xd_araddr[gb*64 +: 64]),
+      .s_axi_arlen   (xd_arlen[gb*8 +: 8]),
+      .s_axi_arsize  (xd_arsize[gb*3 +: 3]),
+      .s_axi_arburst (xd_arburst[gb*2 +: 2]),
+      .s_axi_arlock  (xd_arlock[gb]),
+      .s_axi_arcache (xd_arcache[gb*4 +: 4]),
+      .s_axi_arprot  (xd_arprot[gb*3 +: 3]),
       .s_axi_arregion(4'h0),
       .s_axi_arqos   (4'h0),
-      .s_axi_arvalid (xd_arvalid[gi]),
-      .s_axi_arready (xd_arready[gi]),
-      .s_axi_rid     (xd_rid[gi*16 +: 16]),
-      .s_axi_rdata   (xd_rdata[gi*512 +: 512]),
-      .s_axi_rresp   (xd_rresp[gi*2 +: 2]),
-      .s_axi_rlast   (xd_rlast[gi]),
-      .s_axi_rvalid  (xd_rvalid[gi]),
-      .s_axi_rready  (xd_rready[gi]),
+      .s_axi_arvalid (xd_arvalid[gb]),
+      .s_axi_arready (xd_arready[gb]),
+      .s_axi_rid     (xd_rid[gb*16 +: 16]),
+      .s_axi_rdata   (xd_rdata[gb*512 +: 512]),
+      .s_axi_rresp   (xd_rresp[gb*2 +: 2]),
+      .s_axi_rlast   (xd_rlast[gb]),
+      .s_axi_rvalid  (xd_rvalid[gb]),
+      .s_axi_rready  (xd_rready[gb]),
 
       .m_axi_awid    (rsd_awid),
       .m_axi_awaddr  (rsd_awaddr),
@@ -536,7 +662,7 @@ module cl_forge_morph_lm_d512
       .s_axi_aclk    (clk_main_a0),
       .s_axi_aresetn (rst_n_local),
       .s_axi_awid    (rsd_awid),
-      .s_axi_awaddr  (rsd_awaddr[23:0]),   // [20:0]->[23:0]: 16 MB staging window
+      .s_axi_awaddr  (rsd_awaddr[21:0]),   // 4 MB bank window ([21:0], 65536 lines)
       .s_axi_awlen   (rsd_awlen),
       .s_axi_awsize  (rsd_awsize),
       .s_axi_awburst (rsd_awburst),
@@ -555,7 +681,7 @@ module cl_forge_morph_lm_d512
       .s_axi_bvalid  (rsd_bvalid),
       .s_axi_bready  (rsd_bready),
       .s_axi_arid    (rsd_arid),
-      .s_axi_araddr  (rsd_araddr[23:0]),   // [20:0]->[23:0]: 16 MB staging window
+      .s_axi_araddr  (rsd_araddr[21:0]),   // 4 MB bank window ([21:0], 65536 lines)
       .s_axi_arlen   (rsd_arlen),
       .s_axi_arsize  (rsd_arsize),
       .s_axi_arburst (rsd_arburst),
@@ -579,45 +705,45 @@ module cl_forge_morph_lm_d512
       .bram_rddata_a (bram_a_rddata)
     );
 
-    // ---- kernel-side BRAM controller (kernel m_axi -> URAM port B) ----
+    // ---- kernel-side BRAM controller (XBAR_KRN MI gb -> URAM port B) ----
     axi_bram_ctrl_krn BRAM_CTL_KRN (
       .s_axi_aclk    (clk_main_a0),
       .s_axi_aresetn (rst_n_local),
-      .s_axi_awid    (krn_awid),
-      .s_axi_awaddr  (krn_awaddr[23:0]),   // [20:0]->[23:0]: 16 MB window
-      .s_axi_awlen   (krn_awlen),
-      .s_axi_awsize  (krn_awsize),
-      .s_axi_awburst (krn_awburst),
-      .s_axi_awlock  (krn_awlock[0]),
-      .s_axi_awcache (krn_awcache),
-      .s_axi_awprot  (krn_awprot),
-      .s_axi_awvalid (krn_awvalid),
-      .s_axi_awready (krn_awready),
-      .s_axi_wdata   (krn_wdata),
-      .s_axi_wstrb   (krn_wstrb),
-      .s_axi_wlast   (krn_wlast),
-      .s_axi_wvalid  (krn_wvalid),
-      .s_axi_wready  (krn_wready),
-      .s_axi_bid     (krn_bid),
-      .s_axi_bresp   (krn_bresp),
-      .s_axi_bvalid  (krn_bvalid),
-      .s_axi_bready  (krn_bready),
-      .s_axi_arid    (krn_arid),
-      .s_axi_araddr  (krn_araddr[23:0]),   // [20:0]->[23:0]: 16 MB window
-      .s_axi_arlen   (krn_arlen),
-      .s_axi_arsize  (krn_arsize),
-      .s_axi_arburst (krn_arburst),
-      .s_axi_arlock  (krn_arlock[0]),
-      .s_axi_arcache (krn_arcache),
-      .s_axi_arprot  (krn_arprot),
-      .s_axi_arvalid (krn_arvalid),
-      .s_axi_arready (krn_arready),
-      .s_axi_rid     (krn_rid),
-      .s_axi_rdata   (krn_rdata),
-      .s_axi_rresp   (krn_rresp),
-      .s_axi_rlast   (krn_rlast),
-      .s_axi_rvalid  (krn_rvalid),
-      .s_axi_rready  (krn_rready),
+      .s_axi_awid    (kb_awid[gb]),
+      .s_axi_awaddr  (kb_awaddr[gb*64 +: 22]),   // 4 MB bank window ([21:0])
+      .s_axi_awlen   (kb_awlen[gb*8 +: 8]),
+      .s_axi_awsize  (kb_awsize[gb*3 +: 3]),
+      .s_axi_awburst (kb_awburst[gb*2 +: 2]),
+      .s_axi_awlock  (kb_awlock[gb]),
+      .s_axi_awcache (kb_awcache[gb*4 +: 4]),
+      .s_axi_awprot  (kb_awprot[gb*3 +: 3]),
+      .s_axi_awvalid (kb_awvalid[gb]),
+      .s_axi_awready (kb_awready[gb]),
+      .s_axi_wdata   (kb_wdata[gb*512 +: 512]),
+      .s_axi_wstrb   (kb_wstrb[gb*64 +: 64]),
+      .s_axi_wlast   (kb_wlast[gb]),
+      .s_axi_wvalid  (kb_wvalid[gb]),
+      .s_axi_wready  (kb_wready[gb]),
+      .s_axi_bid     (kb_bid[gb]),
+      .s_axi_bresp   (kb_bresp[gb*2 +: 2]),
+      .s_axi_bvalid  (kb_bvalid[gb]),
+      .s_axi_bready  (kb_bready[gb]),
+      .s_axi_arid    (kb_arid[gb]),
+      .s_axi_araddr  (kb_araddr[gb*64 +: 22]),   // 4 MB bank window ([21:0])
+      .s_axi_arlen   (kb_arlen[gb*8 +: 8]),
+      .s_axi_arsize  (kb_arsize[gb*3 +: 3]),
+      .s_axi_arburst (kb_arburst[gb*2 +: 2]),
+      .s_axi_arlock  (kb_arlock[gb]),
+      .s_axi_arcache (kb_arcache[gb*4 +: 4]),
+      .s_axi_arprot  (kb_arprot[gb*3 +: 3]),
+      .s_axi_arvalid (kb_arvalid[gb]),
+      .s_axi_arready (kb_arready[gb]),
+      .s_axi_rid     (kb_rid[gb]),
+      .s_axi_rdata   (kb_rdata[gb*512 +: 512]),
+      .s_axi_rresp   (kb_rresp[gb*2 +: 2]),
+      .s_axi_rlast   (kb_rlast[gb]),
+      .s_axi_rvalid  (kb_rvalid[gb]),
+      .s_axi_rready  (kb_rready[gb]),
       .bram_rst_a    (bram_b_rst),
       .bram_clk_a    (),
       .bram_en_a     (bram_b_en),
@@ -627,24 +753,23 @@ module cl_forge_morph_lm_d512
       .bram_rddata_a (bram_b_rddata)
     );
 
-    // ---- 16 MB true-dual-port URAM (512b x 262144); 1-cycle read latency ----
-    // D=512 buffer is 12.25 MB -> 16 MB window. MEMORY_SIZE is in BITS:
-    // 16 MB = 134217728 bits (was 16777216 = 2 MB). 262144 lines -> ADDR_WIDTH 18
-    // (was 32768/15). This 16 MB URAM spans multiple SLRs (see floorplan).
+    // ---- 4 MB true-dual-port URAM bank (512b x 65536); 1-cycle read latency ----
+    // MEMORY_SIZE is in BITS: 4 MB = 33554432 bits. 65536 lines -> ADDR_WIDTH 16.
+    // Two banks = 8 MB staging total (~128 URAM blocks each; see floorplan).
     xpm_memory_tdpram #(
-      .MEMORY_SIZE        (134217728),
+      .MEMORY_SIZE        (33554432),
       .MEMORY_PRIMITIVE   ("ultra"),
       .CLOCKING_MODE      ("common_clock"),
       .WRITE_DATA_WIDTH_A (512),
       .READ_DATA_WIDTH_A  (512),
       .BYTE_WRITE_WIDTH_A (8),
-      .ADDR_WIDTH_A       (18),
+      .ADDR_WIDTH_A       (16),
       .READ_LATENCY_A     (1),
       .WRITE_MODE_A       ("no_change"),
       .WRITE_DATA_WIDTH_B (512),
       .READ_DATA_WIDTH_B  (512),
       .BYTE_WRITE_WIDTH_B (8),
-      .ADDR_WIDTH_B       (18),
+      .ADDR_WIDTH_B       (16),
       .READ_LATENCY_B     (1),
       .WRITE_MODE_B       ("no_change")
     ) BUF_URAM (
@@ -652,7 +777,7 @@ module cl_forge_morph_lm_d512
       .rsta   (bram_a_rst),
       .ena    (bram_a_en),
       .wea    (bram_a_we),
-      .addra  (bram_a_addr[23:6]),   // [20:6]->[23:6]: 18-bit line select (262144 x 512b)
+      .addra  (bram_a_addr[21:6]),   // 16-bit line select (65536 x 512b)
       .dina   (bram_a_wrdata),
       .douta  (bram_a_rddata),
       .regcea (1'b1),
@@ -664,7 +789,7 @@ module cl_forge_morph_lm_d512
       .rstb   (bram_b_rst),
       .enb    (bram_b_en),
       .web    (bram_b_we),
-      .addrb  (bram_b_addr[23:6]),   // [20:6]->[23:6]: 18-bit line select (262144 x 512b)
+      .addrb  (bram_b_addr[21:6]),   // 16-bit line select (65536 x 512b)
       .dinb   (bram_b_wrdata),
       .doutb  (bram_b_rddata),
       .regceb (1'b1),
@@ -674,6 +799,8 @@ module cl_forge_morph_lm_d512
       .dbiterrb (),
       .sleep  (1'b0)
     );
+
+    end  // BANK[gb]
 
   end
   endgenerate

@@ -51,11 +51,22 @@ static const acc_t ML_POS_INF = acc_t( 2147483647LL);
 // Bit-exact: same per-position adds, same order (integer adds associative); the
 // CSIM fused golden validates. Default OFF -> shipped buffer-backed path.
 #ifdef TT_ONCHIP_GRAD
+#if ML_D >= 512
+// D>=512 culls the buffer G sections to 0 words (forge_buffer_morph_lm.hpp),
+// so the on-chip accumulators are sized by the WEIGHT regions directly
+// (identical values at any width where the G sections exist).
+static int32_t g_embed_oc[WORDS_EMBED];
+static int32_t g_mh_oc[WORDS_MH];
+static int32_t g_mp_oc[WORDS_MP];
+static int32_t g_mb_oc[WORDS_MB];
+static int32_t g_whead_oc[WORDS_W_HEAD];
+#else
 static int32_t g_embed_oc[WORDS_G_EMBED];
 static int32_t g_mh_oc[WORDS_G_MH];
 static int32_t g_mp_oc[WORDS_G_MP];
 static int32_t g_mb_oc[WORDS_G_MB];
 static int32_t g_whead_oc[WORDS_G_W_HEAD];
+#endif
 #define GEMBED(i) g_embed_oc[i]
 #define GMH(i)    g_mh_oc[i]
 #define GMP(i)    g_mp_oc[i]
@@ -765,11 +776,21 @@ static int do_train_run(int32_t* buffer, int n_steps, int lr, int threshold) {
     burst_load_words(buffer, OFF_MP,     mp_buf,   WORDS_MP);
     burst_load_words(buffer, OFF_W_HEAD, wh_buf,   WORDS_W_HEAD);
     burst_load_words(buffer, OFF_CE_LUT, ce_lut,   WORDS_CE_LUT);
+#if ML_D >= 512
+    // G sections culled at D>=512: zero the on-chip accumulators by their
+    // ARRAY sizes (WORDS_G_* are 0 at this width and would skip the zeroing).
+    for (int i = 0; i < WORDS_EMBED;  i++) g_embed_oc[i] = 0;
+    for (int i = 0; i < WORDS_MH;     i++) g_mh_oc[i]    = 0;
+    for (int i = 0; i < WORDS_MP;     i++) g_mp_oc[i]    = 0;
+    for (int i = 0; i < WORDS_MB;     i++) g_mb_oc[i]    = 0;
+    for (int i = 0; i < WORDS_W_HEAD; i++) g_whead_oc[i] = 0;
+#else
     for (int i = 0; i < WORDS_G_EMBED;  i++) g_embed_oc[i] = 0;
     for (int i = 0; i < WORDS_G_MH;     i++) g_mh_oc[i]    = 0;
     for (int i = 0; i < WORDS_G_MP;     i++) g_mp_oc[i]    = 0;
     for (int i = 0; i < WORDS_G_MB;     i++) g_mb_oc[i]    = 0;
     for (int i = 0; i < WORDS_G_W_HEAD; i++) g_whead_oc[i] = 0;
+#endif
 #endif
 
 STEP_LOOP: for (int s = 0; s < n_steps; s++) {
