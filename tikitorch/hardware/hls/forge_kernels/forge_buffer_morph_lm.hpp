@@ -170,8 +170,8 @@ constexpr int WORDS_W_HEAD   = ML_V * ML_D;                 // LM head          
 // drops 4.58 MB so the D=512 buffer (7.69 MB) fits the 8 MB staging window
 // (axi_bram_ctrl caps at 65536 lines = 4 MB/bank; the CL banks two of them).
 // The D=128 layout below is UNTOUCHED (deployed-AFI ABI, sentinel-exact).
-#if !defined(TT_ONCHIP_GRAD) || !defined(TT_RESIDENT_W)
-#error "ML_D>=512 requires -DTT_RESIDENT_W -DTT_ONCHIP_GRAD (buffer G sections are culled to fit the 8MB staging window; non-resident builds would silently not train)"
+#if !defined(TT_ONCHIP_GRAD) || !defined(TT_RESIDENT_W) || !defined(TT_URAM_W)
+#error "ML_D>=512 requires -DTT_RESIDENT_W -DTT_ONCHIP_GRAD -DTT_URAM_W (G sections are culled to fit the 8MB staging window, and without TT_URAM_W the multi-MB resident/grad arrays land in BRAM and blow P&R hours in)"
 #endif
 constexpr int WORDS_G_EMBED  = 0;
 constexpr int WORDS_G_MH     = 0;

@@ -164,8 +164,13 @@ def main(argv):
     # final weights once. Wall-clock of that single kick IS the on-fabric
     # training time -> the honest, host-overhead-free tok/s. Final {wcrc,preds16}
     # must equal the host golden's fused line (bit-exact). ----
-    fused = os.environ.get("TT_FUSED_STEPS")
-    if fused:
+    # DEFAULT "30" (mirrors morph_lm_silicon_n4.py): on EVERY deployed AFI the
+    # per-position modes 0/1/2 are #if !SYNTHESIS host-CSIM-only (rc=99 on
+    # silicon), so a plain invocation must land on the fused path, not raise on
+    # the first mode-0 kick. Set TT_FUSED_STEPS=0 explicitly to force the
+    # per-position path (host-CSIM builds only).
+    fused = os.environ.get("TT_FUSED_STEPS", "30")
+    if fused and int(fused) > 0:
         n = int(fused)
         t0 = time.time()
         run(lib, h, dbuf, 3, n, SGD_LR, SGD_THR)     # mode 3, ONE kick, whole run

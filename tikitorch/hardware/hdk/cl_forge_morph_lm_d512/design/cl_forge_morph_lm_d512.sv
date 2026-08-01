@@ -705,18 +705,37 @@ module cl_forge_morph_lm_d512
       .bram_rddata_a (bram_a_rddata)
     );
 
-    // ---- kernel-side BRAM controller (XBAR_KRN MI gb -> URAM port B) ----
-    axi_bram_ctrl_krn BRAM_CTL_KRN (
-      .s_axi_aclk    (clk_main_a0),
-      .s_axi_aresetn (rst_n_local),
+    // ---- kernel-side register slice: XBAR_KRN MI gb -> (reg) -> BRAM_CTL_KRN.
+    // Mirrors RS_DMA exactly (review-confirmed RISK: the bare crossbar->
+    // controller hop is the twice-measured -1.75/-1.147 ns inter-SLR failure
+    // mode of this design family). Excluded from the pblock so it floats to
+    // the SLR boundary and both hops route reg-to-reg through Laguna.
+    logic         rsk_awid, rsk_arid, rsk_bid, rsk_rid;
+    logic [63:0]  rsk_awaddr, rsk_araddr;
+    logic  [7:0]  rsk_awlen, rsk_arlen;
+    logic  [2:0]  rsk_awsize, rsk_arsize, rsk_awprot, rsk_arprot;
+    logic  [1:0]  rsk_awburst, rsk_arburst, rsk_bresp, rsk_rresp;
+    logic         rsk_awlock, rsk_arlock;
+    logic  [3:0]  rsk_awcache, rsk_arcache;
+    logic         rsk_awvalid, rsk_awready, rsk_arvalid, rsk_arready;
+    logic [511:0] rsk_wdata, rsk_rdata;
+    logic  [63:0] rsk_wstrb;
+    logic         rsk_wlast, rsk_wvalid, rsk_wready;
+    logic         rsk_bvalid, rsk_bready, rsk_rlast, rsk_rvalid, rsk_rready;
+
+    axi_register_slice_krn RS_KRN (
+      .aclk    (clk_main_a0),
+      .aresetn (rst_n_local),
       .s_axi_awid    (kb_awid[gb]),
-      .s_axi_awaddr  (kb_awaddr[gb*64 +: 22]),   // 4 MB bank window ([21:0])
+      .s_axi_awaddr  (kb_awaddr[gb*64 +: 64]),
       .s_axi_awlen   (kb_awlen[gb*8 +: 8]),
       .s_axi_awsize  (kb_awsize[gb*3 +: 3]),
       .s_axi_awburst (kb_awburst[gb*2 +: 2]),
       .s_axi_awlock  (kb_awlock[gb]),
       .s_axi_awcache (kb_awcache[gb*4 +: 4]),
       .s_axi_awprot  (kb_awprot[gb*3 +: 3]),
+      .s_axi_awregion(4'h0),
+      .s_axi_awqos   (4'h0),
       .s_axi_awvalid (kb_awvalid[gb]),
       .s_axi_awready (kb_awready[gb]),
       .s_axi_wdata   (kb_wdata[gb*512 +: 512]),
@@ -729,13 +748,15 @@ module cl_forge_morph_lm_d512
       .s_axi_bvalid  (kb_bvalid[gb]),
       .s_axi_bready  (kb_bready[gb]),
       .s_axi_arid    (kb_arid[gb]),
-      .s_axi_araddr  (kb_araddr[gb*64 +: 22]),   // 4 MB bank window ([21:0])
+      .s_axi_araddr  (kb_araddr[gb*64 +: 64]),
       .s_axi_arlen   (kb_arlen[gb*8 +: 8]),
       .s_axi_arsize  (kb_arsize[gb*3 +: 3]),
       .s_axi_arburst (kb_arburst[gb*2 +: 2]),
       .s_axi_arlock  (kb_arlock[gb]),
       .s_axi_arcache (kb_arcache[gb*4 +: 4]),
       .s_axi_arprot  (kb_arprot[gb*3 +: 3]),
+      .s_axi_arregion(4'h0),
+      .s_axi_arqos   (4'h0),
       .s_axi_arvalid (kb_arvalid[gb]),
       .s_axi_arready (kb_arready[gb]),
       .s_axi_rid     (kb_rid[gb]),
@@ -744,6 +765,87 @@ module cl_forge_morph_lm_d512
       .s_axi_rlast   (kb_rlast[gb]),
       .s_axi_rvalid  (kb_rvalid[gb]),
       .s_axi_rready  (kb_rready[gb]),
+
+      .m_axi_awid    (rsk_awid),
+      .m_axi_awaddr  (rsk_awaddr),
+      .m_axi_awlen   (rsk_awlen),
+      .m_axi_awsize  (rsk_awsize),
+      .m_axi_awburst (rsk_awburst),
+      .m_axi_awlock  (rsk_awlock),
+      .m_axi_awcache (rsk_awcache),
+      .m_axi_awprot  (rsk_awprot),
+      .m_axi_awregion(),
+      .m_axi_awqos   (),
+      .m_axi_awvalid (rsk_awvalid),
+      .m_axi_awready (rsk_awready),
+      .m_axi_wdata   (rsk_wdata),
+      .m_axi_wstrb   (rsk_wstrb),
+      .m_axi_wlast   (rsk_wlast),
+      .m_axi_wvalid  (rsk_wvalid),
+      .m_axi_wready  (rsk_wready),
+      .m_axi_bid     (rsk_bid),
+      .m_axi_bresp   (rsk_bresp),
+      .m_axi_bvalid  (rsk_bvalid),
+      .m_axi_bready  (rsk_bready),
+      .m_axi_arid    (rsk_arid),
+      .m_axi_araddr  (rsk_araddr),
+      .m_axi_arlen   (rsk_arlen),
+      .m_axi_arsize  (rsk_arsize),
+      .m_axi_arburst (rsk_arburst),
+      .m_axi_arlock  (rsk_arlock),
+      .m_axi_arcache (rsk_arcache),
+      .m_axi_arprot  (rsk_arprot),
+      .m_axi_arregion(),
+      .m_axi_arqos   (),
+      .m_axi_arvalid (rsk_arvalid),
+      .m_axi_arready (rsk_arready),
+      .m_axi_rid     (rsk_rid),
+      .m_axi_rdata   (rsk_rdata),
+      .m_axi_rresp   (rsk_rresp),
+      .m_axi_rlast   (rsk_rlast),
+      .m_axi_rvalid  (rsk_rvalid),
+      .m_axi_rready  (rsk_rready)
+    );
+
+    // ---- kernel-side BRAM controller (RS_KRN -> URAM port B) ----
+    axi_bram_ctrl_krn BRAM_CTL_KRN (
+      .s_axi_aclk    (clk_main_a0),
+      .s_axi_aresetn (rst_n_local),
+      .s_axi_awid    (rsk_awid),
+      .s_axi_awaddr  (rsk_awaddr[21:0]),   // 4 MB bank window ([21:0])
+      .s_axi_awlen   (rsk_awlen),
+      .s_axi_awsize  (rsk_awsize),
+      .s_axi_awburst (rsk_awburst),
+      .s_axi_awlock  (rsk_awlock),
+      .s_axi_awcache (rsk_awcache),
+      .s_axi_awprot  (rsk_awprot),
+      .s_axi_awvalid (rsk_awvalid),
+      .s_axi_awready (rsk_awready),
+      .s_axi_wdata   (rsk_wdata),
+      .s_axi_wstrb   (rsk_wstrb),
+      .s_axi_wlast   (rsk_wlast),
+      .s_axi_wvalid  (rsk_wvalid),
+      .s_axi_wready  (rsk_wready),
+      .s_axi_bid     (rsk_bid),
+      .s_axi_bresp   (rsk_bresp),
+      .s_axi_bvalid  (rsk_bvalid),
+      .s_axi_bready  (rsk_bready),
+      .s_axi_arid    (rsk_arid),
+      .s_axi_araddr  (rsk_araddr[21:0]),   // 4 MB bank window ([21:0])
+      .s_axi_arlen   (rsk_arlen),
+      .s_axi_arsize  (rsk_arsize),
+      .s_axi_arburst (rsk_arburst),
+      .s_axi_arlock  (rsk_arlock),
+      .s_axi_arcache (rsk_arcache),
+      .s_axi_arprot  (rsk_arprot),
+      .s_axi_arvalid (rsk_arvalid),
+      .s_axi_arready (rsk_arready),
+      .s_axi_rid     (rsk_rid),
+      .s_axi_rdata   (rsk_rdata),
+      .s_axi_rresp   (rsk_rresp),
+      .s_axi_rlast   (rsk_rlast),
+      .s_axi_rvalid  (rsk_rvalid),
+      .s_axi_rready  (rsk_rready),
       .bram_rst_a    (bram_b_rst),
       .bram_clk_a    (),
       .bram_en_a     (bram_b_en),

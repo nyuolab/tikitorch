@@ -43,8 +43,16 @@ set_property -dict [list \
 create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name axi_register_slice_dma -dir $ipdir
 set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {16} CONFIG.ADDR_WIDTH {64} \
   CONFIG.REG_AW {1} CONFIG.REG_W {1} CONFIG.REG_B {1} CONFIG.REG_AR {1} CONFIG.REG_R {1}] [get_ips axi_register_slice_dma]
+# 7. Full-AXI4 register slice on each XBAR_KRN MI -> BRAM_CTL_KRN path (ID1,
+#    kernel side). The bare crossbar->controller hop is the twice-measured
+#    (-1.75 / -1.147 ns) inter-SLR failure mode of this design family; the
+#    pblock-excluded slice floats to the SLR boundary so both hops route
+#    reg-to-reg through Laguna — the exact RS_DMA fix, mirrored.
+create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name axi_register_slice_krn -dir $ipdir
+set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {1} CONFIG.ADDR_WIDTH {64} \
+  CONFIG.REG_AW {1} CONFIG.REG_W {1} CONFIG.REG_B {1} CONFIG.REG_AR {1} CONFIG.REG_R {1}] [get_ips axi_register_slice_krn]
 puts "=== generated IPs ==="
-foreach ip {axi_register_slice_light axi_bram_ctrl_dma axi_bram_ctrl_krn axi_crossbar_dma axi_crossbar_krn axi_register_slice_dma} {
+foreach ip {axi_register_slice_light axi_bram_ctrl_dma axi_bram_ctrl_krn axi_crossbar_dma axi_crossbar_krn axi_register_slice_dma axi_register_slice_krn} {
   generate_target {synthesis} [get_ips $ip]
   puts "$ip OK"
 }

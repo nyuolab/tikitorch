@@ -40,9 +40,10 @@
 
 create_pblock pb_k0
 add_cells_to_pblock pb_k0 [get_cells -hier -regexp {.*KINST\[0\]\..*}]
-# RS_OCL sits at KINST[0] level; RS_DMA is per-bank (KINST[0].BANK[b].RS_DMA in
-# the v2 two-bank design) — both float to the SLR boundaries (reg-to-reg Laguna).
-remove_cells_from_pblock pb_k0 [get_cells -hier -regexp {.*KINST\[0\]\.(BANK\[[0-9]+\]\.)?RS_(DMA|OCL).*}]
+# RS_OCL sits at KINST[0] level; RS_DMA and RS_KRN are per-bank
+# (KINST[0].BANK[b].RS_{DMA,KRN} in the v2 two-bank design) — all float to the
+# SLR boundaries (reg-to-reg Laguna on both sides of each crossing).
+remove_cells_from_pblock pb_k0 [get_cells -hier -regexp {.*KINST\[0\]\.(BANK\[[0-9]+\]\.)?RS_(DMA|OCL|KRN).*}]
 # Full user area SLR0 (Y0-3) + SLR1 (Y4-7) + SLR2 (Y8-11), all columns X0-X7.
 # TODO: tighten per the first P&R utilization report (shell-reserved regions).
 resize_pblock pb_k0 -add {CLOCKREGION_X0Y0:CLOCKREGION_X7Y11}
