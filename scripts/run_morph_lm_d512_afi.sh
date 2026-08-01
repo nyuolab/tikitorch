@@ -11,15 +11,18 @@
 #     width parameterization, and the WHOLE cl_forge_morph_lm_d512 package) are
 #     UNCOMMITTED (house rules: no commit) — so we archive the WORKING TREE via
 #     `git stash create` (a commit object, no index/tree mutation), NOT HEAD.
-#   * CLOCK (F2 REALITY — corrects the original F1-era plan): the F2 shell's
-#     clk_main_a0 is FIXED at 250 MHz, and this CL clocks the kernel ap_clk on
-#     clk_main_a0. --clock_recipe_a does NOTHING for the kernel clock unless the
-#     CL instantiates AWS_CLK_GEN and moves the kernel to clk_extra_a1 (the S1
-#     CDC rearchitecture — see run_s1_afi_build.sh; this CL does NOT do that).
-#     Therefore the kernel MUST be HLS-scheduled at TT_CLK_NS=4.0 and close at
-#     250 MHz. If a 4.0 ns recsynth ever fails to schedule, the fallback is the
-#     S1 clkgen port (kernel on clk_extra_a1=125 MHz, --aws_clk_gen), NOT a
-#     recipe flag. Leave CLOCK_RECIPE_A empty.
+#   * CLOCK (v3 CLKGEN, after the v2 250 MHz P&R MEASURED WNS -2.726 ns): the
+#     failing paths were INSIDE the 4 MB staging banks (BRAM_CTL write control
+#     -> 16-deep URAM cascade, ~6.7 ns physical) — unfixable at the shell-fixed
+#     4 ns clk_main_a0. The CL now instantiates AWS_CLK_GEN (the S1 pattern,
+#     cut at the SHELL edge): the ENTIRE user design (crossbars, banks,
+#     controllers, kernel) runs on clk_extra_a1 = 125 MHz (8 ns; worst measured
+#     path closes with >1.2 ns slack), with async AXI clock converters on the
+#     DMA-PCIS + OCL boundaries. The build MUST pass --aws_clk_gen AND
+#     --clock_recipe_a A1 (CLOCK_ARGS below; A1 -> clk_extra_a1 = 125 MHz).
+#     The kernel stays HLS-scheduled at TT_CLK_NS=4.0 (verified est 3.376 ns,
+#     II parity) — over-pipelined at 8 ns is harmless, and the HLS gate keeps
+#     guarding regressions.
 #   * HLS GATE: after the on-box csynth, the estimated CP and the DSP total are
 #     parsed from the report; DSP!=0 or estimate > target ABORTS before the ~3 h
 #     P&R (report is uploaded either way).
@@ -53,7 +56,7 @@ ML_D="${ML_D:-512}"
 # URAM 189%/SLR = the all-SLR floorplan). Do NOT build plain.
 TT_BUILD_FLAGS="${TT_BUILD_FLAGS:--DTT_RESIDENT_W -DTT_ONCHIP_GRAD -DTT_URAM_W}"
 TT_CLK_NS="${TT_CLK_NS:-4.0}"                            # HLS target = the FIXED 250 MHz clk_main_a0 (see CLOCK note above)
-CLOCK_RECIPE_A="${CLOCK_RECIPE_A:-}"                     # leave EMPTY: kernel is on fixed clk_main_a0; recipes only matter with AWS_CLK_GEN (S1 pattern)
+CLOCK_RECIPE_A="${CLOCK_RECIPE_A:-A1}"                   # A1 -> clk_extra_a1 = 125 MHz (the user-design clock; AWS_CLK_GEN in the CL). A0 -> 62.5 MHz relief knob.
 DO_REGISTER="${DO_REGISTER:-1}"                          # 1 -> create-fpga-image on the box after the DCP
 AFI_NAME="${AFI_NAME:-cl_forge_morph_lm_d512}"
 ROLE="${ROLE:-tiki-sweep-runner}"
@@ -79,6 +82,7 @@ cmd_launch(){
            "$PKG_REL/build/scripts/synth_$CL.tcl" \
            "$PKG_REL/build/scripts/gen_ip.tcl" \
            "$PKG_REL/build/constraints/cl_pnr_user_floorplan.xdc" \
+           "$PKG_REL/build/constraints/small_shell_cl_pnr_user.xdc" \
            "tikitorch/hardware/hls/forge_kernels/$KERNEL_TCL" \
            "tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp"; do
     tar tzf "$STATE_DIR/src.tar.gz" | grep -qx "$f" || { echo "FATAL: $f not in shipped (working-tree) tarball"; exit 1; }; done
@@ -184,7 +188,10 @@ ls -la "\$CLROOT/design/ip" 2>&1 | head -20; up
 export CL_DIR="\$CLROOT"
 BUILD_PY="\$(find "\$CLROOT/build" -name aws_build_dcp_from_cl.py 2>/dev/null | head -1)"
 echo "BUILD_PY=\$BUILD_PY"; chmod +x "\$BUILD_PY" 2>/dev/null; cd "\$(dirname "\$BUILD_PY")"
-CLKARG=""; [ -n "\$CLOCK_RECIPE_A" ] && CLKARG="--clock_recipe_a \$CLOCK_RECIPE_A"
+# v3 CLKGEN: AWS_CLK_GEN is instantiated in the CL, so --aws_clk_gen is MANDATORY
+# on EVERY build (pulls in aws_clk_gen.sv + its IP + clkgen clock constraints; the
+# S1 lesson: recipe WITHOUT clkgen silently leaves the kernel with no 125MHz clock).
+CLKARG="--aws_clk_gen --clock_recipe_a \${CLOCK_RECIPE_A:-A1}"
 echo "=== aws_build_dcp_from_cl (CL=\$CL \$CLKARG) START \$(date -u) ==="
 ./aws_build_dcp_from_cl.py --cl "\$CL" --no-encrypt \$CLKARG > /tmp/aws_build.full.log 2>&1; echo "BUILD_RC=\$?"
 tail -120 /tmp/aws_build.full.log

@@ -51,8 +51,24 @@ set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.I
 create_ip -name axi_register_slice -vendor xilinx.com -library ip -module_name axi_register_slice_krn -dir $ipdir
 set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ID_WIDTH {1} CONFIG.ADDR_WIDTH {64} \
   CONFIG.REG_AW {1} CONFIG.REG_W {1} CONFIG.REG_B {1} CONFIG.REG_AR {1} CONFIG.REG_R {1}] [get_ips axi_register_slice_krn]
+# 8. v3 CLKGEN CDCs — the whole user design runs on clk_extra_a1 (125 MHz;
+#    measured v2 250 MHz P&R WNS -2.726 ns inside the URAM staging banks).
+#    ASYNC converters (clock-agnostic; the S1 pattern, cut at the shell edge).
+#    SELF-OWNED module names so they never collide with HDK pre-built CDC IP.
+# CDC-1: shell DMA-PCIS 250 -> 125 MHz, AXI4 512b ID16.
+create_ip -name axi_clock_converter -vendor xilinx.com -library ip -module_name mld512_pcis_cdc -dir $ipdir
+set_property -dict [list \
+  CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {512} CONFIG.ADDR_WIDTH {64} \
+  CONFIG.ID_WIDTH {16} CONFIG.ACLK_ASYNC {1} CONFIG.SYNCHRONIZATION_STAGES {3} \
+] [get_ips mld512_pcis_cdc]
+# CDC-2: shell OCL control 250 -> 125 MHz, AXI4-Lite 32b.
+create_ip -name axi_clock_converter -vendor xilinx.com -library ip -module_name mld512_ocl_cdc -dir $ipdir
+set_property -dict [list \
+  CONFIG.PROTOCOL {AXI4LITE} CONFIG.DATA_WIDTH {32} CONFIG.ADDR_WIDTH {32} \
+  CONFIG.ID_WIDTH {0} CONFIG.ACLK_ASYNC {1} CONFIG.SYNCHRONIZATION_STAGES {3} \
+] [get_ips mld512_ocl_cdc]
 puts "=== generated IPs ==="
-foreach ip {axi_register_slice_light axi_bram_ctrl_dma axi_bram_ctrl_krn axi_crossbar_dma axi_crossbar_krn axi_register_slice_dma axi_register_slice_krn} {
+foreach ip {axi_register_slice_light axi_bram_ctrl_dma axi_bram_ctrl_krn axi_crossbar_dma axi_crossbar_krn axi_register_slice_dma axi_register_slice_krn mld512_pcis_cdc mld512_ocl_cdc} {
   generate_target {synthesis} [get_ips $ip]
   puts "$ip OK"
 }

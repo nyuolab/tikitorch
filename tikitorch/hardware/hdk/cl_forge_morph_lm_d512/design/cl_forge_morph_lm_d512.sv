@@ -53,7 +53,8 @@ module cl_forge_morph_lm_d512
 `include "cl_id_defines.vh"
 `include "unused_flr_template.inc"
 `include "unused_ddr_template.inc"
-`include "unused_cl_sda_template.inc"
+// NOTE: unused_cl_sda_template.inc is DELETED — the SDA AXI-Lite slave drives
+// AWS_CLK_GEN's control plane (the S1 clkgen pattern; see run_s1_afi_build.sh).
 `include "unused_apppf_irq_template.inc"
 `include "unused_pcim_template.inc"
 
@@ -78,8 +79,96 @@ module cl_forge_morph_lm_d512
   assign cl_sh_dma_rd_full = 1'b0;
 
   // =========================================================================
-  // OCL register slice (timing closure between shell and the OCL fan-out)
+  // v3 CLKGEN: the v2 250 MHz P&R measured WNS -2.726 ns / TNS -40.8 us with
+  // the worst paths INSIDE the 4 MB staging banks (BRAM_CTL write control ->
+  // 16-deep URAM cascade CAS_IN_EN pins, ~6.7 ns physical) — unfixable at the
+  // shell-fixed 4 ns clk_main_a0. So the ENTIRE user design (crossbars, banks,
+  // controllers, kernel) moves to the generated clk_extra_a1 = 125 MHz (8 ns;
+  // worst measured path closes with >1.2 ns slack), with async AXI clock
+  // converters at the two shell boundaries (DMA-PCIS + OCL). This is the S1
+  // CDC rearchitecture (cl_forge_train_step_s1.sv), cut at the shell edge.
+  // Build MUST pass --aws_clk_gen --clock_recipe_a A1 (run_morph_lm_d512_afi.sh).
   // =========================================================================
+  logic  gen_clk_hbm_ref;
+  logic  gen_clk_main_a0;            // 250 MHz pass-through (shell domain)
+  logic  gen_clk_extra_a1;           // 125 MHz (Recipe A1)  <-- USER-DESIGN CLOCK
+  logic  gen_clk_extra_a2, gen_clk_extra_a3;
+  logic  gen_clk_extra_b0, gen_clk_extra_b1, gen_clk_extra_c0, gen_clk_extra_c1;
+  logic  gen_clk_hbm_axi;
+  logic  gen_rst_hbm_axi_n, gen_rst_hbm_ref_n;
+  logic  gen_rst_c1_n, gen_rst_c0_n, gen_rst_b1_n, gen_rst_b0_n;
+  logic  gen_rst_a3_n, gen_rst_a2_n;
+  logic  gen_rst_a1_n;               // reset sync'd to clk_extra_a1 (125 MHz domain)
+  logic  gen_rst_main_n;             // reset sync'd to clk_main_a0 (250 MHz shell domain)
+
+  // SDA reset synchronizer (matches cl_mem_perf / the S1 CL).
+  logic sda_sync_rst_n;
+  xpm_cdc_async_rst CDC_ASYNC_RST_N_SDA (
+    .src_arst  (rst_main_n     ),
+    .dest_clk  (clk_main_a0    ),
+    .dest_arst (sda_sync_rst_n )
+  );
+
+  aws_clk_gen #(
+    .CLK_GRP_A_EN (1), .CLK_GRP_B_EN (0), .CLK_GRP_C_EN (0), .CLK_HBM_EN (0)
+  ) AWS_CLK_GEN (
+    .i_clk_main_a0       (clk_main_a0    ),
+    .i_rst_main_n        (sda_sync_rst_n ),
+    .i_clk_hbm_ref       (clk_hbm_ref    ),
+    .s_axil_ctrl_awaddr  (sda_cl_awaddr  ), .s_axil_ctrl_awvalid (sda_cl_awvalid ), .s_axil_ctrl_awready (cl_sda_awready),
+    .s_axil_ctrl_wdata   (sda_cl_wdata   ), .s_axil_ctrl_wstrb   (sda_cl_wstrb   ), .s_axil_ctrl_wvalid  (sda_cl_wvalid ), .s_axil_ctrl_wready (cl_sda_wready),
+    .s_axil_ctrl_bresp   (cl_sda_bresp   ), .s_axil_ctrl_bvalid  (cl_sda_bvalid  ), .s_axil_ctrl_bready  (sda_cl_bready ),
+    .s_axil_ctrl_araddr  (sda_cl_araddr  ), .s_axil_ctrl_arvalid (sda_cl_arvalid ), .s_axil_ctrl_arready (cl_sda_arready),
+    .s_axil_ctrl_rdata   (cl_sda_rdata   ), .s_axil_ctrl_rresp   (cl_sda_rresp   ), .s_axil_ctrl_rvalid  (cl_sda_rvalid ), .s_axil_ctrl_rready (sda_cl_rready),
+    .o_clk_hbm_ref       (gen_clk_hbm_ref ), .o_clk_main_a0   (gen_clk_main_a0 ),
+    .o_clk_extra_a1      (gen_clk_extra_a1), .o_clk_extra_a2  (gen_clk_extra_a2), .o_clk_extra_a3 (gen_clk_extra_a3),
+    .o_clk_extra_b0      (gen_clk_extra_b0), .o_clk_extra_b1  (gen_clk_extra_b1),
+    .o_clk_extra_c0      (gen_clk_extra_c0), .o_clk_extra_c1  (gen_clk_extra_c1), .o_clk_hbm_axi  (gen_clk_hbm_axi),
+    .o_cl_rst_hbm_axi_n  (gen_rst_hbm_axi_n), .o_cl_rst_hbm_ref_n (gen_rst_hbm_ref_n),
+    .o_cl_rst_c1_n       (gen_rst_c1_n    ), .o_cl_rst_c0_n   (gen_rst_c0_n    ), .o_cl_rst_b1_n  (gen_rst_b1_n   ), .o_cl_rst_b0_n (gen_rst_b0_n),
+    .o_cl_rst_a3_n       (gen_rst_a3_n    ), .o_cl_rst_a2_n   (gen_rst_a2_n    ), .o_cl_rst_a1_n  (gen_rst_a1_n   ), .o_cl_rst_main_n (gen_rst_main_n)
+  );
+
+  // =========================================================================
+  // OCL path: shell (250 MHz) -> OCL_CDC (async clock converter) -> register
+  // slice + fan-out on the 125 MHz user domain.
+  // =========================================================================
+  logic        oclc_aw_valid, oclc_aw_ready;
+  logic [31:0] oclc_aw_addr;
+  logic        oclc_w_valid, oclc_w_ready;
+  logic [31:0] oclc_w_data;
+  logic  [3:0] oclc_w_strb;
+  logic        oclc_b_valid, oclc_b_ready;
+  logic  [1:0] oclc_b_resp;
+  logic        oclc_ar_valid, oclc_ar_ready;
+  logic [31:0] oclc_ar_addr;
+  logic        oclc_r_valid, oclc_r_ready;
+  logic [31:0] oclc_r_data;
+  logic  [1:0] oclc_r_resp;
+
+  mld512_ocl_cdc OCL_CDC (
+    .s_axi_aclk    (clk_main_a0),     .s_axi_aresetn (rst_main_n),      // 250 MHz slave = shell OCL
+    .s_axi_awaddr  (ocl_cl_awaddr),   .s_axi_awprot  (3'h0),
+    .s_axi_awvalid (ocl_cl_awvalid),  .s_axi_awready (cl_ocl_awready),
+    .s_axi_wdata   (ocl_cl_wdata),    .s_axi_wstrb   (ocl_cl_wstrb),
+    .s_axi_wvalid  (ocl_cl_wvalid),   .s_axi_wready  (cl_ocl_wready),
+    .s_axi_bresp   (cl_ocl_bresp),    .s_axi_bvalid  (cl_ocl_bvalid),   .s_axi_bready (ocl_cl_bready),
+    .s_axi_araddr  (ocl_cl_araddr),   .s_axi_arprot  (3'h0),
+    .s_axi_arvalid (ocl_cl_arvalid),  .s_axi_arready (cl_ocl_arready),
+    .s_axi_rdata   (cl_ocl_rdata),    .s_axi_rresp   (cl_ocl_rresp),
+    .s_axi_rvalid  (cl_ocl_rvalid),   .s_axi_rready  (ocl_cl_rready),
+    .m_axi_aclk    (gen_clk_extra_a1),.m_axi_aresetn (gen_rst_a1_n),    // 125 MHz master
+    .m_axi_awaddr  (oclc_aw_addr),    .m_axi_awprot  (),
+    .m_axi_awvalid (oclc_aw_valid),   .m_axi_awready (oclc_aw_ready),
+    .m_axi_wdata   (oclc_w_data),     .m_axi_wstrb   (oclc_w_strb),
+    .m_axi_wvalid  (oclc_w_valid),    .m_axi_wready  (oclc_w_ready),
+    .m_axi_bresp   (oclc_b_resp),     .m_axi_bvalid  (oclc_b_valid),    .m_axi_bready (oclc_b_ready),
+    .m_axi_araddr  (oclc_ar_addr),    .m_axi_arprot  (),
+    .m_axi_arvalid (oclc_ar_valid),   .m_axi_arready (oclc_ar_ready),
+    .m_axi_rdata   (oclc_r_data),     .m_axi_rresp   (oclc_r_resp),
+    .m_axi_rvalid  (oclc_r_valid),    .m_axi_rready  (oclc_r_ready)
+  );
+
   logic        ocl_aw_valid_pre, ocl_aw_ready_pre;
   logic [31:0] ocl_aw_addr_pre;
   logic        ocl_w_valid_pre, ocl_w_ready_pre;
@@ -94,26 +183,26 @@ module cl_forge_morph_lm_d512
   logic  [1:0] ocl_r_resp_pre;
 
   axi_register_slice_light OCL_REG_SLC (
-    .aclk          (clk_main_a0),
-    .aresetn       (rst_main_n),
-    .s_axi_awaddr  (ocl_cl_awaddr),
+    .aclk          (gen_clk_extra_a1),
+    .aresetn       (gen_rst_a1_n),
+    .s_axi_awaddr  (oclc_aw_addr),
     .s_axi_awprot  (3'h0),
-    .s_axi_awvalid (ocl_cl_awvalid),
-    .s_axi_awready (cl_ocl_awready),
-    .s_axi_wdata   (ocl_cl_wdata),
-    .s_axi_wstrb   (ocl_cl_wstrb),
-    .s_axi_wvalid  (ocl_cl_wvalid),
-    .s_axi_wready  (cl_ocl_wready),
-    .s_axi_bresp   (cl_ocl_bresp),
-    .s_axi_bvalid  (cl_ocl_bvalid),
-    .s_axi_bready  (ocl_cl_bready),
-    .s_axi_araddr  (ocl_cl_araddr),
-    .s_axi_arvalid (ocl_cl_arvalid),
-    .s_axi_arready (cl_ocl_arready),
-    .s_axi_rdata   (cl_ocl_rdata),
-    .s_axi_rresp   (cl_ocl_rresp),
-    .s_axi_rvalid  (cl_ocl_rvalid),
-    .s_axi_rready  (ocl_cl_rready),
+    .s_axi_awvalid (oclc_aw_valid),
+    .s_axi_awready (oclc_aw_ready),
+    .s_axi_wdata   (oclc_w_data),
+    .s_axi_wstrb   (oclc_w_strb),
+    .s_axi_wvalid  (oclc_w_valid),
+    .s_axi_wready  (oclc_w_ready),
+    .s_axi_bresp   (oclc_b_resp),
+    .s_axi_bvalid  (oclc_b_valid),
+    .s_axi_bready  (oclc_b_ready),
+    .s_axi_araddr  (oclc_ar_addr),
+    .s_axi_arvalid (oclc_ar_valid),
+    .s_axi_arready (oclc_ar_ready),
+    .s_axi_rdata   (oclc_r_data),
+    .s_axi_rresp   (oclc_r_resp),
+    .s_axi_rvalid  (oclc_r_valid),
+    .s_axi_rready  (oclc_r_ready),
 
     .m_axi_awaddr  (ocl_aw_addr_pre),
     .m_axi_awprot  (),
@@ -193,9 +282,22 @@ module cl_forge_morph_lm_d512
   logic [NB*2-1:0]   xd_rresp;   logic [NB-1:0]     xd_rlast;
   logic [NB-1:0]     xd_rvalid;  logic [NB-1:0]     xd_rready;
 
-  axi_crossbar_dma XBAR_DMA (
-    .aclk    (clk_main_a0),
-    .aresetn (rst_main_n),
+  // PCIS CDC: shell dma_pcis (250 MHz) -> async converter -> XBAR_DMA (125 MHz).
+  logic [15:0]  pdc_awid, pdc_arid, pdc_bid, pdc_rid;
+  logic [63:0]  pdc_awaddr, pdc_araddr;
+  logic  [7:0]  pdc_awlen, pdc_arlen;
+  logic  [2:0]  pdc_awsize, pdc_arsize, pdc_awprot, pdc_arprot;
+  logic  [1:0]  pdc_awburst, pdc_arburst, pdc_bresp, pdc_rresp;
+  logic         pdc_awlock, pdc_arlock;
+  logic  [3:0]  pdc_awcache, pdc_arcache, pdc_awqos, pdc_arqos;
+  logic         pdc_awvalid, pdc_awready, pdc_arvalid, pdc_arready;
+  logic [511:0] pdc_wdata, pdc_rdata;
+  logic  [63:0] pdc_wstrb;
+  logic         pdc_wlast, pdc_wvalid, pdc_wready;
+  logic         pdc_bvalid, pdc_bready, pdc_rlast, pdc_rvalid, pdc_rready;
+
+  mld512_pcis_cdc PCIS_CDC (
+    .s_axi_aclk    (clk_main_a0), .s_axi_aresetn (rst_main_n),          // 250 MHz slave = shell dma_pcis
     .s_axi_awid    (sh_cl_dma_pcis_awid),
     .s_axi_awaddr  (sh_cl_dma_pcis_awaddr),
     .s_axi_awlen   (sh_cl_dma_pcis_awlen),
@@ -205,6 +307,7 @@ module cl_forge_morph_lm_d512
     .s_axi_awcache (sh_cl_dma_pcis_awcache),
     .s_axi_awprot  (sh_cl_dma_pcis_awprot),
     .s_axi_awqos   (4'h0),
+    .s_axi_awregion(4'h0),
     .s_axi_awvalid (sh_cl_dma_pcis_awvalid),
     .s_axi_awready (cl_sh_dma_pcis_awready),
     .s_axi_wdata   (sh_cl_dma_pcis_wdata),
@@ -225,6 +328,7 @@ module cl_forge_morph_lm_d512
     .s_axi_arcache (sh_cl_dma_pcis_arcache),
     .s_axi_arprot  (sh_cl_dma_pcis_arprot),
     .s_axi_arqos   (4'h0),
+    .s_axi_arregion(4'h0),
     .s_axi_arvalid (sh_cl_dma_pcis_arvalid),
     .s_axi_arready (cl_sh_dma_pcis_arready),
     .s_axi_rid     (cl_sh_dma_pcis_rid),
@@ -233,6 +337,88 @@ module cl_forge_morph_lm_d512
     .s_axi_rlast   (cl_sh_dma_pcis_rlast),
     .s_axi_rvalid  (cl_sh_dma_pcis_rvalid),
     .s_axi_rready  (sh_cl_dma_pcis_rready),
+    .m_axi_aclk    (gen_clk_extra_a1), .m_axi_aresetn (gen_rst_a1_n),   // 125 MHz master = XBAR_DMA SI
+    .m_axi_awid    (pdc_awid),
+    .m_axi_awaddr  (pdc_awaddr),
+    .m_axi_awlen   (pdc_awlen),
+    .m_axi_awsize  (pdc_awsize),
+    .m_axi_awburst (pdc_awburst),
+    .m_axi_awlock  (pdc_awlock),
+    .m_axi_awcache (pdc_awcache),
+    .m_axi_awprot  (pdc_awprot),
+    .m_axi_awqos   (pdc_awqos),
+    .m_axi_awregion(),
+    .m_axi_awvalid (pdc_awvalid),
+    .m_axi_awready (pdc_awready),
+    .m_axi_wdata   (pdc_wdata),
+    .m_axi_wstrb   (pdc_wstrb),
+    .m_axi_wlast   (pdc_wlast),
+    .m_axi_wvalid  (pdc_wvalid),
+    .m_axi_wready  (pdc_wready),
+    .m_axi_bid     (pdc_bid),
+    .m_axi_bresp   (pdc_bresp),
+    .m_axi_bvalid  (pdc_bvalid),
+    .m_axi_bready  (pdc_bready),
+    .m_axi_arid    (pdc_arid),
+    .m_axi_araddr  (pdc_araddr),
+    .m_axi_arlen   (pdc_arlen),
+    .m_axi_arsize  (pdc_arsize),
+    .m_axi_arburst (pdc_arburst),
+    .m_axi_arlock  (pdc_arlock),
+    .m_axi_arcache (pdc_arcache),
+    .m_axi_arprot  (pdc_arprot),
+    .m_axi_arqos   (pdc_arqos),
+    .m_axi_arregion(),
+    .m_axi_arvalid (pdc_arvalid),
+    .m_axi_arready (pdc_arready),
+    .m_axi_rid     (pdc_rid),
+    .m_axi_rdata   (pdc_rdata),
+    .m_axi_rresp   (pdc_rresp),
+    .m_axi_rlast   (pdc_rlast),
+    .m_axi_rvalid  (pdc_rvalid),
+    .m_axi_rready  (pdc_rready)
+  );
+
+  axi_crossbar_dma XBAR_DMA (
+    .aclk    (gen_clk_extra_a1),
+    .aresetn (gen_rst_a1_n),
+    .s_axi_awid    (pdc_awid),
+    .s_axi_awaddr  (pdc_awaddr),
+    .s_axi_awlen   (pdc_awlen),
+    .s_axi_awsize  (pdc_awsize),
+    .s_axi_awburst (pdc_awburst),
+    .s_axi_awlock  (pdc_awlock),
+    .s_axi_awcache (pdc_awcache),
+    .s_axi_awprot  (pdc_awprot),
+    .s_axi_awqos   (pdc_awqos),
+    .s_axi_awvalid (pdc_awvalid),
+    .s_axi_awready (pdc_awready),
+    .s_axi_wdata   (pdc_wdata),
+    .s_axi_wstrb   (pdc_wstrb),
+    .s_axi_wlast   (pdc_wlast),
+    .s_axi_wvalid  (pdc_wvalid),
+    .s_axi_wready  (pdc_wready),
+    .s_axi_bid     (pdc_bid),
+    .s_axi_bresp   (pdc_bresp),
+    .s_axi_bvalid  (pdc_bvalid),
+    .s_axi_bready  (pdc_bready),
+    .s_axi_arid    (pdc_arid),
+    .s_axi_araddr  (pdc_araddr),
+    .s_axi_arlen   (pdc_arlen),
+    .s_axi_arsize  (pdc_arsize),
+    .s_axi_arburst (pdc_arburst),
+    .s_axi_arlock  (pdc_arlock),
+    .s_axi_arcache (pdc_arcache),
+    .s_axi_arprot  (pdc_arprot),
+    .s_axi_arqos   (pdc_arqos),
+    .s_axi_arvalid (pdc_arvalid),
+    .s_axi_arready (pdc_arready),
+    .s_axi_rid     (pdc_rid),
+    .s_axi_rdata   (pdc_rdata),
+    .s_axi_rresp   (pdc_rresp),
+    .s_axi_rlast   (pdc_rlast),
+    .s_axi_rvalid  (pdc_rvalid),
+    .s_axi_rready  (pdc_rready),
 
     .m_axi_awid    (xd_awid),
     .m_axi_awaddr  (xd_awaddr),
@@ -331,9 +517,9 @@ module cl_forge_morph_lm_d512
     // low-fanout net per instance crosses the SLR boundary (async assert, no
     // timing requirement; 4-cycle synchronized deassert).
     (* ASYNC_REG = "true" *) logic [3:0] rst_pipe;
-    always_ff @(posedge clk_main_a0 or negedge rst_main_n)
-      if (!rst_main_n) rst_pipe <= 4'b0;
-      else             rst_pipe <= {rst_pipe[2:0], 1'b1};
+    always_ff @(posedge gen_clk_extra_a1 or negedge gen_rst_a1_n)
+      if (!gen_rst_a1_n) rst_pipe <= 4'b0;
+      else               rst_pipe <= {rst_pipe[2:0], 1'b1};
     wire rst_n_local = rst_pipe[3];
 
     // ---- OCL register slice (control): broadcast/mux drives the slice s_axi
@@ -347,7 +533,7 @@ module cl_forge_morph_lm_d512
     logic        rso_awvalid, rso_awready, rso_wvalid, rso_wready;
     logic        rso_bvalid, rso_bready, rso_arvalid, rso_arready, rso_rvalid, rso_rready;
     axi_register_slice_light RS_OCL (
-      .aclk          (clk_main_a0),
+      .aclk          (gen_clk_extra_a1),
       .aresetn       (rst_n_local),
       .s_axi_awaddr  (ocl_aw_addr_pre),
       .s_axi_awprot  (3'h0),
@@ -389,7 +575,7 @@ module cl_forge_morph_lm_d512
 
     // ---- kernel: control via per-instance OCL register slice ----
     forge_train_step_morph_lm u_train (
-      .ap_clk     (clk_main_a0),
+      .ap_clk     (gen_clk_extra_a1),
       .ap_rst_n   (rst_n_local),
       .interrupt  (krn_irq),
 
@@ -465,7 +651,7 @@ module cl_forge_morph_lm_d512
     // XBAR_DMA. Lives inside the kernel pblock (talks only to in-pblock
     // endpoints). STRATEGY=2 registered outputs.
     axi_crossbar_krn XBAR_KRN (
-      .aclk    (clk_main_a0),
+      .aclk    (gen_clk_extra_a1),
       .aresetn (rst_n_local),
       .s_axi_awid    (krn_awid),
       .s_axi_awaddr  (krn_awaddr),
@@ -574,7 +760,7 @@ module cl_forge_morph_lm_d512
     logic [21:0] bram_b_addr;             logic [511:0] bram_b_wrdata, bram_b_rddata;  // 4 MB bank window
 
     axi_register_slice_dma RS_DMA (
-      .aclk    (clk_main_a0),
+      .aclk    (gen_clk_extra_a1),
       .aresetn (rst_n_local),
       .s_axi_awid    (xd_awid[gb*16 +: 16]),
       .s_axi_awaddr  (xd_awaddr[gb*64 +: 64]),
@@ -659,7 +845,7 @@ module cl_forge_morph_lm_d512
 
     // ---- DMA-side BRAM controller (reg slice -> URAM port A) ----
     axi_bram_ctrl_dma BRAM_CTL_DMA (
-      .s_axi_aclk    (clk_main_a0),
+      .s_axi_aclk    (gen_clk_extra_a1),
       .s_axi_aresetn (rst_n_local),
       .s_axi_awid    (rsd_awid),
       .s_axi_awaddr  (rsd_awaddr[21:0]),   // 4 MB bank window ([21:0], 65536 lines)
@@ -724,7 +910,7 @@ module cl_forge_morph_lm_d512
     logic         rsk_bvalid, rsk_bready, rsk_rlast, rsk_rvalid, rsk_rready;
 
     axi_register_slice_krn RS_KRN (
-      .aclk    (clk_main_a0),
+      .aclk    (gen_clk_extra_a1),
       .aresetn (rst_n_local),
       .s_axi_awid    (kb_awid[gb]),
       .s_axi_awaddr  (kb_awaddr[gb*64 +: 64]),
@@ -809,7 +995,7 @@ module cl_forge_morph_lm_d512
 
     // ---- kernel-side BRAM controller (RS_KRN -> URAM port B) ----
     axi_bram_ctrl_krn BRAM_CTL_KRN (
-      .s_axi_aclk    (clk_main_a0),
+      .s_axi_aclk    (gen_clk_extra_a1),
       .s_axi_aresetn (rst_n_local),
       .s_axi_awid    (rsk_awid),
       .s_axi_awaddr  (rsk_awaddr[21:0]),   // 4 MB bank window ([21:0])
@@ -875,7 +1061,7 @@ module cl_forge_morph_lm_d512
       .READ_LATENCY_B     (1),
       .WRITE_MODE_B       ("no_change")
     ) BUF_URAM (
-      .clka   (clk_main_a0),
+      .clka   (gen_clk_extra_a1),
       .rsta   (bram_a_rst),
       .ena    (bram_a_en),
       .wea    (bram_a_we),
@@ -887,7 +1073,7 @@ module cl_forge_morph_lm_d512
       .injectdbiterra (1'b0),
       .sbiterra (),
       .dbiterra (),
-      .clkb   (clk_main_a0),
+      .clkb   (gen_clk_extra_a1),
       .rstb   (bram_b_rst),
       .enb    (bram_b_en),
       .web    (bram_b_we),

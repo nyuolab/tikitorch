@@ -1,4 +1,9 @@
 # =============================================================================
+# !!! NOT READ BY THE F2 SMALL-SHELL P&R FLOW (S1-proven: the flow reads ONLY
+# !!! ${SHELL_MODE}_cl_pnr_user.xdc). The LIVE v3 constraints are in
+# !!! small_shell_cl_pnr_user.xdc (async clock groups + rst false path, NO
+# !!! pblock). This file is kept as the URAM-budget documentation record.
+# =============================================================================
 # D=512 SINGLE-KERNEL (NK=1) floorplan — ALL-SLR.
 #
 # PARALLEL to the D=128 sentinel floorplan (../../cl_forge_morph_lm, NK=4,
