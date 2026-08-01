@@ -11,16 +11,26 @@
 #     width parameterization, and the WHOLE cl_forge_morph_lm_d512 package) are
 #     UNCOMMITTED (house rules: no commit) — so we archive the WORKING TREE via
 #     `git stash create` (a commit object, no index/tree mutation), NOT HEAD.
-#   * REDUCED CLOCK: pass CLOCK_RECIPE_A (set it from the recsynth-measured clock;
-#     the box prints the shell's clock-recipe table so you pick a valid one).
+#   * CLOCK (F2 REALITY — corrects the original F1-era plan): the F2 shell's
+#     clk_main_a0 is FIXED at 250 MHz, and this CL clocks the kernel ap_clk on
+#     clk_main_a0. --clock_recipe_a does NOTHING for the kernel clock unless the
+#     CL instantiates AWS_CLK_GEN and moves the kernel to clk_extra_a1 (the S1
+#     CDC rearchitecture — see run_s1_afi_build.sh; this CL does NOT do that).
+#     Therefore the kernel MUST be HLS-scheduled at TT_CLK_NS=4.0 and close at
+#     250 MHz. If a 4.0 ns recsynth ever fails to schedule, the fallback is the
+#     S1 clkgen port (kernel on clk_extra_a1=125 MHz, --aws_clk_gen), NOT a
+#     recipe flag. Leave CLOCK_RECIPE_A empty.
+#   * HLS GATE: after the on-box csynth, the estimated CP and the DSP total are
+#     parsed from the report; DSP!=0 or estimate > target ABORTS before the ~3 h
+#     P&R (report is uploaded either way).
 #   * After the DCP tarball, register the AFI with `aws ec2 create-fpga-image`
 #     (DO_REGISTER=1 default; needs ec2:CreateFpgaImage on the runner role — if it
 #     is denied the tarball is left in S3 for manual `create-fpga-image`).
 #
-# PREREQ: run scripts/run_morph_lm_d512_recsynth.sh FIRST to learn the achievable
-# clock, then choose CLOCK_RECIPE_A to match it (do NOT chase 250 MHz — A3 accepts
-# ~125-166 MHz). The DEPLOYED D=128 AFI (agfi-0433370d93cb58a78) is NOT touched by
-# this build (separate CL package + separate AFI).
+# PREREQ: a PASSING 4.0 ns recsynth (run_morph_lm_d512_recsynth.sh with
+# TT_CLK_NS=4.0 + the champion flags). The DEPLOYED D=128 AFI
+# (agfi-0433370d93cb58a78) is NOT touched by this build (separate CL package +
+# separate AFI).
 #
 #   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
 #   CLOCK_RECIPE_A=A1 bash scripts/run_morph_lm_d512_afi.sh launch     # pick recipe per recsynth
@@ -42,8 +52,8 @@ ML_D="${ML_D:-512}"
 # backward loops) vs 4.38 ns with these flags (gmem II violations 34->6, DSP=0,
 # URAM 189%/SLR = the all-SLR floorplan). Do NOT build plain.
 TT_BUILD_FLAGS="${TT_BUILD_FLAGS:--DTT_RESIDENT_W -DTT_ONCHIP_GRAD -DTT_URAM_W}"
-TT_CLK_NS="${TT_CLK_NS:-6.0}"                            # HLS scheduling target for the kernel
-CLOCK_RECIPE_A="${CLOCK_RECIPE_A:-}"                     # AFI main clock recipe; EMPTY -> shell default. SET per recsynth.
+TT_CLK_NS="${TT_CLK_NS:-4.0}"                            # HLS target = the FIXED 250 MHz clk_main_a0 (see CLOCK note above)
+CLOCK_RECIPE_A="${CLOCK_RECIPE_A:-}"                     # leave EMPTY: kernel is on fixed clk_main_a0; recipes only matter with AWS_CLK_GEN (S1 pattern)
 DO_REGISTER="${DO_REGISTER:-1}"                          # 1 -> create-fpga-image on the box after the DCP
 AFI_NAME="${AFI_NAME:-cl_forge_morph_lm_d512}"
 ROLE="${ROLE:-tiki-sweep-runner}"
@@ -137,6 +147,17 @@ VHLS="\$(command -v vitis_hls || ls /opt/Xilinx/Vitis_HLS/*/bin/vitis_hls 2>/dev
 echo "=== HLS \$KERNEL_TCL (ML_D=\$ML_D TT_CLK_NS=\$TT_CLK_NS) START \$(date -u) ==="; "\$VHLS" -f "\$KERNEL_TCL" 2>&1 | tail -30
 KVDIR="/opt/tiki/tikitorch/hardware/hls/forge_kernels/\$KERNEL_PROJ/solution1/syn/verilog"
 ls -la "\$KVDIR" | head; ls "\$KVDIR" | wc -l; up
+# --- 1b. HLS GATE: DSP must be 0 (mult-free) and estimated CP <= target, else ABORT before the ~3h P&R.
+#     Parse failures do NOT abort (a P&R attempt still yields the utilization feedback the pblock TODO needs).
+KRPT="/opt/tiki/tikitorch/hardware/hls/forge_kernels/\$KERNEL_PROJ/solution1/syn/report/forge_train_step_morph_lm_csynth.rpt"
+aws s3 cp "\$KRPT" "\$S3_RESULTS/csynth.rpt" --only-show-errors || true
+EST="\$(awk -F'|' '/ap_clk/{gsub(/[ ns]/,"",\$4); print \$4; exit}' "\$KRPT")"
+DSPTOT="\$(awk -F'|' '/^\|Total/{gsub(/ /,"",\$4); print \$4; exit}' "\$KRPT")"
+echo "HLS GATE: est=\${EST:-unparsed} target=\$TT_CLK_NS dsp=\${DSPTOT:-unparsed}"
+GATEFAIL=0
+[ -n "\$DSPTOT" ] && [ "\$DSPTOT" != "0" ] && { echo "GATE FAIL: DSP=\$DSPTOT != 0 (mult-free invariant)"; GATEFAIL=1; }
+[ -n "\$EST" ] && awk -v e="\$EST" -v t="\$TT_CLK_NS" 'BEGIN{exit !(e>t)}' && { echo "GATE FAIL: estimated \$EST ns > target \$TT_CLK_NS ns"; GATEFAIL=1; }
+if [ "\$GATEFAIL" = "1" ]; then echo "est=\$EST dsp=\$DSPTOT" | aws s3 cp - "\$S3_RESULTS/HLS_GATE_FAIL" --only-show-errors || true; up; shutdown -h now; exit 1; fi
 # --- 2. scaffold the CL from the HDK template, overlay OUR d512 design/+build/ ---
 TPL=""
 for cand in CL_TEMPLATE cl_template cl_dram_hbm_dma cl_dram_dma cl_mem_perf; do
