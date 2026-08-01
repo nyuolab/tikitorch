@@ -47,6 +47,7 @@ cmd_launch(){
     tikitorch/fpga/silicon/morph_lm_silicon.py \
     tikitorch/fpga/silicon/gen_buffer_init.py \
     tikitorch/fpga/silicon/cstdint_shim \
+    tikitorch/hardware/hls/forge_hls_types.hpp \
     tikitorch/hardware/hls/forge_kernels
   aws_ s3 cp "$STATE_DIR/src.tar.gz" "$S3_SRC" --only-show-errors
   UD="$STATE_DIR/user-data.sh"; render_user_data "$S3_SRC" "$S3_RESULTS" > "$UD"
