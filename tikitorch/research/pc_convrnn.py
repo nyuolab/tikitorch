@@ -31,6 +31,7 @@ import json
 import math
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import torch
@@ -49,6 +50,40 @@ from tikitorch.nn import (                                # noqa: E402
     TropicalTopKModule,
 )
 from tikitorch.research.nanogpt import BPEData, CharData, evaluate, sample, tau_at  # noqa: E402
+
+
+@dataclass(frozen=True)
+class RoutedGradientPacket:
+    """A non-stepping MorphPC differentiation result.
+
+    ``grads`` is a detached snapshot keyed by ``model.named_parameters()``.
+    ``route_support`` contains the exact selected support for hard-routed
+    parameter tensors. ``route_counts``, when available, contains the exact
+    number of hard forward selections for every corresponding coordinate.
+    Smooth/loss/optimizer-boundary tensors are omitted and must be handled as
+    dense by a consolidation policy.  Soft-route packets retain the legacy
+    conservative support and set ``route_counts`` to ``None``.
+
+    The model's ``.grad`` fields remain installed so callers may either apply
+    the packet directly or replace them with a consolidated gradient before an
+    optimizer step.  Creating a packet never changes a parameter or optimizer
+    state.
+    """
+
+    logits: torch.Tensor
+    grads: dict[str, torch.Tensor]
+    route_support: dict[str, torch.Tensor]
+    route_counts: dict[str, torch.Tensor] | None = None
+
+
+@dataclass(frozen=True)
+class RouteCertificate:
+    """Target-free route inventory and optional action read from one forward."""
+
+    logits: torch.Tensor
+    route_support: dict[str, torch.Tensor]
+    route_counts: dict[str, torch.Tensor] | None = None
+    action_logits: torch.Tensor | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -605,15 +640,162 @@ class MorphPCEngine:
         g.index_add_(0, top["ids"].reshape(-1), e0.reshape(-1, D))
         m.embed.weight.grad = g
 
+    @torch.no_grad()
+    def _cascade_from_cache(self, logits, caches, top, targets):
+        """Install the exact cascade gradients from an existing forward cache."""
+        e = self._top_error(logits, targets, top, grads=True)
+        for layer, cache in zip(reversed(self.model.layers), reversed(caches)):
+            e = self._layer_adjoint(layer, e, cache, grads=True)
+        self._embed_grads(e, top)
+
+    @torch.no_grad()
+    def _hard_route_inventory(self, caches, top):
+        """Return support and exact multiplicity for cached hard routes.
+
+        The lifetime memory experiment only localizes consolidation on the
+        routed MorphSSM trunk.  Embeddings, normalizers, readout heads and the
+        loss remain explicit dense boundaries and are intentionally absent.
+        Soft-phase routes conservatively mark their complete tensor support and
+        return ``None`` for the packet-wide counts inventory: fractional soft
+        routing is not an exact hard-route certificate.
+        """
+        support = {}
+        counts = {}
+        all_routes_hard = True
+        for li, (layer, cache) in enumerate(zip(self.model.layers, caches)):
+            conv = layer.morph_conv
+            cr = cache["conv_route"]
+            if cr.dtype.is_floating_point:
+                cs = (cr != 0).any(dim=(0, 2))
+                all_routes_hard = False
+            else:
+                cc = torch.zeros_like(conv.weight, dtype=torch.int64)
+                for j in range(conv.kernel_size):
+                    cc[:, j] = (cr == j).sum(dim=(0, 2), dtype=torch.int64)
+                cs = cc > 0
+            conv_name = f"layers.{li}.morph_conv.weight"
+            support[conv_name] = cs.detach().clone()
+            if not cr.dtype.is_floating_point:
+                counts[conv_name] = cc.detach().clone()
+
+            proj = layer.out_proj
+            pr = cache["proj_route"]
+            if pr is None:
+                ps = torch.ones_like(proj.weight, dtype=torch.bool)
+                all_routes_hard = False
+            else:
+                out_features, in_features = proj.weight.shape
+                offsets = (torch.arange(out_features, device=pr.device)
+                           .view(1, out_features) * in_features)
+                pc = torch.bincount(
+                    (offsets + pr).reshape(-1),
+                    minlength=out_features * in_features,
+                ).reshape(out_features, in_features).to(torch.int64)
+                ps = pc > 0
+            proj_name = f"layers.{li}.out_proj.weight"
+            support[proj_name] = ps.detach().clone()
+            if pr is not None:
+                counts[proj_name] = pc.detach().clone()
+
+        if not all_routes_hard:
+            return support, None
+        if counts.keys() != support.keys():
+            raise AssertionError("hard route count/support inventory mismatch")
+        for name in support:
+            if not torch.equal(support[name], counts[name] > 0):
+                raise AssertionError(f"hard route count/support mismatch for {name}")
+        return support, counts
+
+    @torch.no_grad()
+    def _hard_route_support(self, caches, top):
+        """Backward-compatible Boolean view of :meth:`_hard_route_inventory`."""
+        support, _ = self._hard_route_inventory(caches, top)
+        return support
+
+    @torch.no_grad()
+    def route_certificate(self, ids: torch.Tensor) -> RouteCertificate:
+        """Run one target-free forward and return its exact route inventory.
+
+        This method never clears or installs gradients and never changes model
+        parameters or optimizer state.  In training mode it consumes exactly
+        the random draws made by the underlying cached forward (for dropout),
+        and no additional random draws; in evaluation mode it is RNG-neutral.
+        """
+        logits, caches, top = self._forward_cache(ids)
+        support, counts = self._hard_route_inventory(caches, top)
+        return RouteCertificate(
+            logits=logits,
+            route_support=support,
+            route_counts=counts,
+            action_logits=top.get("act_logits"),
+        )
+
+    @torch.no_grad()
+    def compute_grads(self, ids: torch.Tensor, targets: torch.Tensor,
+                      *, clear: bool = True) -> RoutedGradientPacket:
+        """Differentiate one cached hard-routed forward without stepping.
+
+        This is the optimizer-boundary interface used by continual-memory
+        consolidation.  It deliberately supports the exact cascade path only;
+        iterative relaxation has a different state contract and must not be
+        substituted silently.
+        """
+        if clear:
+            self.model.zero_grad(set_to_none=True)
+        logits, caches, top = self._forward_cache(ids)
+        self._cascade_from_cache(logits, caches, top, targets)
+        grads = {name: param.grad.detach().clone()
+                 for name, param in self.model.named_parameters()
+                 if param.grad is not None}
+        support, counts = self._hard_route_inventory(caches, top)
+        return RoutedGradientPacket(
+            logits=logits,
+            grads=grads,
+            route_support=support,
+            route_counts=counts,
+        )
+
+    @torch.no_grad()
+    def install_grads(self, grads: dict[str, torch.Tensor], *,
+                      clear: bool = True, strict: bool = True) -> None:
+        """Install one validated optimizer-side gradient snapshot.
+
+        This is the inverse boundary of :meth:`compute_grads`: a continual
+        learner may inspect two routed packets, combine them, then install
+        exactly one mapping before ``optimizer.step()``.  Installation itself
+        never changes a parameter or optimizer state.
+        """
+        parameters = dict(self.model.named_parameters())
+        unknown = sorted(set(grads) - set(parameters))
+        if unknown:
+            raise KeyError(f"gradient names are not model parameters: {unknown}")
+        if strict:
+            missing = sorted(name for name, parameter in parameters.items()
+                             if parameter.requires_grad and name not in grads)
+            if missing:
+                raise KeyError(f"gradient mapping is incomplete: {missing}")
+        if clear:
+            self.model.zero_grad(set_to_none=True)
+        for name, grad in grads.items():
+            parameter = parameters[name]
+            if not torch.is_tensor(grad) or not grad.is_floating_point():
+                raise TypeError(f"gradient {name!r} must be floating tensor")
+            if grad.shape != parameter.shape:
+                raise ValueError(
+                    f"gradient {name!r} shape {tuple(grad.shape)} != "
+                    f"parameter shape {tuple(parameter.shape)}")
+            if grad.device != parameter.device:
+                raise ValueError(
+                    f"gradient {name!r} device {grad.device} != "
+                    f"parameter device {parameter.device}")
+            parameter.grad = grad.detach().to(dtype=parameter.dtype).clone()
+
     # -- entry points --------------------------------------------------------
     @torch.no_grad()
     def cascade_grads(self, ids: torch.Tensor, targets: torch.Tensor):
         """One forward (cached routing) + ONE reverse-topological sweep."""
         logits, caches, top = self._forward_cache(ids)
-        e = self._top_error(logits, targets, top, grads=True)
-        for layer, cache in zip(reversed(self.model.layers), reversed(caches)):
-            e = self._layer_adjoint(layer, e, cache, grads=True)
-        self._embed_grads(e, top)
+        self._cascade_from_cache(logits, caches, top, targets)
         return logits
 
     @torch.no_grad()
@@ -677,11 +859,7 @@ class MorphPCEngine:
             do = fire(ce) if callable(fire) else bool(fire)
             if do:
                 opt.zero_grad(set_to_none=True)
-                e = self._top_error(logits, targets, top, grads=True)
-                for layer, cache in zip(reversed(self.model.layers),
-                                        reversed(caches)):
-                    e = self._layer_adjoint(layer, e, cache, grads=True)
-                self._embed_grads(e, top)
+                self._cascade_from_cache(logits, caches, top, targets)
                 opt.step()
                 fired = True
         return logits, ce, fired
