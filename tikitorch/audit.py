@@ -1,20 +1,17 @@
-"""tikitorch.audit — mechanically verify a model is multiplier-free (closed).
+"""Software audits for multiply-bearing modules and executed PyTorch operations.
 
-The TikiTorch claim is that a whole model — forward *and* backward — maps to
-comparisons, additions, and bit-shifts, with **zero hardware multipliers** (zero
-DSP blocks on FPGA). That whole-model claim is checked by
-:func:`assert_training_closed` (forward + loss + backward + optimizer); it holds for
-the tropical max-plus stack trained with a sign-only rule, and is a property of the
-*training recipe*, not any single layer. :func:`assert_closed` is the narrower
-*structural, forward* gate: it walks the module tree and raises if it finds any
-standard ``torch.nn`` layer that contains a data-dependent multiply or divide
+TikiTorch distinguishes three boundaries. :func:`assert_closed` is a structural
+deny-list scan. :func:`assert_closed_runtime` observes one executed forward path.
+:func:`assert_training_closed` observes one concrete forward, loss, backward, and
+optimizer step. The latter two classify intercepted eager PyTorch operations; they
+do not cover unexecuted branches, compiler rewrites, external kernels, or a routed
+hardware implementation.
+
+:func:`assert_closed` walks the module tree and raises if it finds a standard
+``torch.nn`` layer known to contain a data-dependent multiply or divide
 (``nn.Linear``, ``nn.Conv2d``, ``nn.LayerNorm``, ``nn.MultiheadAttention``, the
-cuDNN RNNs, ...). A clean ``assert_closed`` therefore does not by itself certify the
-backward — see the ``_zero_dsp_layer`` note below for the dyadic case in particular.
-
-This is a reproducible artifact behind the paper's headline: paste a model,
-call ``assert_closed(model)``, and either it passes or it names every
-multiply-bearing standard module to fix.
+cuDNN RNNs, ...). A clean structural scan does not certify custom arithmetic,
+the backward pass, or physical zero-DSP behavior.
 
 **Scope (necessary, not sufficient).** This is a *structural* check: it scans for
 registered standard ``torch.nn`` modules that contain a data-dependent multiply
@@ -25,12 +22,12 @@ own unit tests). The denylist covers the common offenders — Linear/Conv/Norm,
 the cuDNN RNNs, ``MultiheadAttention``, gated/parametric activations
 (``GLU``/``PReLU``), ``EmbeddingBag`` (mean/per-sample-weights), and LRN — but a
 clean ``assert_closed`` is a *necessary* condition for zero-DSP, not a proof of
-it. For the sufficient, graph-level check use :func:`assert_closed_runtime`, which
+it. For an executed-path check use :func:`assert_closed_runtime`, which
 traces a real forward pass (via ``TorchDispatchMode``) and flags every actual
 multiply/divide ATen op — catching a raw ``*`` / ``@`` / ``torch.exp`` in a custom
 ``forward`` that the structural scan cannot see. It correctly treats power-of-two
-multiplies/divides (``x * 2**k`` / ``x / 8``) as bit-shifts, not multipliers, so
-it passes the tropical models and catches genuine DSP ops.
+multiplies/divides (``x * 2**k`` / ``x / 8``) as bit-shifts under its software
+classification rules.
 
 Usage::
 
@@ -38,7 +35,7 @@ Usage::
     from tikitorch.audit import assert_closed, find_closure_violations
 
     cnn = tt.models.TropicalCNN(in_channels=1, num_classes=10)
-    assert_closed(cnn)                       # passes — fully multiplier-free
+    assert_closed(cnn)                       # no registered deny-list module
 
     # A model with a standard nn.Linear head is a *declared* DSP boundary:
     cnn2 = tt.models.TropicalCNN(head_type="linear")
@@ -53,8 +50,9 @@ they pass here; harden with ``tau -> 0`` for the closed deploy graph.
 **The ``_zero_dsp_layer`` marker is FORWARD-scoped.** A module may set
 ``_zero_dsp_layer = True`` to tell the *structural* check to skip it — used by
 :class:`tikitorch.nn.DyadicLinear`, whose weights are signed powers of two, so the
-forward ``W·x`` compiles to sign+shift+add (ZERO DSP), proven *statically* by
-:func:`tikitorch.fpga.dyadic_export.verify_schedule`. Two things this marker does
+forward ``W·x`` has a sign+shift+add export schedule, checked *statically* by
+:func:`tikitorch.fpga.dyadic_export.verify_schedule`. Synthesis reports establish
+physical resource use. Two things this marker does
 *not* claim, and which you must not read into it:
 
 1. It is NOT visible to an eager trace. On a CPU/GPU host the dyadic forward runs a
@@ -115,7 +113,8 @@ MULTIPLY_MODULES = tuple(
 def find_closure_violations(model: nn.Module):
     """Return ``[(module_path, module_type), ...]`` for every multiply-bearing module.
 
-    Empty list means the model is multiplier-free (closed).
+    An empty list means no registered deny-list module was found. It does not
+    inspect raw custom arithmetic, a backward pass, or a physical build.
     """
     out = []
     for name, m in model.named_modules():
@@ -189,9 +188,9 @@ def find_runtime_multiplies(model, *example_inputs, run_eval=True, harden_tau=Tr
     multiply, vs a shift), or ``transcendental`` (exp/log/... -- the soft tau>0
     relaxations; absent once annealed to tau=0).
 
-    By default the model is put in ``eval()`` and annealed to the hard tau=0 deploy
-    path first (``harden_tau``), since that is the graph the closure claim is about.
-    Returns ``[(category, op_name), ...]`` (empty == multiplier-free at runtime).
+    By default the model is put in ``eval()`` and annealed to a hard ``tau=0``
+    candidate path first (``harden_tau``). Returns ``[(category, op_name), ...]``;
+    an empty result means no classified operation was observed for these inputs.
     """
     from torch.utils._python_dispatch import TorchDispatchMode
 
@@ -256,14 +255,15 @@ def find_runtime_multiplies(model, *example_inputs, run_eval=True, harden_tau=Tr
 
 def assert_closed_runtime(model, *example_inputs, allow_transcendental=False,
                           harden_tau=True):
-    """Assert a forward pass runs NO hardware multiply (the runtime closure check).
+    """Require no classified multiply-like op on one executed forward path.
 
     Complements :func:`assert_closed` (structural) with a graph-level trace via
     :func:`find_runtime_multiplies`. Raises ``AssertionError`` naming every
     multiply/divide op actually executed. ``allow_transcendental=True`` permits
     the soft ``tau>0`` exp/log relaxations (set it when checking a soft model);
     by default the model is hardened to ``tau=0`` first, where none should appear.
-    Returns the model on success.
+    Returns the model on success. Passing is scoped to the supplied inputs and
+    eager execution; it is not proof about other paths or synthesized resources.
     """
     hits = find_runtime_multiplies(model, *example_inputs, harden_tau=harden_tau)
     if allow_transcendental:
@@ -328,10 +328,11 @@ def _make_catcher(hits):
 
 def find_training_multiplies(model, example_inputs, targets, loss_fn, optimizer=None,
                              harden_tau=True):
-    """Trace a WHOLE training step (forward + loss + backward + optimizer) for multiplies.
+    """Trace one training step for classified multiply-like operations.
 
-    This is the **Level-B** check: it verifies that *training itself* is
-    multiplier-free, not just inference. A soft ``tau>0`` relaxation (``exp``), a
+    This is the **Level-B** software check: it observes forward, loss, backward,
+    and (optionally) optimizer execution for the supplied example. A soft
+    ``tau>0`` relaxation (``exp``), a
     non-closure-faithful loss (cross-entropy = ``softmax``+``log``), or an adaptive
     optimizer (Adam's moments / divide / sqrt) all show up here even though the
     deployed forward is closed. The closure-faithful recipe -- hard tropical
@@ -340,7 +341,8 @@ def find_training_multiplies(model, example_inputs, targets, loss_fn, optimizer=
 
     ``example_inputs`` is a tuple/list of model args; ``targets`` is passed to
     ``loss_fn(predictions, targets)``. If ``optimizer`` is given, ``.step()`` is
-    traced too. Returns ``[(category, op_name), ...]`` (empty == multiplier-free).
+    traced too. An empty result means no classified operation was observed on this
+    run; it does not predict compiler or synthesis resource use.
     """
     if not isinstance(example_inputs, (tuple, list)):
         example_inputs = (example_inputs,)
@@ -367,10 +369,12 @@ def find_training_multiplies(model, example_inputs, targets, loss_fn, optimizer=
 
 def assert_training_closed(model, example_inputs, targets, loss_fn, optimizer=None,
                            harden_tau=True):
-    """Assert a full training step is multiplier-free (the Level-B training-closure check).
+    """Require no classified multiply-like op in one full-step eager trace.
 
     See :func:`find_training_multiplies`. Raises ``AssertionError`` naming every
-    multiply across forward+loss+backward(+optimizer); returns the model on success.
+    observed multiply across forward+loss+backward(+optimizer); returns the model
+    on success. A pass is a recipe- and input-scoped software result, not a
+    physical zero-DSP certificate.
     """
     hits = find_training_multiplies(model, example_inputs, targets, loss_fn,
                                     optimizer=optimizer, harden_tau=harden_tau)
@@ -387,13 +391,15 @@ def assert_training_closed(model, example_inputs, targets, loss_fn, optimizer=No
 
 def closure_report(model, example_inputs=None, targets=None, loss_fn=None,
                    optimizer=None, harden_tau=True):
-    """One-call closure audit of a model -- structural + inference (+ training).
+    """Collect structural and executed-path software audit results.
 
     Returns a dict with ``structural`` (module-level :func:`find_closure_violations`),
     ``inference`` (:func:`find_runtime_multiplies`, when ``example_inputs`` given),
     ``training`` (:func:`find_training_multiplies`, when ``targets`` + ``loss_fn``
     given), and booleans ``inference_closed`` / ``training_closed`` /
-    ``training_zero_dsp`` (training without the sign-invariant loss-value ``divide``).
+    ``training_zero_dsp`` (a legacy-named convenience boolean meaning that the
+    eager trace had no classified multiply/transcendental except the documented
+    loss-value divide). It does not report synthesized DSP utilization.
     This is the "double-check TikiTorch" one-liner::
 
         tt.closure_report(model, x)                       # structural + inference
@@ -404,7 +410,7 @@ def closure_report(model, example_inputs=None, targets=None, loss_fn=None,
     is the non-closed trainable relaxation), a closure-faithful loss
     (``tropical_perceptron_loss``/L1, not cross-entropy), a sign-only optimizer
     (``PureTropicalSGD``), and a power-of-two ``d_model`` (so the norm's mean is a
-    shift). Inference is closed by construction for the tropical models.
+    shift). Results remain scoped to the executed configuration and inputs.
     """
     rep = {"structural": find_closure_violations(model)}
     if example_inputs is not None:
@@ -518,15 +524,16 @@ def closed(fn=None, *, allow_transcendental=False):
 
 
 def assert_closed(model: nn.Module, allow=()):
-    """Assert ``model`` has no multiply-bearing standard module; raise listing any.
+    """Require ``model`` to contain no registered multiply-bearing module.
 
     Args:
         model: the module to audit.
-        allow: names (module paths, e.g. ``"head"``) or type names
+        allow (Iterable[str]): names (module paths, e.g. ``"head"``) or type names
             (e.g. ``"Linear"``) to treat as *declared* DSP boundaries and skip.
 
     Returns the model on success (so it can be chained). Raises ``AssertionError``
-    naming every violation otherwise.
+    naming every violation otherwise. This structural result is necessary but not
+    sufficient for an executed-recipe or physical closure claim.
     """
     allow = set(allow)
 

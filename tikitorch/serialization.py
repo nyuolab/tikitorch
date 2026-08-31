@@ -1,10 +1,13 @@
-"""tikitorch.serialization — save/load a tropical model *with its closure proof*.
+"""Checkpoint helpers with constructor metadata and a structural audit manifest.
 
 A plain ``torch.save(model.state_dict(), path)`` throws away two things that
 matter for TikiTorch: (1) *what model the weights belong to* (the class and the
-exact constructor kwargs needed to rebuild it), and (2) *that the reloaded graph
-is the same multiplier-free graph* — the property the whole library exists to
-guarantee. :func:`save` / :func:`load` keep both.
+constructor kwargs needed to rebuild it), and (2) the result of TikiTorch's
+registered-module closure scan. :func:`save` / :func:`load` keep both.
+
+The manifest is not a proof of graph identity or physical zero-DSP execution. It
+records the output of :func:`tikitorch.audit.find_closure_violations`, a structural
+deny-list scan, and detects changes in that classification after reconstruction.
 
 A checkpoint is a single ``torch.save`` dict with four keys:
 
@@ -17,11 +20,9 @@ A checkpoint is a single ``torch.save`` dict with four keys:
                       snapshot of the model's simple scalar attributes is stored
                       instead (best-effort; explicit config is preferred).
     ``"closure_manifest"`` — :func:`tikitorch.audit.find_closure_violations`
-                      output: the list of multiply-bearing modules (empty for a
-                      fully-closed model). On :func:`load` this is recomputed on
-                      the reconstructed model and compared; a mismatch means the
-                      reloaded graph is NOT the same closed graph it was saved as,
-                      and a :class:`ClosureManifestMismatch` warning is emitted.
+                      output: the list of registered multiply-bearing modules.
+                      On :func:`load` this is recomputed and compared; a mismatch
+                      emits :class:`ClosureManifestMismatch`.
 
 Idiomatic usage::
 
@@ -57,10 +58,10 @@ _FORMAT_VERSION = 1
 class ClosureManifestMismatch(UserWarning):
     """Warned when a reloaded model's closure manifest differs from the saved one.
 
-    The reloaded graph is not provably the same multiplier-free graph it was saved
-    as: some multiply-bearing module appeared or disappeared (a config/class drift,
-    or a manually edited checkpoint). The state_dict is still loaded — this is a
-    warning, not an error — but the closure guarantee no longer transfers.
+    A registered multiply-bearing module appeared or disappeared, usually because
+    of class/config drift or a manually edited checkpoint. The state dict is still
+    loaded. Matching manifests establish only matching structural-audit output;
+    they do not establish graph identity or physical closure.
     """
 
 
@@ -92,7 +93,8 @@ def save(model: nn.Module, path, config: dict = None) -> dict:
 
     Args:
         model: the (tropical) model to serialize.
-        path: destination passed to ``torch.save`` (filename or file-like object).
+        path (Any): destination passed to ``torch.save`` (filename or file-like
+            object).
         config: the constructor kwargs, such that ``Model(**config)`` rebuilds an
             architecturally-identical model. The TikiTorch models take keyword-only
             args, so this is exactly that kwargs dict. If ``None``, a generic
@@ -110,7 +112,8 @@ def save(model: nn.Module, path, config: dict = None) -> dict:
         "config": dict(config) if config is not None else _snapshot_simple_attrs(model),
         # Provenance flag: was the config the user's explicit kwargs, or a snapshot?
         "config_is_explicit": config is not None,
-        # The closure proof: empty list == fully multiplier-free (closed) graph.
+        # Structural audit snapshot; an empty list is necessary, not sufficient,
+        # for a recipe-level or physical closure claim.
         "closure_manifest": find_closure_violations(model),
     }
     torch.save(checkpoint, path)
@@ -137,17 +140,16 @@ def load(path, model: nn.Module = None, config: dict = None, map_location="cpu")
         the saved ``(module, qualname)`` and instantiated with the saved ``config``
         (overridable via the ``config`` argument), then the state_dict is loaded.
 
-    In both modes the closure manifest is recomputed on the loaded model and
-    compared to the one stored at save time; a mismatch emits a
-    :class:`ClosureManifestMismatch` warning (the reloaded graph is not provably the
-    same closed graph).
+    In both modes the structural closure manifest is recomputed on the loaded
+    model and compared to the one stored at save time; a mismatch emits a
+    :class:`ClosureManifestMismatch` warning.
 
     Args:
-        path: source passed to ``torch.load``.
+        path (Any): source passed to ``torch.load``.
         model: an existing model instance to load weights into (optional).
         config: constructor-kwargs override used only in the reconstruct path; merged
             over the saved config (saved values are the base, ``config`` wins).
-        map_location: forwarded to ``torch.load`` (default ``"cpu"``).
+        map_location (Any): forwarded to ``torch.load`` (default ``"cpu"``).
 
     Returns the loaded model.
     """
@@ -181,7 +183,7 @@ def load(path, model: nn.Module = None, config: dict = None, map_location="cpu")
 
     model.load_state_dict(state_dict)
 
-    # Verify the reloaded graph is provably the same closed graph.
+    # Compare the registered-module audit classification across serialization.
     saved_manifest = checkpoint.get("closure_manifest")
     if saved_manifest is not None:
         # Normalize to lists of tuples — torch.save round-trips tuples as tuples,
@@ -193,10 +195,11 @@ def load(path, model: nn.Module = None, config: dict = None, map_location="cpu")
         if _norm(current_manifest) != _norm(saved_manifest):
             warnings.warn(
                 "Reloaded model's closure manifest does not match the saved one — "
-                "the reconstructed graph is NOT provably the same multiplier-free "
-                f"graph.\n  saved:   {sorted(saved_manifest)}\n"
+                "the reconstructed model has a different registered-module "
+                f"closure classification.\n  saved:   {sorted(saved_manifest)}\n"
                 f"  current: {sorted(current_manifest)}\n"
-                "Check the class/config used to reconstruct it.",
+                "Check the class/config used to reconstruct it. A matching "
+                "manifest is a structural consistency check, not physical proof.",
                 ClosureManifestMismatch,
                 stacklevel=2,
             )

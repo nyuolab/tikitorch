@@ -1,28 +1,21 @@
-"""Closure-faithful cross-entropy: recovering accuracy without a hardware multiply.
+"""Loss-conditioning ablation for a tropical-transformer host experiment.
 
-The zero-DSP silicon kernel cannot run a softmax cross-entropy, so on chip the
-loop has used a *perceptron* gradient: a 2-hot vector, +1 at the predicted
-(argmax) logit and -1 at the target logit. That is strictly sign-valued
-(multiplier-free) but it is the single largest accuracy cost in the closure
-waterfall (~-17.5pp on Shakespeare char-LM) because it discards all
-probability-mass information.
+The compared boundaries are a 2-hot perceptron gradient, host-conditioned
+softmax, an experimental lookup/shift approximation, and ordinary floating
+cross-entropy.
 
-This script demonstrates, live, that conditioning the gradient with a softmax
-recovers a chunk of that accuracy *without reintroducing a multiplier* into the
-training loop. Everything is held fixed -- the same 1-layer tropical transformer
+This script measures how loss conditioning changes a small host run. Everything
+is held fixed -- the same 1-layer tropical transformer
 at the silicon dims (D=128, V=128, D_FF=512), the same sign-based optimizer, the
 same seed, the same Shakespeare windows -- and only the loss conditioning varies:
 
-    perceptron        the silicon baseline: 2-hot sign gradient (multiplier-free)
+    perceptron        2-hot sign-valued gradient boundary
     tropical_ce       softmax - onehot, host-conditioned exact softmax
-                      (zero-DSP kernel + a tiny V-way host softmax)
-    tropical_ce_lut   softmax - onehot, fully multiplier-free shift_softmax
-                      (subtract-max + exp LUT + shift-normalize, on chip)
+    tropical_ce_lut   lookup/shift softmax approximation
     cross_entropy     F.cross_entropy float reference ceiling (uses multiplies)
 
-The honest, silicon-defensible recovery (perceptron -> tropical_ce) is on the
-order of a few points at this prototype scale; the float `cross_entropy` row is
-the unconstrained ceiling, NOT a silicon number.
+These are pedagogical host rows, not silicon measurements or confirmatory
+accuracy estimates.
 
 Usage::
 
@@ -111,7 +104,7 @@ def main():
     p.add_argument("--n-layers", type=int, default=1)
     p.add_argument("--n-heads", type=int, default=4)
     p.add_argument("--tau", type=float, default=0.5,
-                   help="tropical temperature; 0.0 = hard (fully closed), >0 = soft relaxation")
+                   help="tropical temperature; 0.0 = hard routing, >0 = soft relaxation")
     p.add_argument("--lr", type=float, default=2e-3)
     p.add_argument("--momentum", type=float, default=0.9)
     p.add_argument("--seed", type=int, default=0)
@@ -130,9 +123,9 @@ def main():
     print(f"chance={chance:.4f}   majority-char baseline={maj:.4f}\n")
 
     rows = [
-        ("perceptron      (silicon baseline, 2-hot, mult-free)", "perceptron"),
-        ("tropical_ce     (host softmax, kernel mult-free)",     "tropical_ce"),
-        ("tropical_ce_lut (shift_softmax, FULLY mult-free)",     "tropical_ce_lut"),
+        ("perceptron      (2-hot sign boundary)",                "perceptron"),
+        ("tropical_ce     (host softmax)",                        "tropical_ce"),
+        ("tropical_ce_lut (lookup/shift approximation)",         "tropical_ce_lut"),
         ("cross_entropy   (float reference ceiling)",            "cross_entropy"),
     ]
     print(f"{'loss conditioning':54s}  {'train_acc':>9s}  {'eval_acc':>8s}")
@@ -148,9 +141,9 @@ def main():
     rec_lut = results["tropical_ce_lut"] - results["perceptron"]
     ceil_gap = results["cross_entropy"] - results["tropical_ce"]
     print(f"recovery  perceptron -> tropical_ce      : {rec:+.4f}  "
-          f"({'multiplier-free kernel + host softmax'})")
+          f"({'host-conditioned comparison'})")
     print(f"recovery  perceptron -> tropical_ce_lut  : {rec_lut:+.4f}  "
-          f"({'FULLY multiplier-free loop'})")
+          f"({'lookup/shift host comparison'})")
     print(f"remaining gap to float CE ceiling        : {ceil_gap:+.4f}  "
           f"(not a silicon number)")
 

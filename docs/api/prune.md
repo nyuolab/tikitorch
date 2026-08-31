@@ -1,3 +1,3 @@
-# tikitorch.prune
+# `tikitorch.prune`
 
 ::: tikitorch.prune

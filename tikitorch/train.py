@@ -1,23 +1,19 @@
-"""tikitorch.train — a closure-aware Trainer (the soft->hard deploy loop).
+"""A thin Trainer for TikiTorch's soft-to-hard reference workflow.
 
-Every TikiTorch model trains the same way as the validated research loop and the
-``scripts/run_closed_benchmarks.py`` harness: build a closed-by-construction
-model, anneal the tropical relaxation temperature ``tau`` from soft (``tau≈1``)
-down to the hard deploy point (``tau=0``), step a sign-only / multiplier-free
-optimizer, and ship the ``tau=0`` graph -- the one that maps to the zero-DSP FPGA
-kernel. :class:`Trainer` packages that loop so it does not have to be re-derived
-per task, and -- crucially -- *gates deploy on closure*: at the hard endpoint it
-runs :func:`tikitorch.audit.assert_closed` (and the graph-level
-:func:`~tikitorch.audit.assert_closed_runtime` when an example batch is on hand),
-so a model that smuggled in an ``nn.Linear`` head fails loudly *before* it is
-ever called the deployable artifact.
+The helper anneals a model's tropical relaxation temperature, executes an ordinary
+PyTorch loss/backward/optimizer loop, and hardens the model to ``tau=0`` afterward.
+At the hard endpoint it can run :func:`tikitorch.audit.assert_closed` and
+:func:`~tikitorch.audit.assert_closed_runtime` on the observed input path.
 
-Why a Trainer (and why it is thin). TikiTorch is config-free, the way ``torch``
-is: you instantiate the optimizer yourself (``optim.SignSGD(model.parameters())``)
-and hand it in. The Trainer only owns the two things that are easy to get subtly
-wrong and that the closure claim depends on -- (1) driving ``tau`` to exactly 0
-on the schedule so the deploy graph is hard, and (2) asserting closure at that
-endpoint -- plus plain progress printing (no wandb; see the logging-budget note).
+Those checks cover registered modules and one executed forward path. They do not
+audit the loss, backward, or optimizer used during :meth:`Trainer.fit`, and they
+do not establish properties of a synthesized hardware build. Use
+:func:`tikitorch.audit.assert_training_closed` for a concrete full-step software
+audit and bind any physical claim to build reports and a known-answer test.
+
+TikiTorch is config-free in the same limited sense as ``torch``: instantiate the
+optimizer yourself and pass it in. The Trainer owns the temperature schedule,
+the final hardening step, optional forward-path audits, and plain progress output.
 
     import tikitorch as tt
     import tikitorch.optim as optim
@@ -26,7 +22,7 @@ endpoint -- plus plain progress printing (no wandb; see the logging-budget note)
                                   input_dim=8, num_classes=3, dropout=0.0)
     opt = optim.SignSGD(model.parameters(), lr=2e-2)
     trainer = tt.Trainer(model, opt, steps=400)
-    trainer.fit((X, y))                  # anneals tau->0, asserts closed on deploy
+    trainer.fit((X, y))                  # trains, hardens, audits an observed path
     print(trainer.evaluate((Xte, yte)))  # hard (tau=0) accuracy
 
 The loss follows the same precedence as the rest of the package: call
@@ -169,22 +165,24 @@ def _batch_iter(data: DataSource, *, batch_size: int, steps: int,
 # ---------------------------------------------------------------------------
 
 class Trainer:
-    """A closure-aware training loop with a soft->hard ``tau`` anneal.
+    """A reference training loop with a soft-to-hard ``tau`` anneal.
 
     Args:
-        model: a (closed-by-construction) TikiTorch model. If it defines
+        model (nn.Module): a TikiTorch model. If it defines
             ``compute_loss(x, y)`` that is used as the loss; otherwise pass
             ``loss_fn``.
-        optimizer: an instantiated optimizer (e.g. ``optim.SignSGD(...)``). The
+        optimizer (torch.optim.Optimizer): an instantiated optimizer (e.g.
+            ``optim.SignSGD(...)``). The
             Trainer never builds one for you -- TikiTorch is config-free.
         tau_schedule: ``"linear"`` (default), ``"cosine"``, or ``"constant"`` --
             how the relaxation temperature anneals from ``tau_max`` toward 0.
-        steps: number of optimizer steps. The last step always trains at the hard
-            ``tau=0`` deploy point.
+        steps: number of optimizer steps. Training uses at least ``tau_min``;
+            the model is hardened to ``tau=0`` after the final update.
         loss_fn: ``loss_fn(pred, y) -> scalar`` used only when the model has no
             ``compute_loss``.
         batch_size: minibatch size when ``fit`` is given a single ``(X, y)`` pair.
-        tau_max / tau_min: anneal endpoints. During training ``tau`` ramps from
+        tau_max: starting anneal temperature.
+        tau_min: ending anneal temperature. During training ``tau`` ramps from
             ``tau_max`` to the small floor ``tau_min`` (default 0.01) and holds
             there -- NOT exactly 0, because sign-only optimizers collapse on the
             fully-hard landscape. The exact ``tau=0`` deploy graph is pinned once
@@ -195,6 +193,7 @@ class Trainer:
             :func:`assert_closed` (structural) and, if an example batch is
             available, :func:`assert_closed_runtime` (graph-level). A model with a
             multiply-bearing standard module (e.g. an ``nn.Linear`` head) raises.
+            This does not audit the training step or a physical implementation.
         closed_allow: names/types forwarded to :func:`assert_closed` ``allow=`` to
             declare an *intentional* DSP boundary (skips the gate for those).
         log_every: print a progress line every ``log_every`` steps (0 = silent).
@@ -241,11 +240,11 @@ class Trainer:
 
     # -- training -----------------------------------------------------------
     def fit(self, data: DataSource) -> "Trainer":
-        """Train for ``steps``, annealing ``tau`` to 0, then gate deploy on closure.
+        """Train for ``steps``, then harden and audit the observed forward path.
 
         ``data`` is either a single ``(X, y)`` tensor pair (random minibatches) or
         an iterable of ``(x, y)`` batches. Returns ``self`` (the trained model is
-        left in ``eval()`` at the hard ``tau=0`` deploy point).
+        left in ``eval()`` at the hard ``tau=0`` endpoint).
         """
         self.history = []
         self.model.train()
@@ -268,7 +267,7 @@ class Trainer:
                 print(f"[trainer] step {step + 1:5d}/{self.steps} "
                       f"tau {tau:.3f} loss {lv:.4f}", flush=True)
 
-        # --- hard (tau=0) deploy endpoint ---
+        # --- hard (tau=0) evaluation/export candidate endpoint ---
         _set_tau(self.model, 0.0)
         self.model.eval()
         if self.assert_closed_on_deploy:
@@ -279,7 +278,7 @@ class Trainer:
         return self
 
     def _assert_deploy_closed(self) -> None:
-        """Run the structural (and, if possible, runtime) closure gate at tau=0.
+        """Run structural and, when possible, observed-path audits at ``tau=0``.
 
         :func:`assert_closed` is the structural check (named standard modules);
         when a batch was seen during ``fit`` we additionally trace the real forward
@@ -299,7 +298,7 @@ class Trainer:
     # -- evaluation ---------------------------------------------------------
     @torch.no_grad()
     def evaluate(self, data: DataSource, *, metric: str = "accuracy") -> dict:
-        """Evaluate at the hard ``tau=0`` deploy point.
+        """Evaluate at the hard ``tau=0`` endpoint.
 
         Returns ``{"loss": ..., metric: ...}`` averaged over ``data`` (a single
         ``(X, y)`` pair or an iterable of batches). ``metric`` is ``"accuracy"``

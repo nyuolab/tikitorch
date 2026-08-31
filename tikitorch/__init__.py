@@ -21,7 +21,7 @@ Idiomatic usage::
 Submodules:
     tikitorch.functional  — stateless tropical ops + autograd Functions
     tikitorch.nn          — tropical layer Modules (a la torch.nn)
-    tikitorch.optim       — multiplier-free optimizers (a la torch.optim)
+    tikitorch.optim       — sign-, shift-, and counter-oriented optimizer variants
     tikitorch.models      — ready-to-use tropical architectures
     tikitorch.autodiff    — exact forward-route certificates and replay VJPs
     tikitorch.hardware    — HLS kernels + an AFI/silicon build guide
@@ -82,7 +82,7 @@ from tikitorch.serialization import save, load  # noqa: F401
 from tikitorch import profile  # noqa: F401
 from tikitorch.profile import profile_model, format_report  # noqa: F401
 
-# The closure-aware Trainer is finalized like optim/models; guard so a missing
+# The soft-to-hard Trainer is finalized like optim/models; guard so a missing
 # dependency never hard-fails ``import tikitorch``.
 try:  # pragma: no cover - import guard
     from tikitorch import train  # noqa: F401

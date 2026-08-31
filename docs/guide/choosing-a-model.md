@@ -1,80 +1,109 @@
-# Choosing a model, optimizer, and loss
+# Choosing a model and recipe
 
-A short decision guide. The defaults are good; reach for the alternatives when the
-listed condition applies.
+A TikiTorch experiment is more than a model class. Choose the model, projections,
+normalization, routing temperature, loss, reverse rule, optimizer, and deployment
+boundary together.
 
-## Which model?
+## Start with the task
 
-| Your task | Model | Why |
-|---|---|---|
-| Sequence / LM / streaming signals | `MorphSSM` | causal morphological convs, `.step()` streaming, long receptive field |
-| LM / tasks where *content routing* matters (induction, copy) | `TropicalTransformer` | tropical attention routes (argmax-gather) by distance |
-| Scale capacity at fixed per-token compute | `MoTE` | sparse top-k mixture of tropical experts |
-| Image classification | `TropicalCNN` | morphological (dilation/erosion) feature extractor |
-| Tabular / vector classification, a simple baseline | `TropicalMLP` / `MorphMLP` | alternating min/max layers |
-| Backprop-free / local learning | `TropicalForwardForward`, `DyadicForwardForward`, PC nets | forward-only or predictive-coding training |
-| DP / shortest-path / sorting (learn an algorithm) | `algorithmic.TropicalReasoner` | the layer *is* the min-plus recurrence — see [Beyond DL](beyond-deep-learning.md) |
+| Task | Starting model | Main reason to try it |
+| --- | --- | --- |
+| Sequence classification, streaming signals, or character modeling | `MorphSSM` | Causal morphological convolution and a streaming `step()` interface |
+| Content-routing sequence tasks | `TropicalTransformer` | Distance scoring followed by hard or softened routing |
+| Sparse expert experiments | `MoTE` / `MoTEModel` | Top-k expert routing |
+| Image classification | `TropicalCNN` | Learned morphological dilation and erosion blocks |
+| Small vector or tabular baseline | `TropicalMLP` / `MorphMLP` | Compact alternating min/max layers |
+| Local, forward-only learning | `TropicalForwardForward` / `DyadicForwardForward` | A distinct training API without global `loss.backward()` |
+| Dynamic programming or planning | `algorithmic` / `planning` | Operations that directly express min-plus or max-plus recurrences |
 
-All take `task_type` (`"classification"` | `"lm"` | `"regression"`) and `head_type`
-(`"tropical"` fully-closed, or `"linear"` declared-boundary). Start with
-`head_type="linear"` to measure the strong number, then quantify the fully-closed cost.
+Check the [`models` API](../api/models.md) for the task types and constructor arguments
+actually supported by each class. Not every model accepts the same options.
 
-## Which optimizer?
+## Decide what boundary you are studying
 
-Every optimizer here is multiplier-free (sign-based or power-of-two steps).
+Use ordinary PyTorch components when the scientific question is representation or
+learning behavior and multiplier-free closure is not the dependent variable. Use a
+closed-oriented recipe only when that systems constraint matters, and record every
+exception.
 
-| Optimizer | Use when |
-|---|---|
-| **`SignSGD`** | the default — sign-of-gradient, optional momentum. Robust, simple, what most examples use. |
-| `PureTropicalSGD` | you want *strictly* pure (integer-counter momentum, power-of-two lr as a shift, LFSR noise) — the silicon-faithful one. |
-| `TropicalAdam` | SignSGD stalls and you want adaptivity — per-parameter power-of-two step via sign-streak Rprop (zero-DSP). |
-| `TropicalLion` | you want sign-of-**momentum** (stronger signal than sign-of-gradient), pow2 betas. |
-| `FrexpMagnitudeSGD`, `ExponentEMAAdam`, `CountAgreementSGD`, `PerLayerStepSGD` | magnitude-aware closed adaptivity — tier the step by the gradient's frexp exponent or sign-agreement count. Try these to recover the SignSGD-vs-Adam gap. |
+Common recipe switches include:
 
-Rule of thumb: **start with `SignSGD`**; if it underfits, move to `TropicalAdam` or the
-magnitude-aware family. The optimizer is one of the two big closure-penalty terms (see
-[Why tropical for ML/DL](why-tropical-ml.md#the-closure-penalty)).
+| Switch | Ordinary or soft path | Closure-oriented path |
+| --- | --- | --- |
+| Input/output projection | `input_type="linear"`, `head_type="linear"` | tropical projection/head where supported |
+| Routing | `tau > 0` soft relaxation | `tau == 0` hard selection |
+| Normalization | standard PyTorch normalization | a supported tropical/dyadic normalization with compatible dimensions |
+| Dropout | training-time dropout | `dropout=0.0` for the audited step |
+| Loss | ordinary task loss | an explicitly audited loss path |
+| Optimizer | any PyTorch optimizer | a concrete sign/dyadic configuration that passes the training-step audit |
 
-## Which loss?
+A dense head can be a useful declared boundary. Report it as such and do not describe
+the resulting whole model as closed.
 
-| Loss | Use when |
-|---|---|
-| **`nn.TropicalCrossEntropyLoss(softmax="exact")`** | the default — closure-faithful CE, host-conditioned softmax. |
-| `nn.TropicalCrossEntropyLoss(softmax="lut")` | you need the loss itself multiplier-free (full closed loop / on-silicon) — power-of-two exp LUT softmax. |
-| `nn.TropicalPerceptronLoss` | only as the silicon baseline / ablation — it is the single biggest accuracy cost (~−17pp on hard char-LM). |
+## Choose an optimizer
 
-The functional forms (`F.tropical_cross_entropy`, `F.tropical_perceptron_loss`) are
-identical; or just call `model.compute_loss(x, y)` which uses the model's `loss_type`.
+All TikiTorch optimizers implement the `torch.optim.Optimizer` protocol, but closure
+depends on options and the executed path.
 
-## The `tau` soft→hard recipe
+| Optimizer | When to consider it | Important boundary |
+| --- | --- | --- |
+| `SignSGD` / `TropicalSGD` | Simple sign updates | Optional floating-point momentum and weight decay are not the strict path |
+| `PureTropicalSGD` | Integer-counter momentum and power-of-two step experiments | Keep `adaptive=False`; audit noise and decay options used by the recipe |
+| `TropicalLion` | Sign-of-momentum experiments | Verify the configured integer/dyadic path with `assert_training_closed` |
+| `TropicalAdam` | Experimental adaptive update | Do not infer closure from the class name; audit the chosen settings |
+| `FrexpMagnitudeSGD`, `ExponentEMAAdam`, `CountAgreementSGD`, `PerLayerStepSGD` | Magnitude-aware or layerwise experiments | Specialized research optimizers; compare against a simple baseline and audit separately |
 
-The curriculum is the third closure-penalty lever. For CNN/SSM/Transformer/MoTE:
+For a new problem, begin with an ordinary optimizer to establish learnability, then add
+the constrained optimizer as a controlled change. This separates a model failure from
+an update-rule failure.
+
+## Choose a loss
+
+| Loss | Role |
+| --- | --- |
+| `torch.nn.CrossEntropyLoss` or a model's default `compute_loss` | Ordinary learnability baseline; do not assume closure |
+| `nn.TropicalCrossEntropyLoss(softmax="exact")` | Host-conditioned gradient path; the exact softmax is an explicit ordinary boundary |
+| `nn.TropicalCrossEntropyLoss(softmax="lut")` | LUT-conditioned experimental path; validate the full executed step and compiled implementation |
+| `nn.TropicalPerceptronLoss` | Simple routed-gradient baseline used by some hardware experiments |
+
+Loss-value computation, loss gradient, averaging, and placement can have different
+boundaries. State which object the compiled kernel implements.
+
+## Use soft routing deliberately
+
+Several models expose `set_tau`:
 
 ```python
-total = EPOCHS * len(loader); step = 0
-for xb, yb in loader:
-    model.set_tau(max(tau0 * (1 - step / (warmup_frac * total)), 0.0))  # anneal to 0
-    ...
-    step += 1
-model.set_tau(0.0)        # eval & deploy: the hard, multiplier-free op
+for step, (x, target) in enumerate(loader):
+    progress = step / max(1, len(loader) - 1)
+    model.set_tau(max(1.0 - progress, 0.0))
+
+    optimizer.zero_grad()
+    loss = model.compute_loss(x, target)
+    loss.backward()
+    optimizer.step()
+
+model.set_tau(0.0)
 ```
 
-- `tau0 ≈ 0.5–1.0` to start (smooth, trainable), anneal to `0.0`.
-- `warmup_frac ≈ 0.8` — reach hard before training ends so the last steps fine-tune the
-  deploy graph.
-- **Always `set_tau(0.0)` for eval and FPGA export** — `tau=0` is exactly the graph that
-  maps to the zero-DSP kernel.
+This is a template, not a universal schedule. Soft routing can make optimization
+easier, while hard routing defines the selected-path graph used by a closure-oriented
+deployment. Evaluate both and record when hardening occurs.
 
-`TropicalMLP` fixes its softness at construction (`use_softmin`, `temperature`,
-`tau_min`) instead of `set_tau`.
-
-## Verify before you ship
+## Verify the exact recipe
 
 ```python
-from tikitorch.audit import assert_closed, find_closure_violations
-assert_closed(model)                 # fully closed, or…
-assert_closed(model, allow={"head"}) # …backbone closed, head a declared boundary
-find_closure_violations(model)       # list what (if anything) multiplies
+import tikitorch as tt
+
+report = tt.closure_report(
+    model,
+    example_inputs=x,
+    targets=target,
+    loss_fn=loss_fn,
+    optimizer=optimizer,
+)
 ```
 
-See [FAQ & troubleshooting](faq.md) when training stalls or `assert_closed` complains.
+Follow the [closure guide](closure.md) before making a multiplier-free claim. A passing
+software report still needs build-specific synthesis and routed evidence for a physical
+hardware claim.

@@ -3,9 +3,9 @@
 Every model subclasses
 ``torch.nn.Module`` directly (no abstract base class), takes plain
 keyword arguments (no ``config`` dict), and composes the tropical building
-blocks from :mod:`tikitorch.nn`. The tropical / closure math (forward,
-backward via the autograd Functions in :mod:`tikitorch.functional`, and the
-architecture wiring) is ported verbatim from the validated research code.
+blocks from :mod:`tikitorch.nn`. The implementations originated in the research
+codebase, but closure and hardware properties remain configuration- and
+recipe-specific; a model class name is not itself a certificate.
 
 Public models:
 
@@ -15,7 +15,7 @@ Public models:
     MorphMLP              — alternating dilation/erosion MLP
     TropicalTransformer   — transformer with tropical attention + tropical FFN
     MoTEModel (alias MoTE)— Mixture of Tropical Experts
-    TropicalForwardForward — forward-only, backprop-free local learner (max-plus)
+    TropicalForwardForward — layer-local learner without end-to-end backpropagation
     DyadicForwardForward  — the same Forward-Forward rule on the dyadic ±2^k
                             substrate (dense/additive -> much higher accuracy)
 
@@ -76,11 +76,9 @@ from tikitorch.nn import (
 def _make_head(head_type: str, in_dim: int, out_dim: int, topk_k: int = 8):
     """Build a classification/LM output head.
 
-    ``"tropical"`` (default for a fully-closed model) is a multiplier-free
-    :class:`TropicalTopKModule` -- a top-k max-plus aggregation that beat every
-    other closed head in the sweep (MNIST 0.80 at the same param count as a dense
-    head, vs 0.62 for a single dilation∘erosion). ``"linear"`` is a standard
-    ``nn.Linear`` head, the declared DSP boundary.
+    ``"tropical"`` is a :class:`TropicalTopKModule`, a top-k max-plus
+    aggregation. ``"linear"`` is a standard ``nn.Linear`` head and therefore an
+    ordinary dense boundary. This choice alone does not close a full recipe.
     """
     if head_type == "tropical":
         return TropicalTopKModule(in_dim, out_dim, k=min(topk_k, in_dim))
@@ -92,13 +90,13 @@ def _make_head(head_type: str, in_dim: int, out_dim: int, topk_k: int = 8):
 def _make_input_proj(input_type: str, in_dim: int, out_dim: int):
     """Build an input projection (continuous-feature -> d_model).
 
-    ``"tropical"`` (default closed) is :class:`TropicalQuantizedEmbed` --
+    ``"tropical"`` is :class:`TropicalQuantizedEmbed` --
     quantize each continuous feature and gather a learned per-bin vector. This is
     the *expressive* closed input: a tropical add-only projection of a scalar is
     rank-degenerate (can shift but not scale), which stalls training, whereas the
-    quantize+gather embedding is closed AND expressive (it unlocked fully-closed
-    sequence tasks). Assumes inputs in [0, 1] (normalize first). ``"linear"`` is
-    the ``nn.Linear`` boundary. (LM models embed tokens with ``nn.Embedding``.)
+    quantize+gather embedding avoids that scalar-rank limitation. Assumes inputs
+    in [0, 1] (normalize first). ``"linear"`` is the ``nn.Linear`` boundary. (LM
+    models embed tokens with ``nn.Embedding``.)
     """
     if input_type == "tropical":
         return TropicalQuantizedEmbed(in_dim, out_dim, n_bins=32, lo=0.0, hi=1.0)
@@ -532,11 +530,12 @@ class MorphSSM(FpgaAccelerable, nn.Module):
         use_soft: soft relaxation for training (default True)
         tau: temperature for soft max/min (default 1.0)
         tropical_proj: use tropical (vs nn.Linear) channel-mixing projection
-        norm_type: "layernorm" (default) or "tropical_shift"
+        norm_type: "tropical" (default), "layernorm", or another documented norm
         group_size: morph-conv channel grouping (default 1)
         max_dilation: cap on the exponential per-layer dilation (default 2048)
         multi_scale: use MultiScaleMorphConv1d per layer (default False)
-        kernel_sizes: kernel sizes when multi_scale (default (3, 7, 15))
+        kernel_sizes (tuple[int, ...]): kernel sizes when multi_scale
+            (default (3, 7, 15))
         residual_scaling: scale residual by 1/sqrt(n_layers) (default False).
             NOTE: 1/sqrt(n_layers) is a non-power-of-2 data-path multiply, so
             residual_scaling=True is NOT closure-preserving; leave False (or use a
@@ -607,11 +606,11 @@ class MorphSSM(FpgaAccelerable, nn.Module):
             nn.init.normal_(layer.out_proj.weight, std=0.02 / math.sqrt(2 * n_layers))
 
     def set_tau(self, tau: float) -> None:
-        """Anneal the soft->hard tropical temperature across the whole model.
+        """Anneal the soft-to-hard tropical temperature across the whole model.
 
         Walks every sub-module: calls ``set_tau`` where defined and otherwise sets
-        the ``tau`` attribute and ``use_soft = tau > 0`` (tau==0 is the hard,
-        multiplier-free deploy form). Without this the morph convs / projections
+        the ``tau`` attribute and ``use_soft = tau > 0`` (``tau==0`` selects the
+        hard operator path). Without this the morph convs / projections
         stay at their construction temperature through training (soft-anneal freeze).
         """
         for m in self.modules():
@@ -695,10 +694,11 @@ class MorphSSM(FpgaAccelerable, nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def hardware_cost(self, batch_size: int = 1, seq_len: int = 1) -> HardwareCostProfile:
-        """Morphological conv: comparisons + additions only. Linear proj uses DSP.
+        """Return an operation-count estimate for a MorphSSM configuration.
 
-        For fully-closed config (use_soft=False + tropical_proj=True): the
-        sequence processing core uses ZERO DSP blocks — only LUTs + carry chains.
+        The estimator classifies hard morphological convolution as comparisons
+        and additions and dense linear projection as multiply-bearing. It is not a
+        synthesis report and does not predict routed DSP utilization.
         """
         profile = HardwareCostProfile()
 
@@ -903,7 +903,7 @@ class TropicalTransformer(FpgaAccelerable, nn.Module):
         d_model: model dimension (default 256)
         n_heads: number of attention heads (default 4)
         n_layers: number of transformer blocks (default 6)
-        d_ff: FFN inner dim; if None -> d_model * 4 (default None)
+        d_ff (int | None): FFN inner dim; if None -> d_model * 4 (default None)
         dropout: dropout rate (default 0.1)
         tau: temperature for soft attention; 0.0 is hard tropical (default 0.0)
         use_shift_attn: use TropicalShiftAttention (no Q/K/V projections)
@@ -1010,7 +1010,8 @@ class MoTEModel(FpgaAccelerable, nn.Module):
         n_experts: number of experts (default 8)
         expert_type: "transformer" (default) or "morph"
         expert_layers: layers per expert (default 1)
-        d_ff: expert FFN inner dim; if None -> d_model * 4 (default None)
+        d_ff (int | None): expert FFN inner dim; if None -> d_model * 4
+            (default None)
         n_heads: attention heads in transformer experts (default 4)
         router_dim: routing projection dim (default 32)
         n_shared_pre: shared pre-layers (default 4)
@@ -1261,20 +1262,19 @@ MoTE = MoTEModel
 
 
 class TropicalCNN(FpgaAccelerable, nn.Module):
-    """A fully multiplier-free CNN: morphological conv + max-pool + tropical head.
+    """A morphological CNN with max-pooling and a configurable output head.
 
-    Every operation is add/compare/shift only — morphological ``TropicalConv2d``
-    (max/min-plus), ``TropicalLayerNorm2d`` (subtract-mean + power-of-2 shift),
-    ``tropical_leaky_relu`` (power-of-2 leak), ``TropicalMaxPool2d`` (compare),
-    global max-pool (compare), and a ``TropicalDilationModule`` head (max-plus).
-    There is no ``nn.Conv2d``, no ``nn.LayerNorm``, no dense matmul anywhere; the
-    whole forward and backward pass synthesizes to zero DSP blocks. Verify with
-    :func:`tikitorch.audit.assert_closed`.
+    With ``head_type="tropical"`` its main hard operators have compare/add/shift
+    formulations; ``head_type="linear"`` is an ordinary dense boundary. The
+    structural auditor can reject registered dense modules, but it does not prove
+    the whole forward, backward, optimizer, or synthesized resource use. Audit the
+    exact recipe and bind physical wording to its build reports.
 
     Args:
         in_channels: input image channels (1 for MNIST, 3 for CIFAR).
         num_classes: number of output classes.
-        channels: width of each conv stage (one ``MorphConvBlock`` per entry).
+        channels (tuple[int, ...]): width of each conv stage (one
+            ``MorphConvBlock`` per entry).
         kernel_size: square kernel size for every conv.
         mode: base semiring of the first conv block; with ``alternate=True`` the
             blocks alternate ``dilation``/``erosion`` (opening/closing structure,
@@ -1284,8 +1284,8 @@ class TropicalCNN(FpgaAccelerable, nn.Module):
             before the head. ``g>1`` keeps coarse spatial layout (important for
             digits/objects) by flattening a ``g x g`` grid; ``g=1`` is a pure
             global max-pool (location-invariant). Default 4.
-        head_type: ``"tropical"`` (fully closed, default — a compositional
-            dilation∘erosion projection, a universal piecewise-linear map) or
+        head_type: ``"tropical"`` (default, a compositional dilation-erosion
+            projection) or
             ``"linear"`` (standard ``nn.Linear`` head, the declared DSP boundary).
         task_type: ``"classification"`` only.
     """
@@ -1355,15 +1355,16 @@ class TropicalCNN(FpgaAccelerable, nn.Module):
 
 
 class TropicalForwardForward(FpgaAccelerable, nn.Module):
-    """Tropical Forward-Forward classifier — forward-only, backprop-free, closure-clean.
+    """Tropical Forward-Forward classifier with layer-local objectives.
 
     Hinton's Forward-Forward on the max-plus substrate, packaged as a standard
     tikitorch model. **Unlike every other model here it is NOT trained by
     ``loss.backward()`` on a global head** — each layer is a *local* learner
     trained on a goodness contrast between positive (correct-label-overlaid) and
-    negative (wrong-label-overlaid) data. The whole training step is multiplier-
-    free (zero-DSP), verified by ``tt.assert_no_multiply`` /
-    ``tt.assert_training_closed``. The mechanics live in
+    negative (wrong-label-overlaid) data. This avoids end-to-end gradient transport,
+    but local updates still need to be audited as a complete, concrete recipe.
+    Software audit results do not establish synthesized DSP utilization. The
+    mechanics live in
     :mod:`tikitorch.forward_forward`; this class wires them to the model API.
 
     Training (forward-only)::
@@ -1376,7 +1377,7 @@ class TropicalForwardForward(FpgaAccelerable, nn.Module):
       (overlay each candidate label, sum the per-layer goodness) — so a trained
       model is a drop-in classifier (``argmax`` = prediction).
     - :meth:`forward_forward_fit` / :meth:`forward_forward_step` /
-      :meth:`make_trainer` are the (closure-clean) forward-forward training API.
+      :meth:`make_trainer` are the forward-forward training API.
     - :meth:`compute_loss` is the cross-entropy on the goodness logits, provided
       for monitoring and as a *non-FF* global-backprop baseline; it does **not**
       implement the forward-forward rule (use ``forward_forward_*`` for that).
@@ -1448,7 +1449,8 @@ class TropicalForwardForward(FpgaAccelerable, nn.Module):
 
         Builds a trainer (unless one is passed; extra kwargs go to
         :meth:`make_trainer`) and runs ``epochs`` of :meth:`forward_forward_step`.
-        Returns the trainer (reuse it to continue training). Multiplier-free.
+        Returns the trainer (reuse it to continue training). Audit the exact
+        trainer configuration before making a closure claim.
         """
         if trainer is None:
             trainer = self.make_trainer(**trainer_kwargs)
@@ -1476,23 +1478,22 @@ class TropicalForwardForward(FpgaAccelerable, nn.Module):
 
 
 class DyadicForwardForward(TropicalForwardForward):
-    """Closure-clean **dyadic** Forward-Forward — the high-accuracy substrate.
+    """Dyadic Forward-Forward with signed-power-of-two projection weights.
 
     Same forward-only local FF rule as :class:`TropicalForwardForward`, but each
     layer is a :class:`tikitorch.nn.DyadicLinear` (dense weights constrained to
-    signed powers of two, ``±2^k`` → shift+add-tree, zero DSP) instead of the
-    max-plus dilation. Because the dyadic projection is **dense/additive**, it
-    composes the FF label overlay the way Hinton's float FF does — so it reaches
-    far higher accuracy than the max-plus substrate (which is winner-take-all and
-    caps ~0.3 on MNIST), while staying multiplier-free.
+    signed powers of two, ``±2^k``, which admit a shift-add export schedule)
+    instead of max-plus dilation. The dense/additive substrate is a distinct
+    capacity choice; accuracy and physical-resource claims remain experiment- and
+    build-specific.
 
-    Closure caveat (inherited from :class:`tikitorch.nn.DyadicLinear`): the
-    deployed forward is zero-DSP as a *static weight-value* property (verified by
-    ``tikitorch.fpga.dyadic_export.verify_schedule``), NOT by the eager op trace —
+    Closure caveat (inherited from :class:`tikitorch.nn.DyadicLinear`): a
+    shift-add forward schedule is a *static weight-value* property checked by
+    ``tikitorch.fpga.dyadic_export.verify_schedule``, not by the eager op trace —
     the float sim runs a real ``addmm``, so a dyadic FF does **not** pass the
     runtime ``tt.assert_no_multiply`` (unlike the max-plus substrate, which does).
-    The weight *update* is sign-only (``SignSGD``/``PureTropicalSGD``), and the
-    on-fabric weight-gradient is the sign-product rule (see ``DyadicLinear``).
+    The reference weight update is sign-oriented, while any on-fabric reverse and
+    update path must be validated as its own implementation (see ``DyadicLinear``).
     """
 
     def __init__(self, **kwargs):
@@ -1517,13 +1518,13 @@ def classification_loss(logits: torch.Tensor, y: torch.Tensor,
       * ``"cross_entropy"`` — ``F.cross_entropy`` (real softmax; uses multiplies).
         The float reference ceiling.
       * ``"perceptron"`` — :func:`~tikitorch.functional.tropical_perceptron_loss`,
-        the multiplier-free 2-hot gradient the F2 silicon kernel actually emits.
-        The honest silicon baseline.
+        the 2-hot gradient used by a documented F2 kernel path.
       * ``"tropical_ce"`` — :func:`~tikitorch.functional.tropical_cross_entropy`
         with a host-side exact softmax (zero-DSP kernel + tiny host softmax; the
         silicon-validated +3.2pp path).
-      * ``"tropical_ce_lut"`` — the same, with the fully multiplier-free
-        ``shift_softmax`` (on-chip conditioning, whole loop multiply-free).
+      * ``"tropical_ce_lut"`` — the same with ``shift_softmax``; this is a
+        lookup/shift-oriented conditioning path, not by itself a whole-loop or
+        physical closure claim.
     """
     if loss_type == "cross_entropy":
         return F.cross_entropy(logits, y)

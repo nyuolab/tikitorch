@@ -1,3 +1,3 @@
-# tikitorch.classical
+# `tikitorch.classical`
 
 ::: tikitorch.classical

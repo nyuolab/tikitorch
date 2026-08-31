@@ -1,3 +1,3 @@
-# tikitorch.geometry
+# `tikitorch.geometry`
 
 ::: tikitorch.geometry

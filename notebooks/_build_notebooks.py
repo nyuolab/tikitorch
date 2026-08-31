@@ -50,8 +50,15 @@ except ImportError:
     REPO_URL = "https://github.com/nyuolab/tikitorch.git"
     import subprocess, sys, os
     if not os.path.exists("tikitorch_repo"):
-        subprocess.run(["git", "clone", REPO_URL, "tikitorch_repo"], check=False)
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", "tikitorch_repo"], check=False)
+        subprocess.run(
+            ["git", "clone", "--branch", "pc-morphssm", "--single-branch",
+             REPO_URL, "tikitorch_repo"],
+            check=True,
+        )
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-q", "-e", "tikitorch_repo"],
+        check=True,
+    )
     import tikitorch
 import torch
 print("TikiTorch", getattr(tikitorch, "__version__", "?"), "| torch", torch.__version__)
@@ -63,26 +70,25 @@ print("TikiTorch", getattr(tikitorch, "__version__", "?"), "| torch", torch.__ve
 # ===========================================================================
 intro = [
     md(r"""
-# TikiTorch — deep learning without a single multiply
+# TikiTorch — tropical deep learning with a PyTorch-shaped workflow
 
-**TikiTorch** is a PyTorch-shaped deep-learning library whose entire learning
-loop — forward, backward, *and* the optimizer — runs in the **tropical
-semiring**: the only primitive operations are **compare, add, and bit-shift**.
-There are **no multiplications anywhere**, which is exactly what lets a whole
-training step map onto FPGA fabric with **zero DSP blocks** (zero hardware
-multipliers).
+**TikiTorch** is a PyTorch-shaped library for tropical, morphological, and
+hard-routed learning. It includes a general host-side research API and a
+narrower audited subset for concrete compare/add/shift recipes. A tropical
+operator does not, by itself, make its loss, backward rule, optimizer, host
+boundary, or compiled hardware multiplier-free.
 
 In the tropical semiring, "multiply" becomes ordinary **addition** and "add"
 becomes a **min** or **max** (a comparison). A linear layer
 `y = Wx` becomes a *morphological* operation `y_j = min_i (W_ji + x_i)` (erosion)
 or `max_i (W_ji + x_i)` (dilation). Stack those, add a tropical attention or a
 morphological convolution, train with a sign-based optimizer, and you have a deep
-net that never multiplies.
+net built around sparse, discrete routes.
 
 This notebook is a 10-minute tour. The others go deeper:
 - **02_tropical_math** — the semiring, dilation/erosion, the soft→hard curriculum.
-- **03_vision_cnn** — a fully multiplier-free CNN on MNIST.
-- **04_sequence** — multiplier-free language modeling + the closure-faithful loss.
+- **03_vision_cnn** — a morphological CNN and its declared arithmetic boundaries.
+- **04_sequence** — sequence modeling and alternative loss/optimizer boundaries.
 """),
     SETUP,
     md(r"""
@@ -90,7 +96,7 @@ This notebook is a 10-minute tour. The others go deeper:
 
 TikiTorch mirrors the PyTorch namespace: `tt.nn`, `tt.optim`, `tt.models`,
 `tt.functional`. Here is a morphological state-space LM trained one step with a
-strictly multiplier-free optimizer.
+shift-oriented optimizer. This is an API example, not a full-step closure claim.
 """),
     code(r"""
 import torch
@@ -108,40 +114,33 @@ opt.step(); opt.zero_grad()
 print("loss:", round(loss.item(), 4))
 """),
     md(r"""
-## The zero-multiply claim is *checkable*
+## Closure is checked at declared boundaries
 
-The headline isn't a vibe — it's mechanically verifiable. `assert_closed` walks a
-model and raises if it finds **any** standard `torch.nn` module that contains a
-hardware multiply or divide (`nn.Linear`, `nn.Conv2d`, `nn.LayerNorm`, the cuDNN
-RNNs, ...). A TikiTorch model built from tropical primitives passes.
+`assert_closed` is a structural deny-list over registered modules. Runtime and
+full-training-step auditors cover executed paths for representative inputs.
+Passing a software audit is useful evidence, but it is not a proof about
+unexecuted branches or a synthesized hardware build.
 """),
     code(r"""
 from tikitorch.audit import assert_closed, find_closure_violations
 
 cnn = tt.models.TropicalCNN(in_channels=1, num_classes=10)   # morphological CNN
 assert_closed(cnn)
-print("TropicalCNN is fully multiplier-free  ✓  (params:", cnn.param_count, ")")
+print("TropicalCNN passes the structural module audit (params:", cnn.param_count, ")")
 
 # A standard nn.Linear head is a *declared* DSP boundary — the checker names it:
 boundary = tt.models.TropicalCNN(head_type="linear")
 print("violations in linear-head variant:", find_closure_violations(boundary))
 """),
     md(r"""
-## Why this matters: it runs on silicon at single-digit millijoules
+## Why this matters
 
-Because the loop never multiplies, the same computation synthesizes to **zero DSP
-blocks** on an FPGA. TikiTorch ships the HLS kernels; the architectures here were
-trained **end-to-end on AWS F2 silicon** (Virtex UltraScale+ VU47P):
-
-| Build | Throughput | Energy | DSP |
-|---|---|---|---|
-| 2-layer tropical LM (char) | ~772 tok/s | ~9.0 mJ/token | **0** |
-| MorphSSM ECG (clinical) | ~1207 tok/s | ~5.8 mJ/token | **0** |
-
-The accuracy cost of this *closure* is real and measured (a few points on
-classification; larger on hard char-LM) — and TikiTorch gives you the knobs (the
-soft→hard `tau` curriculum, the loss/optimizer choices) to trade it back. That's
-the subject of the other notebooks.
+Hard tropical routes can be implemented with comparisons, additions, shifts,
+and data movement. TikiTorch includes HLS and AWS F2 research artifacts for
+specific multiplier-free inference and learning kernels. Those physical claims
+belong to the exact built configurations; the software model in this notebook
+does not inherit them automatically. See the repository claim ledger for the
+measured silicon results and their limitations.
 
 **The map:**
 
@@ -149,9 +148,9 @@ the subject of the other notebooks.
 |---|---|
 | `tt.functional` | stateless tropical ops + autograd (linear, dilation, conv2d, attention, losses) |
 | `tt.nn` | layer modules (TropicalLinear, TropicalConv2d, TropicalAttention, TropicalLayerNorm, ...) |
-| `tt.optim` | multiplier-free optimizers (SignSGD, TropicalLion, PureTropicalSGD) |
+| `tt.optim` | sign-, shift-, and counter-oriented optimizer variants |
 | `tt.models` | ready architectures (TropicalMLP/CNN, MorphSSM, TropicalTransformer, MoTE) |
-| `tt.audit` | `assert_closed` — verify a model is multiplier-free |
+| `tt.audit` | structural, runtime, and full-step closure checks |
 """),
 ]
 
@@ -205,8 +204,9 @@ The hard `min`/`max` has sparse gradients, which can be hard to train from
 scratch. TikiTorch provides a **soft relaxation** controlled by a temperature
 `tau`: `softmin(z, tau) = -tau · logsumexp(-z/tau)`, which is smooth (dense
 gradients) for `tau > 0` and **converges to the hard min as `tau → 0`**. You
-train soft, anneal `tau → 0`, and deploy the hard, multiplier-free op — the *same
-weights* drive both. Let's watch a soft min converge to the hard min.
+train soft, anneal `tau → 0`, and deploy the hard routed op — the *same weights*
+drive both. The soft training path is outside the hard closed subset. Let's
+watch a soft min converge to the hard min.
 """),
     code(r"""
 import torch, tikitorch.functional as F
@@ -248,32 +248,28 @@ with torch.no_grad():
     md(r"""
 ## The closure penalty
 
-Forcing the whole loop into the tropical semiring with sign-only updates costs
-some accuracy versus an unconstrained `AdamW + softmax-CE + FP32` baseline — the
-**closure penalty**. On a hard char-LM the penalty decomposes (measured) as:
-SignSGD vs AdamW ≈ −13pp, perceptron loss vs cross-entropy ≈ −17pp, INT16
-quantization ≈ −1pp, hard tropical ops ≈ −5pp. The point of TikiTorch is not to
-beat a GPU transformer on perplexity — it is to make the *whole loop closed* and
-to give you the levers (the `tau` curriculum, the loss, the optimizer) to climb
-the penalty back. Notebook **04** shows one lever recovering ~11pp,
-multiplier-free.
+A constrained hard-routed recipe can lose quality relative to an unconstrained
+PyTorch baseline. The penalty must be measured with matched models, data, and
+budgets rather than inferred from operator names. TikiTorch exposes the relevant
+levers—routing temperature, loss, optimizer, and declared dense boundaries—so
+they can be ablated explicitly. Notebook **04** demonstrates that workflow.
 """),
 ]
 
 
 # ===========================================================================
-# 03 — Vision: a multiplier-free CNN
+# 03 — Vision: a morphological CNN
 # ===========================================================================
 vision = [
     md(r"""
-# A multiplier-free CNN on MNIST
+# A morphological CNN on MNIST
 
 A tropical 2-D convolution **is** a learned grayscale *morphological* operation:
 `y = max_{ci,kh,kw} (weight + patch)` (dilation) or `min` (erosion). No multiplies
 — a structuring element is added to each image patch and reduced by a compare.
-This notebook builds a CNN entirely from such ops (conv → tropical-norm →
-power-of-2 leaky-relu → max-pool → compositional tropical head), verifies it is
-multiplier-free, and trains it on MNIST with a **sign-only optimizer**.
+This notebook builds a CNN from such ops, inspects its declared boundaries, and
+trains it on MNIST with a sign-oriented optimizer. Structural inspection alone
+does not certify the complete loss/backward/update path or a physical build.
 """),
     SETUP,
     md("## See the morphology: TropicalConv2d as dilation / erosion"),
@@ -291,22 +287,20 @@ print("after dilation      :", int((d > 0.5).sum()), "(square grew — max-plus)
 print("after erosion       :", int((e > 0.5).sum()), "(square shrank — min-plus)")
 """),
     md(r"""
-## The model: a multiplier-free morphological feature extractor
+## The model: a morphological feature extractor
 
 `TropicalCNN` alternates dilation/erosion conv blocks (opening/closing structure,
 much more expressive than all-dilation), pools with `max`, normalizes with a
 power-of-2 `TropicalLayerNorm`, keeps coarse spatial layout with an adaptive
 max-pool grid, and ends in a head. Two honest choices for the head:
 
-- **`head_type="linear"`** — a standard `nn.Linear` classifier. The *feature
-  extractor* is fully multiplier-free; the head is a single **declared DSP
-  boundary** (`assert_closed(model, allow={"head"})`). This is the strong,
-  honest configuration: ~**96–97% MNIST with a sign-only optimizer**.
+- **`head_type="linear"`** — a standard `nn.Linear` classifier. The head is an
+  explicit ordinary-arithmetic boundary (`assert_closed(model, allow={"head"})`).
 - **`head_type="tropical"`** — a compositional dilation∘erosion head, so the
-  **entire** model is multiplier-free (`assert_closed(model)` passes outright).
-  This costs accuracy at the 10-way head — the *closure penalty* made visible.
+  model passes the structural module audit without an allowed head. Executed
+  forward and full-step audits are still separate checks.
 
-We train the strong configuration first, then quantify the fully-closed cost.
+We train the dense-head configuration first, then compare the tropical head.
 """),
     code(r"""
 import tikitorch as tt
@@ -316,10 +310,10 @@ model = tt.models.TropicalCNN(in_channels=1, num_classes=10, channels=(16, 32),
                               pool_grid=4, head_type="linear",
                               use_soft=True, tau=1.0)
 model.loss_type = "cross_entropy"
-# The feature extractor is multiplier-free; only the head is a declared boundary:
+# The structural checker identifies the ordinary linear-head boundary:
 print("closure violations:", find_closure_violations(model))   # -> [('head', 'Linear')]
 assert_closed(model, allow={"head"})
-print("Backbone is multiplier-free ✓ (head = declared DSP boundary). params:", model.param_count)
+print("Backbone passes the structural audit (linear head allowed). params:", model.param_count)
 """),
     md("## Load MNIST and train with a sign-only optimizer + soft→hard anneal"),
     code(r"""
@@ -350,25 +344,23 @@ for epoch in range(EPOCHS):
         for xb, yb in test_loader:
             correct += (model(xb).argmax(-1) == yb).sum().item(); tot += yb.numel()
     print(f"epoch {epoch}: tau->0  test_acc = {correct/tot:.4f}   "
-          f"(multiplier-free backbone + SignSGD; head is the one declared boundary)")
+          f"(morphological backbone + SignSGD; linear head declared)")
 """),
     md(r"""
-## The fully-closed model, and the closure penalty
+## Remove the dense head and inspect the structural boundary
 
-Now swap to the **tropical head** so the *entire* network is multiplier-free —
-`assert_closed(model)` passes with no allowances. On MNIST this 10-way tropical
-head is the bottleneck (the single-argmax routing is weaker than a dense head),
-so accuracy drops — that gap *is* the closure penalty at the head, and reporting
-both numbers is the honest comparison. The morphological **features** are
-identical and excellent (they drove the ~96% above); only the head changed.
+Now swap to the **tropical head** so `assert_closed(model)` passes with no
+module allowance. Compare the two heads under the same training budget, report
+the observed gap, and run the full-step auditor before making a recipe-level
+closure claim.
 """),
     code(r"""
 closed = tt.models.TropicalCNN(in_channels=1, num_classes=10, channels=(16, 32),
                                pool_grid=2, head_type="tropical",
                                use_soft=True, tau=1.0)
 closed.loss_type = "tropical_ce"
-assert_closed(closed)     # no allow=... needed: the WHOLE model is multiplier-free
-print("Fully multiplier-free CNN ✓ (forward + backward + optimizer, zero DSP).")
+assert_closed(closed)     # structural module audit; no allowed dense head
+print("Tropical-head CNN passes the structural module audit.")
 
 opt = optim.SignSGD(closed.parameters(), lr=2e-3, momentum=0.9)
 total = 2 * len(train_loader); step = 0
@@ -382,31 +374,29 @@ for epoch in range(2):
     with torch.no_grad():
         for xb, yb in test_loader:
             c += (closed(xb).argmax(-1) == yb).sum().item(); t += yb.numel()
-    print(f"epoch {epoch}: FULLY-closed test_acc = {c/t:.4f}  (vs ~0.96 with a boundary head)")
+    print(f"epoch {epoch}: tropical-head test_acc = {c/t:.4f}")
 
-print("\\nThe deploy graph (tau=0) is exactly what maps to the zero-DSP FPGA kernel.")
+print("\\nFor hardware claims, bind the hard recipe to HLS and routed build reports.")
 """),
 ]
 
 
 # ===========================================================================
-# 04 — Sequence: multiplier-free language modeling + the closure-faithful loss
+# 04 — Sequence modeling and the loss boundary
 # ===========================================================================
 sequence = [
     md(r"""
-# Multiplier-free sequence modeling, and recovering accuracy for free
+# Sequence modeling and alternative loss boundaries
 
-The last place a multiply hides in a "closed" model is the **loss**: a softmax
-cross-entropy uses exp + divide + multiply. On silicon the loop instead used a
-*perceptron* gradient (a 2-hot ±1 vector) — multiplier-free, but the single
-biggest accuracy cost in the closure penalty (~−17pp on char-LM).
+The **loss** is one important recipe boundary: ordinary softmax
+cross-entropy uses exponential and division operations, while a perceptron
+gradient and a lookup/shift approximation expose different numerical and
+hardware trade-offs.
 
-TikiTorch's `tropical_cross_entropy` closes that gap **without a hardware
-multiply**: the CE gradient is `softmax(logits) − onehot(target)`, and
-`shift_softmax` computes the softmax from a subtract-max, a power-of-2-addressed
-exp lookup, additions, and a shift-normalize. This notebook reproduces the
-recovery live on a character LM, then shows the `TropicalLion` optimizer and the
-streaming `MorphSSM` cell.
+TikiTorch exposes ordinary host cross-entropy, a perceptron boundary, and an
+experimental lookup/shift approximation. This notebook compares those choices
+on a character LM, then shows `TropicalLion` and the streaming `MorphSSM` cell.
+It is a pedagogical run, not a silicon or publication benchmark.
 """),
     SETUP,
     md("## A character-level Shakespeare LM at the silicon dims (D=128, V=128)"),
@@ -430,14 +420,12 @@ def batch(bs, L, gen):
     return x, y
 """),
     md(r"""
-## The recovery: perceptron → closure-faithful CE (multiplier-free)
+## Compare perceptron, host CE, and lookup/shift conditioning
 
 We hold the model, optimizer, seed, and data fixed and vary **only the loss
-conditioning**: the perceptron baseline (what silicon used), the host-softmax
-`tropical_ce`, and the fully multiplier-free `tropical_ce_lut`. Watch the
-multiplier-free LUT softmax recover most of the perceptron penalty — and match
-the float cross-entropy ceiling (under a sign optimizer, only the gradient *sign*
-matters, and the LUT reproduces it).
+conditioning**: the perceptron baseline, the host-softmax `tropical_ce`, and the
+experimental `tropical_ce_lut`. The comparison describes this executed host
+configuration only; it does not establish a compiled full-step result.
 """),
     code(r"""
 def run(loss_type, steps=400, L=48, bs=24, seed=0):
@@ -459,22 +447,21 @@ def run(loss_type, steps=400, L=48, bs=24, seed=0):
 
 rows = [("perceptron (silicon baseline)", "perceptron"),
         ("tropical_ce (host softmax)", "tropical_ce"),
-        ("tropical_ce_lut (FULLY mult-free)", "tropical_ce_lut"),
+        ("tropical_ce_lut (lookup/shift)", "tropical_ce_lut"),
         ("cross_entropy (float ceiling)", "cross_entropy")]
 res = {lt: run(lt) for _, lt in rows}
 for label, lt in rows:
     print(f"{label:34s}  eval_acc={res[lt]:.4f}")
 print(f"\nrecovery perceptron -> tropical_ce_lut: "
-      f"{res['tropical_ce_lut'] - res['perceptron']:+.4f}  (multiplier-free)")
+      f"{res['tropical_ce_lut'] - res['perceptron']:+.4f}")
 """),
     md(r"""
-## A multiplier-free momentum optimizer: TropicalLion
+## A shift-oriented momentum optimizer: TropicalLion
 
-`TropicalLion` takes the **sign of a momentum** (stronger than SignSGD's
-sign-of-gradient), with power-of-2 betas so the EMA is a shift+add. Crucially the
-momentum is simulated in **truncating integer fixed-point**, faithfully modeling
-the silicon (a float EMA would over-state it). `momentum_density()` confirms the
-momentum is alive (not collapsed to SignSGD).
+`TropicalLion` takes the **sign of a momentum**, with power-of-two beta choices
+and truncating integer fixed-point state. `momentum_density()` is a diagnostic
+for whether that state remains active. Treat this optimizer as an experimental
+component and audit it with the rest of the declared recipe.
 """),
     code(r"""
 m = tt.models.TropicalTransformer(d_model=128, n_heads=4, n_layers=1, d_ff=512,
@@ -688,7 +675,7 @@ print("tropical PCA embedding shape:   ", tuple(Z.shape))
 
 A tropical NN layer, a shortest-path relaxation, a DP table, and a max-plus schedule are
 **one operation** — `min`/`max` of sums — wearing different hats. That is why this
-substrate suits both multiplier-free hardware *and* combinatorial reasoning.
+substrate can suit both constrained hardware recipes *and* combinatorial reasoning.
 
 Concept companion: **Guide → Beyond deep learning**.
 """),

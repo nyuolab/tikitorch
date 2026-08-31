@@ -1083,12 +1083,13 @@ class TropicalCrossEntropyFn(torch.autograd.Function):
 
 def tropical_cross_entropy(logits: torch.Tensor, target: torch.Tensor,
                            softmax: str = "exact", **lut_kwargs) -> torch.Tensor:
-    """Closure-faithful cross-entropy loss.
+    """Cross-entropy value with a configurable custom gradient conditioner.
 
     ``softmax="exact"`` host-conditions with a true softmax (the silicon-validated
-    path); ``softmax="lut"`` uses :func:`shift_softmax` for a fully multiplier-free
-    loop. Extra keyword args (``lut_size``, ``z_range``, ``normalize``) pass
-    through to :func:`shift_softmax`.
+    path); ``softmax="lut"`` uses :func:`shift_softmax` for a lookup/shift-oriented
+    conditioner. Neither option alone establishes closure of the surrounding
+    backward, optimizer, or physical build. Extra keyword args (``lut_size``,
+    ``z_range``, ``normalize``) pass through to :func:`shift_softmax`.
     """
     return TropicalCrossEntropyFn.apply(logits, target, softmax, lut_kwargs)
 

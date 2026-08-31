@@ -1,94 +1,96 @@
-# Why tropical algebra for ML/DL
+# Why tropical algebra for ML/DL?
 
-Tropical algebra is not just a curiosity — restricting a network to the min-plus /
-max-plus semiring buys concrete properties that ordinary (multiply-based) deep
-learning cannot have. It also costs something, measurably. This page is the honest
-case for *why* you would do it.
+Tropical algebra replaces ordinary addition and multiplication with selection and
+addition. In max-plus form, for example:
 
-## 1. Multiplier-free → zero-DSP hardware
+```text
+y_j = max_i (x_i + w_ji)
+```
 
-A tropical layer is `min`/`max` of `(weight + activation)`: only **adders and
-comparators**, never a multiplier. That is the whole point. On an FPGA, multiplies
-consume scarce **DSP blocks**; a network whose forward pass, backward pass, *and*
-optimizer are all tropical synthesizes to **zero DSP blocks** — the silicon budget
-goes to more parallel adder lanes instead.
+That primitive is interesting for machine learning for three separate reasons. They
+should not be collapsed into one claim.
 
-TikiTorch is built so the *entire learning loop* stays closed:
+## 1. It changes the representation
 
-- **Forward**: tropical linears/convs/attention (compare + add).
-- **Backward**: gradients route through the argmin/argmax (a scatter, no multiply).
-- **Optimizer**: sign-based (`SignSGD`) or power-of-two-step (`TropicalAdam`,
-  `PureTropicalSGD`) — the learning-rate is a **bit-shift**.
-- **Loss**: `tropical_cross_entropy(softmax="lut")` computes softmax from a
-  subtract-max, a power-of-two-addressed exp lookup, and a shift-normalize.
+A hard tropical layer selects a winning input rather than forming a dense weighted
+sum. This creates a routed, piecewise-linear representation with an inductive bias that
+can suit morphological signal processing, content routing, and min-plus/max-plus
+recurrences.
 
-The architectures shipped here were trained **end-to-end on AWS F2 silicon**
-(Virtex UltraScale+) at single-digit millijoules per token, DSP=0. See the measured
-throughput/energy table in the [README](https://github.com/nyuolab/tikitorch#readme)
-and [notebook 01](https://github.com/nyuolab/tikitorch/blob/main/notebooks/01_intro.ipynb).
+Whether that bias helps is task- and architecture-specific. TikiTorch provides models
+and baselines for testing the question; the package name does not guarantee an accuracy
+advantage.
 
-## 2. A routing inductive bias
+## 2. The primitive maps naturally to add/compare hardware
 
-Because each output picks a single winning input, a tropical net **routes** rather
-than **mixes**. This is a qualitatively different prior:
+The hard max-plus or min-plus operator itself contains additions and comparisons rather
+than data-dependent multiplications. That can be valuable on FPGA or ASIC substrates.
+The mapping claim applies to the operator, not automatically to an entire program.
 
-- It is exactly the right primitive for **algorithmic / combinatorial** tasks —
-  shortest paths, dynamic programming, sorting — which *are* min-plus recurrences
-  (see [Beyond deep learning](beyond-deep-learning.md)).
-- **Tropical attention** routes by an L1/L∞/Hilbert distance + an argmax *gather*;
-  on content-routing tasks (induction/copy) a fully multiplier-free attention matches
-  the softmax ceiling, *if* deployed as argmax-gather and trained with the soft
-  relaxation.
-- Max-plus residuals (`max(relu(Wx), x)`) are more depth-stable than additive
-  residuals in several of our scaling probes.
+A complete learning recipe may additionally include:
 
-## 3. Quantization- and robustness-friendly
+- a soft relaxation with exponential or logarithmic operations;
+- dense input or output projections;
+- normalization and dropout;
+- loss construction and averaging;
+- parameter-gradient outer products;
+- optimizer state updates; and
+- host preprocessing, transfers, or fallback execution.
 
-Adds and shifts compose cleanly in fixed point — there is no multiply to blow up the
-bit-width, so INT16 (or narrower) is natural and the quantization penalty is small
-(measured ~−1pp; see below). The piecewise-linear, order-based structure also gives
-**exact, certifiable** behavior in places where smooth nets are only approximate
-(the tropical geometry of decision regions is literally a polytope arrangement —
-[Tropical geometry of neural nets](tropical-geometry.md)).
+TikiTorch's [closure tools](closure.md) make these boundaries observable in software.
+Final hardware claims still require HLS and routed implementation reports.
 
-## The closure penalty
+## 3. It connects networks to tropical mathematics
 
-Forcing the whole loop into the semiring with sign-only updates costs accuracy versus
-an unconstrained `AdamW + softmax-CE + FP32` baseline — the **closure penalty**. The
-point of TikiTorch is *not* to beat a GPU transformer on perplexity; it is to make the
-loop closed and to give you the levers to climb the penalty back. On a hard
-character-LM the penalty **decomposes (measured)** roughly as:
+Shortest-path relaxation, dynamic programming, mathematical morphology, and tropical
+geometry use closely related min-plus or max-plus structure. A shared tensor substrate
+makes it possible to study neural layers and those classical recurrences together.
 
-| source | cost |
-|---|---|
-| SignSGD vs AdamW | ≈ −13 pp |
-| perceptron loss vs cross-entropy | ≈ −17 pp |
-| INT16 quantization | ≈ −1 pp |
-| hard tropical ops (vs soft) | ≈ −5 pp |
+See [Tropical geometry](tropical-geometry.md) and
+[Beyond deep learning](beyond-deep-learning.md) for the mathematical view.
 
-The two big terms are *optimizer* and *loss conditioning*, not the tropical ops
-themselves — and both have multiplier-free fixes:
+## What the current evidence supports
 
-- **Loss**: swap the perceptron loss for `tropical_cross_entropy` /
-  `nn.TropicalCrossEntropyLoss` — `softmax="lut"` recovers most of the −17pp **without
-  a hardware multiply** ([notebook 04](https://github.com/nyuolab/tikitorch/blob/main/notebooks/04_sequence.ipynb)
-  reproduces the recovery live).
-- **Optimizer**: the adaptive family (`TropicalAdam`, the magnitude-aware optimizers)
-  closes much of the SignSGD gap with power-of-two per-parameter steps.
-- **Ops**: the `tau` soft→hard curriculum recovers the −5pp by training smooth and only
-  hardening at the end.
+The canonical [research ledger](../research/index.md) distinguishes software
+capabilities from measured hardware configurations. In summary:
 
-On easier tasks (e.g. MNIST/CIFAR classification) the penalty is a few points and a
-declared-`nn.Linear`-head configuration reaches ~96–97%. Always report both the closed
-number and the boundary-head number — that is the honest comparison, and it is the
-discipline the whole library is built around (`assert_closed` makes the claim
-mechanical, not rhetorical).
+- The PyTorch-shaped library surface and recipe-scoped software auditing are
+  established by implementation and tests.
+- Specific F2 builds support narrow multiplier-free inference and learning-execution
+  results under their recorded configurations.
+- A small fabric-trained MNIST model has a measured held-out result, with explicit
+  preprocessing and physical-resource qualifications.
+- Replica throughput, end-to-end energy, matched GPU comparisons, and broader learning
+  quality still have unresolved gates.
 
-## When *not* to use it
+Do not generalize one compiled kernel into “all TikiTorch models are multiplier-free,”
+“the auditor proves zero DSP,” or “TikiTorch is faster or more efficient than PyTorch.”
 
-If you have a GPU, plenty of DSP/energy budget, and only care about raw perplexity,
-ordinary dense deep learning wins — the multiply does real work. Tropical pays off
-when the constraint is **hardware** (no multipliers / energy / FPGA-ASIC deployment),
-when the task has **combinatorial structure**, or when you want **certifiable,
-piecewise-linear** behavior. See [Choosing a model](choosing-a-model.md) for the
-decision recipe.
+## The practical trade-off
+
+Hard selection creates sparse routing and removes dense multiply-accumulate structure.
+That changes both optimization and capacity. A useful experiment therefore reports:
+
+1. an ordinary learnability baseline;
+2. a matched hard/soft or dense/tropical ablation;
+3. the exact loss and optimizer boundary;
+4. software closure diagnostics; and
+5. compiled resource, timing, correctness, and power data when hardware is claimed.
+
+Negative results belong in that comparison. The current ledger, for example, records a
+strict MorphSSM language-quality gap in a matched host study and no present
+end-to-end energy-win claim.
+
+## When to use TikiTorch
+
+TikiTorch is a good fit when the research question concerns:
+
+- tropical or morphological neural representations;
+- hard routing and selected-path differentiation;
+- min-plus/max-plus algorithmic structure;
+- recipe-level multiplier elimination; or
+- FPGA/ASIC mappings backed by build-specific evidence.
+
+If the only objective is mature operator coverage or optimized eager GPU throughput,
+ordinary PyTorch is the better starting point. TikiTorch deliberately builds on it
+rather than replacing it.

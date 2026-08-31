@@ -41,13 +41,14 @@ be tested rather than inferred from a model name.
 ## Install
 
 ```bash
-git clone https://github.com/nyuolab/tikitorch.git
+git clone --branch pc-morphssm --single-branch https://github.com/nyuolab/tikitorch.git
 cd tikitorch
 python -m pip install -e ".[dev]"
 ```
 
 TikiTorch requires Python 3.9 or newer, PyTorch 2.0 or newer, and NumPy. The project is
-licensed under GPL-3.0-or-later.
+licensed under GPL-3.0-or-later. Version `0.2.0` is currently a development branch,
+not a published PyPI release.
 
 ## Library map
 
@@ -66,6 +67,20 @@ licensed under GPL-3.0-or-later.
 The package is intentionally shaped like PyTorch: use `tt.nn`, `tt.optim`,
 `tt.models`, `tt.save`, `tt.load`, `tt.device`, and `tt.to` where their documented
 semantics apply.
+
+## API maturity
+
+TikiTorch uses maturity labels to distinguish reusable library surface from active
+research:
+
+| Level | Meaning | Current examples |
+|---|---|---|
+| **Public** | Import-tested API intended for ordinary use; changes require docs, tests, and a changelog entry | `functional`, core `nn`, `models`, `optim`, serialization, logical devices |
+| **Experimental** | Usable and tested, but schemas or performance may change before the first stable release | `autodiff`, FPGA bindings, planning, profiling |
+| **Research artifact** | Evidence, runners, and manuscripts; not a compatibility-guaranteed package API | `scripts/`, `results/`, `papers/`, `manuscript/` |
+
+“Public” does not yet mean semantically frozen: the project has not cut its first
+stable release. Research modules under `tikitorch.research` are explicitly unstable.
 
 ## A complete training step
 
@@ -163,12 +178,13 @@ Start with [the FPGA build guide](tikitorch/hardware/BUILD_GUIDE.md) and
 
 ## Documentation
 
-- [Foundations](docs/guide/foundations.md)
-- [Why tropical methods for ML](docs/guide/why-tropical-ml.md)
-- [Architecture](docs/guide/architecture.md)
-- [Tropical geometry](docs/guide/tropical-geometry.md)
-- [FAQ and troubleshooting](docs/guide/faq.md)
-- [API reference](docs/api/functional.md)
+- [Installation](docs/get-started/installation.md)
+- [Quickstart](docs/get-started/quickstart.md)
+- [Tutorials](docs/tutorials/index.md)
+- [User guide](docs/guide/foundations.md)
+- [Closure auditing](docs/guide/closure.md)
+- [API reference](docs/api/index.md)
+- [Research scope and evidence](docs/research/index.md)
 - [Runnable examples](examples/README.md)
 - [Notebooks](notebooks/README.md)
 
@@ -184,6 +200,7 @@ mkdocs build
 Two focused manuscripts are maintained independently of the future ontogenic-agent
 programme:
 
+- [Root route-certificate manuscript handoff](manuscript/README.md)
 - [Multiplier-free learning on FPGA](papers/multiplier_free_fpga/README.md)
 - [Forward traces as exact differentiation certificates in hard-routed networks](papers/route_certificates/README.md)
 

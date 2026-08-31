@@ -13,6 +13,10 @@ ledger](../docs/research/CLAIM_LEDGER.md).
 
 Workspace: [`route_certificates/`](route_certificates/)
 
+Root-level student handoff and build entry point:
+[`../manuscript/`](../manuscript/). The scientific source remains canonical in
+`papers/route_certificates/`; the handoff does not maintain a second copy.
+
 **Contribution:** a scoped theorem and executable interface showing when a hard
 forward trace plus declared auxiliary fields is sufficient to replay selected
 state and additive-parameter VJPs; exactness tests; and configuration-specific

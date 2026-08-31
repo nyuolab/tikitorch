@@ -63,7 +63,8 @@ class TropicalScanFn(torch.autograd.Function):
         reduce: "max" | "min".
 
     Returns:
-        H: (B, L+1, S) with ``H[:, 0] = h0`` and ``H[:, t] = h_t``.
+        H (torch.Tensor): tensor with shape ``(B, L+1, S)``, where
+            ``H[:, 0] = h0`` and ``H[:, t] = h_t``.
 
     Backward routes ``grad_H`` through the stored winners only: for each step,
     ``grad`` on ``h_t[i]`` flows to ``h_{t-1}[j*]``, ``T[t-1, i, j*]`` and

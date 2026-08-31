@@ -1,30 +1,29 @@
-# Architectures & diagrams
+# Architectures
 
-The four headline models in `tikitorch.models` share a shape: a (closed or declared)
-**input projection** → a stack of **tropical blocks** → a multiplier-free
-**normalization** → a **head** (fully tropical, or a declared `nn.Linear` DSP
-boundary). The blocks differ in how they mix across the sequence/space. All support
-the `set_tau()` soft→hard curriculum and expose `compute_loss(x, y)`.
+The main model families compose an input representation, tropical or hard-routed
+blocks, normalization, and an output head. Exact constructor options differ by class;
+use the [models API](../api/models.md) as the source for signatures.
 
-Legend: `[closed]` = multiplier-free; `[DSP]` = a declared multiply boundary you opt
-into with `assert_closed(model, allow={"head"})`.
+The diagrams label tropical components, not whole-recipe closure. Soft routing, loss,
+backward, optimizer, dropout, projections, and compiled implementation must be checked
+separately with the [closure workflow](closure.md).
 
 ## MorphSSM — morphological state-space sequence model
 
 A causal, streaming sequence model: depthwise **morphological convolutions**
 (dilation/erosion with exponentially-spaced dilations) replace attention. Runs
-token-by-token via `.step()` with an on-chip ring buffer — the form the FPGA kernel
-streams.
+token-by-token via `.step()` with an explicit state buffer. Specific FPGA kernels use
+a corresponding streaming form, but the Python model is not itself a hardware build.
 
 ```text
-tokens ─► Embed ─►┌───────────── MorphSSMLayer × n_layers ─────────────┐─► TropicalLayerNorm ─► Head ─► logits
-                  │  TropicalLayerNorm                                  │       [closed]        [closed
-                  │      │                                              │                        or DSP]
+tokens ─► Embed ─►┌───────────── MorphSSMLayer × n_layers ─────────────┐─► Tropical norm ─► Head ─► logits
+                  │  Tropical norm                                       │                    [tropical
+                  │      │                                               │                     or linear]
                   │      ▼                                              │
                   │  DepthwiseMorphConv1d  (max-plus / min-plus, causal)│
                   │      │   (multi-scale dilations 1,2,4,…,max_dilation)│
                   │      ▼                                              │
-                  │  + residual  (max-plus skip)                        │
+                  │  + residual                                          │
                   └─────────────────────────────────────────────────────┘
 ```
 
@@ -39,8 +38,8 @@ query) instead of a softmax-weighted mix.
 
 ```text
 tokens ─► Embed+Pos ─►┌──────────── TropicalTransformerBlock × n_layers ───────────┐─► Norm ─► Head ─► logits
-                      │  TropicalLayerNorm                                          │  [closed]  [closed
-                      │      │                                                      │             or DSP]
+                      │  Tropical norm                                               │            [tropical
+                      │      │                                                      │             or linear]
                       │      ▼                                                      │
                       │  TropicalAttention   score = -L1/L∞/Hilbert(Q,K)           │
                       │      │   route = argmax-gather over keys (causal mask)      │
@@ -59,7 +58,7 @@ top-k-routes each token to a few tropical experts (transformer or SSM blocks).
 
 ```text
 tokens ─► Embed ─► shared-pre ─►┌─────────── MoTEBlock ───────────┐─► shared-post ─► Head ─► logits
-                  (tropical)    │  TropicalRouter ─► top-k experts │   (tropical)    [closed or DSP]
+                  (tropical)    │  TropicalRouter ─► top-k experts │   (tropical)    [tropical or linear]
                                 │     ├─ expert_1  (tropical)      │
                                 │     ├─ …                         │   + load-balance aux loss
                                 │     └─ expert_E  (tropical)      │     (aux_loss_weight)
@@ -69,7 +68,7 @@ tokens ─► Embed ─► shared-pre ─►┌───────────
 Use for: scaling capacity without scaling per-token compute. `n_experts`,
 `capacity_factor`, `expert_type` configure it.
 
-## TropicalCNN — multiplier-free vision
+## TropicalCNN — morphological vision
 
 A 2-D morphological feature extractor: each block is a **tropical conv** (learned
 structuring element) + power-of-2 norm + power-of-2 leaky-ReLU + max-pool. Alternating
@@ -77,8 +76,8 @@ dilation/erosion gives opening/closing structure (more expressive than all-dilat
 
 ```text
 image ─►┌──────────── MorphConvBlock × len(channels) ───────────┐─► AdaptiveMaxPool(grid) ─► Head ─► logits
-        │  TropicalConv2d   (dilation, then erosion, alternating)│        [closed]           [closed
-        │      │                                                 │                            or DSP]
+        │  TropicalConv2d   (dilation, then erosion, alternating)│                           [tropical
+        │      │                                                 │                            or linear]
         │      ▼                                                 │
         │  TropicalLayerNorm2d ─► TropicalLeakyReLU(2^-k)        │
         │      │                                                 │
@@ -87,19 +86,22 @@ image ─►┌──────────── MorphConvBlock × len(channe
         └─────────────────────────────────────────────────────── ┘
 ```
 
-Use for: image classification under a hardware/energy budget. `head_type="linear"`
-+ `allow={"head"}` reaches ~96–97% MNIST with a sign-only optimizer;
-`head_type="tropical"` is fully closed (the closure penalty shows at the 10-way head).
-See [notebook 03](https://github.com/nyuolab/tikitorch/blob/main/notebooks/03_vision_cnn.ipynb).
+Use for: image-classification experiments with learned dilation/erosion features.
+Compare `head_type="linear"` and `head_type="tropical"` as an explicit ablation rather
+than treating the head choice as a performance-neutral replacement. See
+[notebook 03](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/03_vision_cnn.ipynb).
 
-## The head: the one place a multiply may hide
+## Heads and other boundaries
 
-Every model takes `head_type`:
+Several composed models take `head_type`:
 
-- `"tropical"` — a compositional dilation∘erosion head; **`assert_closed(model)` passes
-  outright**. Weaker at wide classification heads (that gap *is* the closure penalty).
-- `"linear"` — a standard `nn.Linear`; the backbone stays closed and the head is a
-  **declared DSP boundary**: `assert_closed(model, allow={"head"})`. Report both numbers.
+- `"tropical"` selects a tropical output projection where supported.
+- `"linear"` selects a standard `nn.Linear` output boundary.
+
+The registered path can be `head` or `output_head`, depending on the class. Inspect
+`model.named_modules()` before declaring an `allow={...}` path. A tropical head is not
+enough to establish full closure: input projections, soft routing, normalization,
+dropout, loss, backward, and optimizer still belong to the recipe.
 
 See [Choosing a model](choosing-a-model.md) for which to pick, and the
 [API reference](../api/models.md) for every constructor argument.

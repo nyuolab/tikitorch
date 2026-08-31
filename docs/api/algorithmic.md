@@ -1,3 +1,3 @@
-# tikitorch.algorithmic
+# `tikitorch.algorithmic`
 
 ::: tikitorch.algorithmic
