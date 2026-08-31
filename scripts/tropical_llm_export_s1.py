@@ -44,7 +44,7 @@ Usage:
 Writes an int32 numpy array of length S1_BUFLEN (=709200 at D64/L2/V64) plus a sidecar .json with the dims,
 offsets and scales so the harness can self-describe.
 """
-import argparse, json, math
+import argparse, json
 from pathlib import Path
 import numpy as np
 import torch

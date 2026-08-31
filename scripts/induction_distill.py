@@ -31,10 +31,9 @@ import math
 import time
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
-from tropical_induction_v2 import TinyLM, block_copy_batch, Attn, selectivity
+from tropical_induction_v2 import TinyLM, block_copy_batch, Attn
 
 
 def _attn_layers(model):

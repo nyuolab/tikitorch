@@ -11,7 +11,7 @@ fabric would) and compares cascade test accuracy, sqrt(2) vs 1.5x, across depths
 
 Run: PYTHONPATH=. python scripts/pc_wgrad_round_ablation.py
 """
-import sys, math
+import sys
 sys.path.insert(0, ".")
 import torch
 import tikitorch.nn as ttnn

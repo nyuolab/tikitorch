@@ -406,7 +406,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if sys.argv[1:] and sys.argv[1] == "rescue":
-        print(f"== DYADIC PC rescue grid (depth 4) — settle stability + iPC ==")
+        print("== DYADIC PC rescue grid (depth 4) — settle stability + iPC ==")
         print(f"{'gamma':>6} {'steps':>6} {'lr':>7} {'ipc':>4} {'acc':>7} {'sec':>6}")
         depth = 4
         dims = [d] * depth + [10]

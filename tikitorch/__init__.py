@@ -1,9 +1,10 @@
-"""TikiTorch — a tropical-semiring deep-learning library, modeled on PyTorch.
+"""TikiTorch — PyTorch-shaped tools for tropical deep learning.
 
 TikiTorch packages the tropical (max-plus / min-plus) closure machinery as a
-clean, installable, PyTorch-idiomatic library.
-Every forward and backward op reduces to comparisons and additions — no
-multiplications — which is what makes the whole learning loop FPGA-native.
+clean, installable, PyTorch-idiomatic library.  Certified model and optimizer
+recipes can close their complete learning loop over comparisons, additions,
+integer shifts, routing and data movement.  Ordinary PyTorch boundaries remain
+ordinary unless a closure audit explicitly certifies them.
 
 Idiomatic usage::
 
@@ -22,16 +23,18 @@ Submodules:
     tikitorch.nn          — tropical layer Modules (a la torch.nn)
     tikitorch.optim       — multiplier-free optimizers (a la torch.optim)
     tikitorch.models      — ready-to-use tropical architectures
+    tikitorch.autodiff    — exact forward-route certificates and replay VJPs
     tikitorch.hardware    — HLS kernels + an AFI/silicon build guide
     tikitorch.backend     — pluggable execution-backend seam (logical devices + dispatch)
     tikitorch.fpga        — the FPGA backend (DDP-style fpga.accelerate(model))
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # functional and nn are foundational and always importable.
 from tikitorch import functional  # noqa: F401
 from tikitorch import nn  # noqa: F401
+from tikitorch import autodiff  # noqa: F401
 from tikitorch._hardware import HardwareCostProfile  # noqa: F401
 
 # The pluggable backend seam (depends only on functional + torch + stdlib). It
@@ -103,7 +106,7 @@ except Exception:  # noqa: BLE001
 # directly (``tt.MorphSSM``, ``tt.PureTropicalSGD``) as well as via submodule
 # (``tt.models.MorphSSM``, ``tt.optim.PureTropicalSGD``) -- the way ``torch``
 # exposes ``torch.Tensor`` while ``torch.nn`` / ``torch.optim`` also exist.
-_top = ["__version__", "functional", "nn", "optim", "models", "HardwareCostProfile",
+_top = ["__version__", "functional", "nn", "autodiff", "optim", "models", "HardwareCostProfile",
         "audit", "geometry", "classical", "prune", "algorithmic", "assert_closed",
         "assert_closed_runtime", "assert_training_closed", "find_runtime_multiplies",
         "find_training_multiplies", "closure_report",

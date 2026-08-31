@@ -7,7 +7,6 @@ Run on the F2 box before the training driver (the runner invokes this).
 """
 import os, sys
 sys.path.insert(0, ".")
-import numpy as np
 import torch
 
 

@@ -166,7 +166,7 @@ if __name__ == "__main__":
     args = ap.parse_args()
     V_box = [0]
     _, _, V = load(args.ctx, V_box); V = V_box[0]
-    print(f"=== single-process backprop baseline (the quality bar) ===", flush=True)
+    print("=== single-process backprop baseline (the quality bar) ===", flush=True)
     single_proc_backprop(args, V)
     print(f"\n=== model-parallel PC: {args.depth} real processes, 1 layer each, neighbour-only, no barrier ===", flush=True)
     mp.spawn(worker, args=(args.depth, args, V_box), nprocs=args.depth, join=True)

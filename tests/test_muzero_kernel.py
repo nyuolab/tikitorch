@@ -12,7 +12,9 @@ import ctypes
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
+import traceback
 
 import numpy as np
 import pytest
@@ -21,15 +23,33 @@ HLS = os.path.join(os.path.dirname(__file__), "..", "tikitorch", "hardware", "hl
 KERNELS = os.path.join(HLS, "forge_kernels")
 
 
-@pytest.fixture(scope="module")
-def kernel():
+_ISOLATED_CHILD = "TIKITORCH_MUZERO_KERNEL_CHILD"
+
+
+def _run_isolated(test_name):
     if shutil.which("g++") is None:
+        pytest.skip("g++ not available for CSIM build")
+    env = os.environ.copy()
+    env[_ISOLATED_CHILD] = "1"
+    result = subprocess.run(
+        [sys.executable, __file__, test_name],
+        capture_output=True,
+        text=True,
+        close_fds=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _build_kernel():
+    compiler = shutil.which("g++")
+    if compiler is None:
         pytest.skip("g++ not available for CSIM build")
     so = os.path.join(tempfile.mkdtemp(), "libmuzero.so")
     src = os.path.join(KERNELS, "forge_train_step_muzero.cpp")
-    r = subprocess.run(["g++", "-O2", "-std=c++17", "-DCSIM_ONLY", "-shared", "-fPIC",
+    r = subprocess.run([compiler, "-O2", "-std=c++17", "-DCSIM_ONLY", "-shared", "-fPIC",
                         f"-I{KERNELS}", f"-I{HLS}", src, "-o", so],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, close_fds=False)
     if r.returncode != 0:
         pytest.fail(f"kernel CSIM build failed:\n{r.stderr}")
     lib = ctypes.CDLL(so)
@@ -86,8 +106,11 @@ def _reference_forward(buf, L):
     return pol, val[0]
 
 
-def test_muzero_kernel_bit_exact_vs_python_reference(kernel):
-    lib = kernel
+def test_muzero_kernel_bit_exact_vs_python_reference():
+    if os.environ.get(_ISOLATED_CHILD) != "1":
+        _run_isolated("test_muzero_kernel_bit_exact_vs_python_reference")
+        return
+    lib = _build_kernel()
     n = lib.forge_muzero_buffer_words()
     L = _layout(lib)
     rng = np.random.default_rng(0)
@@ -113,3 +136,16 @@ def test_muzero_kernel_bit_exact_vs_python_reference(kernel):
         got_val = int(buf[L["VALUE"]])
         assert got_pol == ref_pol, f"trial {trial}: policy C={got_pol} ref={ref_pol}"
         assert got_val == ref_val, f"trial {trial}: value C={got_val} ref={ref_val}"
+
+
+if __name__ == "__main__":
+    try:
+        globals()[sys.argv[1]]()
+    except BaseException:
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(1)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)

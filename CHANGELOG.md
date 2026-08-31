@@ -7,6 +7,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Exact forward-route certificates** — `tikitorch.autodiff` provides a typed
+  operator registry, packed certificates, and selected-VJP replay for the
+  explicitly supported hard-routed graph. Exactness, composition, tie, saved-state,
+  and actual-MorphSSM tests accompany the implementation.
+- **Independent research workspaces** — paper sources for route certificates and
+  multiplier-free FPGA learning now live under `papers/`, with a shared publication
+  map and evidence-controlled claim ledger.
+- **Reproducible route benchmarks** — matched, trajectory, stability, saved-state,
+  and actual-model entry points under `scripts/route_certificates/`, with preserved
+  reference rows under `results/route_certificates/`.
+- **Citation metadata** — `CITATION.cff` identifies the software artifact while the
+  two research papers maintain separate bibliographies.
 - **Loss modules** — `tt.nn.TropicalCrossEntropyLoss` and `tt.nn.TropicalPerceptronLoss`,
   thin `nn.Module` wrappers over the functional losses (cf. `torch.nn.CrossEntropyLoss`)
   for users who want the loss in a config / `repr`-able. `softmax="lut"` keeps the CE
@@ -43,6 +55,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CI now compiles and runs the HLS kernel CSIM testbenches on every push.
 
 ### Changed
+- The public description is library-first and recipe-scoped: tropical operators do
+  not make every loss, backward rule, optimizer, host call, or synthesized build
+  multiplier-free. Closure claims now point to concrete audit and physical-evidence
+  boundaries.
+- The package export version now agrees with project metadata at `0.2.0`.
 - AWS scripts (`run_tikitorch_f2_silicon.sh`, `run_tikitorch_gpu_benchmarks.sh`)
   no longer default to any account: `AWS_PROFILE` / `KEY_NAME` / `SG` / `AGFI`
   are required env vars; the library ships no AFI (build your own).
@@ -55,8 +72,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.0] — 2026-06-08
 
-Initial public release — a tropical-semiring deep-learning library whose entire
-training loop is multiplier-free and maps to zero-DSP FPGA fabric.
+Initial public development baseline for the tropical-semiring library. It included
+specific closure-clean learning recipes and FPGA research paths; closure was not a
+blanket property of every shipped model or training loop.
 
 ### Added
 - **`tikitorch.functional`** — max-plus / min-plus ops with custom autograd
@@ -80,5 +98,5 @@ training loop is multiplier-free and maps to zero-DSP FPGA fabric.
 - Bundled HLS kernels + silicon build guide; a closed model zoo (`zoo/`); CI
   (ruff + pytest).
 
-[Unreleased]: https://github.com/nyuolab/tikitorch/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/nyuolab/tikitorch/releases/tag/v0.1.0
+[Unreleased]: https://github.com/nyuolab/tikitorch/compare/3edd5f3...HEAD
+[0.1.0]: https://github.com/nyuolab/tikitorch/tree/3edd5f3

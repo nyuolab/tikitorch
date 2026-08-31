@@ -15,7 +15,7 @@ to reach cosine >= 0.999. If round-tax stays ~O(depth) (not O(depth*RF)), the di
 does NOT inflate it and the fabric economics carry over from the MLP. Run:
   PYTHONPATH=. python scripts/pc_conv_parallelism.py
 """
-import sys, json, math
+import sys, json
 sys.path.insert(0, ".")
 import torch
 import torch.nn.functional as F

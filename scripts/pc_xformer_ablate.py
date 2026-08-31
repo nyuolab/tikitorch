@@ -146,7 +146,6 @@ class FDyadLN(nn.Module):
             y_x = F.layer_norm(x, (x.shape[-1],), self.g, self.b)
             return y_x + (y_q - y_x).detach()
         if grad == "center":         # tropical: forward fdyad, backward = mean-centered g_y only (no variance-coupling)
-            xn = (c / scale).detach()                              # x_hat (detached: only used to shape the value path)
             y_c = (c / scale.detach()) * self.g + self.b          # mean-centering flows (c has the mean op); scale detached
             return y_c + (y_q - y_c).detach()
         return y_q                   # straight-through (kernel's current: detached quantized scale)

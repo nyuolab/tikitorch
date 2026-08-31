@@ -6,7 +6,6 @@ OFF the diagonal on a test batch — i.e. the layer is doing real routing, not
 sitting frozen as the identity permutation. If a moderate gap raises active% AND
 accuracy over gap=30, the inert-interior diagnosis is confirmed and addressed.
 """
-import sys
 import time
 import torch
 from tikitorch.nn import TropicalPCNet

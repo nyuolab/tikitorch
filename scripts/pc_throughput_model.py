@@ -50,10 +50,10 @@ B = 32
 def nolat_speedup(tb, tu, R): return (1 + tb) / (R * (1 + tu))
 band = [nolat_speedup(tb, tu, R)
         for tb in (1.3, 1.5, 2.0) for tu in (0.1, 0.3, 0.5) for R in (1.0, 1.5, 2.0)]
-print(f"NO-LATENCY speedup vs ASYNC backprop (missing-backward-sweep term only), "
-      f"over tau_b∈[1.3,2.0] tau_u∈[0.1,0.5] round-tax∈[1,2]:")
+print("NO-LATENCY speedup vs ASYNC backprop (missing-backward-sweep term only), "
+      "over tau_b∈[1.3,2.0] tau_u∈[0.1,0.5] round-tax∈[1,2]:")
 print(f"  band = {min(band):.2f}x .. {max(band):.2f}x   (nominal tau_b=2,tau_u=0.3,R=1.5: {nolat_speedup(2.0,0.3,1.5):.2f}x)")
-print(f"vs SYNCHRONOUS backprop (the old strawman) at L=32:")
+print("vs SYNCHRONOUS backprop (the old strawman) at L=32:")
 for d in (0, 1, 2):
     print(f"  delta={d}: PC {thru(t_pc(32,B,d),B)/thru(t_bp_sync(32,B,d),B):.2f}x   "
           f"(vs async-bp: {thru(t_pc(32,B,d),B)/thru(t_bp_async(32,B,d),B):.2f}x)")

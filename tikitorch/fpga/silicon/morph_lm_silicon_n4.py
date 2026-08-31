@@ -44,18 +44,22 @@ def load_lib(path):
     lib = ctypes.CDLL(path)
     c_void_p, c_char_p, c_int, c_long = (ctypes.c_void_p, ctypes.c_char_p,
                                          ctypes.c_int, ctypes.c_long)
-    lib.tt_fpga_open.argtypes = [c_char_p]; lib.tt_fpga_open.restype = c_void_p
-    lib.tt_fpga_alloc.argtypes = [c_void_p, c_long]; lib.tt_fpga_alloc.restype = c_void_p
+    lib.tt_fpga_open.argtypes = [c_char_p]
+    lib.tt_fpga_open.restype = c_void_p
+    lib.tt_fpga_alloc.argtypes = [c_void_p, c_long]
+    lib.tt_fpga_alloc.restype = c_void_p
     lib.tt_fpga_write_region.argtypes = [c_void_p, c_void_p, c_long, i32p, c_long]
     lib.tt_fpga_read_region.argtypes = [c_void_p, c_void_p, c_long, i32p, c_long]
     lib.tt_fpga_kick.argtypes = [c_void_p, c_int, c_int, c_int, c_int]
     lib.tt_fpga_kick.restype = None
-    lib.tt_fpga_done.argtypes = [c_void_p, c_int]; lib.tt_fpga_done.restype = c_int
+    lib.tt_fpga_done.argtypes = [c_void_p, c_int]
+    lib.tt_fpga_done.restype = c_int
     return lib
 
 
 def fnv1a_words(words, h):
-    MASK = 0xFFFFFFFFFFFFFFFF; PRIME = 1099511628211
+    MASK = 0xFFFFFFFFFFFFFFFF
+    PRIME = 1099511628211
     for w in words:
         u = w & 0xFFFFFFFF
         for b in range(4):
@@ -74,30 +78,35 @@ def weight_crc(buf):
 
 
 def write_region(lib, h, dbuf, off, ints):
-    n = len(ints); arr = (ctypes.c_int32 * n)(*ints)
+    n = len(ints)
+    arr = (ctypes.c_int32 * n)(*ints)
     lib.tt_fpga_write_region(h, dbuf, off, arr, n)
 
 
 def read_region(lib, h, dbuf, off, n):
-    arr = (ctypes.c_int32 * n)(); lib.tt_fpga_read_region(h, dbuf, off, arr, n)
+    arr = (ctypes.c_int32 * n)()
+    lib.tt_fpga_read_region(h, dbuf, off, arr, n)
     return list(arr)
 
 
 def main(argv):
     if len(argv) < 2:
-        sys.stderr.write("usage: morph_lm_silicon_n4.py <buffer_init.bin>\n"); return 2
+        sys.stderr.write("usage: morph_lm_silicon_n4.py <buffer_init.bin>\n")
+        return 2
     with open(argv[1], "rb") as f:
         raw = f.read()
     nwords = len(raw) // 4
     if nwords != L.ML_BUFFER_WORDS:
-        sys.stderr.write("bad init size: %d words, want %d\n" % (nwords, L.ML_BUFFER_WORDS)); return 3
+        sys.stderr.write("bad init size: %d words, want %d\n" % (nwords, L.ML_BUFFER_WORDS))
+        return 3
     init = list(struct.unpack("<%di" % nwords, raw))
     tgts = [init[L.OFF_TARGETS + m] for m in range(L.ML_L_SEQ)]
 
     lib = load_lib(LIB_PATH)
     h = lib.tt_fpga_open(None)
     if not h:
-        sys.stderr.write("tt_fpga_open returned NULL\n"); return 4
+        sys.stderr.write("tt_fpga_open returned NULL\n")
+        return 4
     dbuf = ctypes.c_void_p(lib.tt_fpga_alloc(h, NK * WIN_WORDS))
 
     # ---- stage the SAME init buffer into all NK windows ----
@@ -115,12 +124,15 @@ def main(argv):
             if done_t[i] is None and lib.tt_fpga_done(h, i):
                 done_t[i] = time.time()
         if time.time() > deadline:
-            sys.stderr.write("TIMEOUT: done=%s\n" % [d is not None for d in done_t]); return 5
+            sys.stderr.write("TIMEOUT: done=%s\n" % [d is not None for d in done_t])
+            return 5
     wall = max(done_t) - t0
 
     # ---- per-instance verification ----
     L_SEQ = L.ML_L_SEQ
-    all_ok = True; crcs = []; accs = []
+    all_ok = True
+    crcs = []
+    accs = []
     for i in range(NK):
         base = i * WIN_WORDS
         shadow = [0] * L.ML_BUFFER_WORDS
@@ -128,7 +140,8 @@ def main(argv):
                         (L.OFF_MP, L.WORDS_MP), (L.OFF_MB, L.WORDS_MB),
                         (L.OFF_W_HEAD, L.WORDS_W_HEAD)):
             shadow[off:off + nw] = read_region(lib, h, dbuf, base + off, nw)
-        crc = weight_crc(shadow); crcs.append(crc)
+        crc = weight_crc(shadow)
+        crcs.append(crc)
         preds = read_region(lib, h, dbuf, base + L.OFF_PRED, L_SEQ)
         accs.append(sum(1 for m in range(L_SEQ) if preds[m] == tgts[m]) / float(L_SEQ))
         if crc != GATE_CRC:

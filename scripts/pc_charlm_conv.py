@@ -235,7 +235,6 @@ def bigram_floor(d, V, n_train):
 def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train,
             seed, epochs, batch, lr, wd, drop, device, pc_niter=None, stoch=False):
     torch.manual_seed(seed)
-    pc = mode in ("relax", "relax_async", "relax_exact")
     net = DyadicConvPC1d(V, width, depth, kernel, dils, float_conv=(mode == "bp_float")).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=wd)
     warmup = max(1, epochs // 20)                                  # warmup + cosine decay:
@@ -250,8 +249,6 @@ def run_one(mode, V, *, seq, width, depth, kernel, dils, tr, va, d_full, n_train
     Xtr, Ytr = tr
     for ep in range(epochs):
         for xb, yb in iterate(Xtr, Ytr, batch, gen, device):
-            if drop > 0:
-                xb_in = xb  # token ids; dropout applied as embedding-level not here
             if mode == "relax":
                 net.train_step_relax(xb, yb, opt, stoch=stoch)
             elif mode == "relax_exact":                          # DIAGNOSTIC: local form, REAL grad

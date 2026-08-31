@@ -460,7 +460,7 @@ def strict_gate(model, data, args, opt_name, loss_type):
             lines = "\n".join(f"    {c}: {op}" for c, op in bad)
             raise SystemExit(f"[strict] training step NOT closed:\n{lines}")
         waived = sorted({c for c, _ in hits if c in exempt})
-        print(f"[strict] training-closure OK"
+        print("[strict] training-closure OK"
               + (f" (waived float-sim artifacts: {', '.join(waived)})" if waived else ""))
     print(f"[strict] deploy-closure OK"
           f"{'' if hard_training else ' (training uses soft-tau anneal — Level B not claimed)'}")

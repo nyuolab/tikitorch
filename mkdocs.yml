@@ -1,7 +1,9 @@
 site_name: TikiTorch
-site_description: A tropical-semiring deep-learning library — multiplier-free, FPGA-native training.
+site_description: PyTorch-shaped infrastructure for tropical and hard-routed deep learning.
 repo_url: https://github.com/nyuolab/tikitorch
 repo_name: nyuolab/tikitorch
+exclude_docs: |
+  research/
 
 theme:
   name: material
@@ -50,6 +52,7 @@ nav:
       - optim: api/optim.md
       - models: api/models.md
       - audit (closure): api/audit.md
+      - autodiff (route certificates): api/autodiff.md
       - fpga: api/fpga.md
       - classical: api/classical.md
       - geometry: api/geometry.md

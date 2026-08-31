@@ -147,7 +147,6 @@ class MarginBandedRankBlend(torch.autograd.Function):
     def forward(ctx, s, v, Delta, K):
         B, H, L, Lk = s.shape
         kk = min(K, Lk)
-        finite = torch.isfinite(s)
         # rank by score (desc). topv = sorted scores, topi = their key indices.
         topv, topi = s.topk(kk, dim=-1)                       # (B,H,L,kk)
         win = topv[..., :1]                                   # s_(0), the winner score

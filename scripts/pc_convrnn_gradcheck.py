@@ -22,13 +22,12 @@ import sys
 from pathlib import Path
 
 import torch
-import torch.nn.functional as F
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 
-from pc_convrnn_charlm import ConvRNNLM, MorphPCEngine, build_model  # noqa: E402
+from pc_convrnn_charlm import MorphPCEngine, build_model  # noqa: E402
 
 
 def _grads(model):
@@ -141,7 +140,6 @@ def main():
                         runs[:, :, t] = (runs[:, :, t - 1] + 1) * g[:, :, t]
                     # delivery: fraction of (b,c,t) receiving nonzero error at the
                     # conv-drive after the scan adjoint, bucketed by carry-run length
-                    e_bct = None
                     rows.append(dict(
                         gate="G1", form="chains", depth=L, layer=li, seed=seed,
                         carry_frac=round(float(g.float().mean()), 4),

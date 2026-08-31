@@ -8,7 +8,7 @@ to the working dense arm (lr=3e-3). Cheap, decisive.
 If minplus-rec+dense-head learns (beats bigram 3.58) -> probe was crippled, re-run properly.
 If it stalls near unigram -> the cascade-friendly min-plus recurrence underfits LM (real).
 """
-import sys, math, time, os
+import sys, math, time
 sys.path.insert(0, ".")
 import torch, torch.nn as nn, torch.nn.functional as F
 from tikitorch.nn import TropicalLinearModule

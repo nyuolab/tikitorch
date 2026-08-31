@@ -27,7 +27,6 @@ Usage::
 """
 import argparse
 import json
-import math
 import sys
 import time
 from pathlib import Path
@@ -41,7 +40,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 
 from pc_convrnn_charlm import ConvRNNLM, TropicalLeakyState  # noqa: E402
-from nanogpt_shakespeare import CharData, tau_at              # noqa: E402
+from nanogpt_shakespeare import tau_at              # noqa: E402
 
 VOCAB = 64
 VAL_LO, VAL_HI = 1, 17          # value tokens 1..16

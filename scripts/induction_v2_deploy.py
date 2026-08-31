@@ -119,7 +119,6 @@ def main():
     t0 = time.time()
 
     # (label, score, train_agg, anneal, eval_list[(name,agg,tau)])
-    SMALL = 1e-6
     # eval list: soft (final tau), gather (argmax-gather = TRUE hard-attention limit,
     # mult-free), hard (max-plus matmul = different operator, mult-free)
     # STE investigation: does a HARD forward (no soft-anneal) train via straight-through?

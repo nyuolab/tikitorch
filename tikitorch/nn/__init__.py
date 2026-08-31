@@ -154,7 +154,6 @@ def _sinkhorn_aggregate(v, s_max, tau, sink_eps, sink_iters):
     Every normalization op is +/-/logsumexp (== tropical_softmax, the on-silicon LUT).
     """
     logP = s_max / max(sink_eps, 1e-6)
-    NEG = float("-inf")
     for _ in range(sink_iters):
         logP = logP - torch.logsumexp(logP, dim=-1, keepdim=True)   # rows: over keys j
         col = torch.logsumexp(logP, dim=-2, keepdim=True)           # cols: over queries i
@@ -315,13 +314,13 @@ def _chunked_linear(op, x, weight, bias):
     """``op(x, weight_rows) -> (..., out_rows)``, tiled over output features when the
     (batch, out, in) intermediate would exceed ``_MAXPLUS_CHUNK_ELEMS``. ``x`` is
     (..., in); ``weight`` is (out, in); ``bias`` is (out,)."""
-    O, I = weight.shape
-    batch = x.numel() // I
-    if batch * O * I <= _MAXPLUS_CHUNK_ELEMS:
+    out_features, in_features = weight.shape
+    batch = x.numel() // in_features
+    if batch * out_features * in_features <= _MAXPLUS_CHUNK_ELEMS:
         return op(x, weight) + bias
-    chunk = max(1, _MAXPLUS_CHUNK_ELEMS // max(1, batch * I))
+    chunk = max(1, _MAXPLUS_CHUNK_ELEMS // max(1, batch * in_features))
     return torch.cat([op(x, weight[s:s + chunk]) + bias[s:s + chunk]
-                      for s in range(0, O, chunk)], dim=-1)
+                      for s in range(0, out_features, chunk)], dim=-1)
 
 
 class TropicalSoftMin(nn.Module):
@@ -436,13 +435,13 @@ class TropicalDilationModule(nn.Module):
         Tiled over output features like ``_chunked_linear`` so the transient stays
         bounded. Matches ``forward`` bit-exactly on both paths.
         """
-        O, I = self.weight.shape
-        rows = x.numel() // I
-        xf = x.reshape(rows, I)
-        chunk = O if rows * O * I <= _MAXPLUS_CHUNK_ELEMS else \
-            max(1, _MAXPLUS_CHUNK_ELEMS // max(1, rows * I))
+        out_features, in_features = self.weight.shape
+        rows = x.numel() // in_features
+        xf = x.reshape(rows, in_features)
+        chunk = out_features if rows * out_features * in_features <= _MAXPLUS_CHUNK_ELEMS else \
+            max(1, _MAXPLUS_CHUNK_ELEMS // max(1, rows * in_features))
         outs, idxs = [], []
-        for s in range(0, O, chunk):
+        for s in range(0, out_features, chunk):
             w = self.weight[s:s + chunk]
             expanded = w.unsqueeze(0) + xf.unsqueeze(1)      # (rows, chunk, in)
             if self.use_softmax:
@@ -451,10 +450,10 @@ class TropicalDilationModule(nn.Module):
                 y, idx = expanded.max(dim=-1)
                 idxs.append(idx)
             outs.append(y + self.bias[s:s + chunk])
-        y = torch.cat(outs, dim=-1).reshape(*x.shape[:-1], O)
+        y = torch.cat(outs, dim=-1).reshape(*x.shape[:-1], out_features)
         if self.use_softmax:
             return y, None
-        return y, torch.cat(idxs, dim=-1).reshape(*x.shape[:-1], O)
+        return y, torch.cat(idxs, dim=-1).reshape(*x.shape[:-1], out_features)
 
     def extra_repr(self) -> str:
         return (

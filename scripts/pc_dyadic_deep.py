@@ -557,7 +557,7 @@ if __name__ == "__main__":
                     h = model.f(l, h)
                 return (h.argmax(-1) == Yte).float().mean().item()
 
-        print(f"== EQUILIBRIUM-CEILING: fully-settled PC eq update vs backprop ==")
+        print("== EQUILIBRIUM-CEILING: fully-settled PC eq update vs backprop ==")
         print(f"{'depth':>6} {'PC-eq (Adam-settled)':>20} {'backprop':>9} {'sec':>6}")
         for depth in depths:
             dims = [d] + [width] * (depth - 1) + [10]
@@ -638,7 +638,7 @@ if __name__ == "__main__":
             m, sd = statistics.mean(accs), statistics.pstdev(accs)
             print(f"{name:>22}  {m:.3f}±{sd:.3f}  {[f'{a:.3f}' for a in accs]}")
 
-        print(f"\n== depth scan (seed 0): sync vs partial-50% ==")
+        print("\n== depth scan (seed 0): sync vs partial-50% ==")
         print(f"{'depth':>6} {'sync':>7} {'partial50':>10}")
         for dp in (8, 16, 32):
             nsw = max(12, dp)
@@ -954,7 +954,7 @@ if __name__ == "__main__":
         width, n_tr, depth = 64, 4000, 100
         Xtr2, Ytr2 = Xtr[:n_tr], Ytr[:n_tr]
         dims = [d] + [width] * (depth - 1) + [10]
-        print(f"== depth-100 cascade+multiplier-free tuning (BP ref ~0.81) ==")
+        print("== depth-100 cascade+multiplier-free tuning (BP ref ~0.81) ==")
         print(f"{'epochs':>7} {'lr_shift':>8} {'acc':>7} {'sec':>6}")
         for ep, ls in [(5, 10), (10, 10), (15, 10), (10, 9), (15, 11)]:
             torch.manual_seed(0)

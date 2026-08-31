@@ -1,0 +1,192 @@
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Reference operator semantics}
+
+The reference library implements additive hard max/min mixing, stable hard
+top-$k$, causal one-dimensional morphological convolution, residual addition,
+concatenation, and graph fan-out.  Candidate extrema are compared along a fixed
+flattened ordering.  An exact tie selects the smallest candidate index.  The
+forward result is gathered through that index so that the framework-generated
+pullback and certificate replay select the same branch.
+
+For additive mixing, reverse accepts only the supplied output cotangent, winner
+index, unchanged weight, and static shape.  It scatter-adds the cotangent into
+the input and into the selected additive-weight coordinate; bias cotangents are
+reduced over batch and position.  Morphological convolution uses the recorded
+kernel offset with static padding, dilation, and channel addresses.  Invalid
+indices, NaNs, empty candidate sets, shape mismatches, unsupported groups, and
+underspecified field widths fail rather than selecting a fallback path.
+
+The validated finite recurrent primitive has
+\begin{equation}
+ h_t=\max(u_t,h_{t-1}-\lambda),
+\end{equation}
+with a recorded carry/input gate.  Reverse scans from the final requested time
+to the initial time and routes the accumulated cotangent through the selected
+branch.  A derivative with respect to an additive $\lambda$ is a signed routed
+sum.  The contract says nothing about infinite-horizon equilibria or a route
+that changes during iterative settling.
+
+\subsection{Certificate schema and serialization}
+
+Each tensor field declares a schema version, semantic name, shape,
+cardinality, bit width, and bit offset.  For unsigned cardinality $M$, the
+payload width is $(M-1).\code{bit\_length}()=\lceil\log_2M\rceil$; a
+one-code field uses zero payload bits.  Values are packed least-significant-bit
+first without byte alignment between fields.  The portable representation
+prepends a deterministic self-describing directory.  Decoding verifies the
+schema version, field bounds, payload length, model fingerprint, and every
+decoded value's cardinality.
+
+We distinguish:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \emph{logical bits}: the sum of field cardinality widths;
+  \item \emph{payload bytes}: $\lceil\text{logical bits}/8\rceil$;
+  \item \emph{serialized bytes}: payload plus directory and framing; and
+  \item \emph{allocator/process peak}: a separately measured systems metric.
+\end{enumerate}
+No claim substitutes one quantity for another.  A fixed-slot ring buffer can
+store serialized records in chronological order and overwrite the oldest slot;
+this bounds certificate capacity but does not bound parameters, optimizer
+state, or declared boundary values.
+
+\subsection{Correctness tests}
+
+The 38 reference tests are divided into primitive, composition, tie,
+serialization, and counterexample groups.  Randomized float64 cases compare
+explicit state and parameter VJPs with PyTorch autograd and central finite
+differences away from ties.  The relative-L2 acceptance threshold is
+$10^{-10}$ in float64; tie tests require exact branch identity.  Structured
+cases cover several outputs choosing one input, overlapping convolution
+windows, residual duplication, concatenation, shared-parent fan-out, and
+multi-node composition.  Serialization tests erase forward values before
+reverse, round-trip every field, exercise a capacity-bounded ring, and verify
+the fixed-width coding bound.  A counterexample constructs two dense-linear
+inputs with identical route-free metadata and different exact weight
+cotangents.
+
+\subsection{Reference residual-DAG comparison}
+
+The reference systems grid uses an alternating hard max/min-plus additive
+branch with a unit residual.  Widths are 32 and 64; depths are two and four;
+batch size is eight; three seeds are included.  Parameters, inputs, supplied
+output cotangents, FP32 precision, update order, and plain-SGD learning rate are
+shared across eager autograd, explicit route reverse, packed replay, and
+checkpoint/recompute.  A five-step trajectory is checked after the single-step
+gradient comparison.
+
+The explicit route reverse and the historical ``cascade'' label execute the
+same reverse-topological scatter/add kernel when routes, reductions, and
+parameter rules match.  They are therefore one method, not competitors.
+Checkpointing discards internal route/value state and re-executes each layer.
+The packed arm serializes and decodes all fields before calling the same route
+reverse.  The fixed linear objective supplies the output cotangent and thereby
+isolates differentiation from loss-boundary state.
+
+After five warm-ups, 20 repetitions use one Torch thread and a monotonic
+high-resolution CPU clock.  Forward, reverse, update, and total time are
+recorded separately.  Medians and median absolute deviations are primary.
+Autograd saved storage is observed with saved-tensor hooks and de-duplicated by
+underlying storage pointer.  These CPU Python measurements validate accounting
+and expose serialization overhead; they are not used as accelerator
+projections.
+
+\subsection{MorphSSM retained-state audit}
+
+The actual-model audit uses hard-routing evaluation mode, FP32 tensors, batch
+size one, vocabulary size 38, seed zero for parameters, and seed one for token
+and target generation.  The three $(d,\text{layers},T)$ cells are
+$(64,2,96)$, $(128,4,96)$, and $(256,4,192)$.  The middle cell is the
+configuration called out in the text; it is not presented as a deployment
+scale.
+
+Four retained-state views are measured on identical initialized models and
+inputs:
+\begin{description}[leftmargin=1.6em,style=nextline]
+  \item[Certificate payload.] The bit-packed fields required by the supported
+  hard-route replay path.  Portable directory bytes and loss-boundary logits
+  are recorded separately.
+  \item[Inherited cache.] Every tensor retained by the pre-packing manual
+  reverse cache, with dead dense layer inputs disclosed separately.  This is a
+  diagnostic weak comparator and is not the headline ratio.
+  \item[Eager autograd.] Unique nonparameter storage observed through PyTorch
+  saved-tensor hooks.  Parameter-backed storage is classified separately.
+  This is saved storage, not allocator peak.
+  \item[Checkpoint retained set.] One FP32 layer-boundary tensor per layer,
+  the embedding boundary, and the output logits:
+  \begin{equation}
+    (L+1)BTd\cdot 4 + BT|V|\cdot 4\quad\text{bytes}.
+  \end{equation}
+  Recomputed layer invocations and their traffic are not charged in the
+  retained-byte column and must be reported separately in the full benchmark.
+\end{description}
+
+The draft table reports certificate payload in the denominator, following the
+supplied-output-cotangent theorem boundary.  Because the checkpoint formula
+includes output logits, the artifact will additionally report a boundary-
+matched table with logits either included for every applicable arm or excluded
+after supplying a common output cotangent.  This sensitivity analysis is a
+submission gate, not an invitation to select the more favorable convention.
+
+The recorded result was generated on CPU with Python 3.11.5, PyTorch 2.10.0,
+and NumPy 1.26.4 against TikiTorch commit
+\code{ee3c775281b6046781144b0768a050ac26dfbc19}.  Before submission, the run
+script, raw JSONL, manifest, and schema will be re-executed and archived under
+the canonical TikiTorch paper artifact at the submission commit.
+
+\subsection{Frozen five-arm systems protocol}
+\label{sec:five-arm}
+
+The consequential comparison uses one graph, data batch, output-cotangent/loss
+boundary, parameter snapshot, update order, precision, and optimizer across:
+\begin{enumerate}[leftmargin=1.5em]
+  \item eager framework autograd;
+  \item compiled framework autograd;
+  \item non-reentrant layer checkpoint/recompute;
+  \item a compiled custom VJP consuming unpacked typed fields; and
+  \item the same compiled custom VJP consuming a packed certificate, including
+  packing and decoding in the full-cycle measurement.
+\end{enumerate}
+
+Every cell first checks identical forward outputs and selected routes.  Exact
+integer fields must match bitwise.  Floating-point parameter VJPs and updated
+parameters must meet a preregistered tolerance appropriate to precision and
+reduction order; the paper reports maximum error as well as pass/fail.  A
+systems row is invalid if this gate fails.
+
+For each valid row we record warm-up count, repetitions, synchronization
+points, compiler/runtime versions, graph breaks, generated-kernel inventory,
+host/accelerator identity, and input/model digests.  Primary systems endpoints
+are full-cycle median latency, process or accelerator peak allocation, retained
+bytes under boundary-matched accounting, recomputation calls, and measured or
+modeled bytes moved with the model stated.  Packing, decoding, forward,
+reverse, and optimizer times remain individually visible.  OOM, compiler
+fallback, and graph-break incidents are retained as outcomes.
+
+\subsection{Statistical reporting and decision gates}
+
+Correctness tests are deterministic mechanism checks.  Systems measurements
+use all registered seeds and repetitions; no failed seed is silently removed.
+Per-cell medians and median absolute deviations are primary, with all raw rows
+released.  Scale trends are descriptive unless a separate inferential model is
+preregistered.
+
+The current retained-state gate requires at least a 2$\times$ reduction against
+the strongest boundary-matched checkpoint comparator.  A latency claim
+requires at least a 20\% full-cycle improvement over the strongest valid
+compiled baseline at a consequential scale, including packing and decoding.
+Peak-memory and traffic claims require their own direct measurements; one gate
+cannot substitute for another.  Failure of a gate narrows the paper to theorem,
+exactness, and representation results.
+
+\subsection{Artifact layout at submission}
+
+The canonical artifact will contain the manuscript, schema, reference
+operators, TikiTorch integration, unit and counterexample tests, five-arm runner,
+raw append-only JSONL, environment lock, and a deterministic reducer that
+regenerates every table.  Each manifest binds the command, TikiTorch commit,
+dirty-state digest, environment, device, seed, configuration, input digest,
+result-schema version, and incident status.  Artifact paths listed in the
+paper-directory \code{README.md} are release gates until they exist at the
+canonical commit.

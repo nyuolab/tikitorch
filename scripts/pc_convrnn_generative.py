@@ -31,7 +31,6 @@ Usage::
 """
 import argparse
 import json
-import math
 import sys
 import time
 from pathlib import Path
@@ -44,8 +43,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 
-import tikitorch as tt                                     # noqa: E402
-from pc_convrnn_charlm import ConvRNNLM, build_model       # noqa: E402
+from pc_convrnn_charlm import build_model       # noqa: E402
 from nanogpt_shakespeare import BPEData, CharData          # noqa: E402
 
 
@@ -156,7 +154,6 @@ class GenerativePC:
         # objective mask: observed targets within the light cone of any free var
         tgt_obs = ~free[:, 1:]                               # (B, T-1)
         near = torch.zeros_like(tgt_obs)
-        fpos = free.float()
         for b in range(B):
             idxs = free[b].nonzero(as_tuple=True)[0]
             if idxs.numel():

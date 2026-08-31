@@ -17,7 +17,6 @@ Usage::
 """
 import argparse
 import json
-import math
 import sys
 import time
 from pathlib import Path
@@ -29,7 +28,6 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 
-import tikitorch as tt                                     # noqa: E402
 from pc_convrnn_charlm import MorphPCEngine, build_model   # noqa: E402
 from nanogpt_shakespeare import CharData, tau_at           # noqa: E402
 

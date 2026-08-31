@@ -29,7 +29,6 @@ Usage::
 import argparse
 import json
 import math
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -427,23 +426,25 @@ class MorphPCEngine:
     def _proj_adj(self, layer, e: torch.Tensor, cache, grads: bool):
         """Error at out_proj output (R,O) -> error at its input (R,I)."""
         proj = layer.out_proj
-        O, I = proj.weight.shape
+        out_features, in_features = proj.weight.shape
         R = e.shape[0]
         if cache["proj_route"] is not None:                 # hard: winner scatter
             idx = cache["proj_route"]
-            e_x = torch.zeros(R, I, device=e.device, dtype=e.dtype)
+            e_x = torch.zeros(R, in_features, device=e.device, dtype=e.dtype)
             e_x.scatter_add_(1, idx, e)
             if grads:
-                flat = (torch.arange(O, device=e.device).unsqueeze(0) * I + idx)
-                wg = torch.zeros(O * I, device=e.device, dtype=e.dtype)
+                flat = (torch.arange(out_features, device=e.device).unsqueeze(0)
+                        * in_features + idx)
+                wg = torch.zeros(out_features * in_features, device=e.device, dtype=e.dtype)
                 wg.index_add_(0, flat.reshape(-1), e.reshape(-1))
-                wg = wg.view(O, I)
+                wg = wg.view(out_features, in_features)
         else:                                               # soft: chunked p recompute
             x = cache["proj_in"]
-            e_x = torch.zeros(R, I, device=e.device, dtype=e.dtype)
-            wg = torch.zeros(O, I, device=e.device, dtype=e.dtype) if grads else None
-            chunk = max(1, 32_000_000 // max(1, R * I))
-            for s in range(0, O, chunk):
+            e_x = torch.zeros(R, in_features, device=e.device, dtype=e.dtype)
+            wg = torch.zeros(out_features, in_features, device=e.device,
+                             dtype=e.dtype) if grads else None
+            chunk = max(1, 32_000_000 // max(1, R * in_features))
+            for s in range(0, out_features, chunk):
                 z = (proj.weight[s:s + chunk].unsqueeze(0) + x.unsqueeze(1)) / proj.tau
                 p = torch.softmax(z, dim=-1)                # (R, chunk, I) exact Jacobian
                 e_x += torch.einsum("ro,roi->ri", e[:, s:s + chunk], p)
@@ -822,16 +823,16 @@ class MorphPCEngine:
             if rand_order:
                 order = [free[i] for i in
                          torch.randperm(len(free), generator=gen).tolist()]
-            for l in order:
+            for level in order:
                 if participation < 1.0 and \
                         torch.rand(1, generator=gen).item() >= participation:
                     continue
-                E[l] = self._layer_adjoint(m.layers[l], snap[l + 1],
-                                           caches[l], grads=False)
+                E[level] = self._layer_adjoint(m.layers[level], snap[level + 1],
+                                               caches[level], grads=False)
             E[L] = eL
         self._top_error(logits, targets, top, grads=True)   # head/ln_final grads
-        for l in range(L):                                  # layer grads from settled E
-            self._layer_adjoint(m.layers[l], E[l + 1], caches[l], grads=True)
+        for level in range(L):                              # layer grads from settled E
+            self._layer_adjoint(m.layers[level], E[level + 1], caches[level], grads=True)
         self._embed_grads(E[0], top)
         return logits
 
@@ -1056,7 +1057,7 @@ def run_one(arch, credit, data, args, log_path):
                 row.update(pc_niter=(1 if credit == "cascade" else 3 * L),
                            participation=(1.0 if credit == "cascade"
                                           else args.participation))
-            scans = [l.scan for l in model.layers if getattr(l, "scan", None)]
+            scans = [layer.scan for layer in model.layers if getattr(layer, "scan", None)]
             if scans:
                 lam = torch.cat([s.lam().detach().cpu() for s in scans])
                 row["lambda_p50"] = float(lam.median())

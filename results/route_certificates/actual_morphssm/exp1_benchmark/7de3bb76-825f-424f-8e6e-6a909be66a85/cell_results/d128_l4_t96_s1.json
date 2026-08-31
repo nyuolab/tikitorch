@@ -1,0 +1,253 @@
+{
+ "cell_id": "d128_l4_t96_s1",
+ "d_model": 128,
+ "n_layers": 4,
+ "T": 96,
+ "seed": 1,
+ "vocab": 38,
+ "batch": 1,
+ "warmup": 5,
+ "reps": 20,
+ "torch_num_threads": 1,
+ "torch_num_interop_threads": 1,
+ "status": "COMPLETE",
+ "arm_order": [
+  "checkpoint",
+  "cascade",
+  "eager",
+  "compiled",
+  "packed"
+ ],
+ "timing_arms": {
+  "checkpoint": {
+   "init_params_sha": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "batch_sha": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "timing": {
+    "median_ms": 24.12,
+    "mad_ms": 0.1991,
+    "p10_ms": 23.6915,
+    "p90_ms": 24.5985,
+    "min_ms": 23.5956,
+    "max_ms": 25.1438,
+    "n": 20
+   },
+   "update_count": 25
+  },
+  "cascade": {
+   "init_params_sha": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "batch_sha": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "timing": {
+    "median_ms": 13.0965,
+    "mad_ms": 0.0703,
+    "p10_ms": 13.022,
+    "p90_ms": 13.3118,
+    "min_ms": 12.9461,
+    "max_ms": 14.0234,
+    "n": 20
+   },
+   "update_count": 25
+  },
+  "eager": {
+   "init_params_sha": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "batch_sha": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "timing": {
+    "median_ms": 15.3074,
+    "mad_ms": 0.1618,
+    "p10_ms": 15.1213,
+    "p90_ms": 16.1178,
+    "min_ms": 14.9962,
+    "max_ms": 17.7175,
+    "n": 20
+   },
+   "update_count": 25
+  },
+  "compiled": {
+   "init_params_sha": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "batch_sha": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "compile_overhead_s": 4.4541,
+   "timing": {
+    "median_ms": 17.8337,
+    "mad_ms": 0.1293,
+    "p10_ms": 17.6943,
+    "p90_ms": 18.2512,
+    "min_ms": 17.6083,
+    "max_ms": 18.7848,
+    "n": 20
+   },
+   "update_count": 26
+  },
+  "packed": {
+   "init_params_sha": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "batch_sha": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "timing": {
+    "median_ms": 19.7601,
+    "mad_ms": 0.0674,
+    "p10_ms": 19.6639,
+    "p90_ms": 20.1292,
+    "min_ms": 19.3426,
+    "max_ms": 21.6048,
+    "n": 20
+   },
+   "update_count": 25
+  }
+ },
+ "arm_errors": {},
+ "firing": {
+  "init_params_sha": {
+   "checkpoint": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "cascade": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "eager": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "compiled": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265",
+   "packed": "ae1e2106afef75936f847382eac05235e1eb4ce2a41fba5409ea59b0e533d265"
+  },
+  "batch_sha": {
+   "checkpoint": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "cascade": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "eager": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "compiled": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2",
+   "packed": "bba421a127601595cd50925130b3a135c1737dfdb13be26b79d602c671abe3d2"
+  },
+  "init_params_sha_equal": true,
+  "batch_sha_equal": true,
+  "update_counts": {
+   "checkpoint": 25,
+   "cascade": 25,
+   "eager": 25,
+   "compiled": 26,
+   "packed": 25
+  },
+  "expected_update_count": 25
+ },
+ "components": {
+  "forward_ms": {
+   "median_ms": 11.1265,
+   "mad_ms": 0.0289,
+   "p10_ms": 11.0775,
+   "p90_ms": 11.2069,
+   "min_ms": 11.0597,
+   "max_ms": 11.5277,
+   "n": 20
+  },
+  "replay_only_ms": {
+   "median_ms": 3.2654,
+   "mad_ms": 0.0204,
+   "p10_ms": 3.2334,
+   "p90_ms": 3.2948,
+   "min_ms": 3.2286,
+   "max_ms": 3.3792,
+   "n": 20
+  },
+  "adamw_step_ms": {
+   "median_ms": 0.4666,
+   "mad_ms": 0.0076,
+   "p10_ms": 0.4583,
+   "p90_ms": 0.479,
+   "min_ms": 0.4577,
+   "max_ms": 0.4927,
+   "n": 10
+  }
+ },
+ "retained": {
+  "autograd": {
+   "dedup_total_bytes": 1060996,
+   "dedup_param_bytes": 0,
+   "dedup_nonparam_bytes": 1060996,
+   "unique_storages": 26,
+   "saved_tensor_calls": 27
+  },
+  "checkpoint": {
+   "dedup_total_bytes": 446596,
+   "dedup_param_bytes": 0,
+   "dedup_nonparam_bytes": 446596,
+   "unique_storages": 11,
+   "saved_tensor_calls": 15
+  },
+  "checkpoint_recompute_layer_calls": 4,
+  "boundary_logits_bytes": 14592,
+  "boundary_targets_bytes": 768,
+  "tape_serialized_bytes": 89799,
+  "tape_payload_bytes": 87588,
+  "tape_logical_bits": 700704,
+  "autograd_retained_baseline_bytes": 1061764,
+  "checkpoint_retained_baseline_bytes": 461956,
+  "best_retained_baseline_bytes": 461956,
+  "packed_retained_bytes": 105159,
+  "retained_ratio": 4.3929,
+  "accounting_note": "retained-set ONLY (not process peak); packed peak is reported separately via per-arm subprocess ru_maxrss and includes the dense _forward_cache transient"
+ },
+ "traffic_proxy": {
+  "bytes_allocated_proxy": {
+   "eager": 107870720,
+   "compiled": 3843356,
+   "checkpoint": 132281900,
+   "cascade": 42539496,
+   "packed": 43944549
+  },
+  "traffic_ratio": 3.1096,
+  "label": "PROXY: profiler cpu bytes-allocated, not DRAM traffic"
+ },
+ "fp64_parity": {
+  "cascade_equals_replay_bitexact": true,
+  "cascade_replay_max_abs_diff": 0.0,
+  "autograd_vs_cascade_max_abs_diff": 7.859792816589106e-09,
+  "autograd_vs_cascade_documented_tol": 1e-06,
+  "autograd_vs_cascade_within_documented_tol": true,
+  "route_changing_counterexample_sites": [],
+  "note": "cascade==replay is bit-exact (rtol=atol=0); autograd vs cascade differs at the fp32 softmax-cast boundary (~1e-8), a documented non-tie divergence, not a quality loss"
+ },
+ "subprocess_peaks": {
+  "per_arm": {
+   "eager": {
+    "arm": "eager",
+    "ru_maxrss": 392396800,
+    "unit": "bytes"
+   },
+   "compiled": {
+    "arm": "compiled",
+    "ru_maxrss": 523845632,
+    "unit": "bytes"
+   },
+   "checkpoint": {
+    "arm": "checkpoint",
+    "ru_maxrss": 368033792,
+    "unit": "bytes"
+   },
+   "cascade": {
+    "arm": "cascade",
+    "ru_maxrss": 383647744,
+    "unit": "bytes"
+   },
+   "packed": {
+    "arm": "packed",
+    "ru_maxrss": 372260864,
+    "unit": "bytes"
+   }
+  },
+  "note": "SEPARATE from retained-set; packed peak includes the dense forward-cache transient"
+ },
+ "gate": {
+  "verdict": "PASS",
+  "legs": {
+   "retained": true,
+   "traffic": true,
+   "latency": false
+  },
+  "retained_ratio": 4.3929,
+  "retained_bar": 2.0,
+  "traffic_ratio": 3.1096,
+  "traffic_bar": 2.0,
+  "latency_ratio": 0.8556,
+  "latency_bar": 0.8,
+  "latency_pass": false,
+  "latency_undecidable": false,
+  "latency_undecidable_reason": null,
+  "baseline_medians_ms": {
+   "eager": 15.3074,
+   "compiled": 17.8337,
+   "checkpoint": 24.12
+  },
+  "cascade_median_ms": 13.0965,
+  "baseline_arm_error": false
+ },
+ "wall_s": 30.954
+}

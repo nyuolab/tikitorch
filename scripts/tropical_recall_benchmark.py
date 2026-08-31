@@ -21,7 +21,6 @@ needs attention-augmentation. A clean negative is the valuable, scoping result.
 Run:  python scripts/tropical_recall_benchmark.py
 """
 import argparse
-import math
 import time
 
 import torch

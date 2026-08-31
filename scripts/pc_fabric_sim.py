@@ -27,7 +27,6 @@ comparator is included. Run: PYTHONPATH=. python scripts/pc_fabric_sim.py
 import sys, os, time, json, statistics
 sys.path.insert(0, ".")
 import torch
-import torch.nn.functional as F
 
 # ---------- (1) MEASURE per-stage compute costs on the real DyadicPCNet ----------
 def measure_compute(depth=16, width=256, batch=128, reps=30):

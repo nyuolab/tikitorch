@@ -3,7 +3,7 @@ embed -> [LN->attn->res->LN->FFN->res] -> LN_F -> HEAD) on lowercased tinyshakes
 LM head. Question: does a LINEAR (dot-product) head beat the bigram baseline where the MAX-PLUS head does not,
 at D=64/1L? And does a DYADIC (mult-free, weights snapped to +-2^k) linear head also work?
 """
-import math, sys, time
+import math, time
 import numpy as np
 import torch, torch.nn as nn, torch.nn.functional as F
 
