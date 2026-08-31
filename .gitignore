@@ -31,6 +31,10 @@ site/
 # FPGA build/probe fetch scratch (large regenerable DCP/tar/logs)
 results/fpga_silicon/afibuild/
 results/fpga_silicon/hdk_probe/
+# AWS HDK implementation products are retained in object storage, not ordinary
+# Git. Keep the small timing reports, manifests, and logs in the repository.
+results/fpga_silicon/**/to_aws/*.tar
+results/fpga_silicon/**/to_aws/*.dcp
 
 # local API keys (results/graphics/.env etc.)
 **/.env
