@@ -1,0 +1,255 @@
++ export HOME=/root
++ HOME=/root
++ S3_SRC=s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/src.tar.gz
++ S3_RESULTS=s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results
++ AGFI=agfi-063e2dd0d3255dcaa
++ trap up EXIT
+++ date -u
++ echo 'BOOT Sun Jun 21 18:43:12 UTC 2026'
+BOOT Sun Jun 21 18:43:12 UTC 2026
++ hostname
+ip-172-31-44-213
++ AF=
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /opt/aws-fpga
++ '[' -d /root/aws-fpga/sdk ']'
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /opt/aws-fpga
++ '[' -d '/home/*/src/project_data/aws-fpga/sdk' ']'
++ for p in ~/aws-fpga /home/*/src/project_data/aws-fpga /opt/aws-fpga
++ '[' -d /opt/aws-fpga/sdk ']'
++ '[' -z '' ']'
++ AF=/opt/aws-fpga
++ git clone https://github.com/aws/aws-fpga.git /opt/aws-fpga
+Cloning into '/opt/aws-fpga'...
++ cd /opt/aws-fpga
++ source sdk_setup.sh
+++ script=sdk_setup.sh
+++ '[' sdk_setup.sh == /var/lib/cloud/instance/scripts/part-001 ']'
++++ readlink -f sdk_setup.sh
+++ full_script=/opt/aws-fpga/sdk_setup.sh
++++ basename /opt/aws-fpga/sdk_setup.sh
+++ script_name=sdk_setup.sh
++++ dirname /opt/aws-fpga/sdk_setup.sh
+++ script_dir=/opt/aws-fpga
++++ pwd
+++ current_dir=/opt/aws-fpga
+++ source /opt/aws-fpga/shared/bin/set_common_functions.sh
++++ export -f get_tools_dst_dir
++++ export -f get_tools_lib_dir
+++ source /opt/aws-fpga/shared/bin/set_common_env_vars.sh
++++ info_msg 'Setting up environment variables'
++++ echo -e 'INFO: Setting up environment variables'
+INFO: Setting up environment variables
+++++ git rev-parse --show-toplevel
++++ repo_root=/opt/aws-fpga
++++ [[ -z '' ]]
++++ debug_msg 'AWS_FPGA_REPO_DIR not set so setting to /opt/aws-fpga'
++++ [[ 0 == 0 ]]
++++ return
++++ export AWS_FPGA_REPO_DIR=/opt/aws-fpga
++++ AWS_FPGA_REPO_DIR=/opt/aws-fpga
++++ unset HDK_DIR
++++ unset HDK_COMMON_DIR
++++ unset HDK_SHELL_DIR
++++ unset HDK_SHELL_DESIGN_DIR
++++ export HDK_DIR=/opt/aws-fpga/hdk
++++ HDK_DIR=/opt/aws-fpga/hdk
++++ export HDK_COMMON_DIR=/opt/aws-fpga/hdk/common
++++ HDK_COMMON_DIR=/opt/aws-fpga/hdk/common
+++++ realpath -s /opt/aws-fpga/hdk/common/shell_stable
++++ export HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
++++ HDK_SHELL_DIR=/opt/aws-fpga/hdk/common/shell_stable
++++ export HDK_SHELL_DESIGN_DIR=/opt/aws-fpga/hdk/common/shell_stable/design
++++ HDK_SHELL_DESIGN_DIR=/opt/aws-fpga/hdk/common/shell_stable/design
++++ unset SDK_DIR
++++ export SDK_DIR=/opt/aws-fpga/sdk
++++ SDK_DIR=/opt/aws-fpga/sdk
++++ export VITIS_DIR=/opt/aws-fpga/vitis
++++ VITIS_DIR=/opt/aws-fpga/vitis
++++ python_lib=/opt/aws-fpga/shared/lib
++++ export PYTHONPATH=/opt/aws-fpga/shared/lib:
++++ PYTHONPATH=/opt/aws-fpga/shared/lib:
+++++ echo /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++++ sed -e 's/\(^\|:\)[^:]\+\/shared\/bin\/scripts\(:\|$\)/:/g; s/^://; s/:$//'
++++ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
++++ PATH=/opt/aws-fpga/shared/bin/scripts:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+++ sudo rm -f /tmp/sdk_root_env.exp
+++ typeset -f allow_non_root
+++ sudo chown root:root /tmp/sdk_root_env.exp
+++ sudo chmod 700 /tmp/sdk_root_env.exp
+++ cd /opt/aws-fpga
+++ bash /opt/aws-fpga/sdk/sdk_install.sh
+Entering /opt/aws-fpga/sdk/userspace/utils
+rm -f *.o *.a ../lib/libutils.a
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../include -I/usr/include   -c -o io.o io.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../include -I/usr/include   -c -o log.o log.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../include -I/usr/include   -c -o logger-kmsg.o logger-kmsg.c
+mkdir -p ../lib
+ar rcs ../lib/libutils.a io.o log.o logger-kmsg.o
+Entering /opt/aws-fpga/sdk/userspace/fpga_libs/fpga_pci
+rm -f *.o ../../lib/libfpga_pci.a
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_pci.o fpga_pci.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_pci_sysfs.o fpga_pci_sysfs.c
+mkdir -p ../../lib
+ar rcs ../../lib/libfpga_pci.a fpga_pci.o fpga_pci_sysfs.o
+Entering /opt/aws-fpga/sdk/userspace/fpga_libs/fpga_dma
+rm -f *.o ../../lib/libfpga_dma.a
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_dma_mem.o fpga_dma_mem.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_dma_utils.o fpga_dma_utils.c
+mkdir -p ../../lib
+ar rcs ../../lib/libfpga_dma.a fpga_dma_mem.o fpga_dma_utils.o
+Entering /opt/aws-fpga/sdk/userspace/fpga_libs/fpga_clkgen
+rm -f *.o ../../lib/libfpga_clkgen.a
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_clkgen_utils.o fpga_clkgen_utils.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_clkgen_mmcm.o fpga_clkgen_mmcm.c
+mkdir -p ../../lib
+ar rcs ../../lib/libfpga_clkgen.a fpga_clkgen_utils.o fpga_clkgen_mmcm.o
+Entering /opt/aws-fpga/sdk/userspace/fpga_libs/fpga_mgmt
+rm -f *.o ../../lib/libfpga_mgmt.a ../../lib/so/libfpga_mgmt.so.1.0.0
+cc  -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_mgmt.o fpga_mgmt.c
+cc  -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_mgmt_cmd.o fpga_mgmt_cmd.c
+cc  -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_hal_mbox.o fpga_hal_mbox.c
+mkdir -p ../../lib
+for library in ../../lib/libfpga_pci.a ../../lib/libutils.a ../../lib/libfpga_dma.a ../../lib/libfpga_clkgen.a; do ar -x $library; done
+ar rcs ../../lib/libfpga_mgmt.a *.o
+mkdir -p ../../lib/so
+cc -o ../../lib/so/libfpga_mgmt.so.1.0.0 -shared fpga_mgmt.o fpga_mgmt_cmd.o fpga_hal_mbox.o -Wl,-soname,libfpga_mgmt.so.1 -Wl,--whole-archive ../../lib/libfpga_pci.a ../../lib/libutils.a ../../lib/libfpga_dma.a ../../lib/libfpga_clkgen.a -Wl,--no-whole-archive -lrt -lpthread
+ln -sf libfpga_mgmt.so.1.0.0 ../../lib/so/libfpga_mgmt.so
+Entering /opt/aws-fpga/sdk/userspace/fpga_mgmt_tools/src
+rm -f *.o *.a fpga-local-cmd static-fpga-local-cmd
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g  -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.   -c -o fpga_local_cmd.o fpga_local_cmd.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g  -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.   -c -o fpga_local_cmd_parse.o fpga_local_cmd_parse.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g  -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.   -c -o virtual_jtag_pcie.o virtual_jtag_pcie.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g  -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.   -c -o virtual_jtag_server.o virtual_jtag_server.c
+cc -o fpga-local-cmd fpga_local_cmd.o fpga_local_cmd_parse.o virtual_jtag_pcie.o virtual_jtag_server.o -L../../lib/so -lfpga_mgmt
+cc -o static-fpga-local-cmd fpga_local_cmd.o fpga_local_cmd_parse.o virtual_jtag_pcie.o virtual_jtag_server.o -L../../lib -lfpga_mgmt -lrt -lpthread
+Entering /opt/aws-fpga/sdk/userspace/fpga_mgmt_examples/src
+rm -f *.o *.a clear_single_fpga clear_multiple_fpga load_single_fpga load_multiple_fpga prefetch_multiple_afi static_clear_single_fpga static_clear_multiple_fpga static_load_single_fpga static_load_multiple_fpga static_prefetch_multiple_afi
+cc -o clear_single_fpga clear_single_fpga.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o clear_multiple_fpga clear_multiple_fpga.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o load_single_fpga load_single_fpga.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o load_multiple_fpga load_multiple_fpga.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o prefetch_multiple_afi prefetch_multiple_afi.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_clear_single_fpga clear_single_fpga.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_clear_multiple_fpga clear_multiple_fpga.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_load_single_fpga load_single_fpga.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_load_multiple_fpga load_multiple_fpga.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_prefetch_multiple_afi prefetch_multiple_afi.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.2"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+Build complete.
+Executing as root...
+
+/opt/aws-fpga/shared/bin/scripts:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+AWS FPGA: Copying Amazon FPGA Image (AFI) Management Tools to /usr/local/bin
+AWS FPGA: Installing shared library to /usr/local/lib
+	libfpga_mgmt.so.1 (libc6,x86-64) => /usr/local/lib/libfpga_mgmt.so.1
+AWS FPGA: Done with Amazon FPGA Image (AFI) Management Tools install.
+Done with SDK install.
+++ cd sdk/userspace/cython_bindings
+++ python3 -m venv venv
+The virtual environment was not created successfully because ensurepip is not
+available.  On Debian/Ubuntu systems, you need to install the python3-venv
+package using the following command.
+
+    apt install python3.8-venv
+
+You may need to use sudo with that command.  After installing the python3-venv
+package, recreate your virtual environment.
+
+Failing command: ['/opt/aws-fpga/sdk/userspace/cython_bindings/venv/bin/python3', '-Im', 'ensurepip', '--upgrade', '--default-pip']
+
+++ deactivate
+++ echo 'Warning: Cython bindings setup failed'
+Warning: Cython bindings setup failed
+++ cd /opt/aws-fpga
+++ info_msg 'sdk_setup.sh PASSED'
+++ echo -e 'INFO: sdk_setup.sh PASSED'
+INFO: sdk_setup.sh PASSED
++ SDK=/opt/aws-fpga/sdk/userspace
+++ command -v fpga-describe-local-image
++ FD=/usr/local/bin/fpga-describe-local-image
+++ command -v fpga-load-local-image
++ FL=/usr/local/bin/fpga-load-local-image
+++ command -v fpga-clear-local-image
++ FC=/usr/local/bin/fpga-clear-local-image
++ sudo /usr/local/bin/fpga-clear-local-image -S 0
+AFI          0       No AFI                  cleared           1        ok               0       0x10212415
+AFIDEVICE    0       0x1d0f      0x9048      0000:34:00.0
++ sudo /usr/local/bin/fpga-load-local-image -S 0 -I agfi-063e2dd0d3255dcaa
+AFI          0       agfi-063e2dd0d3255dcaa  loaded            0        ok               0       0x10212415
+AFIDEVICE    0       0x1d0f      0xf010      0000:34:00.0
++ sleep 4
++ echo '== loaded image =='
+== loaded image ==
++ sudo /usr/local/bin/fpga-describe-local-image -S 0
++ tee /tmp/img.txt
+AFI          0       agfi-063e2dd0d3255dcaa  loaded            0        ok               0       0x10212415
+AFIDEVICE    0       0x1d0f      0xf010      0000:34:00.0
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-pcverify.log s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/pcverify.log --only-show-errors
++ mkdir -p /opt/tiki
++ cd /opt/tiki
++ for i in 1 2 3
++ aws s3 cp s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/src.tar.gz s.tgz
+Completed 256.0 KiB/2.9 MiB (1.5 MiB/s) with 1 file(s) remainingCompleted 512.0 KiB/2.9 MiB (3.0 MiB/s) with 1 file(s) remainingCompleted 768.0 KiB/2.9 MiB (4.5 MiB/s) with 1 file(s) remainingCompleted 1.0 MiB/2.9 MiB (5.8 MiB/s) with 1 file(s) remaining  Completed 1.2 MiB/2.9 MiB (7.1 MiB/s) with 1 file(s) remaining  Completed 1.5 MiB/2.9 MiB (8.5 MiB/s) with 1 file(s) remaining  Completed 1.8 MiB/2.9 MiB (9.7 MiB/s) with 1 file(s) remaining  Completed 2.0 MiB/2.9 MiB (10.9 MiB/s) with 1 file(s) remaining Completed 2.2 MiB/2.9 MiB (12.0 MiB/s) with 1 file(s) remaining Completed 2.5 MiB/2.9 MiB (13.2 MiB/s) with 1 file(s) remaining Completed 2.8 MiB/2.9 MiB (14.5 MiB/s) with 1 file(s) remaining Completed 2.9 MiB/2.9 MiB (15.2 MiB/s) with 1 file(s) remaining download: s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/src.tar.gz to ./s.tgz
++ break
++ tar xzf s.tgz
++ gcc -O2 -std=gnu11 -I/opt/aws-fpga/sdk/userspace/include /opt/tiki/tikitorch/fpga/silicon/forge_pc_ddr_verify.c -lfpga_mgmt -o /tmp/forge_pc_ddr_verify
++ tee /tmp/build.txt
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-pcverify.log s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/pcverify.log --only-show-errors
++ sudo /tmp/forge_pc_ddr_verify 0 kat
++ tee /tmp/verify_kat.txt
+[pc] KNOWN-ANSWER TEST: all inputs=1 -> expect gW=gB=16 and e_down=256 everywhere
+[pc] staging mismatches: e 0/4096  W 0/65536  acts 0/4096  mask 0/4096  skip 0/4096
+[pc] gate density (host): mask=1 in 4096/4096, skip=1 in 4096/4096
+[pc] AP_DONE in 0.687 ms -> kernel ran from DDR
+[pc] readback nonzero: gw 65536/65536  e_down 4096/4096  gb 256/256
+[pc] samples: gw[0]=16(ref 16) gw[100]=16(ref 16) ed[0]=256(ref 256) gb[0]=16(ref 16)
+[pc] ON-SILICON vs cascade_grads:  max|gW|=0  max|e_down|=0  max|gB|=0
+[pc] -> BIT-EXACT ON SILICON (the PC gradient computed on F2 == cascade_grads)
++ echo KAT_EXIT=0
++ sudo /tmp/forge_pc_ddr_verify 0
++ tee /tmp/verify.txt
+[pc] staging mismatches: e 0/4096  W 0/65536  acts 0/4096  mask 0/4096  skip 0/4096
+[pc] gate density (host): mask=1 in 2468/4096, skip=1 in 2898/4096
+[pc] AP_DONE in 0.688 ms -> kernel ran from DDR
+[pc] readback nonzero: gw 64891/65536  e_down 4096/4096  gb 251/256
+[pc] samples: gw[0]=393216(ref 393216) gw[100]=118784(ref 118784) ed[0]=-198260(ref -198260) gb[0]=480(ref 480)
+[pc] ON-SILICON vs cascade_grads:  max|gW|=0  max|e_down|=0  max|gB|=0
+[pc] -> BIT-EXACT ON SILICON (the PC gradient computed on F2 == cascade_grads)
++ echo VERIFY_EXIT=0
++ echo '== post metrics =='
+== post metrics ==
++ grep -iE 'Vccint|Last measured|ddr'
++ sudo /usr/local/bin/fpga-describe-local-image -S 0 -M
++ tee /tmp/m_post.txt
+pcim-range-error-addr=0x0
+pcim-axi-protocol-error-addr=0x0
+dma-pcis-timeout-addr=0x0
+ocl-slave-timeout-addr=0x0
+sda-slave-timeout-addr=0x0
+virtual-jtag-slave-timeout-addr=0x0
+DDR0
+Power consumption (Vccint):
+   Last measured: 8 watts
++ for f in img build verify_kat verify m_post
++ aws s3 cp /tmp/img.txt s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/img.txt --only-show-errors
++ for f in img build verify_kat verify m_post
++ aws s3 cp /tmp/build.txt s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/build.txt --only-show-errors
++ for f in img build verify_kat verify m_post
++ aws s3 cp /tmp/verify_kat.txt s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/verify_kat.txt --only-show-errors
++ for f in img build verify_kat verify m_post
++ aws s3 cp /tmp/verify.txt s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/verify.txt --only-show-errors
++ for f in img build verify_kat verify m_post
++ aws s3 cp /tmp/m_post.txt s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/m_post.txt --only-show-errors
++ echo done
++ aws s3 cp - s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/DONE --only-show-errors
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-pcverify.log s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/pcverify.log --only-show-errors
++ shutdown -h now
++ up
++ command -v aws
++ aws s3 cp /var/log/tiki-pcverify.log s3://tiki-sweep-739966866637/pcverify-20260621T184155Z/results/pcverify.log --only-show-errors

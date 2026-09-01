@@ -7,9 +7,10 @@ Foundational layer modules:
     CompositionalTropicalProjection (alias TropicalProjection)
     TropicalTopKModule (alias TropicalTopK)
 
-Higher-level layers are appended below the marker. Every layer here
-wraps the stateless ops in :mod:`tikitorch.functional`; the math is ported
-verbatim from the validated research code.
+Higher-level layers are appended below the marker. Most layers wrap stateless
+ops in :mod:`tikitorch.functional`. Operator-level algebra does not establish
+closure of a model, training recipe, or physical build; audit those boundaries
+separately.
 
 Naming convention. Modules carry their original research names *and* a clean,
 PyTorch-idiomatic alias (e.g. ``TropicalLinearModule`` is also ``TropicalLinear``).
@@ -56,12 +57,11 @@ from tikitorch.functional import (
 def _make_norm(norm_type: str, d_model: int):
     """Build a normalization module by name.
 
-    ``"tropical"`` (default everywhere) is the multiplier-free
-    :class:`TropicalLayerNorm` (subtract-mean + power-of-2 mean-abs rescale) that
-    replaces ``nn.LayerNorm``'s variance/divide/affine multiplies — closing the
-    N1 closure hole.  ``"layernorm"`` keeps standard ``nn.LayerNorm`` as a
-    declared DSP boundary; ``"tropical_rms"``/``"tropical_shift"`` are the
-    cheaper closed variants.  (Names resolve at call time, so the norm classes
+    ``"tropical"`` is :class:`TropicalLayerNorm` (subtract-mean plus a
+    power-of-two-oriented mean-absolute rescale). ``"layernorm"`` keeps standard
+    ``nn.LayerNorm`` as a declared dense arithmetic boundary;
+    ``"tropical_rms"``/``"tropical_shift"`` are lower-complexity variants. A norm
+    choice alone does not close a recipe. (Names resolve at call time, so classes
     defined later in this module are visible.)
     """
     if norm_type in ("tropical", "tropical_layernorm"):
@@ -314,13 +314,13 @@ def _chunked_linear(op, x, weight, bias):
     """``op(x, weight_rows) -> (..., out_rows)``, tiled over output features when the
     (batch, out, in) intermediate would exceed ``_MAXPLUS_CHUNK_ELEMS``. ``x`` is
     (..., in); ``weight`` is (out, in); ``bias`` is (out,)."""
-    n_out, n_in = weight.shape
-    batch = x.numel() // n_in
-    if batch * n_out * n_in <= _MAXPLUS_CHUNK_ELEMS:
+    out_features, in_features = weight.shape
+    batch = x.numel() // in_features
+    if batch * out_features * in_features <= _MAXPLUS_CHUNK_ELEMS:
         return op(x, weight) + bias
-    chunk = max(1, _MAXPLUS_CHUNK_ELEMS // max(1, batch * n_in))
+    chunk = max(1, _MAXPLUS_CHUNK_ELEMS // max(1, batch * in_features))
     return torch.cat([op(x, weight[s:s + chunk]) + bias[s:s + chunk]
-                      for s in range(0, n_out, chunk)], dim=-1)
+                      for s in range(0, out_features, chunk)], dim=-1)
 
 
 class TropicalSoftMin(nn.Module):
@@ -421,6 +421,39 @@ class TropicalDilationModule(nn.Module):
         expanded = self.weight.unsqueeze(0) + x.unsqueeze(1)  # (batch, out, in)
         out, indices = expanded.max(dim=-1)  # (batch, out)
         return out + self.bias, indices
+
+    @torch.no_grad()
+    def forward_with_routing(self, x: torch.Tensor):
+        """Forward returning the FROZEN routing for a PC cascade sweep.
+
+        Hard path (``use_softmax=False`` / tau==0): returns ``(y, indices)`` with
+        ``indices`` the (batch, out) argmax winners — the cacheable routing whose
+        adjoint is a pure scatter (zero multiplies). Soft path (tau>0): returns
+        ``(y, None)`` — the softmax routing weights are (batch, out, in) and are
+        deliberately NOT materialized (600MB-class at d=256, B·T≈2k rows); the PC
+        engine recomputes them chunk-wise from the cached input during the sweep.
+        Tiled over output features like ``_chunked_linear`` so the transient stays
+        bounded. Matches ``forward`` bit-exactly on both paths.
+        """
+        out_features, in_features = self.weight.shape
+        rows = x.numel() // in_features
+        xf = x.reshape(rows, in_features)
+        chunk = out_features if rows * out_features * in_features <= _MAXPLUS_CHUNK_ELEMS else \
+            max(1, _MAXPLUS_CHUNK_ELEMS // max(1, rows * in_features))
+        outs, idxs = [], []
+        for s in range(0, out_features, chunk):
+            w = self.weight[s:s + chunk]
+            expanded = w.unsqueeze(0) + xf.unsqueeze(1)      # (rows, chunk, in)
+            if self.use_softmax:
+                y = tropical_softmax(expanded, tau=self.tau, dim=-1)
+            else:
+                y, idx = expanded.max(dim=-1)
+                idxs.append(idx)
+            outs.append(y + self.bias[s:s + chunk])
+        y = torch.cat(outs, dim=-1).reshape(*x.shape[:-1], out_features)
+        if self.use_softmax:
+            return y, None
+        return y, torch.cat(idxs, dim=-1).reshape(*x.shape[:-1], out_features)
 
     def extra_repr(self) -> str:
         return (
@@ -641,7 +674,8 @@ def dyadic_quantize(w: torch.Tensor) -> torch.Tensor:
 
     forward:  ``w -> sign(w) * 2^round(log2|w|)`` (a bit-shift on fabric);
     backward: identity (STE through the round). The exponents freeze to a fixed
-    shift schedule at deploy, so inference is multiplier-free.
+    shift schedule at export. Verify the schedule and the compiled build before
+    making a physical multiplier claim.
     """
     mag = w.abs().clamp_min(1e-12)
     q = torch.sign(w) * torch.exp2(torch.log2(mag).round())
@@ -649,11 +683,11 @@ def dyadic_quantize(w: torch.Tensor) -> torch.Tensor:
 
 
 class DyadicLinear(nn.Linear):
-    """``nn.Linear`` with weights constrained to signed powers of two (multiplier-free).
+    """``nn.Linear`` with weights constrained to signed powers of two.
 
-    ``w_ij = +/- 2^{k_ij}`` so ``W x`` is a sum of bit-shifts (shift + add-tree,
-    zero DSP). Identical parameters/shape to ``nn.Linear``; the dyadic constraint
-    is applied in ``forward`` via a straight-through estimator.
+    ``w_ij = +/- 2^{k_ij}`` so ``W x`` admits a shift-add export schedule.
+    Parameters and shapes match ``nn.Linear``; the eager reference applies the
+    dyadic constraint in ``forward`` via a straight-through estimator.
 
     ``_zero_dsp_layer = True`` marks this as a declared zero-DSP layer so the
     *structural* :func:`tikitorch.audit.assert_closed` does not flag it as a
@@ -661,19 +695,19 @@ class DyadicLinear(nn.Linear):
     powers of two — a shift, not a DSP multiply). The authoritative numeric check
     that the weights really are powers of two is
     :func:`tikitorch.fpga.dyadic_export.verify_schedule` (integer exponents); the
-    runtime op-tracer still sees the float-sim matmul + STE, which is expected —
-    closure for dyadic is a weight-value property, verified statically, not by the
-    forward op trace.
+    runtime op-tracer still sees the float-sim matmul + STE. The static check
+    establishes the exported weight-value schedule, not physical DSP utilization.
 
-    SCOPE: the marker is **forward only**. The ``W·x`` *forward* is zero-DSP. The
+    SCOPE: the marker is **forward only**. The exported ``W·x`` schedule can use
+    shift-add operations. The
     autograd *backward* is NOT: the input-gradient ``Wᵀ·dL/dy`` is shift+add, but
     the weight-gradient ``dL/dy ⊗ x`` multiplies two arbitrary tensors — a real
     multiply that :func:`tikitorch.audit.find_training_multiplies` reports. A
     backward-zero-DSP training step needs a sign-only rule
     (``sign(dL/dW)=sign(dL/dy)⊕sign(x)``, then a SignSGD update in the (sign,
     exponent) domain so weights stay powers of two); that is the on-fabric training
-    kernel, and it is verified with ``assert_training_closed`` — never inferred from
-    this marker.
+    kernel; validate it with a full-step audit and build evidence, never infer it
+    from this marker.
     """
 
     _zero_dsp_layer = True
@@ -683,14 +717,14 @@ class DyadicLinear(nn.Linear):
 
 
 class DyadicTropicalProjection(nn.Module):
-    """Multiplier-free OBLIQUE projection: dyadic monomial -> tropical max -> dyadic monomial.
+    """Dyadic projection: signed-power-of-two map, ReLU, then another map.
 
     A drop-in alternative to :class:`CompositionalTropicalProjection` for the
     components that must represent oblique/smooth surfaces (value readout,
     representation). ``in_features -> d_intermediate`` (dyadic, oblique normals)
     -> ReLU (``= max(.,0)``, the tropical non-convexity) -> ``d_intermediate ->
-    out_features`` (dyadic). Everything is shift + add + compare: zero multiply,
-    zero DSP. ``tau`` is accepted for interface parity with the max-plus
+    out_features`` (dyadic). Its exported hard schedule is shift/add/compare
+    oriented; physical resources remain build-specific. ``tau`` is accepted for interface parity with the max-plus
     projections but is inert (the dyadic forward deploys as-is).
     """
 
@@ -714,7 +748,7 @@ class DyadicTropicalProjection(nn.Module):
 
     def extra_repr(self) -> str:
         return (f"in_features={self.in_features}, d_intermediate={self.d_intermediate}, "
-                f"out_features={self.out_features} (dyadic, multiplier-free)")
+                f"out_features={self.out_features} (dyadic)")
 
 
 # ---------------------------------------------------------------------------
@@ -827,19 +861,21 @@ class TropicalDropout(nn.Module):
 
 
 class TropicalCrossEntropyLoss(nn.Module):
-    """Closure-faithful cross-entropy loss, as a Module (cf. ``nn.CrossEntropyLoss``).
+    """Configurable tropical cross-entropy wrapper (cf. ``nn.CrossEntropyLoss``).
 
     Wraps :func:`tikitorch.functional.tropical_cross_entropy`. The CE gradient is
     ``softmax(logits) - onehot(target)``; ``softmax="exact"`` conditions it with a
     host softmax (the silicon-validated path) while ``softmax="lut"`` computes the
-    softmax from a subtract-max + power-of-2-addressed exp lookup + shift-normalize,
-    so the *whole* loop stays multiplier-free. Extra keyword args (``lut_size``,
+    softmax from a subtract-max + power-of-two-addressed lookup + shift-normalize.
+    That choice does not by itself establish whole-loop or physical closure. Extra
+    keyword args (``lut_size``,
     ``z_range``, ``normalize``) pass through to
     :func:`tikitorch.functional.shift_softmax`.
 
     Args:
-        softmax: ``"exact"`` (default) or ``"lut"`` (fully multiplier-free).
-        **lut_kwargs: forwarded to ``shift_softmax`` when ``softmax="lut"``.
+        softmax: ``"exact"`` (default) or ``"lut"`` (lookup/shift-oriented).
+        **lut_kwargs (Any): forwarded to ``shift_softmax`` when
+            ``softmax="lut"``.
     """
 
     def __init__(self, softmax: str = "exact", **lut_kwargs):
@@ -1022,6 +1058,42 @@ class DepthwiseMorphConv1d(nn.Module):
             y = y.unsqueeze(2).expand(-1, -1, G, -1).reshape(B, C, L)
 
         return y + self.bias.unsqueeze(0).unsqueeze(-1)
+
+    @torch.no_grad()
+    def forward_with_routing(self, x: torch.Tensor):
+        """Forward returning the FROZEN routing for a PC cascade sweep.
+
+        Hard (``use_soft=False`` / tau==0): ``(y, idx)`` with ``idx`` (B, C, L) the
+        winning kernel slot j* per output — slot j reads input position t − j·d, so
+        the adjoint is a pure scatter to (t − j*·d) and to weight[c, j*] (zero
+        multiplies; error to left-pad positions is dropped, matching ``F.pad``'s
+        backward). Soft (tau>0): ``(y, p)`` with ``p`` (B, C, L, K) the softmax/
+        softmin routing weights — the exact Jacobian of the tau-relaxed op (small:
+        K per output, unlike the d×d projection). Depthwise (``group_size==1``)
+        only. Matches ``forward`` bit-exactly.
+        """
+        assert self.group_size == 1, "forward_with_routing: depthwise only (v1)"
+        B, C, L = x.shape
+        K, d = self.kernel_size, self.dilation
+        x_pad = F.pad(x, ((K - 1) * d, 0))
+        indices = torch.arange(L, device=x.device).unsqueeze(1) + \
+                  torch.arange(K - 1, -1, -1, device=x.device).unsqueeze(0) * d
+        windows = x_pad[:, :, indices]                        # (B, C, L, K)
+        combined = windows + self.weight.unsqueeze(0).unsqueeze(2)
+        soft = self.use_soft and self.tau > 0
+        if self.mode == "dilation":
+            if soft:
+                y = tropical_softmax(combined, tau=self.tau, dim=-1)
+                route = torch.softmax(combined / self.tau, dim=-1)
+            else:
+                y, route = combined.max(dim=-1)
+        else:
+            if soft:
+                y = tropical_softmin(combined, tau=self.tau, dim=-1)
+                route = torch.softmax(-combined / self.tau, dim=-1)
+            else:
+                y, route = combined.min(dim=-1)
+        return y + self.bias.unsqueeze(0).unsqueeze(-1), route
 
     def step(self, x_t: torch.Tensor, buffer: torch.Tensor):
         """Process single timestep incrementally.
@@ -1962,7 +2034,7 @@ def _pow2_normalize(c: torch.Tensor, dim: int, eps: float = 1e-5) -> torch.Tenso
 
 
 class TropicalLayerNorm(nn.Module):
-    """Multiplier-free LayerNorm: subtract-mean + power-of-2 (mean-abs) rescale.
+    """Subtract-mean normalization with a power-of-two mean-absolute rescale.
 
     Replaces ``nn.LayerNorm`` (mean / variance / ``1/sqrt(var)`` / affine ``gamma``
     -- all multiplies/divides) with: subtract the feature mean (``/d`` folds to a
@@ -1996,7 +2068,7 @@ class TropicalLayerNorm(nn.Module):
 
 
 class TropicalRMSNorm(nn.Module):
-    """Multiplier-free RMSNorm: power-of-2 (mean-abs) rescale, no mean-subtract.
+    """Power-of-two mean-absolute rescale without mean subtraction.
 
     The cheapest closed norm -- just ``x * 2^-round(log2 mean|x|)`` (a shift, with
     the exponent clamped to +-8) plus an optional additive bias. Uses mean-abs
@@ -2034,10 +2106,11 @@ class TropicalLayerNorm2d(nn.Module):
 
 
 class MorphConvBlock(nn.Module):
-    """A fully multiplier-free CNN unit: conv -> tropical-norm -> activation -> pool.
+    """Morphological CNN unit: conv -> tropical norm -> activation -> pool.
 
     conv (``TropicalConv2d``) -> ``TropicalLayerNorm2d`` -> ``tropical_leaky_relu``
-    -> optional ``TropicalMaxPool2d``. Every op is add/compare/shift only.
+    -> optional ``TropicalMaxPool2d``. Audit the configured hard path and physical
+    build before making a closure or DSP-utilization claim.
     """
 
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 3,

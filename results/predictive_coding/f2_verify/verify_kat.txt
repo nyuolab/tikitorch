@@ -1,0 +1,9 @@
+[pc] KNOWN-ANSWER TEST: all inputs=1 -> expect gW=gB=16 and e_down=256 everywhere
+[pc] staging mismatches: e 0/4096  W 0/65536  acts 0/4096  mask 0/4096  skip 0/4096
+[pc] gate density (host): mask=1 in 4096/4096, skip=1 in 4096/4096
+[pc] AP_DONE in 0.687 ms -> kernel ran from DDR
+[pc] readback nonzero: gw 65536/65536  e_down 4096/4096  gb 256/256
+[pc] samples: gw[0]=16(ref 16) gw[100]=16(ref 16) ed[0]=256(ref 256) gb[0]=16(ref 16)
+[pc] ON-SILICON vs cascade_grads:  max|gW|=0  max|e_down|=0  max|gB|=0
+[pc] -> BIT-EXACT ON SILICON (the PC gradient computed on F2 == cascade_grads)
+KAT_EXIT=0

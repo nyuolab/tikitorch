@@ -1,0 +1,38 @@
+{
+  "results_dir": "/private/tmp/claude-501/-Users-ekoermann-Documents-tikitorch/c1ffe875-f5d6-4735-ba72-d6d5ce63d8c7/scratchpad/a2",
+  "aggregate": {
+    "gated": {
+      "mean_w": 3.960675981370592,
+      "tok_s": 3700.2569284524448,
+      "reps": 3
+    },
+    "idle": {
+      "mean_w": 4.722713864306785,
+      "tok_s": 0.0,
+      "reps": 3
+    },
+    "serve": {
+      "mean_w": 3.906919229270543,
+      "tok_s": 3537.957100139974,
+      "reps": 3
+    },
+    "update": {
+      "mean_w": 3.9382045788900286,
+      "tok_s": 3796.84467075647,
+      "reps": 3
+    }
+  },
+  "ratios": {
+    "idle_w": 4.722713864306785,
+    "serve_w": 3.906919229270543,
+    "update_w": 3.9382045788900286,
+    "serve_dyn_w": -0.8157946350362422,
+    "update_dyn_w": -0.7845092854167564,
+    "update_over_serve_total": 1.0080076776056943,
+    "update_over_serve_dynamic": 0.9616504592260576,
+    "learn_cost_w": 0.031285349619485814,
+    "learn_cost_frac_of_serve_dyn": -0.038349540773942384,
+    "serve_mJ_per_tok": 1.104286773040852,
+    "update_mJ_per_tok": 1.037230890487125
+  }
+}

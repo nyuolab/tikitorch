@@ -1,15 +1,24 @@
 site_name: TikiTorch
-site_description: A tropical-semiring deep-learning library — multiplier-free, FPGA-native training.
+site_description: PyTorch-shaped infrastructure for tropical and hard-routed deep learning.
 repo_url: https://github.com/nyuolab/tikitorch
 repo_name: nyuolab/tikitorch
+edit_uri: edit/pc-morphssm/docs/
+exclude_docs: |
+  research/CLAIM_LEDGER.md
 
 theme:
   name: material
   features:
+    - navigation.tabs
     - navigation.sections
+    - navigation.indexes
     - navigation.top
+    - navigation.footer
     - content.code.copy
     - search.suggest
+    - search.highlight
+    - search.share
+    - toc.follow
 
 plugins:
   - search
@@ -34,24 +43,45 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Guide:
-      - Foundations: guide/foundations.md
+  - Get started:
+      - Installation: get-started/installation.md
+      - Quickstart: get-started/quickstart.md
+      - Migrating from PyTorch: guide/migration.md
+  - Tutorials:
+      - Overview: tutorials/index.md
+      - Notebook tutorials: guide/notebooks.md
+      - Runnable examples: tutorials/examples.md
+  - User guide:
+      - Tropical algebra: guide/foundations.md
+      - Choosing a model and recipe: guide/choosing-a-model.md
+      - Architectures: guide/architecture.md
+      - Auditing closure: guide/closure.md
       - Why tropical for ML/DL: guide/why-tropical-ml.md
       - Tropical geometry of neural nets: guide/tropical-geometry.md
       - Beyond deep learning: guide/beyond-deep-learning.md
-      - Architecture & diagrams: guide/architecture.md
-      - Choosing a model: guide/choosing-a-model.md
-      - Migrating from PyTorch: guide/migration.md
       - FAQ & troubleshooting: guide/faq.md
-  - Tutorials (notebooks): guide/notebooks.md
   - API reference:
-      - functional: api/functional.md
-      - nn (layers): api/nn.md
-      - optim: api/optim.md
-      - models: api/models.md
-      - audit (closure): api/audit.md
-      - fpga: api/fpga.md
-      - classical: api/classical.md
-      - geometry: api/geometry.md
-      - prune: api/prune.md
-      - algorithmic: api/algorithmic.md
+      - API overview: api/index.md
+      - Core:
+          - functional: api/functional.md
+          - nn (layers): api/nn.md
+          - models: api/models.md
+          - optim: api/optim.md
+          - train: api/train.md
+      - Runtime and verification:
+          - audit (closure): api/audit.md
+          - backend: api/backend.md
+          - serialization: api/serialization.md
+          - profile: api/profile.md
+      - Specialized:
+          - autodiff (route certificates): api/autodiff.md
+          - fpga: api/fpga.md
+          - forward-forward: api/forward_forward.md
+          - planning: api/planning.md
+      - Mathematics and algorithms:
+          - classical: api/classical.md
+          - geometry: api/geometry.md
+          - prune: api/prune.md
+          - algorithmic: api/algorithmic.md
+  - Research:
+      - Scope and evidence: research/index.md

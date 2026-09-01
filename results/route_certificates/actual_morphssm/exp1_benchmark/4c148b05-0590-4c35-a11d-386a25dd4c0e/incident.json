@@ -1,0 +1,32 @@
+{
+ "schema": "ontogenic_v2.exp1_incident.v1",
+ "run_id": "4c148b05-0590-4c35-a11d-386a25dd4c0e",
+ "captured_utc": "2026-08-22T18:34:14Z",
+ "status": "TERMINATED_STALLED_BEFORE_FIRST_DURABLE_ROW",
+ "pid": 2306,
+ "parent_pid": 2304,
+ "launch_local": "2026-08-19T09:02:56-04:00",
+ "elapsed_at_capture": "03-05:31:22",
+ "process_state": "S",
+ "cpu_percent": 0.1,
+ "rss_bytes": 68222976,
+ "command": "/Users/ekoermann/anaconda3/bin/python3.11 -m ontogenic_learner.ontogenic_v2.exp1_benchmark",
+ "children": [
+  {
+   "pid": 2412,
+   "role": "multiprocessing.resource_tracker",
+   "state": "S",
+   "cpu_percent": 0.0
+  }
+ ],
+ "compiler_children": 0,
+ "loaded_torchinductor_shared_objects": 2,
+ "durable_result_files_before_incident": 0,
+ "source_provenance": "UNAVAILABLE: the original runner created the directory before work but wrote its manifest only after all cells; the process held no source file descriptor and the working file changed after launch",
+ "termination_condition": "elapsed far beyond the stated 10-20 minute estimate, sleeping near zero CPU, no compiler child, and no durable result row",
+ "terminated_utc": "2026-08-22T18:34:59Z",
+ "termination_signal": "SIGTERM",
+ "post_termination_process_check": "PID 2306 and child PID 2412 absent",
+ "scientific_use": "NONE",
+ "recovery": "Do not resume or impute this run. Rerun with per-cell durable rows, heartbeats, timeouts, randomized arm order, and an upfront source/import manifest."
+}

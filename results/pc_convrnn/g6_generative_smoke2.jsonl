@@ -1,0 +1,2 @@
+{"gate": "G6b", "arch": "morphssm", "ckpt": "results/pc_convrnn/ckpts/morphssm_cascade_s0.pt", "span": 8, "n_windows": 8, "relax_steps": 100, "em_pc": 0.25, "em_greedy": 0.25, "em_bestof16": 0.1562, "wall_pc_s": 49.8}
+{"gate": "G6c", "arch": "morphssm", "ckpt": "results/pc_convrnn/ckpts/morphssm_cascade_s0.pt", "rate": 0.25, "n_windows": 8, "rec_pc": 0.342, "rec_greedy": 0.342, "rec_leave_corrupt": 0.0155}

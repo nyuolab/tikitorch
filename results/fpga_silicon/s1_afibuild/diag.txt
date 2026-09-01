@@ -1,0 +1,40 @@
++ echo '== aws_build_dcp_from_cl.py locations =='
+== aws_build_dcp_from_cl.py locations ==
++ find /opt/aws-fpga -name aws_build_dcp_from_cl.py
+/opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma/build/scripts/aws_build_dcp_from_cl.py
+/opt/aws-fpga/hdk/cl/examples/cl_mem_perf/build/scripts/aws_build_dcp_from_cl.py
+/opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE/build/scripts/aws_build_dcp_from_cl.py
+/opt/aws-fpga/hdk/cl/examples/cl_sde/build/scripts/aws_build_dcp_from_cl.py
+/opt/aws-fpga/hdk/cl/examples/cl_demo/cl_axil_reg_access/build/scripts/aws_build_dcp_from_cl.py
+/opt/aws-fpga/hdk/common/shell_stable/build/scripts/aws_build_dcp_from_cl.py
++ echo '== CL example/template dirs =='
+== CL example/template dirs ==
++ ls -d /opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE /opt/aws-fpga/hdk/cl/examples/cl_demo /opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma /opt/aws-fpga/hdk/cl/examples/cl_ipi_cdma_test_hlx /opt/aws-fpga/hdk/cl/examples/cl_mem_perf /opt/aws-fpga/hdk/cl/examples/cl_sde /opt/aws-fpga/hdk/cl/examples/create_new_cl.py /opt/aws-fpga/hdk/cl/examples/hello_world_hlx /opt/aws-fpga/hdk/cl/examples/hello_world_mb_hlx '/opt/aws-fpga/hdk/cl/developer_designs/*'
+/opt/aws-fpga/hdk/cl/examples/CL_TEMPLATE
+/opt/aws-fpga/hdk/cl/examples/cl_demo
+/opt/aws-fpga/hdk/cl/examples/cl_dram_hbm_dma
+/opt/aws-fpga/hdk/cl/examples/cl_ipi_cdma_test_hlx
+/opt/aws-fpga/hdk/cl/examples/cl_mem_perf
+/opt/aws-fpga/hdk/cl/examples/cl_sde
+/opt/aws-fpga/hdk/cl/examples/create_new_cl.py
+/opt/aws-fpga/hdk/cl/examples/hello_world_hlx
+/opt/aws-fpga/hdk/cl/examples/hello_world_mb_hlx
++ echo '== HDK_SHELL_DIR interfaces =='
+== HDK_SHELL_DIR interfaces ==
++ ls /opt/aws-fpga/hdk/common/shell_stable/design/interfaces
+cl_ports.vh
+unused_apppf_irq_template.inc
+unused_cl_sda_template.inc
+unused_ddr_template.inc
+unused_dma_pcis_template.inc
+unused_flr_template.inc
+unused_pcim_template.inc
+unused_sh_ocl_template.inc
++ echo '== vivado =='
+== vivado ==
++ command -v vivado
+/opt/Xilinx/Vivado/2024.1/bin/vivado
++ vivado -version
++ head -2
+vivado v2024.1 (64-bit)
+Tool Version Limit: 2023.10

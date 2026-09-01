@@ -1,0 +1,9 @@
+[train] data: 60000 train, 10000 test (D=256)
+[diag] after 1 kick: 37729/65536 W0 weights changed from init (W0[0]:2->2, W0[1]:-2->-2)
+[train] epoch 1: test acc = 0.7101  (1875 kicks, 24.8s)  ON-FABRIC  pred-hist=[997 1103 0 1038 911 2756 977 846 17 1355 ]
+[train] epoch 2: test acc = 0.7430  (1875 kicks, 24.6s)  ON-FABRIC  pred-hist=[1028 1181 2111 1225 1003 416 959 965 3 1109 ]
+[train] epoch 3: test acc = 0.7399  (1875 kicks, 24.6s)  ON-FABRIC  pred-hist=[1033 1144 2473 1137 847 0 961 928 282 1195 ]
+[train] epoch 4: test acc = 0.7479  (1875 kicks, 24.5s)  ON-FABRIC  pred-hist=[1014 1163 2448 1348 1070 0 1031 1007 0 919 ]
+[train] epoch 5: test acc = 0.7475  (1875 kicks, 24.8s)  ON-FABRIC  pred-hist=[984 1157 2555 873 1070 284 1001 968 5 1103 ]
+[train] dumped trained W0/W1 (|W0[0]|=2, sample W1 row0: -9300 9373 9372)
+EXIT=0

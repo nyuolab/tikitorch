@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: >-
+  If you use TikiTorch, cite the software release and the focused paper that
+  owns the research result you rely on.
+title: "TikiTorch: PyTorch-shaped infrastructure for tropical deep learning"
+type: software
+authors:
+  - name: "TikiTorch Authors"
+version: 0.2.0
+repository-code: "https://github.com/nyuolab/tikitorch"
+url: "https://github.com/nyuolab/tikitorch"
+license: GPL-3.0-or-later
+abstract: >-
+  TikiTorch is a PyTorch-shaped research library for max-plus, min-plus,
+  morphological, dyadic, and hard-routed deep learning. It includes operators,
+  modules, model families, optimizers, recipe-scoped closure audits, exact
+  selected-VJP replay for supported route traces, and FPGA research artifacts.
+keywords:
+  - tropical deep learning
+  - max-plus algebra
+  - min-plus algebra
+  - morphological neural networks
+  - hard routing
+  - FPGA learning

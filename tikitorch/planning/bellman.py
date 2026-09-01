@@ -32,14 +32,16 @@ class TropicalValueIteration(nn.Module):
     ``V_{k+1}[s] = max_a ( R[s, a] + gamma * V_k[succ[s, a]] )``.
 
     Args:
-        n_states, n_actions: MDP dimensions ``S``, ``A``.
-        gamma: discount. ``1.0`` or ``2**-k`` is multiply-free; a general float is
-            a declared boundary.
-        tau: ``0`` for the hard backup (argmax, sparse gradient); ``>0`` for the
-            soft logsumexp relaxation (``tropical_softmax`` over actions).
-        n_sweeps: number of backups per :meth:`forward` (the planning horizon). If
-            ``None``, defaults to ``n_states`` (enough for a deterministic MDP with
-            unit-cost steps to propagate values across the whole space).
+        n_states (int): state-space dimension ``S``.
+        n_actions (int): action-space dimension ``A``.
+        gamma (float): discount. ``1.0`` or ``2**-k`` is multiply-free; a
+            general float is a declared boundary.
+        tau (float): ``0`` for the hard backup (argmax, sparse gradient); ``>0``
+            for the soft logsumexp relaxation (``tropical_softmax`` over actions).
+        n_sweeps (int | None): number of backups per :meth:`forward` (the
+            planning horizon). If ``None``, defaults to ``n_states`` (enough for
+            a deterministic MDP with unit-cost steps to propagate values across
+            the whole space).
 
     forward(V0, R, succ):
         V0:   (B, S) or (S,)         initial values.
@@ -97,10 +99,11 @@ def max_plus_power_iteration(A, n_iter=128, tol=1e-6, x0=None):
     the renormalised ``x`` is the eigenvector (the relative-value function).
 
     Args:
-        A: (S, S) max-plus matrix (use ``-inf`` for absent edges).
-        n_iter, tol: power-iteration budget / convergence tolerance on the range
-            of the per-step increment.
-        x0: optional (S,) start vector (default zeros).
+        A (torch.Tensor): (S, S) max-plus matrix (use ``-inf`` for absent edges).
+        n_iter (int): power-iteration budget.
+        tol (float): convergence tolerance on the range of the per-step
+            increment.
+        x0 (torch.Tensor | None): optional (S,) start vector (default zeros).
     Returns ``(eigenvalue: float, eigenvector: (S,) tensor)``. Differentiable in
     ``A`` through :func:`max_plus_matmul`.
     """

@@ -1,0 +1,12 @@
+The IP .xci for this D=512 package are REGENERATED from build/scripts/gen_ip.tcl
+(vivado -mode batch -source gen_ip.tcl -tclargs <this dir>) with the v2 TWO-BANK
+params (the v1 16 MB single-bank config was impossible: axi_bram_ctrl caps at
+MEM_DEPTH 65536, and 456 staging URAM + the kernel's 605 exceeds the device 960):
+  axi_bram_ctrl_{dma,krn}  MEM_DEPTH 65536 (4 MB per bank, the IP max; was 32768)
+  axi_crossbar_dma         NUM_MI 2: M00 0x0100_0000 / M01 0x0140_0000, 22-bit
+  axi_crossbar_krn         NEW (1 SI ID1 -> 2 MI, same bases): kernel-side bank decode
+  axi_register_slice_krn   NEW (ID1): XBAR_KRN -> BRAM_CTL_KRN reg-to-reg hop (RS_DMA mirror)
+  axi_register_slice_{light,dma}  unchanged from the D=128 package
+The D=128 package (../../cl_forge_morph_lm) keeps its committed 2 MB .xci; the
+stale flat copies were removed here so a wrong-param IP can never be read (the CL
+synth tcl reads design/ip/<module>/<module>.xci — the subdirs gen_ip creates).

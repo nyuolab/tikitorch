@@ -1,0 +1,21 @@
+{
+ "n_cells_planned": 9,
+ "n_cells_present": 9,
+ "missing_cells": [],
+ "incident_cells": [],
+ "verdicts": {
+  "d64_l2_t96_s0": "PASS",
+  "d64_l2_t96_s1": "PASS",
+  "d64_l2_t96_s2": "PASS",
+  "d128_l4_t96_s0": "PASS",
+  "d128_l4_t96_s1": "PASS",
+  "d128_l4_t96_s2": "PASS",
+  "d256_l4_t192_s0": "PASS",
+  "d256_l4_t192_s1": "PASS",
+  "d256_l4_t192_s2": "PASS"
+ },
+ "n_pass": 9,
+ "n_fail": 0,
+ "n_undecidable": 0,
+ "scale_gate_complete": true
+}

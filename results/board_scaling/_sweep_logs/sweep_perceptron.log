@@ -1,0 +1,10 @@
+[perceptron] closure audit (empty for fully multiply-free): NONE
+[perceptron] recipe: policy_loss=perceptron entropy=0.0 temp=1.0 lr=0.003 | 256 sims, 40x48 games, 4 workers...
+[perceptron]  trained   @ 100 sims:  d2=0.975  d3=0.588
+[perceptron]  trained   @ 200 sims:  d2=0.775  d3=0.45
+[perceptron]  trained   @ 400 sims:  d2=0.863  d3=0.787
+[perceptron]  untrained @ 100 sims:  d2=0.525  d3=0.562
+[perceptron]  untrained @ 200 sims:  d2=0.775  d3=0.512
+[perceptron]  untrained @ 400 sims:  d2=0.838  d3=0.688
+[perceptron] [saved] /opt/tiki/results/board_scaling/connect4_fully_tropical_perceptron.json
+DONE_FT_perceptron

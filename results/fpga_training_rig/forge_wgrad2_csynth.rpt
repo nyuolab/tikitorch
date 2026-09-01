@@ -1,0 +1,1294 @@
+
+
+================================================================
+== Vitis HLS Report for 'forge_wgrad2'
+================================================================
+* Date:           Sat Jun 20 23:31:15 2026
+
+* Version:        2024.1 (Build 5069499 on May 21 2024)
+* Project:        forge_wgrad2_proj
+* Solution:       solution1 (Vivado IP Flow Target)
+* Product family: virtexuplusHBM
+* Target device:  xcvu47p-fsvh2892-2L-e
+
+
+================================================================
+== Performance Estimates
+================================================================
++ Timing: 
+    * Summary: 
+    +--------+---------+----------+------------+
+    |  Clock |  Target | Estimated| Uncertainty|
+    +--------+---------+----------+------------+
+    |ap_clk  |  4.00 ns|  2.920 ns|     1.08 ns|
+    +--------+---------+----------+------------+
+
++ Latency: 
+    * Summary: 
+    +---------+----------+----------+-----------+--------+----------+----------+
+    |  Latency (cycles)  |  Latency (absolute)  |      Interval     | Pipeline |
+    |   min   |    max   |    min   |    max    |   min  |    max   |   Type   |
+    +---------+----------+----------+-----------+--------+----------+----------+
+    |   682019|  10082339|  2.728 ms|  40.329 ms|  645121|  10045441|  dataflow|
+    +---------+----------+----------+-----------+--------+----------+----------+
+
+    + Detail: 
+        * Instance: 
+        +--------------------+-----------------+---------+----------+----------+-----------+--------+----------+---------+
+        |                    |                 |  Latency (cycles)  |  Latency (absolute)  |      Interval     | Pipeline|
+        |      Instance      |      Module     |   min   |    max   |    min   |    max    |   min  |    max   |   Type  |
+        +--------------------+-----------------+---------+----------+----------+-----------+--------+----------+---------+
+        |stage_and_quant_U0  |stage_and_quant  |    36898|     36898|  0.148 ms|   0.148 ms|   36898|     36898|       no|
+        |compute_U0          |compute          |   645120|  10045440|  2.580 ms|  40.182 ms|  645120|  10045440|       no|
+        |store_U0            |store            |   589835|    589835|  2.359 ms|   2.359 ms|  589835|    589835|       no|
+        +--------------------+-----------------+---------+----------+----------+-----------+--------+----------+---------+
+
+        * Loop: 
+        N/A
+
+
+
+================================================================
+== Utilization Estimates
+================================================================
+* Summary: 
++---------------------+---------+------+---------+---------+-----+
+|         Name        | BRAM_18K|  DSP |    FF   |   LUT   | URAM|
++---------------------+---------+------+---------+---------+-----+
+|DSP                  |        -|     -|        -|        -|    -|
+|Expression           |        -|     -|        0|      870|    -|
+|FIFO                 |        2|     -|      164|      150|    -|
+|Instance             |       82|     -|    57546|   342675|    0|
+|Memory               |       48|     -|     1536|     6528|    0|
+|Multiplexer          |        -|     -|        0|     1944|    -|
+|Register             |        -|     -|      216|        -|    -|
++---------------------+---------+------+---------+---------+-----+
+|Total                |      132|     0|    59462|   352167|    0|
++---------------------+---------+------+---------+---------+-----+
+|Available SLR        |     1344|  3008|   869120|   434560|  320|
++---------------------+---------+------+---------+---------+-----+
+|Utilization SLR (%)  |        9|     0|        6|       81|    0|
++---------------------+---------+------+---------+---------+-----+
+|Available            |     4032|  9024|  2607360|  1303680|  960|
++---------------------+---------+------+---------+---------+-----+
+|Utilization (%)      |        3|     0|        2|       27|    0|
++---------------------+---------+------+---------+---------+-----+
+
++ Detail: 
+    * Instance: 
+    +--------------------+-----------------+---------+----+-------+--------+-----+
+    |      Instance      |      Module     | BRAM_18K| DSP|   FF  |   LUT  | URAM|
+    +--------------------+-----------------+---------+----+-------+--------+-----+
+    |compute_U0          |compute          |        0|   0|  55374|  336179|    0|
+    |control_s_axi_U     |control_s_axi    |        0|   0|    106|     168|    0|
+    |gmem_m_axi_U        |gmem_m_axi       |        2|   0|    687|     709|    0|
+    |stage_and_quant_U0  |stage_and_quant  |       80|   0|   1039|    4875|    0|
+    |store_U0            |store            |        0|   0|    340|     744|    0|
+    +--------------------+-----------------+---------+----+-------+--------+-----+
+    |Total               |                 |       82|   0|  57546|  342675|    0|
+    +--------------------+-----------------+---------+----+-------+--------+-----+
+
+    * DSP: 
+    N/A
+
+    * Memory: 
+    +--------------------------------+------------------------------------+---------+----+----+-----+------+-----+------+-------------+
+    |             Memory             |               Module               | BRAM_18K| FF | LUT| URAM| Words| Bits| Banks| W*Bits*Banks|
+    +--------------------------------+------------------------------------+---------+----+----+-----+------+-----+------+-------------+
+    |forge_wgrad2_int_goE_U          |forge_wgrad2_int_goE_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    5|     1|         7680|
+    |forge_wgrad2_int_goE_2_U        |forge_wgrad2_int_goE_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    5|     1|         7680|
+    |forge_wgrad2_int_goE_3_U        |forge_wgrad2_int_goE_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    5|     1|         7680|
+    |forge_wgrad2_int_goE_4_U        |forge_wgrad2_int_goE_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    5|     1|         7680|
+    |forge_wgrad2_int_goE_5_U        |forge_wgrad2_int_goE_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    5|     1|         7680|
+    |forge_wgrad2_int_goE_6_U        |forge_wgrad2_int_goE_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    5|     1|         7680|
+    |forge_wgrad2_int_goE_7_U        |forge_wgrad2_int_goE_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    5|     1|         7680|
+    |forge_wgrad2_int_goE_8_U        |forge_wgrad2_int_goE_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    5|     1|         7680|
+    |forge_wgrad2_int_goS_U          |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goNZ_U         |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goS_9_U        |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goNZ_16_U      |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goS_10_U       |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goNZ_17_U      |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goS_11_U       |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goNZ_18_U      |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goS_12_U       |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goNZ_19_U      |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goS_13_U       |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goNZ_20_U      |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goS_14_U       |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goNZ_21_U      |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goS_15_U       |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_goNZ_22_U      |forge_wgrad2_int_goS_RAM_AUTO_1R1W  |        2|   0|   0|    0|  1536|    1|     1|         1536|
+    |forge_wgrad2_int_xE_U           |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_23_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_24_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_25_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_26_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_27_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_28_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_29_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_30_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xE_31_U        |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_10_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_11_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_12_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_13_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_14_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_15_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_16_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_17_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_18_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_19_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_20_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_21_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_22_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_23_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_24_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_25_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_26_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_27_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_28_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_29_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_30_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_31_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_32_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_33_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_34_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_35_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_36_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_37_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_38_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_39_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_40_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_41_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_42_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_43_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_44_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_45_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_46_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_47_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_48_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_49_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_50_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_51_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_52_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_53_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_54_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_55_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_56_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_57_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_58_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_59_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_60_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_61_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_62_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |p_ZZ12forge_wgrad2PiE2xE_63_U   |forge_wgrad2_int_xE_RAM_AUTO_1R1W   |        0|  16|  66|    0|   192|    5|     1|          960|
+    |forge_wgrad2_int_xS_U           |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_U          |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_32_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_41_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_33_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_42_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_34_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_43_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_35_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_44_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_36_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_45_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_37_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_46_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_38_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_47_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_39_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_48_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xS_40_U        |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |forge_wgrad2_int_xNZ_49_U       |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_10_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_10_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_11_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_11_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_12_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_12_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_13_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_13_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_14_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_14_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_15_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_15_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_16_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_16_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_17_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_17_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_18_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_18_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_19_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_19_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_20_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_20_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_21_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_21_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_22_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_22_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_23_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_23_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_24_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_24_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_25_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_25_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_26_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_26_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_27_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_27_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_28_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_28_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_29_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_29_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_30_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_30_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_31_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_31_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_32_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_32_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_33_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_33_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_34_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_34_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_35_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_35_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_36_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_36_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_37_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_37_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_38_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_38_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_39_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_39_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_40_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_40_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_41_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_41_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_42_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_42_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_43_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_43_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_44_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_44_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_45_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_45_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_46_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_46_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_47_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_47_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_48_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_48_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_49_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_49_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_50_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_50_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_51_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_51_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_52_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_52_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_53_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_53_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_54_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_54_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_55_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_55_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_56_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_56_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_57_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_57_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_58_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_58_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_59_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_59_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_60_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_60_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_61_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_61_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_62_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_62_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE2xS_63_U   |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    |p_ZZ12forge_wgrad2PiE3xNZ_63_U  |forge_wgrad2_int_xS_RAM_AUTO_1R1W   |        0|   4|  18|    0|   192|    1|     1|          192|
+    +--------------------------------+------------------------------------+---------+----+----+-----+------+-----+------+-------------+
+    |Total                           |                                    |       48|1536|6528|    0| 73728|  504|   216|       172032|
+    +--------------------------------+------------------------------------+---------+----+----+-----+------+-----+------+-------------+
+
+    * FIFO: 
+    +--------------+---------+-----+----+-----+------+-----+---------+
+    |     Name     | BRAM_18K|  FF | LUT| URAM| Depth| Bits| Size:D*B|
+    +--------------+---------+-----+----+-----+------+-----+---------+
+    |buffer_r_c_U  |        0|    5|   0|    -|     3|   64|      192|
+    |gwfifo_U      |        2|  159|   0|    -|  1024|   48|    49152|
+    +--------------+---------+-----+----+-----+------+-----+---------+
+    |Total         |        2|  164|   0|    0|  1027|  112|    49344|
+    +--------------+---------+-----+----+-----+------+-----+---------+
+
+    * Expression: 
+    +----------------------------------------------------+----------+----+---+----+------------+------------+
+    |                    Variable Name                   | Operation| DSP| FF| LUT| Bitwidth P0| Bitwidth P1|
+    +----------------------------------------------------+----------+----+---+----+------------+------------+
+    |ap_channel_done_forge_wgrad2_int_goE                |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goE_2              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goE_3              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goE_4              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goE_5              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goE_6              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goE_7              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goE_8              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goNZ               |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goNZ_16            |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goNZ_17            |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goNZ_18            |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goNZ_19            |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goNZ_20            |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goNZ_21            |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goNZ_22            |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goS                |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goS_10             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goS_11             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goS_12             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goS_13             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goS_14             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goS_15             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_goS_9              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE                 |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_23              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_24              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_25              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_26              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_27              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_28              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_29              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_30              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xE_31              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ                |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_41             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_42             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_43             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_44             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_45             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_46             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_47             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_48             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xNZ_49             |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS                 |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_32              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_33              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_34              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_35              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_36              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_37              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_38              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_39              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_forge_wgrad2_int_xS_40              |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_10         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_11         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_12         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_13         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_14         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_15         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_16         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_17         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_18         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_19         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_20         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_21         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_22         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_23         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_24         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_25         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_26         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_27         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_28         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_29         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_30         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_31         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_32         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_33         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_34         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_35         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_36         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_37         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_38         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_39         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_40         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_41         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_42         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_43         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_44         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_45         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_46         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_47         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_48         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_49         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_50         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_51         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_52         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_53         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_54         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_55         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_56         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_57         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_58         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_59         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_60         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_61         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_62         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xE_63         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_10         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_11         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_12         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_13         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_14         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_15         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_16         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_17         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_18         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_19         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_20         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_21         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_22         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_23         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_24         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_25         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_26         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_27         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_28         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_29         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_30         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_31         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_32         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_33         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_34         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_35         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_36         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_37         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_38         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_39         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_40         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_41         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_42         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_43         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_44         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_45         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_46         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_47         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_48         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_49         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_50         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_51         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_52         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_53         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_54         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_55         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_56         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_57         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_58         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_59         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_60         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_61         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_62         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE2xS_63         |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_10        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_11        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_12        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_13        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_14        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_15        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_16        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_17        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_18        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_19        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_20        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_21        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_22        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_23        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_24        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_25        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_26        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_27        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_28        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_29        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_30        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_31        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_32        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_33        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_34        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_35        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_36        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_37        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_38        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_39        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_40        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_41        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_42        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_43        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_44        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_45        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_46        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_47        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_48        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_49        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_50        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_51        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_52        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_53        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_54        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_55        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_56        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_57        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_58        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_59        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_60        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_61        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_62        |       and|   0|  0|   2|           1|           1|
+    |ap_channel_done_p_ZZ12forge_wgrad2PiE3xNZ_63        |       and|   0|  0|   2|           1|           1|
+    |ap_idle                                             |       and|   0|  0|   2|           1|           1|
+    |compute_U0_ap_start                                 |       and|   0|  0|   2|           1|           1|
+    |stage_and_quant_U0_ap_continue                      |       and|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goE          |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goE_2        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goE_3        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goE_4        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goE_5        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goE_6        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goE_7        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goE_8        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goNZ         |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goNZ_16      |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goNZ_17      |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goNZ_18      |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goNZ_19      |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goNZ_20      |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goNZ_21      |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goNZ_22      |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goS          |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goS_10       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goS_11       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goS_12       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goS_13       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goS_14       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goS_15       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_goS_9        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE           |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_23        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_24        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_25        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_26        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_27        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_28        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_29        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_30        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xE_31        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ          |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_41       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_42       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_43       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_44       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_45       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_46       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_47       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_48       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xNZ_49       |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS           |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_32        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_33        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_34        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_35        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_36        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_37        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_38        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_39        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_forge_wgrad2_int_xS_40        |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_10   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_11   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_12   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_13   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_14   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_15   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_16   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_17   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_18   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_19   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_20   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_21   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_22   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_23   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_24   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_25   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_26   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_27   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_28   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_29   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_30   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_31   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_32   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_33   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_34   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_35   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_36   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_37   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_38   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_39   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_40   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_41   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_42   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_43   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_44   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_45   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_46   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_47   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_48   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_49   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_50   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_51   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_52   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_53   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_54   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_55   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_56   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_57   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_58   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_59   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_60   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_61   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_62   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xE_63   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_10   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_11   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_12   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_13   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_14   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_15   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_16   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_17   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_18   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_19   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_20   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_21   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_22   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_23   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_24   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_25   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_26   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_27   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_28   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_29   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_30   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_31   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_32   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_33   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_34   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_35   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_36   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_37   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_38   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_39   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_40   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_41   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_42   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_43   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_44   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_45   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_46   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_47   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_48   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_49   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_50   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_51   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_52   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_53   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_54   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_55   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_56   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_57   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_58   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_59   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_60   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_61   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_62   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE2xS_63   |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_10  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_11  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_12  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_13  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_14  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_15  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_16  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_17  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_18  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_19  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_20  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_21  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_22  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_23  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_24  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_25  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_26  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_27  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_28  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_29  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_30  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_31  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_32  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_33  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_34  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_35  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_36  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_37  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_38  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_39  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_40  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_41  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_42  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_43  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_44  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_45  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_46  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_47  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_48  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_49  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_50  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_51  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_52  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_53  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_54  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_55  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_56  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_57  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_58  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_59  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_60  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_61  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_62  |        or|   0|  0|   2|           1|           1|
+    |ap_sync_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_63  |        or|   0|  0|   2|           1|           1|
+    +----------------------------------------------------+----------+----+---+----+------------+------------+
+    |Total                                               |          |   0|  0| 870|         435|         435|
+    +----------------------------------------------------+----------+----+---+----+------------+------------+
+
+    * Multiplexer: 
+    +--------------------------------------------------------+----+-----------+-----+-----------+
+    |                          Name                          | LUT| Input Size| Bits| Total Bits|
+    +--------------------------------------------------------+----+-----------+-----+-----------+
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE          |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_2        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_3        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_4        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_5        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_6        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_7        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_8        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ         |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_16      |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_17      |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_18      |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_19      |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_20      |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_21      |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_22      |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS          |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_10       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_11       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_12       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_13       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_14       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_15       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_9        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE           |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_23        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_24        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_25        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_26        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_27        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_28        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_29        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_30        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_31        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ          |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_41       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_42       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_43       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_44       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_45       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_46       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_47       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_48       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_49       |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS           |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_32        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_33        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_34        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_35        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_36        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_37        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_38        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_39        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_40        |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_10   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_11   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_12   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_13   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_14   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_15   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_16   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_17   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_18   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_19   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_20   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_21   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_22   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_23   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_24   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_25   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_26   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_27   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_28   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_29   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_30   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_31   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_32   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_33   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_34   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_35   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_36   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_37   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_38   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_39   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_40   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_41   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_42   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_43   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_44   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_45   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_46   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_47   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_48   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_49   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_50   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_51   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_52   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_53   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_54   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_55   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_56   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_57   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_58   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_59   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_60   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_61   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_62   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_63   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_10   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_11   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_12   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_13   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_14   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_15   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_16   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_17   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_18   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_19   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_20   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_21   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_22   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_23   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_24   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_25   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_26   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_27   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_28   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_29   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_30   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_31   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_32   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_33   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_34   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_35   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_36   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_37   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_38   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_39   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_40   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_41   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_42   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_43   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_44   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_45   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_46   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_47   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_48   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_49   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_50   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_51   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_52   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_53   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_54   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_55   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_56   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_57   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_58   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_59   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_60   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_61   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_62   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_63   |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_10  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_11  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_12  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_13  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_14  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_15  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_16  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_17  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_18  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_19  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_20  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_21  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_22  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_23  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_24  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_25  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_26  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_27  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_28  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_29  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_30  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_31  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_32  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_33  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_34  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_35  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_36  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_37  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_38  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_39  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_40  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_41  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_42  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_43  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_44  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_45  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_46  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_47  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_48  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_49  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_50  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_51  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_52  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_53  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_54  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_55  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_56  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_57  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_58  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_59  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_60  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_61  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_62  |   9|          2|    1|          2|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_63  |   9|          2|    1|          2|
+    +--------------------------------------------------------+----+-----------+-----+-----------+
+    |Total                                                   |1944|        432|  216|        432|
+    +--------------------------------------------------------+----+-----------+-----+-----------+
+
+    * Register: 
+    +--------------------------------------------------------+---+----+-----+-----------+
+    |                          Name                          | FF| LUT| Bits| Const Bits|
+    +--------------------------------------------------------+---+----+-----+-----------+
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE          |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_2        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_3        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_4        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_5        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_6        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_7        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goE_8        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ         |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_16      |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_17      |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_18      |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_19      |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_20      |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_21      |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goNZ_22      |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS          |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_10       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_11       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_12       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_13       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_14       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_15       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_goS_9        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE           |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_23        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_24        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_25        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_26        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_27        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_28        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_29        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_30        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xE_31        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ          |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_41       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_42       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_43       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_44       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_45       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_46       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_47       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_48       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xNZ_49       |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS           |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_32        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_33        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_34        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_35        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_36        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_37        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_38        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_39        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_forge_wgrad2_int_xS_40        |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_10   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_11   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_12   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_13   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_14   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_15   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_16   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_17   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_18   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_19   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_20   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_21   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_22   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_23   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_24   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_25   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_26   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_27   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_28   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_29   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_30   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_31   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_32   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_33   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_34   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_35   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_36   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_37   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_38   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_39   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_40   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_41   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_42   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_43   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_44   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_45   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_46   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_47   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_48   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_49   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_50   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_51   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_52   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_53   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_54   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_55   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_56   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_57   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_58   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_59   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_60   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_61   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_62   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xE_63   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_10   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_11   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_12   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_13   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_14   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_15   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_16   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_17   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_18   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_19   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_20   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_21   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_22   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_23   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_24   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_25   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_26   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_27   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_28   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_29   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_30   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_31   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_32   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_33   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_34   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_35   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_36   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_37   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_38   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_39   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_40   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_41   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_42   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_43   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_44   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_45   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_46   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_47   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_48   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_49   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_50   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_51   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_52   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_53   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_54   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_55   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_56   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_57   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_58   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_59   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_60   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_61   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_62   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE2xS_63   |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_10  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_11  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_12  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_13  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_14  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_15  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_16  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_17  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_18  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_19  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_20  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_21  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_22  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_23  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_24  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_25  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_26  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_27  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_28  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_29  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_30  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_31  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_32  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_33  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_34  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_35  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_36  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_37  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_38  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_39  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_40  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_41  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_42  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_43  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_44  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_45  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_46  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_47  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_48  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_49  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_50  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_51  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_52  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_53  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_54  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_55  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_56  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_57  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_58  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_59  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_60  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_61  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_62  |  1|   0|    1|          0|
+    |ap_sync_reg_channel_write_p_ZZ12forge_wgrad2PiE3xNZ_63  |  1|   0|    1|          0|
+    +--------------------------------------------------------+---+----+-----+-----------+
+    |Total                                                   |216|   0|  216|          0|
+    +--------------------------------------------------------+---+----+-----+-----------+
+
+
+
+================================================================
+== Interface
+================================================================
+* Summary: 
++-----------------------+-----+-----+------------+--------------+--------------+
+|       RTL Ports       | Dir | Bits|  Protocol  | Source Object|    C Type    |
++-----------------------+-----+-----+------------+--------------+--------------+
+|s_axi_control_AWVALID  |   in|    1|       s_axi|       control|        scalar|
+|s_axi_control_AWREADY  |  out|    1|       s_axi|       control|        scalar|
+|s_axi_control_AWADDR   |   in|    5|       s_axi|       control|        scalar|
+|s_axi_control_WVALID   |   in|    1|       s_axi|       control|        scalar|
+|s_axi_control_WREADY   |  out|    1|       s_axi|       control|        scalar|
+|s_axi_control_WDATA    |   in|   32|       s_axi|       control|        scalar|
+|s_axi_control_WSTRB    |   in|    4|       s_axi|       control|        scalar|
+|s_axi_control_ARVALID  |   in|    1|       s_axi|       control|        scalar|
+|s_axi_control_ARREADY  |  out|    1|       s_axi|       control|        scalar|
+|s_axi_control_ARADDR   |   in|    5|       s_axi|       control|        scalar|
+|s_axi_control_RVALID   |  out|    1|       s_axi|       control|        scalar|
+|s_axi_control_RREADY   |   in|    1|       s_axi|       control|        scalar|
+|s_axi_control_RDATA    |  out|   32|       s_axi|       control|        scalar|
+|s_axi_control_RRESP    |  out|    2|       s_axi|       control|        scalar|
+|s_axi_control_BVALID   |  out|    1|       s_axi|       control|        scalar|
+|s_axi_control_BREADY   |   in|    1|       s_axi|       control|        scalar|
+|s_axi_control_BRESP    |  out|    2|       s_axi|       control|        scalar|
+|ap_clk                 |   in|    1|  ap_ctrl_hs|  forge_wgrad2|  return value|
+|ap_rst_n               |   in|    1|  ap_ctrl_hs|  forge_wgrad2|  return value|
+|interrupt              |  out|    1|  ap_ctrl_hs|  forge_wgrad2|  return value|
+|m_axi_gmem_AWVALID     |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWREADY     |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWADDR      |  out|   64|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWID        |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWLEN       |  out|    8|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWSIZE      |  out|    3|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWBURST     |  out|    2|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWLOCK      |  out|    2|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWCACHE     |  out|    4|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWPROT      |  out|    3|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWQOS       |  out|    4|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWREGION    |  out|    4|       m_axi|          gmem|       pointer|
+|m_axi_gmem_AWUSER      |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_WVALID      |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_WREADY      |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_WDATA       |  out|   32|       m_axi|          gmem|       pointer|
+|m_axi_gmem_WSTRB       |  out|    4|       m_axi|          gmem|       pointer|
+|m_axi_gmem_WLAST       |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_WID         |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_WUSER       |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARVALID     |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARREADY     |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARADDR      |  out|   64|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARID        |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARLEN       |  out|    8|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARSIZE      |  out|    3|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARBURST     |  out|    2|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARLOCK      |  out|    2|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARCACHE     |  out|    4|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARPROT      |  out|    3|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARQOS       |  out|    4|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARREGION    |  out|    4|       m_axi|          gmem|       pointer|
+|m_axi_gmem_ARUSER      |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_RVALID      |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_RREADY      |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_RDATA       |   in|   32|       m_axi|          gmem|       pointer|
+|m_axi_gmem_RLAST       |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_RID         |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_RUSER       |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_RRESP       |   in|    2|       m_axi|          gmem|       pointer|
+|m_axi_gmem_BVALID      |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_BREADY      |  out|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_BRESP       |   in|    2|       m_axi|          gmem|       pointer|
+|m_axi_gmem_BID         |   in|    1|       m_axi|          gmem|       pointer|
+|m_axi_gmem_BUSER       |   in|    1|       m_axi|          gmem|       pointer|
++-----------------------+-----+-----+------------+--------------+--------------+
+

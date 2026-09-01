@@ -13,8 +13,20 @@
 // owns the WHOLE LM training step on-chip: embed gather, the 4-layer morph
 // core, the tropical LM head, AND the balanced LUT cross-entropy (or 2-hot
 // perceptron) loss-gradient. Only compare / add / shift ops on the data path —
-// ZERO multiplies (mean over D=128 is >>7; index arithmetic c*K etc. is small
-// loop-counter address math, not a data-path multiply).
+// ZERO multiplies (mean over D is >>ML_LOG2_D, a shift because D is a power of
+// two; index arithmetic c*K etc. is small loop-counter address math, not a
+// data-path multiply).
+//
+// BUILD-TIME WIDTH: the model dimension ML_D defaults to 128 (the deployed
+// sentinel AFI agfi-0433370d93cb58a78) but is overridable via -DML_D=<pow2>
+// (e.g. -DML_D=512). ML_LOG2_D is DERIVED from ML_D (ml_ilog2) and a
+// static_assert((1<<ML_LOG2_D)==ML_D) makes any mismatch a compile error. Every
+// WORDS_*/OFF_* count, on-chip array dim, the shift-normalize, and ML_BUFFER_WORDS
+// is expressed in terms of ML_D/ML_LOG2_D, so a single -DML_D=512 rederives the
+// whole layout; gen_buffer_init.py reads the same width from env ML_D so the
+// driver-staged buffer matches byte-for-byte. NOTE: ML_V (vocab) and ML_L_SEQ
+// (window) are SEPARATE shape constants and stay 128 under a width override —
+// only the channel dimension D scales.
 //
 // =============================================================================
 // POSITION-BY-POSITION execution model (this is the key difference from
@@ -74,13 +86,21 @@
 #include <cstdint>
 
 // =============================================================================
-// Shape constants — "config B" MorphSSM char-LM at D=V=L_SEQ=128, N_LAYERS=4.
-// All sizes are powers of two (or multiples of 16) so every WORDS_* divides 16
-// — required for the 512-bit (16-word) wide-AXI burst helpers — and the
-// divide-by-N normalizations collapse to arithmetic shifts (no divider, no
-// multiply on the data path).
+// Shape constants — "config B" MorphSSM char-LM at V=L_SEQ=128, N_LAYERS=4, and
+// build-time channel dimension ML_D (default 128; -DML_D=512 for the larger
+// deployed artifact). All sizes are powers of two (or multiples of 16) so every
+// WORDS_* divides 16 — required for the 512-bit (16-word) wide-AXI burst helpers
+// — and the divide-by-N normalizations collapse to arithmetic shifts (no
+// divider, no multiply on the data path).
 // =============================================================================
-constexpr int ML_D        = 128;   // model / channel dimension
+// ML_D: model / channel dimension. Build-time selectable — default 128 (the
+// deployed sentinel AFI), override with -DML_D=512 (any power of two). Defined as
+// a macro (not a constexpr int) so the -D flag can override it; every derived
+// constant below expands it as an integer literal, so all constexpr/array/loop
+// contexts behave exactly as before at the default.
+#ifndef ML_D
+#define ML_D 128
+#endif
 constexpr int ML_V        = 128;   // vocabulary (ASCII chars, clipped to 128)
 constexpr int ML_L_SEQ    = 128;   // sequence length / training window
 constexpr int ML_N_LAYERS = 4;     // number of morph SSM layers
@@ -109,8 +129,15 @@ constexpr int ML_BATCH_N = 1;
 static_assert(ML_BATCH_N >= 1, "ML_BATCH must be >= 1");
 
 // log2 helpers for the mean-subtract (>>) normalization. D is a power of two so
-// the per-token divide-by-D collapses to an arithmetic shift.
-constexpr int ML_LOG2_D   = 7;     // log2(ML_D) -> 128
+// the per-token divide-by-D collapses to an arithmetic shift. ML_LOG2_D is
+// DERIVED from ML_D (compile-time recursion), never a standalone literal, so a
+// -DML_D=512 build automatically shifts by 9. The static_assert turns a
+// non-power-of-two ML_D (or a hand-mismatched ML_LOG2_D) into a compile error.
+constexpr int ml_ilog2(int n) { return (n <= 1) ? 0 : (1 + ml_ilog2(n >> 1)); }
+constexpr int ML_LOG2_D   = ml_ilog2(ML_D);   // 128 -> 7, 512 -> 9
+static_assert((1 << ML_LOG2_D) == ML_D,
+              "ML_LOG2_D must equal log2(ML_D): ML_D must be a power of two "
+              "(-DML_D=512 -> ML_LOG2_D=9)");
 
 // Mode codes (match forge_train_step.cpp dispatcher style).
 constexpr int ML_MODE_FWD       = 0;
@@ -134,11 +161,30 @@ constexpr int WORDS_MB       = ML_N_LAYERS * ML_D;          // out-proj bias    
 constexpr int WORDS_W_HEAD   = ML_V * ML_D;                 // LM head            [v][d]
 
 // Gradient accumulators (one per weight region, same sizes):
+#if ML_D >= 512
+// D>=512: the buffer G sections are CULLED (zero words). Grads live ONLY in
+// the on-chip g_*_oc arrays: under TT_RESIDENT_W+TT_ONCHIP_GRAD (mandatory at
+// this width, enforced below) NO code path reads or writes buffer grads —
+// do_signsgd uses signsgd_region_oc, the grad-zero runs on-chip, and the
+// grad flush at the end of do_train_run is guarded !TT_RESIDENT_W. Culling
+// drops 4.58 MB so the D=512 buffer (7.69 MB) fits the 8 MB staging window
+// (axi_bram_ctrl caps at 65536 lines = 4 MB/bank; the CL banks two of them).
+// The D=128 layout below is UNTOUCHED (deployed-AFI ABI, sentinel-exact).
+#if !defined(TT_ONCHIP_GRAD) || !defined(TT_RESIDENT_W) || !defined(TT_URAM_W)
+#error "ML_D>=512 requires -DTT_RESIDENT_W -DTT_ONCHIP_GRAD -DTT_URAM_W (G sections are culled to fit the 8MB staging window, and without TT_URAM_W the multi-MB resident/grad arrays land in BRAM and blow P&R hours in)"
+#endif
+constexpr int WORDS_G_EMBED  = 0;
+constexpr int WORDS_G_MH     = 0;
+constexpr int WORDS_G_MP     = 0;
+constexpr int WORDS_G_MB     = 0;
+constexpr int WORDS_G_W_HEAD = 0;
+#else
 constexpr int WORDS_G_EMBED  = WORDS_EMBED;
 constexpr int WORDS_G_MH     = WORDS_MH;
 constexpr int WORDS_G_MP     = WORDS_MP;
 constexpr int WORDS_G_MB     = WORDS_MB;
 constexpr int WORDS_G_W_HEAD = WORDS_W_HEAD;
+#endif
 
 // Per-sequence region STRIDES (one sequence's worth of words). Under TT_BATCH
 // the buffer holds ML_BATCH_N of each of these back-to-back; sequence b lives at
@@ -234,6 +280,13 @@ constexpr int OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) / 16) * 16;  // host-
 
 constexpr int ML_BUFFER_WORDS = OFF_CE_LUT    + WORDS_CE_LUT;
 constexpr int ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4;
+#if ML_D >= 512
+// D>=512 staging window: two 4 MB axi_bram_ctrl banks = 8 MB total (see
+// cl_forge_morph_lm_d512.sv). The G-culled 7.69 MB layout MUST fit it.
+// (#if'd so the D=128 sentinel's preprocessed source stays byte-identical.)
+static_assert(ML_BUFFER_BYTES <= (8 << 20),
+              "D>=512 buffer must fit the 8 MB (two-bank) staging window");
+#endif
 
 // =============================================================================
 // 16-word (512-bit AXI burst) alignment guard — FAILS THE BUILD, not the bitstream.

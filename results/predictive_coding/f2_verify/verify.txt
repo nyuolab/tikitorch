@@ -1,0 +1,8 @@
+[pc] staging mismatches: e 0/4096  W 0/65536  acts 0/4096  mask 0/4096  skip 0/4096
+[pc] gate density (host): mask=1 in 2468/4096, skip=1 in 2898/4096
+[pc] AP_DONE in 0.688 ms -> kernel ran from DDR
+[pc] readback nonzero: gw 64891/65536  e_down 4096/4096  gb 251/256
+[pc] samples: gw[0]=393216(ref 393216) gw[100]=118784(ref 118784) ed[0]=-198260(ref -198260) gb[0]=480(ref 480)
+[pc] ON-SILICON vs cascade_grads:  max|gW|=0  max|e_down|=0  max|gB|=0
+[pc] -> BIT-EXACT ON SILICON (the PC gradient computed on F2 == cascade_grads)
+VERIFY_EXIT=0

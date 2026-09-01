@@ -1,0 +1,3 @@
+ARM=update_r3 T_START=1785523270
+{"arm":"update","t_start":1785523270.7546556,"t_end":1785523890.8986738,"dur_s":620.1440181732178,"kicks":3679,"steps_per_kick":5,"tokens":2354560,"tok_s":3796.7954716969107,"n_update_kicks":3679,"gate_every":20,"sgd_thr":2048,"frozen_thr":1073741824,"wcrc":3435876935862098320,"init_wcrc":9856645203440722904,"preds16":[111,111,32,111,32,111,111,32,111,111,32,111,32,111,111,32],"acc":0.359375,"golden_wcrc":14650122959732499763,"serve_is_frozen_mode3":true,"serve_wcrc_unchanged":true,"note":"core-rail Vccint only; NOT full-card PMBus"}
+ARM=update_r3 T_END=1785523891 ITERS=1

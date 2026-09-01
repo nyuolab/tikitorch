@@ -1,22 +1,21 @@
-"""Closure-penalty ablation: the cost of making the learning loop FPGA-native.
+"""Recipe-boundary ablation for a small hard-routed training experiment.
 
 This reproduces, on a tiny self-contained task, the central idea behind the
 "algebraic closure of the learning loop" result: each step you take *toward* a
-fully multiplier-free (tropically closed) training loop tends to cost some
-accuracy. The sum of those costs is the "closure penalty."
+an increasingly constrained recipe can cost accuracy. This script measures the
+local effect of three choices; it does not certify a compiled learning loop.
 
 Three knobs, flipped one at a time from the open (GPU-friendly) corner toward
 the closed (silicon-friendly) corner:
 
   1. optimizer:   AdamW  ->  PureTropicalSGD
         AdamW uses multiplications (moment estimates, adaptive lr). PureTropicalSGD
-        is strictly multiplier-free: power-of-2 lr applied as a bit shift,
-        integer-counter momentum.
+        uses power-of-two step choices and integer-counter momentum.
   2. projection:  dense nn.Linear head/proj  ->  tropical projection
         Replaces multiply-accumulate matmuls with max-plus / min-plus selection.
   3. activation:  soft (tau>0, logsumexp)  ->  hard (tau=0, argmin/argmax)
         The soft relaxation has dense gradients (and uses exp); the hard form is
-        the closure-preserving op that maps to an FPGA, with sparse gradients.
+        the route-discrete form intended for separate closure/export auditing.
 
 We train a small ``MorphSSM`` on a synthetic sequence-classification task (no
 downloads) and report the final loss/accuracy at each configuration so the
@@ -130,14 +129,14 @@ def main():
 
     x, y = make_task(args.n_samples, args.seq_len, n_classes=4)
 
-    # Ablation ladder: open corner -> closed corner. Each row flips one knob.
+    # Ablation ladder: ordinary corner -> increasingly constrained candidates.
     configs = [
         # name,                      optimizer,        tropical_proj, tau, anneal
         ("open  (AdamW, dense, soft)",      "adamw",        False, 1.0, False),
         ("+ tropical SGD",                   "puretropical", False, 1.0, False),
         ("+ tropical projection",            "puretropical", True,  1.0, False),
         ("+ hard ops (soft->hard anneal)",   "puretropical", True,  1.0, True),
-        ("closed (AdamW, dense, soft)",      "adamw",        False, 1.0, False),  # reference rerun
+        ("reference rerun (AdamW, dense, soft)", "adamw",    False, 1.0, False),
     ]
 
     print(f"{'configuration':36s}  {'test_loss':>10s}  {'test_acc':>9s}")
@@ -154,10 +153,10 @@ def main():
     open_acc = results[0][2]
     closed_acc = results[3][2]
     print("-" * 60)
-    print(f"closure penalty (open - fully-closed accuracy): "
+    print(f"boundary-choice gap (reference - constrained accuracy): "
           f"{open_acc - closed_acc:+.4f}")
-    print("Each flip toward closure trades accuracy for a multiplier-free, "
-          "FPGA-native learning loop.")
+    print("Run the full-step auditor and physical build gates separately before "
+          "making a multiplier-free or FPGA claim.")
 
 
 if __name__ == "__main__":

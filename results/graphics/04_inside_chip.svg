@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 950" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="cC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4FD1E0"/>
+    </marker>
+    <marker id="cO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#F2A93B"/>
+    </marker>
+    <marker id="cV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B48CFF"/>
+    </marker>
+    <marker id="cW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FA1BF"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="950" fill="#0B1120"/>
+  <text x="700" y="46" text-anchor="middle" fill="#FFFFFF" font-size="28" font-weight="700">Inside one chip — one transformer block, three precision worlds</text>
+  <text x="700" y="78" text-anchor="middle" fill="#8FA1BF" font-size="16">multiply-free forward · BF16 backward (the one place multiplies are allowed) · dyadic-Adam optimizer</text>
+
+  <!-- DDR -->
+  <rect x="40" y="330" width="140" height="100" rx="10" fill="#111A2E" stroke="#8FA1BF" stroke-width="2"/>
+  <text x="110" y="370" text-anchor="middle" fill="#DCE6F5" font-size="15" font-weight="700">DDR4</text>
+  <text x="110" y="392" text-anchor="middle" fill="#8FA1BF" font-size="11">resident today;</text>
+  <text x="110" y="408" text-anchor="middle" fill="#8FA1BF" font-size="11">streamed at 30M</text>
+  <line x1="182" y1="380" x2="198" y2="380" stroke="#8FA1BF" stroke-width="3" marker-end="url(#cW)"/>
+  <text x="110" y="452" text-anchor="middle" fill="#5B6B85" font-size="11">512-bit AXI master</text>
+
+  <!-- Chip outline -->
+  <rect x="200" y="110" width="1160" height="590" rx="16" fill="#0E1730" stroke="#33415C" stroke-width="3"/>
+  <text x="220" y="138" fill="#8FA1BF" font-size="14" font-weight="700">AWS F2 FPGA · kernel fits ONE SLR · forge_pc_xformer block</text>
+
+  <!-- CDC panel -->
+  <rect x="1055" y="122" width="290" height="120" rx="10" fill="#111A2E" stroke="#5B6B85" stroke-width="1.5"/>
+  <text x="1200" y="146" text-anchor="middle" fill="#DCE6F5" font-size="13" font-weight="700">CLOCKING (the timing saga)</text>
+  <g font-size="11.5" fill="#8FA1BF" text-anchor="middle">
+    <text x="1200" y="168">shell hard-locked @ 250 MHz</text>
+    <text x="1200" y="186">→ clk_wiz 150 MHz kernel + AXI clock</text>
+    <text x="1200" y="204">converters + reset false-path</text>
+    <text x="1200" y="226" fill="#58C97D">CLOSED: 0 violated / 113 met · WNS +0.051 ns</text>
+  </g>
+
+  <!-- on-chip state strip -->
+  <rect x="220" y="158" width="810" height="46" rx="8" fill="#16213B" stroke="#33415C"/>
+  <text x="625" y="186" text-anchor="middle" fill="#B9C6DB" font-size="13.5">on-chip state: weight masters (float) · Adam moments · wide activation cache (× S pipeline slots)</text>
+
+  <!-- ================= FORWARD lane ================= -->
+  <text x="220" y="248" fill="#4FD1E0" font-size="15" font-weight="700">FORWARD — multiply-free (this is what "tropical/dyadic" buys)</text>
+  <g>
+    <rect x="230" y="262" width="215" height="60" rx="9" fill="#0F2A33" stroke="#4FD1E0" stroke-width="2"/>
+    <text x="337" y="288" text-anchor="middle" fill="#DCE6F5" font-size="14">dyad_matmul</text>
+    <text x="337" y="308" text-anchor="middle" fill="#4FD1E0" font-size="12" font-family="Menlo, monospace">w = ±2ᵏ → shift + add</text>
+
+    <rect x="480" y="262" width="180" height="60" rx="9" fill="#0F2A33" stroke="#4FD1E0" stroke-width="2"/>
+    <text x="570" y="288" text-anchor="middle" fill="#DCE6F5" font-size="14">int LayerNorm</text>
+    <text x="570" y="308" text-anchor="middle" fill="#4FD1E0" font-size="12">CSD reciprocal</text>
+
+    <rect x="695" y="262" width="170" height="60" rx="9" fill="#0F2A33" stroke="#4FD1E0" stroke-width="2"/>
+    <text x="780" y="288" text-anchor="middle" fill="#DCE6F5" font-size="14">attention</text>
+    <text x="780" y="308" text-anchor="middle" fill="#4FD1E0" font-size="12">SEQ=64 · H=2</text>
+
+    <rect x="900" y="262" width="130" height="60" rx="9" fill="#0F2A33" stroke="#4FD1E0" stroke-width="2"/>
+    <text x="965" y="288" text-anchor="middle" fill="#DCE6F5" font-size="14">FFN</text>
+    <text x="965" y="308" text-anchor="middle" fill="#4FD1E0" font-size="12">256</text>
+
+    <g stroke="#4FD1E0" stroke-width="2.5">
+      <line x1="447" y1="292" x2="476" y2="292" marker-end="url(#cC)"/>
+      <line x1="662" y1="292" x2="691" y2="292" marker-end="url(#cC)"/>
+      <line x1="867" y1="292" x2="896" y2="292" marker-end="url(#cC)"/>
+      <line x1="1032" y1="292" x2="1352" y2="292" marker-end="url(#cC)"/>
+    </g>
+    <text x="1190" y="282" text-anchor="middle" fill="#4FD1E0" font-size="13">x → next chip (bf16)</text>
+  </g>
+
+  <!-- ================= BACKWARD lane ================= -->
+  <text x="220" y="388" fill="#F2A93B" font-size="15" font-weight="700">BACKWARD — BF16, flows right to left (the one place multiplies are spent)</text>
+  <g>
+    <line x1="1352" y1="432" x2="1055" y2="432" stroke="#F2A93B" stroke-width="2.5" marker-end="url(#cO)"/>
+    <text x="1200" y="422" text-anchor="middle" fill="#F2A93B" font-size="13">ε from next chip</text>
+
+    <rect x="835" y="402" width="215" height="60" rx="9" fill="#33270F" stroke="#F2A93B" stroke-width="2"/>
+    <text x="942" y="428" text-anchor="middle" fill="#DCE6F5" font-size="14">STE gradients</text>
+    <text x="942" y="448" text-anchor="middle" fill="#F2A93B" font-size="12">through the dyadic quantizer</text>
+
+    <rect x="480" y="402" width="310" height="60" rx="9" fill="#33270F" stroke="#F2A93B" stroke-width="2"/>
+    <text x="635" y="428" text-anchor="middle" fill="#DCE6F5" font-size="14">bf_linear_bwd — partial-sum lanes, II=1</text>
+    <text x="635" y="448" text-anchor="middle" fill="#F2A93B" font-size="12">(the II=80 fix → 2.94× measured, 0.47 → 1.38 steps/s)</text>
+
+    <g stroke="#F2A93B" stroke-width="2.5">
+      <line x1="831" y1="432" x2="794" y2="432" marker-end="url(#cO)"/>
+      <line x1="476" y1="432" x2="208" y2="432" marker-end="url(#cO)"/>
+    </g>
+    <text x="330" y="422" text-anchor="middle" fill="#F2A93B" font-size="13">ε → previous chip</text>
+  </g>
+
+  <!-- ================= OPTIMIZER lane ================= -->
+  <text x="220" y="528" fill="#B48CFF" font-size="15" font-weight="700">OPTIMIZER — entirely local to the chip</text>
+  <g>
+    <rect x="230" y="542" width="340" height="60" rx="9" fill="#231736" stroke="#B48CFF" stroke-width="2"/>
+    <text x="400" y="568" text-anchor="middle" fill="#DCE6F5" font-size="14">dyadic-Adam</text>
+    <text x="400" y="588" text-anchor="middle" fill="#B48CFF" font-size="12">shift-based moments — no multiplier in the update</text>
+
+    <rect x="610" y="542" width="440" height="60" rx="9" fill="#231736" stroke="#B48CFF" stroke-width="2"/>
+    <text x="830" y="568" text-anchor="middle" fill="#DCE6F5" font-size="14">in-kernel gradient ACCUM = 8</text>
+    <text x="830" y="588" text-anchor="middle" fill="#B48CFF" font-size="12">the effective-batch-1 fix — golden: batch 1/8/32 → bpb 3.74 / 3.20 / 2.95</text>
+
+    <line x1="635" y1="466" x2="635" y2="538" stroke="#B48CFF" stroke-width="2" marker-end="url(#cV)" opacity="0.8"/>
+    <line x1="574" y1="572" x2="606" y2="572" stroke="#B48CFF" stroke-width="2.5" marker-end="url(#cV)"/>
+  </g>
+
+  <!-- invariant banner -->
+  <rect x="230" y="630" width="1110" height="50" rx="9" fill="#0F2418" stroke="#58C97D" stroke-width="2"/>
+  <text x="785" y="661" text-anchor="middle" fill="#58C97D" font-size="15" font-weight="700">INVARIANT: DSP_MULT = 0 in the forward — DSP48s serve as adders/comparators only; every BF16 multiply lives in backward + optimizer</text>
+
+  <!-- ================= resource bars ================= -->
+  <text x="200" y="738" fill="#FFFFFF" font-size="17" font-weight="700">Post-P&amp;R resource utilization <tspan fill="#5B6B85" font-size="13" font-weight="400">(per SLR, measured)</tspan></text>
+
+  <g font-size="13" fill="#8FA1BF" text-anchor="end">
+    <text x="300" y="772">BRAM_18K</text>
+    <text x="300" y="806">LUT</text>
+    <text x="300" y="840">FF</text>
+    <text x="300" y="874">DSP</text>
+    <text x="300" y="908">URAM</text>
+  </g>
+  <g>
+    <rect x="312" y="756" width="700" height="22" rx="5" fill="#1B2740"/>
+    <rect x="312" y="756" width="679" height="22" rx="5" fill="#E0596B"/>
+    <text x="1022" y="772" fill="#E0596B" font-size="13" font-weight="700">97%</text>
+
+    <rect x="312" y="790" width="700" height="22" rx="5" fill="#1B2740"/>
+    <rect x="312" y="790" width="483" height="22" rx="5" fill="#F2A93B"/>
+    <text x="805" y="806" fill="#F2A93B" font-size="13" font-weight="700">69%</text>
+
+    <rect x="312" y="824" width="700" height="22" rx="5" fill="#1B2740"/>
+    <rect x="312" y="824" width="217" height="22" rx="5" fill="#4FD1E0"/>
+    <text x="539" y="840" fill="#4FD1E0" font-size="13" font-weight="700">31%</text>
+
+    <rect x="312" y="858" width="700" height="22" rx="5" fill="#1B2740"/>
+    <rect x="312" y="858" width="105" height="22" rx="5" fill="#58C97D"/>
+    <text x="427" y="874" fill="#58C97D" font-size="13" font-weight="700">15% (455 / 3008 — bound as ADDERS, not multipliers)</text>
+
+    <rect x="312" y="892" width="700" height="22" rx="5" fill="#1B2740"/>
+    <rect x="312" y="892" width="21" height="22" rx="5" fill="#B48CFF"/>
+    <text x="343" y="908" fill="#B48CFF" font-size="13" font-weight="700">3% — the head-room the S=8 / URAM rebinds spend</text>
+  </g>
+
+  <text x="200" y="940" fill="#E0596B" font-size="13">BRAM at 97% is the structural wall — it is what forces DDR weight streaming at the 30M tier (D=256 will not fit resident).</text>
+
+  <!-- kick times side chip -->
+  <rect x="1060" y="748" width="300" height="120" rx="10" fill="#111A2E" stroke="#33415C"/>
+  <text x="1210" y="776" text-anchor="middle" fill="#DCE6F5" font-size="14" font-weight="700">one training "kick" [measured]</text>
+  <g font-size="13" fill="#B9C6DB" text-anchor="middle">
+    <text x="1210" y="802">FWD 53.5–57.6 ms · BWD 91.3–99.0 ms</text>
+    <text x="1210" y="826">@ 150 MHz · compute-bound, not I/O</text>
+    <text x="1210" y="850" fill="#8FA1BF">S=8 rebuild: BWD → ~58 ms projected</text>
+  </g>
+</svg>

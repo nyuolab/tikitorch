@@ -1,0 +1,1 @@
+{"gate": "G5_audit", "arch": "morphssm", "opt": "puretropical", "loss": "lut", "tau": 0.0, "violations": {}, "waived": {"transcendental": 1, "elementwise-divide": 2}, "training_closed": true}

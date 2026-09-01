@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 950" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="fC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4FD1E0"/>
+    </marker>
+    <marker id="fO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#F2A93B"/>
+    </marker>
+  </defs>
+
+  <rect width="1500" height="950" fill="#0B1120"/>
+  <text x="750" y="48" text-anchor="middle" fill="#FFFFFF" font-size="29" font-weight="700">The fabric — model-parallel PC transformer on 8 × AWS F2 FPGAs</text>
+  <text x="750" y="80" text-anchor="middle" fill="#8FA1BF" font-size="16">one transformer block per physical chip · neighbour-only messages · no global gradient, no all-reduce</text>
+
+  <!-- Host -->
+  <rect x="40" y="200" width="200" height="240" rx="12" fill="#111A2E" stroke="#8FA1BF" stroke-width="2"/>
+  <text x="140" y="232" text-anchor="middle" fill="#FFFFFF" font-size="17" font-weight="700">x86 HOST</text>
+  <g font-size="13" fill="#B9C6DB">
+    <text x="60" y="262">• batch loader (char-64)</text>
+    <text x="60" y="288">• PCIe message relay</text>
+    <text x="60" y="314">• cosine LR schedule</text>
+    <text x="60" y="340">• grad ACCUM = 8</text>
+    <text x="60" y="366">• Gate-C verify (2.75 GB)</text>
+    <text x="60" y="392">• no math on the host —</text>
+    <text x="68" y="412">  all compute is on-chip</text>
+  </g>
+
+  <!-- Chips -->
+  <g>
+    <!-- chip boxes -->
+    <g font-size="14" fill="#DCE6F5" text-anchor="middle">
+      <rect x="290" y="200" width="118" height="240" rx="10" fill="#141F38" stroke="#F2A93B" stroke-width="2"/>
+      <text x="349" y="230" font-weight="700">CHIP 0</text>
+      <text x="349" y="254" fill="#8FA1BF" font-size="12">EMB + BLK 0</text>
+
+      <rect x="440" y="200" width="118" height="240" rx="10" fill="#141F38" stroke="#F2A93B" stroke-width="2"/>
+      <text x="499" y="230" font-weight="700">CHIP 1</text>
+      <text x="499" y="254" fill="#8FA1BF" font-size="12">BLK 1</text>
+
+      <rect x="590" y="200" width="118" height="240" rx="10" fill="#141F38" stroke="#F2A93B" stroke-width="2"/>
+      <text x="649" y="230" font-weight="700">CHIP 2</text>
+      <text x="649" y="254" fill="#8FA1BF" font-size="12">BLK 2</text>
+
+      <rect x="740" y="200" width="118" height="240" rx="10" fill="#141F38" stroke="#F2A93B" stroke-width="2"/>
+      <text x="799" y="230" font-weight="700">CHIP 3</text>
+      <text x="799" y="254" fill="#8FA1BF" font-size="12">BLK 3</text>
+
+      <rect x="890" y="200" width="118" height="240" rx="10" fill="#141F38" stroke="#F2A93B" stroke-width="2"/>
+      <text x="949" y="230" font-weight="700">CHIP 4</text>
+      <text x="949" y="254" fill="#8FA1BF" font-size="12">BLK 4</text>
+
+      <rect x="1040" y="200" width="118" height="240" rx="10" fill="#141F38" stroke="#F2A93B" stroke-width="2"/>
+      <text x="1099" y="230" font-weight="700">CHIP 5</text>
+      <text x="1099" y="254" fill="#8FA1BF" font-size="12">BLK 5</text>
+
+      <rect x="1190" y="200" width="118" height="240" rx="10" fill="#141F38" stroke="#F2A93B" stroke-width="2"/>
+      <text x="1249" y="230" font-weight="700">CHIP 6</text>
+      <text x="1249" y="254" fill="#8FA1BF" font-size="12">BLK 6</text>
+
+      <rect x="1340" y="200" width="118" height="240" rx="10" fill="#141F38" stroke="#F2A93B" stroke-width="2"/>
+      <text x="1399" y="230" font-weight="700">CHIP 7</text>
+      <text x="1399" y="254" fill="#8FA1BF" font-size="12">BLK 7 + HEAD/CE</text>
+    </g>
+
+    <!-- per-chip contents -->
+    <g font-size="11" fill="#5B6B85" text-anchor="middle">
+      <text x="349" y="300">mult-free fwd</text><text x="349" y="318">BF16 bwd</text><text x="349" y="336">dyadic-Adam</text>
+      <text x="499" y="300">mult-free fwd</text><text x="499" y="318">BF16 bwd</text><text x="499" y="336">dyadic-Adam</text>
+      <text x="649" y="300">mult-free fwd</text><text x="649" y="318">BF16 bwd</text><text x="649" y="336">dyadic-Adam</text>
+      <text x="799" y="300">mult-free fwd</text><text x="799" y="318">BF16 bwd</text><text x="799" y="336">dyadic-Adam</text>
+      <text x="949" y="300">mult-free fwd</text><text x="949" y="318">BF16 bwd</text><text x="949" y="336">dyadic-Adam</text>
+      <text x="1099" y="300">mult-free fwd</text><text x="1099" y="318">BF16 bwd</text><text x="1099" y="336">dyadic-Adam</text>
+      <text x="1249" y="300">mult-free fwd</text><text x="1249" y="318">BF16 bwd</text><text x="1249" y="336">dyadic-Adam</text>
+      <text x="1399" y="300">mult-free fwd</text><text x="1399" y="318">BF16 bwd</text><text x="1399" y="336">dyadic-Adam</text>
+    </g>
+
+    <!-- forward x arrows -->
+    <g stroke="#4FD1E0" stroke-width="3">
+      <line x1="410" y1="368" x2="438" y2="368" marker-end="url(#fC)"/>
+      <line x1="560" y1="368" x2="588" y2="368" marker-end="url(#fC)"/>
+      <line x1="710" y1="368" x2="738" y2="368" marker-end="url(#fC)"/>
+      <line x1="860" y1="368" x2="888" y2="368" marker-end="url(#fC)"/>
+      <line x1="1010" y1="368" x2="1038" y2="368" marker-end="url(#fC)"/>
+      <line x1="1160" y1="368" x2="1188" y2="368" marker-end="url(#fC)"/>
+      <line x1="1310" y1="368" x2="1338" y2="368" marker-end="url(#fC)"/>
+    </g>
+    <!-- error arrows -->
+    <g stroke="#F2A93B" stroke-width="3">
+      <line x1="438" y1="410" x2="410" y2="410" marker-end="url(#fO)"/>
+      <line x1="588" y1="410" x2="560" y2="410" marker-end="url(#fO)"/>
+      <line x1="738" y1="410" x2="710" y2="410" marker-end="url(#fO)"/>
+      <line x1="888" y1="410" x2="860" y2="410" marker-end="url(#fO)"/>
+      <line x1="1038" y1="410" x2="1010" y2="410" marker-end="url(#fO)"/>
+      <line x1="1188" y1="410" x2="1160" y2="410" marker-end="url(#fO)"/>
+      <line x1="1338" y1="410" x2="1310" y2="410" marker-end="url(#fO)"/>
+    </g>
+    <text x="330" y="160" fill="#4FD1E0" font-size="14">hidden state x (bf16) — one hop down the chain  ⟶</text>
+    <text x="1458" y="160" fill="#F2A93B" font-size="14" text-anchor="end">⟵  error ε — one hop back up</text>
+    <line x1="300" y1="170" x2="349" y2="196" stroke="#4FD1E0" stroke-width="1.5" opacity="0.5"/>
+    <line x1="1420" y1="170" x2="1399" y2="196" stroke="#F2A93B" stroke-width="1.5" opacity="0.5"/>
+  </g>
+
+  <!-- physical transport note -->
+  <line x1="240" y1="470" x2="1458" y2="470" stroke="#44506A" stroke-width="2" stroke-dasharray="6 5"/>
+  <g stroke="#44506A" stroke-width="1.5">
+    <line x1="349" y1="440" x2="349" y2="470"/><line x1="499" y1="440" x2="499" y2="470"/>
+    <line x1="649" y1="440" x2="649" y2="470"/><line x1="799" y1="440" x2="799" y2="470"/>
+    <line x1="949" y1="440" x2="949" y2="470"/><line x1="1099" y1="440" x2="1099" y2="470"/>
+    <line x1="1249" y1="440" x2="1249" y2="470"/><line x1="1399" y1="440" x2="1399" y2="470"/>
+  </g>
+  <text x="750" y="496" text-anchor="middle" fill="#8FA1BF" font-size="13.5">physical transport today: host PCIe relay (the measured bottleneck at 8-chip scale) · next: TcpLink chip-to-chip, protocol already scale-invariant → multi-box</text>
+
+  <!-- ===== 1F1B pipeline timeline ===== -->
+  <text x="340" y="560" fill="#FFFFFF" font-size="18" font-weight="700">Bubble-free 1F1B pipeline — S slots in flight <tspan fill="#5B6B85" font-size="13" font-weight="400">(4 of 8 chips shown)</tspan></text>
+
+  <g font-size="13" fill="#8FA1BF" text-anchor="end">
+    <text x="326" y="636">chip 0</text>
+    <text x="326" y="676">chip 1</text>
+    <text x="326" y="716">chip 2</text>
+    <text x="326" y="756">chip 3</text>
+  </g>
+
+  <!-- row chip0: F1 F2 F3 F4 B1 F5 B2 F6 B3 F7 -->
+  <g font-size="13" text-anchor="middle">
+    <g>
+      <rect x="340" y="612" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="372" y="634" fill="#4FD1E0">F1</text>
+      <rect x="408" y="612" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="440" y="634" fill="#4FD1E0">F2</text>
+      <rect x="476" y="612" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="508" y="634" fill="#4FD1E0">F3</text>
+      <rect x="544" y="612" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="576" y="634" fill="#4FD1E0">F4</text>
+      <rect x="612" y="612" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="644" y="634" fill="#F2A93B">B1</text>
+      <rect x="680" y="612" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="712" y="634" fill="#4FD1E0">F5</text>
+      <rect x="748" y="612" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="780" y="634" fill="#F2A93B">B2</text>
+      <rect x="816" y="612" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="848" y="634" fill="#4FD1E0">F6</text>
+      <rect x="884" y="612" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="916" y="634" fill="#F2A93B">B3</text>
+      <rect x="952" y="612" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="984" y="634" fill="#4FD1E0">F7</text>
+    </g>
+    <!-- row chip1 -->
+    <g>
+      <rect x="408" y="652" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="440" y="674" fill="#4FD1E0">F1</text>
+      <rect x="476" y="652" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="508" y="674" fill="#4FD1E0">F2</text>
+      <rect x="544" y="652" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="576" y="674" fill="#4FD1E0">F3</text>
+      <rect x="612" y="652" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="644" y="674" fill="#F2A93B">B1</text>
+      <rect x="680" y="652" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="712" y="674" fill="#4FD1E0">F4</text>
+      <rect x="748" y="652" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="780" y="674" fill="#F2A93B">B2</text>
+      <rect x="816" y="652" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="848" y="674" fill="#4FD1E0">F5</text>
+      <rect x="884" y="652" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="916" y="674" fill="#F2A93B">B3</text>
+      <rect x="952" y="652" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="984" y="674" fill="#4FD1E0">F6</text>
+    </g>
+    <!-- row chip2 -->
+    <g>
+      <rect x="476" y="692" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="508" y="714" fill="#4FD1E0">F1</text>
+      <rect x="544" y="692" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="576" y="714" fill="#4FD1E0">F2</text>
+      <rect x="612" y="692" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="644" y="714" fill="#F2A93B">B1</text>
+      <rect x="680" y="692" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="712" y="714" fill="#4FD1E0">F3</text>
+      <rect x="748" y="692" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="780" y="714" fill="#F2A93B">B2</text>
+      <rect x="816" y="692" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="848" y="714" fill="#4FD1E0">F4</text>
+      <rect x="884" y="692" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="916" y="714" fill="#F2A93B">B3</text>
+      <rect x="952" y="692" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="984" y="714" fill="#4FD1E0">F5</text>
+    </g>
+    <!-- row chip3 -->
+    <g>
+      <rect x="544" y="732" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="576" y="754" fill="#4FD1E0">F1</text>
+      <rect x="612" y="732" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="644" y="754" fill="#F2A93B">B1</text>
+      <rect x="680" y="732" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="712" y="754" fill="#4FD1E0">F2</text>
+      <rect x="748" y="732" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="780" y="754" fill="#F2A93B">B2</text>
+      <rect x="816" y="732" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="848" y="754" fill="#4FD1E0">F3</text>
+      <rect x="884" y="732" width="64" height="34" rx="5" fill="#3D2A10" stroke="#F2A93B"/><text x="916" y="754" fill="#F2A93B">B3</text>
+      <rect x="952" y="732" width="64" height="34" rx="5" fill="#123A44" stroke="#4FD1E0"/><text x="984" y="754" fill="#4FD1E0">F4</text>
+    </g>
+  </g>
+  <text x="340" y="790" fill="#5B6B85" font-size="13">time →   ·   staleness ladder is depth-proportional [7 … 0] — the real hardware mechanism, penalty recovered at window ≥ depth</text>
+
+  <!-- side notes -->
+  <g font-size="14" fill="#B9C6DB">
+    <text x="1060" y="620">✓ pipelined masters <tspan fill="#58C97D" font-weight="700">BIT-IDENTICAL</tspan> to serial [M]</text>
+    <text x="1060" y="650">✓ pipeline overlap 1.79× measured (2 slots)</text>
+    <text x="1060" y="680">◔ S=8 slot AFI in flight — DDR-only cost,</text>
+    <text x="1078" y="702">csynth-gated (BRAM 61% / URAM 48%)</text>
+    <text x="1060" y="732">✓ no barrier anywhere — chips never wait</text>
+    <text x="1078" y="754">for a global gradient</text>
+  </g>
+
+  <!-- bottom measured band -->
+  <rect x="40" y="820" width="1418" height="100" rx="12" fill="#0F2418" stroke="#58C97D" stroke-width="2"/>
+  <text x="60" y="850" fill="#58C97D" font-size="15" font-weight="700">MEASURED (agfi-0a08046c7d64090ff · D=64 H=2 FFN=256 SEQ=64 · kernel 150 MHz):</text>
+  <g font-size="14.5" fill="#DCE6F5">
+    <text x="60" y="880">FWD kick 53.5–57.6 ms · BWD kick 91.3–99.0 ms · 0.50 steps/s → <tspan font-weight="700">258 tok/s</tspan> pipelined (serial 0.28)</text>
+    <text x="760" y="880">3 chips: <tspan fill="#58C97D" font-weight="700">bpb 3.187 CONVERGED</tspan>, Δ0.14 vs CPU twin · 8 chips × 8 blocks: <tspan fill="#58C97D" font-weight="700">bpb 3.675</tspan>, Gate-C clean</text>
+    <text x="60" y="906" fill="#8FA1BF" font-size="13">remaining quality gap = 0.26 bpb silicon gradient-noise premium — attacked by in-chip batch lanes (grad noise ∝ 1/√N)</text>
+  </g>
+</svg>

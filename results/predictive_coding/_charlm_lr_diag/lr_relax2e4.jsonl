@@ -1,0 +1,1 @@
+{"mode": "relax", "val_bpc": 2.4, "best_epoch": 13, "wall_s": 786.4, "epochs": 14, "context": 12, "hidden": 256, "depth": 4, "wd": 0.0002, "drop": 0.1}

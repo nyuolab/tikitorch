@@ -36,7 +36,8 @@ static const acc_t ML_POS_INF = acc_t( 2147483647LL);
 // --- throughput knobs (compile-time; default = the validated baseline) ---
 // TT_WIDE_LANES: lanes per cycle in the max-plus projection (PJ) and LM head
 // reductions. 8 = baseline. 16/32/64 widen the add+compare tree (more LUT, needs
-// mp_buf/wh_buf banked). MUST divide ML_D (=128). Bit-exact for any value: the
+// mp_buf/wh_buf banked). MUST divide ML_D (128 by default; 512 under -DML_D=512
+// — 8 divides both). Bit-exact for any value: the
 // balanced strict-'>' tree always keeps the lowest index among equal maxima.
 #ifndef TT_WIDE_LANES
 #define TT_WIDE_LANES 8
@@ -50,11 +51,22 @@ static const acc_t ML_POS_INF = acc_t( 2147483647LL);
 // Bit-exact: same per-position adds, same order (integer adds associative); the
 // CSIM fused golden validates. Default OFF -> shipped buffer-backed path.
 #ifdef TT_ONCHIP_GRAD
+#if ML_D >= 512
+// D>=512 culls the buffer G sections to 0 words (forge_buffer_morph_lm.hpp),
+// so the on-chip accumulators are sized by the WEIGHT regions directly
+// (identical values at any width where the G sections exist).
+static int32_t g_embed_oc[WORDS_EMBED];
+static int32_t g_mh_oc[WORDS_MH];
+static int32_t g_mp_oc[WORDS_MP];
+static int32_t g_mb_oc[WORDS_MB];
+static int32_t g_whead_oc[WORDS_W_HEAD];
+#else
 static int32_t g_embed_oc[WORDS_G_EMBED];
 static int32_t g_mh_oc[WORDS_G_MH];
 static int32_t g_mp_oc[WORDS_G_MP];
 static int32_t g_mb_oc[WORDS_G_MB];
 static int32_t g_whead_oc[WORDS_G_W_HEAD];
+#endif
 #define GEMBED(i) g_embed_oc[i]
 #define GMH(i)    g_mh_oc[i]
 #define GMP(i)    g_mp_oc[i]
@@ -213,12 +225,35 @@ static int do_fwd_loss(int32_t* buffer, int b, int m, int token, int target, int
     static int32_t wh_buf[WORDS_W_HEAD];
     static int32_t ce_lut[WORDS_CE_LUT];
 #endif
-#if TT_WIDE_LANES > 8
+#if TT_WIDE_LANES > 8 && ML_D < 512
     // Bank the projection/head weight arrays so the widened reductions get
     // TT_WIDE_LANES contiguous reads/cycle (else the wide tree bottlenecks on
     // a single memory port). Default (8) leaves the baseline mapping untouched.
+    // At ML_D>=512 the D512 block below OWNS mp_buf/wh_buf banking+URAM (a second
+    // ARRAY_PARTITION on the same array would be a duplicate-pragma error), so this
+    // path is disabled there — the D=128 sentinel (ML_D<512) is unaffected.
 #pragma HLS ARRAY_PARTITION variable=mp_buf cyclic factor=TT_WIDE_LANES dim=1
 #pragma HLS ARRAY_PARTITION variable=wh_buf cyclic factor=TT_WIDE_LANES dim=1
+#endif
+#if ML_D >= 512
+    // --- D>=512 TIMING + AREA (A3 reduced-clock build) ------------------------
+    // The out-proj weight mp_buf at D=512 is 4*512*512 = 1,048,576 words (4 MB)
+    // and wh_buf is 128*512 words (256 KB). As single deep BRAM arrays they
+    // (a) push BRAM to 85% of one SLR and (b) put the giant array's cascaded
+    // BRAM output-mux tree on the max-plus read->add->compare path — the
+    // dominant contributor to the 11.425 ns csynth critical path (target 4.0).
+    // Move BOTH to URAM (registered output => deterministic, short read timing;
+    // frees BRAM well under one SLR; URAM was 0% used) and cyclic-partition by
+    // the 16-word (512-bit) wide-AXI burst width so BOTH the 16-wide burst_load
+    // WRITE and the TT_WIDE_LANES(=8)-wide PJ_I/HEAD_D READ are bank-conflict-
+    // free across registered URAM banks. This is a STORAGE-PRIMITIVE + BANKING
+    // change only — the arithmetic (add/compare/shift, strict-'>' tie-break) is
+    // byte-identical, so the CSIM fused golden still validates bit-for-bit.
+    // Fully #if'd out at the D=128 sentinel (ML_D<512) => that RTL is unchanged.
+#pragma HLS ARRAY_PARTITION variable=mp_buf cyclic factor=16 dim=1
+#pragma HLS ARRAY_PARTITION variable=wh_buf cyclic factor=16 dim=1
+#pragma HLS BIND_STORAGE   variable=mp_buf type=RAM_T2P impl=URAM
+#pragma HLS BIND_STORAGE   variable=wh_buf type=RAM_T2P impl=URAM
 #endif
 #ifndef TT_RESIDENT_W
     if (reload) {
@@ -741,11 +776,21 @@ static int do_train_run(int32_t* buffer, int n_steps, int lr, int threshold) {
     burst_load_words(buffer, OFF_MP,     mp_buf,   WORDS_MP);
     burst_load_words(buffer, OFF_W_HEAD, wh_buf,   WORDS_W_HEAD);
     burst_load_words(buffer, OFF_CE_LUT, ce_lut,   WORDS_CE_LUT);
+#if ML_D >= 512
+    // G sections culled at D>=512: zero the on-chip accumulators by their
+    // ARRAY sizes (WORDS_G_* are 0 at this width and would skip the zeroing).
+    for (int i = 0; i < WORDS_EMBED;  i++) g_embed_oc[i] = 0;
+    for (int i = 0; i < WORDS_MH;     i++) g_mh_oc[i]    = 0;
+    for (int i = 0; i < WORDS_MP;     i++) g_mp_oc[i]    = 0;
+    for (int i = 0; i < WORDS_MB;     i++) g_mb_oc[i]    = 0;
+    for (int i = 0; i < WORDS_W_HEAD; i++) g_whead_oc[i] = 0;
+#else
     for (int i = 0; i < WORDS_G_EMBED;  i++) g_embed_oc[i] = 0;
     for (int i = 0; i < WORDS_G_MH;     i++) g_mh_oc[i]    = 0;
     for (int i = 0; i < WORDS_G_MP;     i++) g_mp_oc[i]    = 0;
     for (int i = 0; i < WORDS_G_MB;     i++) g_mb_oc[i]    = 0;
     for (int i = 0; i < WORDS_G_W_HEAD; i++) g_whead_oc[i] = 0;
+#endif
 #endif
 
 STEP_LOOP: for (int s = 0; s < n_steps; s++) {

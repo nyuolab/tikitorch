@@ -1,16 +1,17 @@
 """tikitorch.forward_forward — Tropical Forward-Forward (TFF).
 
-A forward-only, backprop-free *local* learning rule: Hinton's Forward-Forward
+A layer-local rule without end-to-end backpropagation: Hinton's Forward-Forward
 (2022, *The Forward-Forward Algorithm*) adapted to the tropical (max-plus)
 substrate. Each layer is its own learner — it adjusts its weights from a local
 goodness objective on its own activations, with no global backward pass threading
 gradients from the output back through the stack. There are two forward passes
 (one on *positive* data, one on *negative* data) instead of a forward + backward.
 
-Why this is interesting *here*: the whole training step stays **closed**
-(multiplier-free / zero-DSP), the property TikiTorch exists for. The closure-clean
-choices, each of which differs from Hinton's float recipe specifically to avoid a
-hardware multiply, are:
+Why this is interesting *here*: the reference rule uses compare/add/shift-oriented
+choices in places where Hinton's float recipe uses products. These choices make a
+constrained implementation possible, but the complete configured step still needs
+an executed software audit and a physical build audit before it supports a closure
+or DSP-utilization claim:
 
   * **Layer** = max-plus dilation ``h_j = max_i(W[j,i] + x_i)`` (the silicon
     forward kernel), optionally followed by :func:`tikitorch.functional.tropical_relu`.
@@ -49,14 +50,15 @@ Usage::
     for x, y in loader:                                   # x: (B, 784) in [0,1]
         x_pos = overlay_label(x, y, num_classes=10)       # correct label overlaid
         x_neg = overlay_label(x, make_negative_labels(y, 10), num_classes=10)
-        trainer.train_step(x_pos, x_neg)                  # forward-only, closed
+        trainer.train_step(x_pos, x_neg)                  # layer-local update
 
     preds, _ = goodness_classify(net, x_test, num_classes=10)
 
-The deploy/forward kernel is the existing max-plus dilation kernel
+The max-plus projection can target the existing dilation kernel
 (``tikitorch.fpga`` / the HLS ``forge`` kernels): a TFF layer's inference is a
 single ``y = max_i(W + x)`` followed by a subtract-max, so a trained TFF stack
-slots straight into the silicon forward path with no new primitive.
+uses the same core primitive. Export, numeric equivalence, and resource use remain
+properties of the concrete hardware build.
 """
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -149,7 +151,7 @@ def tropical_max_normalize(h: torch.Tensor, dim: int = -1) -> torch.Tensor:
 
 
 class TropicalFFHingeLossFn(torch.autograd.Function):
-    """Forward-Forward hinge loss with a multiplier-free, sign-gated backward.
+    """Forward-Forward hinge loss with a sign-gated custom backward.
 
     Goodness should be HIGH on positive data and LOW on negative data. With a
     threshold ``θ`` and margin ``m`` the per-sample objective is::
@@ -165,7 +167,8 @@ class TropicalFFHingeLossFn(torch.autograd.Function):
     tensor×tensor multiply (same straight-through construction as
     :class:`tikitorch.functional.TropicalPerceptronLossFn`). Fed through the
     max-plus :class:`~tikitorch.functional.TropicalDilationFn` backward (a scatter)
-    and a sign optimizer, the whole update is comparisons + additions — zero DSP.
+    and a sign optimizer, the intended update algebra uses comparisons and
+    additions. Audit the complete executed recipe and any synthesized build.
 
     The continuous forward value and the sign-valued backward are intentionally
     decoupled (a straight-through pattern), so ``gradcheck`` does not apply; the
@@ -213,7 +216,7 @@ class TropicalFFHingeLossFn(torch.autograd.Function):
 def tropical_ff_hinge_loss(h: torch.Tensor, is_pos: torch.Tensor,
                            theta: float = 0.0, margin: float = 1.0,
                            goodness: str = "topk", k: int = 8) -> torch.Tensor:
-    """Scalar FF hinge loss with the multiplier-free sign-gated gradient.
+    """Scalar FF hinge loss with a sign-gated custom gradient.
 
     ``h`` is ``(B, D)`` activations, ``is_pos`` a ``(B,)`` bool mask (True =
     positive sample). See :class:`TropicalFFHingeLossFn`.
@@ -285,32 +288,33 @@ SUBSTRATES = ("maxplus", "dyadic")
 
 
 class TropicalFFLayer(nn.Module):
-    """One Forward-Forward layer: a multiplier-free projection + optional ReLU.
+    """One Forward-Forward layer: a configurable projection plus optional ReLU.
 
     ``forward(x) = relu(proj(x))``. The projection is the pluggable
-    closure-clean *substrate*:
+    *substrate*:
 
     * ``substrate="maxplus"`` (default) — :class:`tikitorch.nn.TropicalDilationModule`,
       ``h_j = max_i(W[j,i] + x_i) + b_j``. The tropical winner-take-all kernel;
       passes the *runtime* closure guard (``tt.assert_no_multiply``) and supports a
       soft (``logsumexp``) ``set_tau`` anneal (harden ``tau→0`` for deploy).
     * ``substrate="dyadic"`` — :class:`tikitorch.nn.DyadicLinear`, a dense linear
-      whose weights are signed powers of two (``±2^k``), so ``W·x`` is a
-      shift+add-tree (zero DSP). Dense/additive, so it composes the FF label
-      overlay far better than max-plus (it is the repo's validated max-plus
-      *expressivity* fix). NB its closure is a static weight-value property
+      whose weights are signed powers of two (``±2^k``), so ``W·x`` admits a
+      shift-add export schedule. Dense/additive, it is a distinct capacity choice
+      from max-plus. Its export property is checked statically
       (``fpga.dyadic_export.verify_schedule``), NOT the eager op trace — the
       float-sim runs a real ``addmm``, so it does **not** pass the runtime
       ``assert_no_multiply`` (this is the documented dyadic caveat; the *update*
-      stays sign-only / multiplier-free).
+      is sign-oriented). Physical DSP use is determined from synthesis reports.
 
     The goodness, subtract-max normalization, and hinge loss are substrate-agnostic
     (they act on ``h``) — a TFF layer *is* its own local learner either way.
 
     Args:
-        in_features, out_features: projection dims.
+        in_features: input projection dimension.
+        out_features: output projection dimension.
         substrate: ``"maxplus"`` (default) or ``"dyadic"``.
-        use_relu / leaky_shift: optional (power-of-2 leaky) ReLU after the projection.
+        use_relu: whether to apply ReLU after the projection.
+        leaky_shift: optional power-of-two leaky-ReLU shift.
         goodness: ``"topk"`` (default) or ``"max"``.
         k: top-k width for ``goodness="topk"``.
         init_identity: seed a square max-plus dilation as identity (max-plus only).
@@ -465,7 +469,7 @@ class TropicalFFNet(nn.Module):
 
 
 class TropicalFFTrainer:
-    """Greedy, forward-only, per-layer trainer for a :class:`TropicalFFNet`.
+    """Greedy, layer-local trainer for a :class:`TropicalFFNet`.
 
     Each layer owns a sign-only optimizer and trains on its **own** local hinge
     loss; the (tropically-normalized) activations are detached before being handed
@@ -474,17 +478,18 @@ class TropicalFFTrainer:
     forward pass per layer.
 
     The threshold ``θ`` defaults to the **adaptive batch midpoint**
-    ``0.5·(mean G_pos + mean G_neg)`` (a power-of-2 shift + a mean + an add — all
-    closure-clean), which tracks the unknown goodness scale of a max-plus layer;
+    ``0.5·(mean G_pos + mean G_neg)``, which tracks the unknown goodness scale of
+    a max-plus layer;
     pass a float for a fixed threshold (Hinton's original).
 
     Args:
         net: the :class:`TropicalFFNet` to train.
         optimizer_factory: ``params -> Optimizer``; default builds a
-            :class:`tikitorch.optim.PureTropicalSGD` (sign-only, zero-DSP).
+            :class:`tikitorch.optim.PureTropicalSGD` (sign-oriented reference).
         theta: ``"adaptive"`` (default) or a float threshold.
         margin: hinge margin ``m`` (goodness units).
-        lr_shift, momentum_bits: forwarded to the default ``PureTropicalSGD``.
+        lr_shift: forwarded to the default ``PureTropicalSGD``.
+        momentum_bits: forwarded to the default ``PureTropicalSGD``.
     """
 
     def __init__(self, net: TropicalFFNet, *,

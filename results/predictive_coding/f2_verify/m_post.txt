@@ -1,0 +1,9 @@
+pcim-range-error-addr=0x0
+pcim-axi-protocol-error-addr=0x0
+dma-pcis-timeout-addr=0x0
+ocl-slave-timeout-addr=0x0
+sda-slave-timeout-addr=0x0
+virtual-jtag-slave-timeout-addr=0x0
+DDR0
+Power consumption (Vccint):
+   Last measured: 8 watts

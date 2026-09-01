@@ -1,0 +1,6 @@
+device=cuda  jobs=2  out=results/predictive_coding/scale_cifar.jsonl
+[1/2] tinyimagenet resnet18 bp_float   s0  test=0.6297  (2949.2s)
+/opt/tiki/tikitorch/nn/__init__.py:608: UserWarning: No PYTORCH_KERNEL_CACHE_PATH or HOME environment variable set! This disables kernel caching. (Triggered internally at ../aten/src/ATen/native/cuda/jit_utils.cpp:1426.)
+  q = torch.sign(w) * torch.exp2(torch.log2(mag).round())
+[2/2] tinyimagenet resnet18 cascade    s0  test=0.6162  (6425.2s)
+DONE

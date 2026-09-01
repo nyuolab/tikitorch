@@ -13,8 +13,10 @@ hardware/schedule bug, not an init mismatch.
 Layout (config B, all offsets/counts in int32 WORDS; verified against
 forge_buffer_morph_lm.hpp lines 83-178):
 
-    ML_D = ML_V = ML_L_SEQ = 128, ML_N_LAYERS = 4, ML_K = 7,
-    ML_LOG2_D = 7, ML_DIL_CAP = 64.
+    ML_D (env ML_D, default 128; 512 for the larger build) with ML_LOG2_D =
+    log2(ML_D); ML_V = ML_L_SEQ = 128, ML_N_LAYERS = 4, ML_K = 7, ML_DIL_CAP = 64.
+    The numeric comments beside the STRIDE_*/WORDS_* below are the ML_D=128
+    values; every expression is symbolic in ML_D so ML_D=512 rederives them.
 
 Weight regions get small int16-range values (-4..4, matching the reference
 validator's rng.integers(-4, 5)); the kernel reads each weight word as
@@ -31,12 +33,21 @@ import struct
 import sys
 
 # ---- Shape constants (config B) — mirror forge_buffer_morph_lm.hpp exactly ----
-ML_D        = 128
+# ML_D is build-time selectable in the kernel (-DML_D=512, default 128). The
+# driver imports this module, so it MUST agree with the kernel's ML_D or the
+# staged buffer layout silently corrupts. Read it from env ML_D (the same knob
+# the build passes) so generator and kernel stay in lockstep; default 128 =>
+# the deployed sentinel layout, byte-identical to the AFI buffer. ML_LOG2_D is
+# DERIVED (never a standalone literal), matching the header's ml_ilog2(ML_D).
+# ML_V (vocab) and ML_L_SEQ (window) are SEPARATE constants and stay 128.
+ML_D        = int(os.environ.get("ML_D", "128"))
+assert ML_D >= 16 and (ML_D & (ML_D - 1)) == 0, "ML_D must be a power of two >= 16"
 ML_V        = 128
 ML_L_SEQ    = 128
 ML_N_LAYERS = 4
 ML_K        = 7
-ML_LOG2_D   = 7
+ML_LOG2_D   = ML_D.bit_length() - 1        # 128 -> 7, 512 -> 9
+assert (1 << ML_LOG2_D) == ML_D
 ML_DIL_CAP  = 64
 
 # ---- BATCH parallelism (mirror header TT_BATCH / ML_BATCH_N) ----
@@ -63,11 +74,18 @@ WORDS_MH       = ML_N_LAYERS * ML_D * ML_K   # 3584
 WORDS_MP       = ML_N_LAYERS * ML_D * ML_D   # 65536
 WORDS_MB       = ML_N_LAYERS * ML_D          # 512
 WORDS_W_HEAD   = ML_V * ML_D                 # 16384
-WORDS_G_EMBED  = WORDS_EMBED
-WORDS_G_MH     = WORDS_MH
-WORDS_G_MP     = WORDS_MP
-WORDS_G_MB     = WORDS_MB
-WORDS_G_W_HEAD = WORDS_W_HEAD
+if ML_D >= 512:
+    # D>=512 CULLS the buffer G sections (0 words) — grads are on-chip-only
+    # (the header #errors unless TT_RESIDENT_W+TT_ONCHIP_GRAD at this width),
+    # dropping 4.58 MB so the 7.69 MB D=512 buffer fits the CL's 8 MB
+    # two-bank staging window. Mirrors forge_buffer_morph_lm.hpp EXACTLY.
+    WORDS_G_EMBED = WORDS_G_MH = WORDS_G_MP = WORDS_G_MB = WORDS_G_W_HEAD = 0
+else:
+    WORDS_G_EMBED  = WORDS_EMBED
+    WORDS_G_MH     = WORDS_MH
+    WORDS_G_MP     = WORDS_MP
+    WORDS_G_MB     = WORDS_MB
+    WORDS_G_W_HEAD = WORDS_W_HEAD
 WORDS_TAP_IDX  = ML_BATCH * STRIDE_TAP_IDX
 WORDS_PROJ_IDX = ML_BATCH * STRIDE_PROJ_IDX
 WORDS_AD_HEAD  = ML_BATCH * STRIDE_AD_HEAD
@@ -105,6 +123,10 @@ OFF_CE_LUT     = ((OFF_CFG + WORDS_CFG + 15) // 16) * 16
 
 ML_BUFFER_WORDS = OFF_CE_LUT + WORDS_CE_LUT
 ML_BUFFER_BYTES = ML_BUFFER_WORDS * 4
+# D>=512 staging window is 8 MB (two 4 MB axi_bram_ctrl banks) — see
+# cl_forge_morph_lm_d512.sv; the G-culled layout must fit it.
+assert ML_D < 512 or ML_BUFFER_BYTES <= (8 << 20), \
+    "D>=512 buffer must fit the 8 MB (two-bank) staging window"
 
 # Per-sequence offset helpers (mirror off_tokens_b / off_targets_b in the header).
 def off_tokens_b(b):  return OFF_TOKENS  + b * STRIDE_TOKENS
@@ -219,8 +241,8 @@ def main(argv):
     nbytes = write_bin(out, buf)
     assert nbytes == ML_BUFFER_BYTES, (nbytes, ML_BUFFER_BYTES)
     sys.stderr.write(
-        "wrote %s: %d words, %d bytes (ML_BUFFER_WORDS=%d) ML_BATCH=%d seed=%d\n"
-        % (out, len(buf), nbytes, ML_BUFFER_WORDS, ML_BATCH, seed))
+        "wrote %s: %d words, %d bytes (ML_BUFFER_WORDS=%d) ML_D=%d ML_LOG2_D=%d ML_BATCH=%d seed=%d\n"
+        % (out, len(buf), nbytes, ML_BUFFER_WORDS, ML_D, ML_LOG2_D, ML_BATCH, seed))
     sys.stderr.write(
         "  OFF_TOKENS=%d OFF_TARGETS=%d OFF_CFG=%d OFF_CE_LUT=%d (loss_kind=%d zshift=%d)\n"
         % (OFF_TOKENS, OFF_TARGETS, OFF_CFG, OFF_CE_LUT, CFG_LOSS_KIND, CFG_CE_ZSHIFT))

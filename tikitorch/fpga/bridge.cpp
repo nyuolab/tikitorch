@@ -23,8 +23,10 @@
 // drives LOCAL and silicon identically.
 
 #include <cstdint>
+#include <cstdio>   // fprintf (clkgen bring-up diagnostics)
 #include <cstdlib>
 #include <cstring>
+#include <ctime>    // nanosleep (clkgen MMCM lock poll)
 #include <new>  // std::nothrow
 
 #if defined(TT_FPGA_PCI)
@@ -81,6 +83,21 @@ int forge_train_step_morph_lm(int32_t* buffer, int mode, int a1, int a2, int a3)
 #define TT_AP_START       0x01
 #define TT_AP_DONE        0x02
 #define TT_BUFFER_ADDR    0x01000000ULL
+// --- AWS_CLK_GEN bring-up (env-gated TT_CLKGEN_BRINGUP=1; OFF by default) ----
+// Clkgen-enabled AFIs (the d512 v3 CL and any --aws_clk_gen build) boot with
+// SYS_RST_REG=0xFFFF_FFFE: every CL reset asserted and clk_extra_a1 static-low
+// until MMCM_A locks — the ENTIRE 125 MHz user design (CDCs, crossbars, banks,
+// kernel) is dead and the first poke/DMA hangs forever. The host must poll
+// MMCM_LOCK_REG then clear SYS_RST_REG BEFORE any staging/kick (the S1 lesson;
+// see forge_train_step_s1_f2.c clkgen_bringup + AWS_CLK_GEN_spec Boot/Reset).
+// ENV-GATED because the deployed non-clkgen AFIs (d128 agfi-0433/N4) have no
+// AWS_CLK_GEN — poking clkgen registers there would be undefined. Set
+// TT_CLKGEN_BRINGUP=1 in the runner for clkgen AFIs only (the d512 flow).
+// Registers (explicit-register flavor, no -lfpga_clkgen link dependency):
+#define TT_CLKGEN_BASE_REG    0x00058000UL  // AWS_CLK_REGS base in the mgmt (SDA) space
+#define TT_CLKGEN_SYS_RST     0x14U         // SYS_RST_REG; boot=0xFFFF_FFFE
+#define TT_CLKGEN_MMCM_LOCK   0x20U         // MMCM_LOCK_REG; bit0 = MMCM_A locked
+#define TT_CLKGEN_A_LOCKED    0x00000001U   // group-A-only mask (CLK_GRP_A_EN only)
 #endif
 
 namespace {
@@ -115,6 +132,40 @@ void* tt_fpga_open(const char* arg) {
     TtCtx* ctx = new (std::nothrow) TtCtx();
     if (!ctx) return nullptr;
     ctx->slot = (arg && *arg) ? atoi(arg) : 0;
+    // Clkgen AFIs: release the 125 MHz user-design resets BEFORE the first
+    // attach/poke (see the TT_CLKGEN_* note above). Env-gated, default OFF.
+    {
+        const char* cg = std::getenv("TT_CLKGEN_BRINGUP");
+        if (cg && cg[0] == '1') {
+            pci_bar_handle_t mbar = PCI_BAR_HANDLE_INIT;
+            if (fpga_pci_attach(ctx->slot, FPGA_MGMT_PF, MGMT_PF_BAR4, 0, &mbar) != 0) {
+                std::fprintf(stderr, "[tt] clkgen: attach mgmt BAR failed\n");
+                delete ctx; return nullptr;
+            }
+            uint32_t lock = 0;
+            for (int i = 0; i < 500; ++i) {   // ~5 s @ 10 ms
+                if (fpga_pci_peek(mbar, TT_CLKGEN_BASE_REG + TT_CLKGEN_MMCM_LOCK, &lock) == 0 &&
+                    (lock & TT_CLKGEN_A_LOCKED)) break;
+                struct timespec ts = {0, 10 * 1000 * 1000}; nanosleep(&ts, nullptr);
+            }
+            if (!(lock & TT_CLKGEN_A_LOCKED)) {
+                std::fprintf(stderr, "[tt] clkgen: MMCM_A did NOT lock (MMCM_LOCK_REG=0x%08x) in 5s — "
+                                     "clkgen AFI dead or TT_CLKGEN_BRINGUP set on a non-clkgen AFI\n", lock);
+                fpga_pci_detach(mbar); delete ctx; return nullptr;
+            }
+            if (fpga_pci_poke(mbar, TT_CLKGEN_BASE_REG + TT_CLKGEN_SYS_RST, 0x00000000U) != 0) {
+                std::fprintf(stderr, "[tt] clkgen: SYS_RST_REG deassert write failed\n");
+                fpga_pci_detach(mbar); delete ctx; return nullptr;
+            }
+            uint32_t rstv = 0xdeadbeefU;
+            fpga_pci_peek(mbar, TT_CLKGEN_BASE_REG + TT_CLKGEN_SYS_RST, &rstv);
+            // Reserved bits [31:10] read back SET per spec; only [9:0] must be 0.
+            std::fprintf(stderr, "[tt] clkgen: MMCM_A locked (0x%08x); SYS_RST cleared "
+                                 "(readback 0x%08x, writable[9:0]=0x%03x expect 0x000) — user domain live\n",
+                         lock, rstv, rstv & 0x3FFu);
+            fpga_pci_detach(mbar);
+        }
+    }
     if (fpga_pci_attach(ctx->slot, FPGA_APP_PF, APP_PF_BAR0, 0, &ctx->bar0) != 0) {
         delete ctx; return nullptr;
     }
@@ -240,7 +291,13 @@ int tt_fpga_run(void* h, const char* entry, void* buf, int mode,
     fpga_pci_poke(ctx->bar0, TT_ADDR_ARG2, (uint32_t)a2);
     fpga_pci_poke(ctx->bar0, TT_ADDR_ARG3, (uint32_t)a3);
     fpga_pci_poke(ctx->bar0, TT_ADDR_AP_CTRL, TT_AP_START);
-    for (long spin = 0; spin < 200000000L; ++spin) {
+    // Spin cap ~= wall-clock ceiling on ONE kick (each peek ~1.5us PCIe read ->
+    // 200M spins ~= 5-7 min). Long fused whole-run kicks (d512 at 125 MHz:
+    // ~0.21 s/step -> 2000 steps ~= 7 min) legitimately exceed it: override
+    // with TT_KICK_SPIN (spins, not seconds).
+    long spin_cap = 200000000L;
+    { const char* s = std::getenv("TT_KICK_SPIN"); if (s && *s) { long v = atol(s); if (v > 0) spin_cap = v; } }
+    for (long spin = 0; spin < spin_cap; ++spin) {
         uint32_t ctrl = 0;
         fpga_pci_peek(ctx->bar0, TT_ADDR_AP_CTRL, &ctrl);
         if (ctrl & TT_AP_DONE) {

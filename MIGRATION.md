@@ -1,11 +1,14 @@
 # Migrating from PyTorch to TikiTorch
 
-TikiTorch mirrors the PyTorch namespace (`tt.nn`, `tt.optim`, `tt.functional`,
-`tt.models`) and reuses `nn.Module`, so `.parameters()`, `.state_dict()`,
-`.to(device)`, `.train()/.eval()`, `nn.Sequential` and `opt.step(); opt.zero_grad()`
-all work unchanged. What changes is the **algebra** — every op is compare / add /
-bit-shift, so the loop is multiplier-free — and the one new invariant is **closure**:
-`tikitorch.audit.assert_closed(model)`.
+TikiTorch mirrors familiar PyTorch namespaces (`tt.nn`, `tt.optim`,
+`tt.functional`, `tt.models`) and builds on `torch.nn.Module`, so common module,
+state-dict, device, and optimizer-loop conventions carry over. It is not a
+drop-in implementation of every PyTorch operator, and using a tropical layer
+does not make an entire training recipe multiplier-free.
+
+The additional concept is **recipe-scoped closure**. Structural, runtime, and
+full-training-step audits answer different questions; none replaces synthesis
+evidence for a physical hardware claim.
 
 > **Full guide (with the before/after training loop and the soft→hard curriculum):**
 > [docs/guide/migration.md](docs/guide/migration.md) — also rendered on the docs site
@@ -31,8 +34,8 @@ bit-shift, so the loop is multiplier-free — and the one new invariant is **clo
 | `optim.SGD` | `optim.SignSGD` |
 | `optim.Adam` | `optim.TropicalAdam` / `optim.PureTropicalSGD` |
 
-Three new ideas: the **soft→hard `tau` curriculum** (train soft, anneal `tau → 0`,
-deploy the hard op), **`assert_closed`** as the zero-multiply test (a `head_type=
-"linear"` head is a *declared* boundary — `assert_closed(model, allow={"head"})`),
-and **sign-based optimizers**. See the full guide for the details and a runnable
-before/after loop.
+Three recurring ideas are the **soft→hard `tau` curriculum**, explicit
+arithmetic boundaries, and sign-/shift-oriented optimizer variants. Treat the
+table as an API map, not as proof that every substituted component has the same
+numerics, accuracy, gradient density, or hardware cost. See the full guide for
+the runnable before/after loop and audit limitations.

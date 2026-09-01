@@ -3,7 +3,7 @@
 The min-plus semiring did not start in deep learning — it is the native algebra of
 **dynamic programming, shortest paths, and scheduling**, and it underpins a small
 family of **classical ML** methods. The punchline of this page (and of
-[notebook 06 — *Beyond deep learning*](https://github.com/nyuolab/tikitorch/blob/main/notebooks/06_beyond_deep_learning.ipynb)):
+[notebook 06 — *Beyond deep learning*](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/06_beyond_deep_learning.ipynb)):
 the *exact same* `min`-plus matmul that is a tropical NN layer is also the
 Floyd–Warshall update — so an algorithm and a network layer are the same primitive.
 
@@ -42,7 +42,7 @@ README's *algorithmic reasoning* benchmarks — head-matched against dense basel
 
 ## Classical tropical machine learning
 
-`tikitorch.classical` provides order-based analogues of staple algorithms, built on the
+`tikitorch.classical` provides experimental order-based analogues of familiar algorithms, built on the
 tropical (projective) metric `tropical_distance`:
 
 ```python
@@ -58,9 +58,8 @@ svm = TropicalSVM().fit(X, y)                 # tropical max-margin separator
 Z   = tropical_pca(X, k=2)                    # tropical principal components
 ```
 
-- **Tropical k-means / nearest centroid** cluster and classify under the min-plus
-  distance instead of Euclidean — robust to the kind of additive, monotone structure
-  the semiring models.
+- **Tropical k-means / nearest centroid** cluster and classify under the tropical
+  distance instead of Euclidean distance.
 - **Tropical SVM** finds a max-margin separator in tropical projective space — a
   polytope-based decision boundary, connecting back to
   [Tropical geometry](tropical-geometry.md).
@@ -77,7 +76,7 @@ shortest-path machinery above is the optimization face of the same coin.
 
 A tropical net layer, a shortest-path relaxation, a DP table, and a max-plus schedule
 are **one operation** — `min`/`max` of sums — wearing different hats. That is why this
-substrate is uniquely suited to multiplier-free hardware *and* to combinatorial
-reasoning, and why TikiTorch ships the classical/algorithmic modules next to the neural
-ones. For the runnable tour, open
-[notebook 06](https://github.com/nyuolab/tikitorch/blob/main/notebooks/06_beyond_deep_learning.ipynb).
+substrate can be useful for add/compare hardware studies and combinatorial reasoning,
+and why TikiTorch ships classical and algorithmic modules next to the neural ones. This
+is an algebraic connection, not a general performance guarantee. For the runnable tour,
+open [notebook 06](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/06_beyond_deep_learning.ipynb).

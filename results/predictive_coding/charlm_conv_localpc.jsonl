@@ -1,0 +1,3 @@
+{"mode": "bp_dyadic", "val_bpc": 2.4507, "best_epoch": 72, "wall_s": 225.1, "seq": 256, "width": 128, "depth": 5, "lr": 0.0015}
+{"mode": "relax", "val_bpc": 2.6173, "best_epoch": 41, "wall_s": 737.3, "seq": 256, "width": 128, "depth": 5, "lr": 0.0007}
+{"mode": "relax_async", "val_bpc": 2.6173, "best_epoch": 41, "wall_s": 1245.0, "seq": 256, "width": 128, "depth": 5, "lr": 0.0007}

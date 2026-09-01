@@ -1,13 +1,14 @@
 # Contributing to TikiTorch
 
-Thanks for your interest. TikiTorch is research code with one non-negotiable
-invariant — **the learning loop stays multiplier-free** — so the contribution
-flow is built around protecting that.
+Thanks for your interest. TikiTorch is a PyTorch-shaped research library with
+two deliberately different surfaces: a general host-side API for tropical and
+hard-routed experiments, and a narrower **audited closed subset** for concrete
+multiplier-free recipes. Contributions must keep that boundary explicit.
 
 ## Dev setup
 
 ```bash
-git clone https://github.com/nyuolab/tikitorch.git
+git clone --branch pc-morphssm --single-branch https://github.com/nyuolab/tikitorch.git
 cd tikitorch
 pip install -e ".[dev]"        # editable install + pytest + ruff
 ```
@@ -37,34 +38,54 @@ minutes-long. Run them on demand:
 pytest -m slow        # the training tests only
 ```
 
-## The closure invariant (read this before adding an op or layer)
+## The closure contract (read this before adding an op or layer)
 
-TikiTorch's whole premise is that **every operation in the forward and backward
-pass reduces to compare / add / bit-shift — no multiplies anywhere in the
-learning loop.** That is what makes the loop algebraically closed and mappable
-to FPGA fabric with zero DSP blocks.
+TikiTorch does not claim that every package component or configuration is
+multiplier-free. Closure belongs to an executed recipe: hard model, loss,
+reverse rule, optimizer, representative input path, and compiled build. A
+component advertised as part of the closed subset must state which of those
+boundaries it covers.
 
 If you add a new op, layer, model, or optimizer:
 
-- **No multiplies in the closed path.** No `*` between tensors, no `@`/`matmul`,
+- **No undeclared multiplies in an advertised closed path.** No `*` between tensors, no `@`/`matmul`,
   no `/`, no `exp`/`log`/`softmax` on the hot path. Tropical "multiply" is `+`;
   tropical "add" is `min`/`max`. Scaling, when unavoidable, must be a power-of-2
   bit-shift (`x * 2**k`), which the audit treats as closure-clean.
-- **Prove it.** The repo ships an auditor — use it in your tests:
+- **Test the declared boundary.** The repo ships structural and executed-path
+  auditors; use both in tests:
 
   ```python
-  from tikitorch.audit import assert_closed, find_runtime_multiplies
-  assert_closed(model)                       # static: inspects registered modules
-  assert not find_runtime_multiplies(model, example_input)   # dynamic: traces real ATen ops
+  from tikitorch.audit import assert_closed, assert_closed_runtime
+
+  assert_closed(model)                         # declared module structure
+  assert_closed_runtime(model, example_input)  # this executed forward path
   ```
 
-  `assert_closed` inspects modules statically; `find_runtime_multiplies` traces
-  an actual forward/backward and catches a raw `*`/`@`/`exp` hidden inside a
-  custom `forward` (the gap static checks miss). New closed components should
-  ship a test asserting both.
+  `assert_closed` cannot see raw arithmetic inside a custom `forward`, while
+  runtime tracing covers only the path and inputs that actually execute. A
+  full-training claim additionally needs `assert_training_closed` with the
+  declared loss and optimizer. These are software checks, not substitutes for
+  HLS operator/resource reports and routed hardware evidence.
 - If a component genuinely needs a real multiply (e.g. a standard `nn.LayerNorm`
   or `nn.Linear` head), it must be a **declared, documented boundary** — not a
   silent one — so the audit can account for it.
+- General host-side and experimental components may use ordinary PyTorch
+  arithmetic. Do not label them closed, multiplier-free, or FPGA-ready unless
+  the corresponding recipe-level tests and physical gates exist.
+
+## Docs & notebooks
+
+- The docs site is mkdocs + mkdocstrings: API pages are auto-generated from in-source
+  docstrings, and the prose **Guide** lives under `docs/guide/`. Build it with
+  `pip install -e ".[docs]" && mkdocs build` (what the CI docs job runs).
+- The tutorial notebooks are **generated** from
+  [`notebooks/_build_notebooks.py`](notebooks/_build_notebooks.py) (so they stay
+  diffable). Edit the generator, not the `.ipynb`, then regenerate:
+
+  ```bash
+  python notebooks/_build_notebooks.py
+  ```
 
 ## Docs & notebooks
 
@@ -89,9 +110,11 @@ If you add a new op, layer, model, or optimizer:
 
 ## PRs
 
-- Branch from `main`, keep the change focused, and describe the *why*.
-- Green CI is required. A new op/layer without a closure test will be asked for
-  one.
+- Until the 0.2 branch is reconciled with the repository default, branch from the
+  maintained revision named in the installation guide. Keep the change focused
+  and describe the *why*.
+- Green CI is required. A component advertised as closed must include the
+  appropriate structural, executed-path, and (when relevant) full-step tests.
 
 ## License
 

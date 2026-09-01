@@ -1,0 +1,108 @@
+===== depth 2 =====
+  [   sync_L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [  sync_3L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [ sync_10L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [ async_3L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [   sync_L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [  sync_3L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [ sync_10L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [ async_3L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [   sync_L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [  sync_3L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [ sync_10L] mean_cos=1.00001 worst=1.00000 @param1/4
+  [ async_3L] mean_cos=1.00001 worst=1.00000 @param1/4
+===== depth 4 =====
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param1/8
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param1/8
+===== depth 8 =====
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param1/16
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param1/16
+===== depth 16 =====
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param1/32
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param1/32
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param1/32
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param1/32
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param22/32
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param22/32
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param22/32
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param22/32
+  [   sync_L] mean_cos=1.00000 worst=1.00000 @param16/32
+  [  sync_3L] mean_cos=1.00000 worst=1.00000 @param16/32
+  [ sync_10L] mean_cos=1.00000 worst=1.00000 @param16/32
+  [ async_3L] mean_cos=1.00000 worst=1.00000 @param16/32
+
+wrote results/pc_depth_traction/exp1_divergence.jsonl
+
+depth  config     mean_cos(worst over batches)
+    2   sync_10L  1.00000
+    2   async_3L  1.00000
+    4   sync_10L  1.00000
+    4   async_3L  1.00000
+    8   sync_10L  1.00000
+    8   async_3L  1.00000
+   16   sync_10L  1.00000
+   16   async_3L  1.00000
+vocab=65 train=359989 bigram_floor=3.577
+[L=2 s0    bp_float] bpc=3.052 (30s)
+[L=2 s0   bp_dyadic] bpc=3.077 (42s)
+[L=2 s0 relax_async] bpc=2.691 (97s)
+[L=2 s1    bp_float] bpc=3.059 (31s)
+[L=2 s1   bp_dyadic] bpc=3.083 (42s)
+[L=2 s1 relax_async] bpc=2.675 (101s)
+[L=2 s2    bp_float] bpc=3.050 (31s)
+[L=2 s2   bp_dyadic] bpc=3.066 (43s)
+[L=2 s2 relax_async] bpc=2.666 (100s)
+[L=4 s0    bp_float] bpc=2.732 (55s)
+[L=4 s0   bp_dyadic] bpc=2.809 (104s)
+[L=4 s0 relax_async] bpc=2.604 (349s)
+[L=4 s1    bp_float] bpc=2.724 (58s)
+[L=4 s1   bp_dyadic] bpc=2.829 (104s)
+[L=4 s1 relax_async] bpc=2.602 (356s)
+[L=4 s2    bp_float] bpc=2.719 (58s)
+[L=4 s2   bp_dyadic] bpc=2.824 (106s)
+[L=4 s2 relax_async] bpc=2.592 (355s)
+[L=8 s0    bp_float] bpc=2.675 (103s)
+[L=8 s0   bp_dyadic] bpc=2.763 (208s)
+[L=8 s0 relax_async] bpc=2.574 (1263s)
+[L=8 s1    bp_float] bpc=2.676 (108s)
+[L=8 s1   bp_dyadic] bpc=2.795 (214s)
+[L=8 s1 relax_async] bpc=2.586 (1268s)
+[L=8 s2    bp_float] bpc=2.666 (109s)
+[L=8 s2   bp_dyadic] bpc=2.783 (216s)
+[L=8 s2 relax_async] bpc=2.577 (1288s)
+[L=16 s0    bp_float] bpc=2.666 (198s)
+[L=16 s0   bp_dyadic] bpc=2.768 (425s)
+[L=16 s0 relax_async] bpc=2.579 (4664s)
+[L=16 s1    bp_float] bpc=2.670 (206s)
+[L=16 s1   bp_dyadic] bpc=2.783 (454s)
+[L=16 s1 relax_async] bpc=2.584 (4885s)
+[L=16 s2    bp_float] bpc=2.675 (209s)
+[L=16 s2   bp_dyadic] bpc=2.760 (457s)
+[L=16 s2 relax_async] bpc=2.553 (4904s)
+
+===== TRACTION SUMMARY (mean bpc over seeds) =====
+depth  bp_float bp_dyadic relax_async substrate tax  rule tax
+    2     3.054     3.075       2.677        +0.021    -0.398
+    4     2.725     2.821       2.599        +0.095    -0.221
+    8     2.673     2.780       2.579        +0.108    -0.201
+   16     2.670     2.770       2.572        +0.100    -0.198

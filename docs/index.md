@@ -1,50 +1,46 @@
 # TikiTorch
 
-A tropical-semiring deep-learning library — **multiplier-free, FPGA-native
-training**, modeled closely on PyTorch. Every operation in the forward *and*
-backward pass — and the optimizer — reduces to compare / add / bit-shift, so the
-whole learning loop is algebraically closed and maps to FPGA fabric with **zero
-DSP blocks**.
-
-```bash
-pip install -e .
-```
+TikiTorch is a PyTorch-shaped library for experiments with tropical and hard-routed
+deep learning. It provides familiar `nn`, `optim`, `functional`, and `models`
+namespaces while reusing PyTorch tensors, autograd, modules, devices, and training-loop
+conventions.
 
 ```python
 import torch
 import tikitorch as tt
-import tikitorch.optim as optim
 
-model = tt.models.MorphSSM(d_model=128, n_layers=4, task_type="lm", vocab_size=128)
-opt = optim.PureTropicalSGD(model.parameters())     # power-of-2 lr = bit-shift, no DSPs
-loss = model.compute_loss(torch.randint(0, 128, (8, 64)), torch.randint(0, 128, (8, 64)))
-loss.backward(); opt.step(); opt.zero_grad()
+layer = tt.nn.TropicalLinear(4, 3)
+x = torch.randn(8, 4)
+y = layer(x)
+
+print(y.shape)  # torch.Size([8, 3])
 ```
 
-- **Full story, benchmarks & how it compares:** the
-  [README](https://github.com/nyuolab/tikitorch#readme).
-- **Verify it's multiplier-free / train on the FPGA kernel with no board:**
-  `bash scripts/build_fpga_local.sh` then `python examples/fpga_quickstart.py`.
-- **Prove closure on any model:** `tikitorch.audit.assert_closed(model)` /
-  `find_runtime_multiplies` / `closure_report` (see **API reference → audit**).
-- **Contributing & the closure invariant:**
-  [CONTRIBUTING](https://github.com/nyuolab/tikitorch/blob/main/CONTRIBUTING.md).
+TikiTorch is currently research software at version 0.2. It does not promise complete
+PyTorch API compatibility, optimized eager-GPU performance, or multiplier-free
+execution for every configuration.
 
-## Start here
+## Choose a path
 
-New to TikiTorch or to tropical algebra? The **Guide** in the navigation is the
-teaching path:
+| Goal | Start here |
+| --- | --- |
+| Install and run a first model | [Installation](get-started/installation.md) → [Quickstart](get-started/quickstart.md) |
+| Port a familiar PyTorch loop | [Migrating from PyTorch](guide/migration.md) |
+| Learn the algebra | [Tropical algebra](guide/foundations.md) |
+| Select a model, loss, and optimizer | [Choosing a recipe](guide/choosing-a-model.md) |
+| Check a multiplier-free claim | [Auditing closure](guide/closure.md) |
+| Look up a class or function | [API reference](api/index.md) |
+| Reproduce an experiment | [Research scope and evidence](research/index.md) |
 
-- **[Foundations](guide/foundations.md)** — the tropical (min/max-plus) semiring, by hand.
-- **[Why tropical for ML/DL](guide/why-tropical-ml.md)** — multiplier-free hardware, the
-  routing inductive bias, and the honest closure-penalty trade-off.
-- **[Tropical geometry of neural nets](guide/tropical-geometry.md)** — nets as tropical
-  rational maps; linear regions and decision boundaries.
-- **[Beyond deep learning](guide/beyond-deep-learning.md)** — shortest-path DP, k-means,
-  SVM as the *same* min-plus operation.
-- **[Migrating from PyTorch](guide/migration.md)** · **[Choosing a model](guide/choosing-a-model.md)**
-  · **[Architecture](guide/architecture.md)** · **[FAQ](guide/faq.md)**
-- **[Tutorials (notebooks)](guide/notebooks.md)** — six runnable Colab notebooks.
+## What is in the library?
 
-Browse the **API reference** in the navigation — it is generated from the
-in-source docstrings, so it always matches the code.
+- Max-plus and min-plus tensor operations and neural-network layers.
+- Morphological sequence, vision, attention, and mixture-of-experts models.
+- Sign-, shift-, and counter-oriented optimizers alongside PyTorch interoperability.
+- Structural, executed-path, and full-training-step closure audits.
+- Serialization, profiling, backend dispatch, and opt-in FPGA paths.
+- Operator-scoped route-certificate replay for supported hard-routed graphs.
+
+The [quickstart](get-started/quickstart.md) demonstrates the normal library workflow.
+The [research section](research/index.md) separately tracks measured results, draft
+claims, limitations, paper workspaces, and reproduction artifacts.

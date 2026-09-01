@@ -1,0 +1,4 @@
+{"mode": "bp_float", "val_bpc": 2.4827, "best_epoch": 12, "wall_s": 296.3, "epochs": 14, "context": 16, "hidden": 256, "depth": 4, "wd": 0.0002, "drop": 0.1, "lr": 0.0015}
+{"mode": "bp_dyadic", "val_bpc": 2.5728, "best_epoch": 13, "wall_s": 488.1, "epochs": 14, "context": 16, "hidden": 256, "depth": 4, "wd": 0.0002, "drop": 0.1, "lr": 0.0015}
+{"mode": "relax", "val_bpc": 2.5409, "best_epoch": 7, "wall_s": 1764.7, "epochs": 14, "context": 16, "hidden": 256, "depth": 4, "wd": 0.0002, "drop": 0.1, "lr": 0.0005}
+{"mode": "relax_async", "val_bpc": 2.5401, "best_epoch": 7, "wall_s": 1778.9, "epochs": 14, "context": 16, "hidden": 256, "depth": 4, "wd": 0.0002, "drop": 0.1, "lr": 0.0005}

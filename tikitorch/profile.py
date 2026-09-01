@@ -71,7 +71,7 @@ def profile_model(model: nn.Module, example_inputs=None) -> dict:
 
     Args:
         model: any ``torch.nn.Module`` (a TikiTorch tropical model or a plain one).
-        example_inputs: optional input(s) for the runtime trace. Pass a single
+        example_inputs (Any): optional input(s) for the runtime trace. Pass a single
             tensor, or a tuple/list of positional args, to additionally run
             :func:`~tikitorch.audit.find_runtime_multiplies` (the graph-level
             check that catches a raw ``*`` / ``@`` / ``exp`` in a custom forward).

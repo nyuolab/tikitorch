@@ -13,7 +13,9 @@ import ctypes
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
+import traceback
 
 import numpy as np
 import pytest
@@ -27,15 +29,33 @@ HLS = os.path.join(os.path.dirname(__file__), "..", "tikitorch", "hardware", "hl
 KERNELS = os.path.join(HLS, "forge_kernels")
 
 
-@pytest.fixture(scope="module")
-def kernel():
+_ISOLATED_CHILD = "TIKITORCH_MUZERO_TRAIN_KERNEL_CHILD"
+
+
+def _run_isolated(test_name):
     if shutil.which("g++") is None:
+        pytest.skip("g++ not available for CSIM build")
+    env = os.environ.copy()
+    env[_ISOLATED_CHILD] = "1"
+    result = subprocess.run(
+        [sys.executable, __file__, test_name],
+        capture_output=True,
+        text=True,
+        close_fds=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _build_kernel():
+    compiler = shutil.which("g++")
+    if compiler is None:
         pytest.skip("g++ not available for CSIM build")
     so = os.path.join(tempfile.mkdtemp(), "libmuzero_train.so")
     src = os.path.join(KERNELS, "forge_train_step_muzero_train.cpp")
-    r = subprocess.run(["g++", "-O2", "-std=c++17", "-DCSIM_ONLY", "-shared", "-fPIC",
+    r = subprocess.run([compiler, "-O2", "-std=c++17", "-DCSIM_ONLY", "-shared", "-fPIC",
                         f"-I{KERNELS}", f"-I{HLS}", src, "-o", so],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, close_fds=False)
     if r.returncode != 0:
         pytest.fail(f"training kernel CSIM build failed:\n{r.stderr}")
     lib = ctypes.CDLL(so)
@@ -198,8 +218,11 @@ def _reference_train_step(buf, L, lr):
     _sgd_layer(buf, L["W_R1"], L["B_R1"], gzr1, obs, DR, OBS, lr)
 
 
-def test_muzero_train_kernel_bit_exact_vs_python_reference(kernel):
-    lib = kernel
+def test_muzero_train_kernel_bit_exact_vs_python_reference():
+    if os.environ.get(_ISOLATED_CHILD) != "1":
+        _run_isolated("test_muzero_train_kernel_bit_exact_vs_python_reference")
+        return
+    lib = _build_kernel()
     n = lib.forge_muzero_train_buffer_words()
     L = _layout(lib)
     rng = np.random.default_rng(7)
@@ -223,10 +246,26 @@ def test_muzero_train_kernel_bit_exact_vs_python_reference(kernel):
             f"C={int(buf[mism[0]])} ref={ref[mism[0]]}")
 
 
-def test_muzero_train_kernel_unknown_mode_returns_error(kernel):
-    lib = kernel
+def test_muzero_train_kernel_unknown_mode_returns_error():
+    if os.environ.get(_ISOLATED_CHILD) != "1":
+        _run_isolated("test_muzero_train_kernel_unknown_mode_returns_error")
+        return
+    lib = _build_kernel()
     n = lib.forge_muzero_train_buffer_words()
     buf = np.zeros(n, dtype=np.int32)
     # only mode 2 (train step) is defined for this kernel
     rc = lib.forge_train_step_muzero_train(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)), 0, 1, 0, 0)
     assert rc == -1
+
+
+if __name__ == "__main__":
+    try:
+        globals()[sys.argv[1]]()
+    except BaseException:
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(1)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)

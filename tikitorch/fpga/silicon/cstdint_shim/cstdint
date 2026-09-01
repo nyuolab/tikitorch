@@ -1,0 +1,9 @@
+/* cstdint_shim/cstdint — C-safe redirect for the C++ <cstdint> header. The shared
+   forge_s1_config.hpp (included by the kernel, the testbench, AND the C host driver
+   forge_train_step_s1_f2.c) does `#include <cstdint>`. When the driver is compiled with
+   a plain C toolchain (gcc -std=gnu11, required for the AWS fpga_pci.h burst path), <cstdint>
+   is absent. Putting this dir on the -I path makes the angle-bracket `#include <cstdint>`
+   resolve here, pulling in the C <stdint.h> (which defines int32_t/int16_t etc.). The C++
+   builds of the kernel/TB never see this shim (their toolchain finds the real <cstdint> first
+   on the system include path). */
+#include <stdint.h>

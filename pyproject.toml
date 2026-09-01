@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tikitorch"
-version = "0.1.0"
-description = "A tropical-semiring deep-learning library: multiplier-free, FPGA-native training, PyTorch-idiomatic."
+version = "0.2.0"
+description = "PyTorch-shaped infrastructure for tropical and hard-routed deep learning."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "GPL-3.0-or-later" }
@@ -88,6 +88,9 @@ target-version = "py39"
 # are the teaching point, so the layout rules are relaxed here.
 "examples/**" = ["E401", "E402", "E701", "E702", "E731", "E741"]
 "scripts/**" = ["E401", "E402", "E701", "E702", "E731", "E741"]
+# Predictive-coding equations conventionally use `l` as a layer index throughout;
+# retaining that notation is clearer than a mechanical rename of this legacy module.
+"tikitorch/nn/predictive_coding.py" = ["E741"]
 # Notebooks re-import and re-assign freely across cells by design; lint only for
 # genuine syntax/logic errors, not style or per-cell redefinitions.
 "notebooks/**" = ["E401", "E402", "E701", "E702", "E731", "E741", "F401", "F811", "F841"]
@@ -104,6 +107,8 @@ target-version = "py39"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Ensure the checkout under test wins over any separately installed TikiTorch build.
+pythonpath = ["."]
 # `slow` marks end-to-end training tests that validate research/learning claims
 # (a model reaches some accuracy), NOT library correctness. They dominate runtime
 # and are inherently stochastic, so they are DESELECTED by default: plain `pytest`

@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1190" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <rect width="1500" height="1190" fill="#0B1120"/>
+
+  <text x="750" y="44" text-anchor="middle" fill="#FFFFFF" font-size="29" font-weight="700">The realistic path to 100B — what scales, what walls</text>
+  <text x="750" y="76" text-anchor="middle" fill="#8FA1BF" font-size="15">PC on FPGA fabric at GPT-3 scale — what the architecture carries, and every wall including the dollar one · tags: [M]easured / [E]stimate / [P]rojection</text>
+
+  <!-- ================= Row 1: target · memory · staleness ================= -->
+  <!-- Target -->
+  <rect x="40" y="100" width="430" height="218" rx="12" fill="#111A2E" stroke="#B48CFF" stroke-width="2"/>
+  <text x="255" y="128" text-anchor="middle" fill="#B48CFF" font-size="16" font-weight="700">THE TARGET — a GPT-3-class dense LM</text>
+  <g font-size="13.5" fill="#DCE6F5">
+    <text x="62" y="158">D=10240 · L=80 · SEQ=2048 · vocab ≈50k BPE †</text>
+    <text x="62" y="182">→ 12·L·D² ≈ <tspan font-weight="700" fill="#FFFFFF">100.7B parameters</tspan></text>
+    <text x="62" y="210">mapping stays the measured one: <tspan fill="#B48CFF">1 block = 1 chip</tspan></text>
+    <text x="62" y="234">→ 80 block chips + 1 embed/head chip = <tspan font-weight="700" fill="#FFFFFF">81 chips</tspan></text>
+    <text x="62" y="258">= <tspan font-weight="700" fill="#FFFFFF">11 F2 boxes</tspan> (8 FPGAs each, 88 slots) <tspan fill="#5B6B85">[E]</tspan></text>
+  </g>
+  <text x="62" y="284" fill="#5B6B85" font-size="11.5">this shape is literally YaLM-100B; GPT-3 is D=12288/L=96</text>
+  <text x="62" y="302" fill="#5B6B85" font-size="11.5">† BPE + the 50k mult-free softmax head: builds still owed</text>
+
+  <!-- Memory -->
+  <rect x="500" y="100" width="530" height="218" rx="12" fill="#0F2418" stroke="#58C97D" stroke-width="2"/>
+  <text x="765" y="128" text-anchor="middle" fill="#58C97D" font-size="16" font-weight="700">MEMORY — NOT THE WALL ✓ <tspan fill="#8FA1BF" font-size="12" font-weight="400">(per chip: 16 GiB HBM + 64 GiB DDR4)</tspan></text>
+  <g font-size="12.5" fill="#DCE6F5">
+    <text x="522" y="156">block state: 12·D² = <tspan font-weight="700">1.26B params</tspan> · bf16 master + Adam m,v + int8 code = <tspan font-weight="700">8.8 GB</tspan> → HBM ✓</text>
+    <text x="522" y="180">fp32-master variant = <tspan font-weight="700">16.4 GB</tspan> → DDR4 ✓ (3.9× headroom)</text>
+    <text x="522" y="204">in-flight activations: ~160 µbatches × 42–210 MB = <tspan font-weight="700">7–54 GB</tspan> → DDR4 + flash-style</text>
+    <text x="522" y="224">recompute in backward (+~20% compute) <tspan fill="#5B6B85">[E]</tspan></text>
+    <text x="522" y="248">x/ε messages: 84 MB per hop per kick vs ~50 s kicks → compute-bound ✓ <tspan fill="#5B6B85">[E]</tspan></text>
+  </g>
+  <rect x="522" y="264" width="486" height="34" rx="8" fill="#0B1120" stroke="#2C4A38"/>
+  <text x="765" y="286" text-anchor="middle" fill="#58C97D" font-size="13" font-weight="700">a 100B block fits on TODAY's F2 chip — weight streaming is the enabler</text>
+
+  <!-- Staleness -->
+  <rect x="1060" y="100" width="400" height="218" rx="12" fill="#111A2E" stroke="#F2A93B" stroke-width="2"/>
+  <text x="1260" y="128" text-anchor="middle" fill="#F2A93B" font-size="15.5" font-weight="700">80-DEEP STALENESS — THE #1 RISK</text>
+  <g font-size="12.5" fill="#DCE6F5">
+    <text x="1082" y="158">measured rule <tspan fill="#58C97D">[M]</tspan>: weight staleness ≤ ~1 window,</text>
+    <text x="1082" y="180">held by grad-ACCUM ≥ the in-flight depth</text>
+    <text x="1082" y="206">at L=80 the window is ~2L = 160 µbatches →</text>
+    <text x="1082" y="230">batch floor ≈ <tspan font-weight="700" fill="#FFFFFF">330k tokens/step</tspan> — below the</text>
+    <text x="1082" y="254">2–4M-token batches standard at 100B ✓ <tspan fill="#5B6B85">[E]</tspan></text>
+  </g>
+  <text x="1082" y="282" fill="#F2A93B" font-size="11.5">but convergence under a 160-deep window is validated</text>
+  <text x="1082" y="300" fill="#F2A93B" font-size="11.5">only at 3–8 chips — open research, not engineering [P]</text>
+
+  <!-- ================= Row 2: the four axes ================= -->
+  <text x="40" y="356" fill="#FFFFFF" font-size="19" font-weight="700">The four multiplicative axes <tspan fill="#8FA1BF" font-size="14" font-weight="400">— tok/s = MAC-rate(K) × pipeline-fill(S, L) × chains(R); each axis is independent hardware</tspan></text>
+
+  <g>
+    <rect x="40" y="372" width="1420" height="60" rx="10" fill="#111A2E" stroke="#4FD1E0" stroke-width="1.5"/>
+    <text x="76" y="409" text-anchor="middle" fill="#4FD1E0" font-size="22" font-weight="700">×L</text>
+    <text x="110" y="396" fill="#4FD1E0" font-size="14" font-weight="700">DEPTH → CHIPS — the measured axis</text>
+    <text x="110" y="418" fill="#B9C6DB" font-size="12.5">one block per chip along the chain: 3 chips → 8 chips measured, bit-exact, no global gradient <tspan fill="#58C97D">[M]</tspan> · TcpLink protocol scale-invariant → 80+1 chips / 11 boxes <tspan fill="#5B6B85">[E]</tspan></text>
+
+    <rect x="40" y="440" width="1420" height="60" rx="10" fill="#111A2E" stroke="#4FD1E0" stroke-width="1.5"/>
+    <text x="76" y="477" text-anchor="middle" fill="#4FD1E0" font-size="22" font-weight="700">×S</text>
+    <text x="110" y="464" fill="#4FD1E0" font-size="14" font-weight="700">PIPELINE SLOTS — keep every chip busy</text>
+    <text x="110" y="486" fill="#B9C6DB" font-size="12.5">bubble-free 1F1B: 1.79× measured at S=2, bit-identical to serial <tspan fill="#58C97D">[M]</tspan> · S=8 AFI in flight <tspan fill="#F2A93B">[◔]</tspan> · at 100B: S ≈ in-flight depth ~160, slot state is GB-scale → DDR-budget check owed <tspan fill="#5B6B85">[E]</tspan></text>
+
+    <rect x="40" y="508" width="1420" height="60" rx="10" fill="#111A2E" stroke="#F2A93B" stroke-width="1.5"/>
+    <text x="76" y="545" text-anchor="middle" fill="#F2A93B" font-size="22" font-weight="700">×K</text>
+    <text x="110" y="532" fill="#F2A93B" font-size="14" font-weight="700">MAC WIDTH PER CHIP — the compute-rate ladder (the limiter is operand read ports, not the 9,024 DSPs)</text>
+    <text x="110" y="554" fill="#B9C6DB" font-size="12.5">0.15 GMAC/s (1 MAC/cyc @150 MHz) <tspan fill="#58C97D">[M]</tspan> → 2.4 (K=16, the 30M rebuild) <tspan fill="#5B6B85">[E]</tspan> → ~150 (K=512 @300 MHz; joint DSP+LUT budget checks; csynth-gated) <tspan fill="#5B6B85">[P]</tspan> → ~0.9 TMAC/s ceiling — no csynth <tspan fill="#E0596B">[speculative]</tspan></text>
+
+    <rect x="40" y="576" width="1420" height="60" rx="10" fill="#111A2E" stroke="#B48CFF" stroke-width="1.5"/>
+    <text x="76" y="613" text-anchor="middle" fill="#B48CFF" font-size="22" font-weight="700">×R</text>
+    <text x="110" y="600" fill="#B48CFF" font-size="14" font-weight="700">REPLICA CHAINS — data-parallel with no per-step all-reduce</text>
+    <text x="110" y="622" fill="#B9C6DB" font-size="12.5">DiLoCo-style local-SGD: inner steps stay local, outer sync of O(params) every ~500 steps (async variants exist) — demonstrated at 8 replicas ≤400M, OpenDiLoCo ~1B → <tspan fill="#F2A93B">R≥100 at 100B is open research</tspan> <tspan fill="#5B6B85">[P]</tspan></text>
+  </g>
+
+  <!-- ================= Row 3: the wall ================= -->
+  <rect x="40" y="660" width="1420" height="330" rx="12" fill="#1F1708" stroke="#F2A93B" stroke-width="2"/>
+  <text x="750" y="692" text-anchor="middle" fill="#F2A93B" font-size="18" font-weight="700">THE WALL — wall-clock and dollars at real token budgets <tspan fill="#8FA1BF" font-size="13" font-weight="400">(tok/s per chain at the K=512 rate [P]; Chinchilla ≈ 20 tokens/param)</tspan></text>
+
+  <g font-size="13" fill="#8FA1BF">
+    <text x="70" y="722" font-weight="700">tier</text>
+    <text x="330" y="722" font-weight="700">chain</text>
+    <text x="520" y="722" font-weight="700">tok/s per chain</text>
+    <text x="740" y="722" font-weight="700">tokens to train</text>
+    <text x="930" y="722" font-weight="700">one chain</text>
+    <text x="1110" y="722" font-weight="700">with R replica chains</text>
+  </g>
+  <line x1="60" y1="732" x2="1440" y2="732" stroke="#3D2A10" stroke-width="1.5"/>
+
+  <g font-size="13.5" fill="#DCE6F5">
+    <text x="70" y="758" font-weight="700" fill="#58C97D">1B-class</text>
+    <text x="145" y="758" fill="#8FA1BF" font-size="12">D=2048 · L=24</text>
+    <text x="330" y="758">25 chips / 4 boxes</text>
+    <text x="520" y="758">~1,000</text>
+    <text x="740" y="758">24B</text>
+    <text x="930" y="758">~9 months</text>
+    <text x="1110" y="758">R=8 (32 boxes): <tspan font-weight="700" fill="#58C97D">~5 weeks ✓</tspan></text>
+
+    <text x="70" y="790" font-weight="700" fill="#DCE6F5">10B-class</text>
+    <text x="155" y="790" fill="#8FA1BF" font-size="12">D=5120 · L=40</text>
+    <text x="330" y="790">41 chips / 6 boxes</text>
+    <text x="520" y="790">~160</text>
+    <text x="740" y="790">250B</text>
+    <text x="930" y="790">~50 years ✗</text>
+    <text x="1110" y="790">R=50–100 (300–600 boxes): <tspan font-weight="700">6–12 months</tspan></text>
+
+    <text x="70" y="822" font-weight="700" fill="#F2A93B">100B</text>
+    <text x="125" y="822" fill="#8FA1BF" font-size="12">D=10240 · L=80</text>
+    <text x="330" y="822">81 chips / 11 boxes</text>
+    <text x="520" y="822">~40 <tspan fill="#8FA1BF" font-size="12">(~240 at ceiling)</tspan></text>
+    <text x="740" y="822">2T</text>
+    <text x="930" y="822">260–1,600 yr ✗</text>
+    <text x="1110" y="822">R≈530–3,200 (43k–257k FPGAs): <tspan font-weight="700">~6 mo</tspan> <tspan fill="#5B6B85">[P]</tspan></text>
+  </g>
+  <line x1="60" y1="842" x2="1440" y2="842" stroke="#3D2A10" stroke-width="1.5"/>
+
+  <text x="70" y="868" fill="#E0596B" font-size="13" font-weight="700">the dollar wall [P]:</text>
+  <text x="220" y="868" fill="#DCE6F5" font-size="13">on-demand F2 ≈ $1.98/FPGA-hr → an 81-chip chain ≈ $160/hr → 2T tokens ≈ <tspan font-weight="700" fill="#E0596B">$0.4B (ceiling) – $2.2B (K=512)</tspan> of rent, vs ~$2–10M of H100-hours for the same model.</text>
+  <text x="220" y="890" fill="#DCE6F5" font-size="13">Rented-silicon dollars favor GPUs by 40–1000× — the fabric's case is architecture, owned/cheap silicon, and the <tspan font-weight="700">1–10B deliverable tier</tspan>, not rented 100B pretraining.</text>
+
+  <text x="750" y="922" text-anchor="middle" fill="#F2A93B" font-size="14" font-weight="700">The wall is MAC-rate × wall-clock × dollars — the same physics GPUs face, with a rented-cost handicap. What is NEW: no per-step all-reduce,</text>
+  <text x="750" y="944" text-anchor="middle" fill="#F2A93B" font-size="14" font-weight="700">no weight transport, memory fits — nothing architectural breaks on the way up.</text>
+
+  <text x="750" y="972" text-anchor="middle" fill="#5B6B85" font-size="11.5">wall-clock figures are lower bounds: they assume checkpoint/restart (~1.3 TB of state per chain), N+1 spare chips per chain, and unexamined AWS capacity for O(10³) f2.48xlarge</text>
+
+  <!-- ================= Row 4: honest claim ladder ================= -->
+  <text x="40" y="1026" fill="#FFFFFF" font-size="19" font-weight="700">The honest claim ladder <tspan fill="#8FA1BF" font-size="14" font-weight="400">— what we would actually publish, in order (the 124M playbook, scaled)</tspan></text>
+
+  <g>
+    <rect x="40" y="1044" width="330" height="112" rx="10" fill="#0F2418" stroke="#58C97D" stroke-width="2"/>
+    <text x="205" y="1070" text-anchor="middle" fill="#58C97D" font-size="14" font-weight="700">1 — NEXT: 1B CONVERGED</text>
+    <text x="205" y="1094" text-anchor="middle" fill="#B9C6DB" font-size="12">first billion-param LM convergence-trained</text>
+    <text x="205" y="1112" text-anchor="middle" fill="#B9C6DB" font-size="12">by predictive coding on fabric — 4 boxes;</text>
+    <text x="205" y="1130" text-anchor="middle" fill="#B9C6DB" font-size="12">~5 weeks with R=8 <tspan fill="#5B6B85">[E]</tspan></text>
+    <text x="205" y="1148" text-anchor="middle" fill="#5B6B85" font-size="11">every lever here is already csynth-grounded</text>
+
+    <rect x="400" y="1044" width="330" height="112" rx="10" fill="#111A2E" stroke="#8FA1BF" stroke-width="1.5"/>
+    <text x="565" y="1070" text-anchor="middle" fill="#DCE6F5" font-size="14" font-weight="700">2 — 10B, SHORT-TOKEN REGIMES</text>
+    <text x="565" y="1094" text-anchor="middle" fill="#B9C6DB" font-size="12">continued-pretrain / fine-tune / distill</text>
+    <text x="565" y="1112" text-anchor="middle" fill="#B9C6DB" font-size="12">(tokens ≪ Chinchilla) on ~6 boxes —</text>
+    <text x="565" y="1130" text-anchor="middle" fill="#B9C6DB" font-size="12">useful 10B work without 250B tokens <tspan fill="#5B6B85">[P]</tspan></text>
+
+    <rect x="760" y="1044" width="330" height="112" rx="10" fill="#111A2E" stroke="#8FA1BF" stroke-width="1.5"/>
+    <text x="925" y="1070" text-anchor="middle" fill="#DCE6F5" font-size="14" font-weight="700">3 — 100B DATAPATH, MEASURED</text>
+    <text x="925" y="1094" text-anchor="middle" fill="#B9C6DB" font-size="12">one-step bit-exact training kick + generation</text>
+    <text x="925" y="1112" text-anchor="middle" fill="#B9C6DB" font-size="12">through all 81 chips on 11 boxes —</text>
+    <text x="925" y="1130" text-anchor="middle" fill="#B9C6DB" font-size="12">the 124M honest-flagship pattern at 100B <tspan fill="#5B6B85">[P]</tspan></text>
+
+    <rect x="1120" y="1044" width="340" height="112" rx="10" fill="#111A2E" stroke="#8FA1BF" stroke-width="1.5" stroke-dasharray="7 5"/>
+    <text x="1290" y="1070" text-anchor="middle" fill="#DCE6F5" font-size="14" font-weight="700">4 — 100B FULL PRETRAIN [projection only]</text>
+    <text x="1290" y="1094" text-anchor="middle" fill="#B9C6DB" font-size="12">~530–3,200 outer-averaged chains</text>
+    <text x="1290" y="1112" text-anchor="middle" fill="#B9C6DB" font-size="12">(43k–257k FPGAs); publish the lever math</text>
+    <text x="1290" y="1130" text-anchor="middle" fill="#B9C6DB" font-size="12">and the measured anchors — not the claim <tspan fill="#5B6B85">[P]</tspan></text>
+  </g>
+
+  <text x="750" y="1180" text-anchor="middle" fill="#44506A" font-size="12">anchors: agfi-0a08046c7d64090ff silicon runs · csynth kick model reconciled to ~1% · large-D projections carry the roadmap's ±1.5× band · Chinchilla 20 tok/param (Hoffmann 2022) · GPT-3: 300B tokens · DiLoCo: arXiv 2311.08105 · adversarially fact-checked 2026-07-03</text>
+</svg>

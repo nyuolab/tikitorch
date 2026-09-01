@@ -1,0 +1,82 @@
+{
+ "schema": "ontogenic_v2.run.v1",
+ "experiment": "exp1_saved_state",
+ "run_id": "529c45f4-7274-4999-b35c-c59d1db917e6",
+ "timestamp_utc": "2026-08-19T10:39:26Z",
+ "command": "python -m ontogenic_learner.ontogenic_v2.exp1_saved_state",
+ "config": {
+  "scales": [
+   [
+    64,
+    2,
+    96
+   ],
+   [
+    128,
+    4,
+    96
+   ],
+   [
+    256,
+    4,
+    192
+   ]
+  ],
+  "vocab": 38,
+  "batch": 1
+ },
+ "ontogenic_commit": "7b29124b63c30abadb0288b095db0cc85c5400f7",
+ "ontogenic_dirty_patch_sha256": "24b605604f6bdee19f0dc4d9909fc6189c3b9d21991df767b5aa6c8284711f91",
+ "tikitorch_commit": "ee3c775281b6046781144b0768a050ac26dfbc19",
+ "tikitorch_dirty_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+ "host": "Erics-MacBook-Pro.local",
+ "platform": "macOS-26.5.2-arm64-arm-64bit",
+ "python": "3.11.5",
+ "torch": "2.10.0",
+ "numpy": "1.26.4",
+ "device": "cpu",
+ "inputs": [],
+ "incident_status": "completed",
+ "wall_s": 0.188,
+ "metrics": {
+  "n_points": 3,
+  "lifetime_model": {
+   "d_model": 128,
+   "n_layers": 4,
+   "T": 96,
+   "vocab": 38,
+   "n_tok": 96,
+   "inherited_total": 1220736,
+   "inherited_per_token": 12716.0,
+   "inherited_dead_x_in": 196608,
+   "inherited_fields": {
+    "conv_route": 393216,
+    "drop_mask": 0,
+    "f1": 1536,
+    "f2": 1536,
+    "gates": 0,
+    "proj_in": 0,
+    "proj_route": 393216,
+    "top.f_final": 384,
+    "top.head_idx": 233472,
+    "top.ids": 768,
+    "top.mask0": 0,
+    "x_in": 196608
+   },
+   "packed": {
+    "logical_bits": 700704,
+    "payload_bytes": 87588,
+    "serialized_bytes": 89799
+   },
+   "packed_per_token": 912.4,
+   "autograd_saved_param": 0,
+   "autograd_saved_nonparam": 1060996,
+   "autograd_nonparam_per_token": 11052.0,
+   "checkpoint_retained": 260352,
+   "boundary_logits": 14592,
+   "ratio_inherited_over_packed": 13.94,
+   "ratio_autograd_nonparam_over_packed": 12.11,
+   "ratio_checkpoint_over_packed": 2.97
+  }
+ }
+}

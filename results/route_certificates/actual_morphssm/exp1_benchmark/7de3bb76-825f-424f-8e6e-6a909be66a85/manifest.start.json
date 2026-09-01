@@ -1,0 +1,90 @@
+{
+ "schema": "ontogenic_v2.run.v2",
+ "experiment": "exp1_benchmark",
+ "run_id": "7de3bb76-825f-424f-8e6e-6a909be66a85",
+ "timestamp_utc": "2026-08-29T17:04:43Z",
+ "command": "python st_resource_bench.py --pilot",
+ "config": {
+  "mode": "pilot",
+  "configs": [
+   [
+    64,
+    2,
+    96
+   ],
+   [
+    128,
+    4,
+    96
+   ],
+   [
+    256,
+    4,
+    192
+   ]
+  ],
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "arms": [
+   "eager",
+   "compiled",
+   "checkpoint",
+   "cascade",
+   "packed"
+  ],
+  "warmup": 5,
+  "reps": 20,
+  "retained_bar": 2.0,
+  "traffic_bar": 2.0,
+  "latency_bar": 0.8,
+  "cell_timeout_s": 1800,
+  "hard_wall_s": 21600,
+  "heartbeat_s": 10.0,
+  "torch_threads": 1
+ },
+ "ontogenic_commit": "c7a6787b0551ff205d19f0c3a1113ef8260a9e5e",
+ "ontogenic_dirty_patch_sha256": "034f6a21da2ad25f6a7a710bb4417d86626983b6d9dd3652c75f9f4b8c8c8121",
+ "tikitorch_commit": "9d13474a98d4cf5b971b8bd6f63e0f647ee8c7ec",
+ "tikitorch_dirty_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+ "host": "Erics-MacBook-Pro.local",
+ "platform": "macOS-26.5.2-arm64-arm-64bit",
+ "python": "3.11.5",
+ "torch": "2.10.0",
+ "numpy": "1.26.4",
+ "device": "mps",
+ "modules": [
+  {
+   "module": "tikitorch.research.pc_convrnn",
+   "file": "/Users/ekoermann/Documents/tikitorch/tikitorch/research/pc_convrnn.py",
+   "repo": "tikitorch",
+   "commit": "9d13474a98d4cf5b971b8bd6f63e0f647ee8c7ec"
+  },
+  {
+   "module": "ontogenic_learner.route_sufficient.morphssm_tape",
+   "file": "/Users/ekoermann/Documents/ontogenic-agent/ontogenic_learner/route_sufficient/morphssm_tape.py",
+   "repo": "ontogenic-agent",
+   "commit": "c7a6787b0551ff205d19f0c3a1113ef8260a9e5e"
+  }
+ ],
+ "inputs": [
+  {
+   "path": "/Users/ekoermann/Documents/ontogenic-agent/ontogenic_learner/experiments/st_resource_bench.py",
+   "bytes": 41435,
+   "sha256": "241698fbc3ef680e4d5b397403d0f4eba954141b70e7ad9315313a0df28a037c"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/research/pc_convrnn.py",
+   "bytes": 57601,
+   "sha256": "0721135f4321bc3bbe7f609bd9cce0055ca8843fd09d069c821c912c18659b98"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/ontogenic-agent/ontogenic_learner/route_sufficient/morphssm_tape.py",
+   "bytes": 9233,
+   "sha256": "8bfd30786787e90a1e6c771c0c30d5be8820ae9731988637aabb8d8a1a62a75f"
+  }
+ ],
+ "incident_status": "running"
+}

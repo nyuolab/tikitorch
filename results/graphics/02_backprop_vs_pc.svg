@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="aW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#DCE6F5"/>
+    </marker>
+    <marker id="aC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4FD1E0"/>
+    </marker>
+    <marker id="aR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E0596B"/>
+    </marker>
+    <marker id="aO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#F2A93B"/>
+    </marker>
+    <marker id="aV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B48CFF"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="900" fill="#0B1120"/>
+  <text x="700" y="52" text-anchor="middle" fill="#FFFFFF" font-size="30" font-weight="700">Why predictive coding, not backprop</text>
+  <text x="700" y="84" text-anchor="middle" fill="#8FA1BF" font-size="17">credit assignment that fits on a chain of chips</text>
+
+  <line x1="700" y1="110" x2="700" y2="760" stroke="#22304A" stroke-width="2"/>
+
+  <!-- =============== LEFT: BACKPROP =============== -->
+  <text x="360" y="136" text-anchor="middle" fill="#E0596B" font-size="21" font-weight="700">BACKPROP — how GPUs learn</text>
+
+  <!-- layers -->
+  <g>
+    <rect x="230" y="170" width="220" height="64" rx="10" fill="#111A2E" stroke="#33415C" stroke-width="2"/>
+    <text x="340" y="208" text-anchor="middle" fill="#DCE6F5" font-size="16">layer 1</text>
+    <rect x="230" y="282" width="220" height="64" rx="10" fill="#111A2E" stroke="#33415C" stroke-width="2"/>
+    <text x="340" y="320" text-anchor="middle" fill="#DCE6F5" font-size="16">layer 2</text>
+    <rect x="230" y="394" width="220" height="64" rx="10" fill="#111A2E" stroke="#33415C" stroke-width="2"/>
+    <text x="340" y="432" text-anchor="middle" fill="#DCE6F5" font-size="16">layer 3</text>
+    <rect x="230" y="506" width="220" height="64" rx="10" fill="#111A2E" stroke="#33415C" stroke-width="2"/>
+    <text x="340" y="544" text-anchor="middle" fill="#DCE6F5" font-size="16">layer 4</text>
+    <rect x="255" y="618" width="170" height="52" rx="10" fill="#2A1220" stroke="#E0596B" stroke-width="2"/>
+    <text x="340" y="650" text-anchor="middle" fill="#E0596B" font-size="16" font-weight="700">LOSS</text>
+  </g>
+
+  <!-- forward arrows -->
+  <line x1="310" y1="238" x2="310" y2="278" stroke="#4FD1E0" stroke-width="2.5" marker-end="url(#aC)"/>
+  <line x1="310" y1="350" x2="310" y2="390" stroke="#4FD1E0" stroke-width="2.5" marker-end="url(#aC)"/>
+  <line x1="310" y1="462" x2="310" y2="502" stroke="#4FD1E0" stroke-width="2.5" marker-end="url(#aC)"/>
+  <line x1="310" y1="574" x2="310" y2="614" stroke="#4FD1E0" stroke-width="2.5" marker-end="url(#aC)"/>
+
+  <!-- one long global backward chain -->
+  <path d="M 430 644 C 540 640, 540 600, 540 420 C 540 240, 540 210, 470 202" fill="none" stroke="#E0596B" stroke-width="4" marker-end="url(#aR)"/>
+  <line x1="540" y1="314" x2="458" y2="314" stroke="#E0596B" stroke-width="2.5" marker-end="url(#aR)"/>
+  <line x1="540" y1="426" x2="458" y2="426" stroke="#E0596B" stroke-width="2.5" marker-end="url(#aR)"/>
+  <line x1="540" y1="538" x2="458" y2="538" stroke="#E0596B" stroke-width="2.5" marker-end="url(#aR)"/>
+  <text x="588" y="400" fill="#E0596B" font-size="15" transform="rotate(-90 588 400)" text-anchor="middle">∂L/∂W — the global chain</text>
+
+  <!-- annotations -->
+  <g font-size="14.5" fill="#B9C6DB">
+    <text x="70" y="712">✗ every update waits on the full backward pass</text>
+    <text x="70" y="740">✗ weight transport: layer k needs Wᵀ of layers above it</text>
+    <text x="70" y="768">✗ all-reduce / sync barrier across devices, every step</text>
+    <text x="70" y="796">✗ on a chip chain: constant global traffic, idle silicon</text>
+  </g>
+
+  <!-- =============== RIGHT: PREDICTIVE CODING =============== -->
+  <text x="1050" y="136" text-anchor="middle" fill="#B48CFF" font-size="21" font-weight="700">PREDICTIVE CODING — how the fabric learns</text>
+
+  <!-- layers with error units; each layer maps to a chip -->
+  <g>
+    <rect x="880" y="170" width="220" height="64" rx="10" fill="#111A2E" stroke="#B48CFF" stroke-width="2"/>
+    <text x="990" y="200" text-anchor="middle" fill="#DCE6F5" font-size="16">block 1</text>
+    <text x="990" y="222" text-anchor="middle" fill="#5B6B85" font-size="12">= chip 1</text>
+    <rect x="880" y="282" width="220" height="64" rx="10" fill="#111A2E" stroke="#B48CFF" stroke-width="2"/>
+    <text x="990" y="312" text-anchor="middle" fill="#DCE6F5" font-size="16">block 2</text>
+    <text x="990" y="334" text-anchor="middle" fill="#5B6B85" font-size="12">= chip 2</text>
+    <rect x="880" y="394" width="220" height="64" rx="10" fill="#111A2E" stroke="#B48CFF" stroke-width="2"/>
+    <text x="990" y="424" text-anchor="middle" fill="#DCE6F5" font-size="16">block 3</text>
+    <text x="990" y="446" text-anchor="middle" fill="#5B6B85" font-size="12">= chip 3</text>
+    <rect x="880" y="506" width="220" height="64" rx="10" fill="#111A2E" stroke="#B48CFF" stroke-width="2"/>
+    <text x="990" y="536" text-anchor="middle" fill="#DCE6F5" font-size="16">block 4 + CE head</text>
+    <text x="990" y="558" text-anchor="middle" fill="#5B6B85" font-size="12">= chip 4</text>
+  </g>
+
+  <!-- error units attached to each layer -->
+  <g>
+    <circle cx="1140" cy="202" r="16" fill="#0B1120" stroke="#F2A93B" stroke-width="2"/>
+    <text x="1140" y="208" text-anchor="middle" fill="#F2A93B" font-size="14">ε₁</text>
+    <circle cx="1140" cy="314" r="16" fill="#0B1120" stroke="#F2A93B" stroke-width="2"/>
+    <text x="1140" y="320" text-anchor="middle" fill="#F2A93B" font-size="14">ε₂</text>
+    <circle cx="1140" cy="426" r="16" fill="#0B1120" stroke="#F2A93B" stroke-width="2"/>
+    <text x="1140" y="432" text-anchor="middle" fill="#F2A93B" font-size="14">ε₃</text>
+    <circle cx="1140" cy="538" r="16" fill="#0B1120" stroke="#F2A93B" stroke-width="2"/>
+    <text x="1140" y="544" text-anchor="middle" fill="#F2A93B" font-size="14">ε₄</text>
+  </g>
+
+  <!-- forward x arrows (one hop) -->
+  <line x1="950" y1="238" x2="950" y2="278" stroke="#4FD1E0" stroke-width="2.5" marker-end="url(#aC)"/>
+  <line x1="950" y1="350" x2="950" y2="390" stroke="#4FD1E0" stroke-width="2.5" marker-end="url(#aC)"/>
+  <line x1="950" y1="462" x2="950" y2="502" stroke="#4FD1E0" stroke-width="2.5" marker-end="url(#aC)"/>
+  <text x="928" y="264" fill="#4FD1E0" font-size="13">x↓</text>
+  <text x="928" y="376" fill="#4FD1E0" font-size="13">x↓</text>
+  <text x="928" y="488" fill="#4FD1E0" font-size="13">x↓</text>
+
+  <!-- error arrows: ONE HOP up only -->
+  <line x1="1020" y1="278" x2="1020" y2="238" stroke="#F2A93B" stroke-width="2.5" marker-end="url(#aO)"/>
+  <line x1="1020" y1="390" x2="1020" y2="350" stroke="#F2A93B" stroke-width="2.5" marker-end="url(#aO)"/>
+  <line x1="1020" y1="502" x2="1020" y2="462" stroke="#F2A93B" stroke-width="2.5" marker-end="url(#aO)"/>
+  <text x="1032" y="264" fill="#F2A93B" font-size="13">ε↑</text>
+  <text x="1032" y="376" fill="#F2A93B" font-size="13">ε↑</text>
+  <text x="1032" y="488" fill="#F2A93B" font-size="13">ε↑</text>
+
+  <!-- local update loops -->
+  <g fill="none" stroke="#58C97D" stroke-width="2">
+    <path d="M 862 202 a 22 22 0 1 1 6 -18" marker-end="url(#aG)"/>
+    <path d="M 862 314 a 22 22 0 1 1 6 -18" marker-end="url(#aG)"/>
+    <path d="M 862 426 a 22 22 0 1 1 6 -18" marker-end="url(#aG)"/>
+    <path d="M 862 538 a 22 22 0 1 1 6 -18" marker-end="url(#aG)"/>
+  </g>
+  <marker id="aG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0,0 L10,5 L0,10 z" fill="#58C97D"/>
+  </marker>
+  <text x="790" y="206" fill="#58C97D" font-size="13" text-anchor="middle">Δw local</text>
+  <text x="790" y="318" fill="#58C97D" font-size="13" text-anchor="middle">Δw local</text>
+  <text x="790" y="430" fill="#58C97D" font-size="13" text-anchor="middle">Δw local</text>
+  <text x="790" y="542" fill="#58C97D" font-size="13" text-anchor="middle">Δw local</text>
+
+  <!-- target arrow into head -->
+  <line x1="990" y1="614" x2="990" y2="574" stroke="#E0596B" stroke-width="2.5" marker-end="url(#aR)" stroke-dasharray="5 4"/>
+  <text x="990" y="640" text-anchor="middle" fill="#E0596B" font-size="14">targets enter ONLY at the head (CE)</text>
+
+  <!-- annotations -->
+  <g font-size="14.5" fill="#B9C6DB">
+    <text x="760" y="712">✓ a block updates from itself + one neighbour — nothing else</text>
+    <text x="760" y="740">✓ messages are just x (down) and ε (up), one hop, bf16</text>
+    <text x="760" y="768">✓ weight staleness ~1 step — absorbed by gradient ACCUM</text>
+    <text x="760" y="796">✓ a layer = a chip: the rule is native to a chain of FPGAs</text>
+  </g>
+
+  <!-- bottom banner -->
+  <rect x="120" y="822" width="1160" height="52" rx="10" fill="#111A2E" stroke="#33415C"/>
+  <text x="700" y="855" text-anchor="middle" fill="#DCE6F5" font-size="16">The learning rule never needs information that isn't already on the chip or its neighbour — that is what lets an LM train across 8 FPGAs with <tspan fill="#58C97D" font-weight="700">no global gradient</tspan>.</text>
+</svg>

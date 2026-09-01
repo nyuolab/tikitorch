@@ -2,16 +2,17 @@
 
 Runnable, PyTorch-idiomatic usage demos. Each script is self-contained and runs
 without downloads (synthetic data; `train_sequential_mnist.py` adds a `--smoke`
-flag for its no-download path).
+flag for its no-download path). Examples demonstrate APIs; only an explicit
+audit of the complete executed recipe supports a closure claim.
 
 | script | what it shows |
 | --- | --- |
 | [`quickstart.py`](quickstart.py) | The whole loop in ~10 lines: `MorphSSM` + `PureTropicalSGD`, `compute_loss` / `backward` / `step`. |
-| [`train_sequential_mnist.py`](train_sequential_mnist.py) | A vanilla PyTorch training loop over sequential MNIST (28×28 read as a length-784 sequence of scalar pixels) with a multiplier-free tropical model + optimizer. |
-| [`closure_ablation.py`](closure_ablation.py) | The "closure penalty": flip soft→hard, dense→tropical projection, AdamW→`PureTropicalSGD` one at a time and watch accuracy trade off for an FPGA-native (multiplier-free) learning loop. |
+| [`train_sequential_mnist.py`](train_sequential_mnist.py) | A vanilla PyTorch training loop over sequential MNIST (28×28 read as a length-784 sequence of scalar pixels) using a tropical model and optimizer. |
+| [`closure_ablation.py`](closure_ablation.py) | A recipe-boundary ablation: change soft/hard routing, projection, and optimizer choices one at a time and inspect the accuracy/closure trade-off. |
 | [`backend_dispatch.py`](backend_dispatch.py) | The backend seam: logical `tt.device`, the op registry, byte-identical CPU dispatch, and transparent one-time-warned fallback. Runs CPU-only. |
-| [`fpga_quickstart.py`](fpga_quickstart.py) | One line — `model = tt.fpga.accelerate(model)` — to target the FPGA, training loop unchanged. Binds to a silicon kernel on an F2 board; CPU fallback everywhere else. |
-| [`tropical_muzero.py`](tropical_muzero.py) | The signature planner: a multiplier-free Tropical MuZero (dyadic zero-DSP cores) trains on GridWorld via self-play MCTS, scores vs a value-iteration oracle, then exports its weights to a bit-exact FPGA shift schedule. |
+| [`fpga_quickstart.py`](fpga_quickstart.py) | The `model.fpga()` interface across CPU fallback, a local host-reference bridge, and a compatible native F2 runner; backend provenance remains explicit. |
+| [`tropical_muzero.py`](tropical_muzero.py) | A Tropical MuZero research demo that trains on GridWorld, compares with a value-iteration oracle, and exports supported dyadic weights to a shift schedule. |
 
 ## Run
 
@@ -34,10 +35,10 @@ python examples/backend_dispatch.py
 # FPGA quickstart — one-line accelerate(); CPU fallback with no board
 python examples/fpga_quickstart.py
 
-# Tropical MuZero — multiplier-free planner on GridWorld + zero-DSP shift-schedule export
+# Tropical MuZero — planner demo + dyadic shift-schedule export
 python examples/tropical_muzero.py
 ```
 
-The point of every example: **tropical (multiplier-free) layers and optimizers
-drop into ordinary PyTorch code with no change to how you write the loop.**
-`model.compute_loss(x, y).backward(); opt.step()` is all of it.
+The common point is ergonomic: tropical layers and TikiTorch optimizers fit an
+ordinary PyTorch-style loop. Whether a particular forward, loss, backward, and
+update is closed must be checked separately with `tikitorch.audit`.
