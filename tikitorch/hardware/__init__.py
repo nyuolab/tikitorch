@@ -13,10 +13,11 @@ The actual artifacts are data files shipped alongside this package:
     README.md                         closure->LUT mapping + HLS->AFI->F2 guide
     BUILD_GUIDE.md                    condensed HLS -> AFI -> F2 walkthrough
 
-The headline kernel, ``forge_train_step_morph_ecg`` (MorphSSM core scaled to
-the PTB-XL ECG config), trains end-to-end on AWS F2 silicon at 1,207 tok/s,
-5.8 mJ/token, with DSP=0 and WNS=+0.009 ns — the tropical learning loop closed
-in fabric with nothing but comparators, adders, and bit-shifts.
+A historical ``forge_train_step_morph_ecg`` build records the fused MorphSSM
+core forward/reverse/update at 1,207 tok/s, DSP=0, and WNS=+0.009 ns. Its
+5.8 mJ/token value is derived rather than measured full-card energy, and the
+embedding, classification head, and loss remain host-owned. These are
+configuration-specific core measurements, not an end-to-end system guarantee.
 
 Use :func:`hls_dir` / :func:`readme_path` / :func:`build_guide_path` to locate
 these on disk after installation (they are included as package data).

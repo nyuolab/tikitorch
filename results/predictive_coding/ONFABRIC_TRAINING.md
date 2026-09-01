@@ -3,6 +3,9 @@
 **Date:** 2026-06-23. **AGFI:** `agfi-0fdc38db9da6add74` (`forge_pc_train_step`). **Instance:**
 f2.6xlarge, slot 0.
 
+The AGFI identifies the historical account/region-specific experiment; it is
+not bundled with TikiTorch or guaranteed to remain public or accessible.
+
 A 2-layer dyadic MLP (256 → 256 → 10) is trained on 16×16-downsampled MNIST with **every step of
 credit assignment running on the FPGA fabric** — forward, top-error, cascade backward, gradient,
 momentum, and the weight update. The host only streams each minibatch (pixels + a one-hot label
@@ -26,7 +29,8 @@ and logs); their required corrections are folded into the framing and caveats be
 
 - Batch 32 → 1875 kicks/epoch over 60 000 train images. The ~24.6 s/epoch wall **also includes** a
   host weight read-back + a full 10 000-image host eval, so it is not a training-rate figure;
-  per-kick fabric time is sub-ms. This is a correctness/structure demonstration, not a throughput claim.
+  the archive does not isolate per-kick fabric time. This is a correctness/structure demonstration,
+  not a throughput claim.
 - After a single kick, 37 729 / 65 536 W0 weights had changed from init → the on-fabric update is
   live and persists in DDR (`[diag]` line in `train.txt`).
 - Predictions are spread across most classes (not collapsed to one), though **imbalanced** — the
@@ -43,11 +47,14 @@ the Python recipe forward) re-evaluated them on a **freshly downloaded** torchvi
 RECIPE-EVAL of ON-FABRIC weights: test acc = 0.7413   (driver reported 0.7475)
 ```
 
-The two agree to within ~0.6 pp (0.62). The small gap is a data-pipeline rounding difference
-(`F.interpolate(area)` differs in the last ULP across torch versions / platforms between the box
-that generated the bins and the Mac that reloaded them) — *not* a forward/training discrepancy.
-That the fabric-trained weights generalize to an independently-loaded test set makes the result
-**stronger**, not weaker.
+The two differ by 0.62 percentage points. That difference is **unresolved
+pipeline variation**: the archive did not freeze identical evaluator inputs,
+preprocessing output, and software versions for the two paths. Platform/version
+differences in `F.interpolate(area)` are a plausible source, but the current
+records do not isolate the cause and therefore cannot distinguish preprocessing
+from other evaluator-implementation variation. The separate evaluation does
+establish that the exported fabric-trained weights retain substantial accuracy on a freshly
+loaded test set; it is not a bit-for-bit parity test.
 
 ## What runs on the fabric, exactly (kernel `forge_pc_train_step.cpp`)
 
@@ -83,36 +90,45 @@ copied between chips for the backward; only a neighbour error message crosses.
 
 ## The bug that almost buried it (and the honest fix)
 
-The first run sat at **exactly 0.098** (predict always class 0) although the train-step kernel was
-verified **bit-exact on silicon** and the weights demonstrably evolved. Root cause: the kernel's
+The first run sat at **exactly 0.098** (predict always class 0) even though the
+weights demonstrably evolved. Root cause: the kernel's
 `norm_shift` computes `s = highest_bit_pos − target` (= `bit_length − 1 − target`), **one shift less**
 than the validated recipe's `bit_length − target`. argmax is shift-invariant, so *evaluation* was
 unaffected — but in *training* the kernel's activations/logits come out 2× larger, which halves the
 effective logit-vs-target gap and collapses the dyad-rounded gradient's class asymmetry → no
-learning. The one-step verify could not catch it (kernel == its own C reference, both off-by-one;
-neither == the recipe).
+learning. A C reference carrying the same off-by-one convention would not, by
+itself, detect this recipe mismatch. Importantly, the archived training run did
+**not** execute its optional full-train-kernel one-step verifier
+(`onfabric_train/pctrain.log` records `VERIFY=`); no such KAT result is claimed
+for this run.
 
 Reproduced exactly in the recipe (`PC_KERNEL_SHIFT=1` → stuck at 0.098, identical weight growth;
 committed: `onfabric_train/recipe_diag.txt`). **Fixed host-side, no AFI rebuild:** double the
 true-class target 8 → 16, which precisely compensates the 2× scale. The target is a loss *data input*
 the host already supplies, so this moves **no computation off the fabric** — the training-loop claim
-is intact. Recipe confirmation: off-by-one + tgt=16 → 0.896; tgt sweep shows 16 is the exact optimum
-(24 → 0.864, 32 → 0.789). *(A future clean rebuild could set `norm_shift = bit_length − target` so
-tgt=8 works; cosmetic, not required.)*
+is intact. Recipe confirmation: off-by-one + tgt=16 → 0.896; among the tested
+target values, 16 performed best (24 → 0.864, 32 → 0.789). *(A future clean
+rebuild could set `norm_shift = bit_length − target` so tgt=8 works. That rebuild
+is unnecessary for this target-compensated demonstration, but it is required
+before claiming recipe-parity at the original target scale.)*
 
-**Why 0.7475 and not 0.896 — reconciling the gap.** 0.896 is the *recipe's* number at **8 epochs /
-batch 128 / `randn*4` init**. This fabric run used **5 epochs / batch 32 (TN=32) / uniform-int(−4..4)
-init** (the driver's defaults). At that *matched* configuration the recipe itself reaches ~0.81
-(`recipe_diag.txt`: 0.7996 / 0.8079 / 0.8094 over 3 epochs), and the fabric run's 0.7475 sits a few pp
-below that — attributable to the init RNG (C `rand()` vs torch) and the data-pipeline rounding, **not**
-a residual kernel defect (the one-step kernel is bit-exact on silicon, and the cross-check confirms the
-trained weights). The gap is configuration + init, not arithmetic.
+**Why 0.7475 and not 0.896 — non-parity context.** The 0.896 recipe run used
+**8 epochs / batch 128 / `randn*4` initialization**. The fabric run used **5
+epochs / batch 32 (TN=32) / uniform-int(−4..4) initialization**. A closer recipe
+configuration reached ~0.81 (`recipe_diag.txt`: 0.7996 / 0.8079 / 0.8094 over
+three epochs), but it still used a different RNG path and did not freeze the
+same evaluator preprocessing. These records show that the runs are not a
+controlled parity comparison; they do not attribute the remaining accuracy
+difference. The independent evaluation confirms useful exported weights, but
+the archive does not contain full-train-kernel KAT or full-trajectory parity
+evidence and therefore does not exclude every residual kernel issue.
 
 ## Honest scope — what this is and is not
 
 - **Is:** a complete credit-assignment loop (fwd + local-cascade bwd + update) closing entirely on
-  one multiplier-free FPGA, training a real net from chance to ~0.75 on downsampled MNIST, with the
-  result independently cross-validated.
+  one multiplier-free FPGA, training a real net from chance to ~0.75 on downsampled MNIST. The
+  exported weights were independently re-evaluated at 0.7413; the 0.62-point evaluator difference
+  remains unresolved.
 - **Is not** a SOTA-accuracy claim: 16×16 MNIST, ~0.75, 2 layers. The point is that the *loop closes
   on fabric*, not the number.
 - **Is not** a throughput claim (see the table note).
@@ -128,10 +144,11 @@ trained weights). The gap is configuration + init, not arithmetic.
 ## Reproduce
 
 ```
-# kernel/recipe parity + the off-by-one diagnosis (committed: onfabric_train/recipe_diag.txt)
+# recipe reproduction of the off-by-one diagnosis (committed: onfabric_train/recipe_diag.txt)
 PYTHONPATH=. PC_KERNEL_SHIFT=1            python scripts/pc_onfabric_train_ref.py   # -> stuck 0.098
 PYTHONPATH=. PC_KERNEL_SHIFT=1 PC_TGT=16  python scripts/pc_onfabric_train_ref.py   # -> 0.896
 # on-fabric run (host stages batch + kicks; weights persist in DDR; eval read back per epoch)
+# requires an authorized, compatible AFI in the caller's AWS account/region
 AWS_PROFILE=... AGFI=agfi-0fdc38db9da6add74 EPOCHS=5 bash scripts/run_pc_train_f2.sh launch
 # independent cross-check of the dumped on-fabric weights (committed: onfabric_train/crosscheck.txt)
 PYTHONPATH=. python scripts/pc_eval_onfabric_weights.py <trainedW0.i32> <trainedW1.i32>

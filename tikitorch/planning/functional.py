@@ -1,7 +1,6 @@
 """tikitorch.planning.functional — tropical dynamic-programming primitives.
 
-This module adds the two stateless ops that the planning / RL layers are built
-on, in the same multiplier-free spirit as :mod:`tikitorch.functional`:
+This module adds two stateless hard tropical ops used by the planning/RL layers:
 
   * :class:`TropicalScanFn` — the generic ``(max,+)`` / ``(min,+)`` *linear
     recurrence* (a DP scan) with argmax/argmin routing in the backward pass.
@@ -13,9 +12,10 @@ on, in the same multiplier-free spirit as :mod:`tikitorch.functional`:
     custom backward), with a sparse argmax backward. Repeated max-plus matmul is
     all-pairs longest/shortest path and max-plus matrix powers (value iteration).
 
-Both reduce to comparisons and additions only — no multiplies — so they map
-directly onto the inlined max-plus PE in the HLS kernels (the ``SCORE_N``
-``max_d(Q+K)`` loop iterated over a step axis).
+Their mathematical hard-path recipes use comparisons, additions, gathers, and
+scatters. That makes a compare/add lowering plausible, but the PyTorch reference
+does not establish a specific FPGA mapping or DSP count; those require a concrete
+lowering and matching synthesis report.
 """
 
 import torch
@@ -44,8 +44,7 @@ __all__ = [
 # vector; ``T`` is the per-step transition cost; ``emit`` is an optional per-step
 # local cost. The forward stores, for each step and each target state ``i``, the
 # winning source index ``j*`` (argmax/argmin). The backward is a reverse pass that
-# routes the upstream gradient only through those stored winners -- one-hot
-# scatter, exactly like the attention value-pull -- so it is multiply-free.
+# routes the upstream gradient only through those stored winners using scatter-add.
 
 
 class TropicalScanFn(torch.autograd.Function):
@@ -68,7 +67,8 @@ class TropicalScanFn(torch.autograd.Function):
 
     Backward routes ``grad_H`` through the stored winners only: for each step,
     ``grad`` on ``h_t[i]`` flows to ``h_{t-1}[j*]``, ``T[t-1, i, j*]`` and
-    ``emit[t-1, i]`` where ``j* = argmax/argmin``. Add/compare only.
+    ``emit[t-1, i]`` where ``j* = argmax/argmin``. Its abstract recipe is
+    add/compare/gather/scatter; this is not a physical implementation claim.
     """
 
     @staticmethod
@@ -192,8 +192,8 @@ class MaxPlusMatmulFn(torch.autograd.Function):
 
     The max-plus dual of :func:`tikitorch.functional.tropical_matmul` (min-plus).
     Unlike that helper it defines a custom backward that routes the gradient only
-    through the winning ``k*`` -- a one-hot scatter, multiply-free -- and (in the
-    decode path) exposes that index. Repeated application is all-pairs
+    through the winning ``k*`` with scatter-add and (in the decode path) exposes
+    that index. Repeated application is all-pairs
     shortest/longest path and max-plus matrix powers (value iteration).
     """
 

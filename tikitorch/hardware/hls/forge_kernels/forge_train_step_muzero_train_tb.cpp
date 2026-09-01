@@ -1,11 +1,12 @@
 // forge_train_step_muzero_train_tb.cpp — CSIM convergence test for the on-chip MuZero
 // training step (forge_train_step_muzero_train.cpp).
 //
-// Verifies, under plain g++ (no Vitis), that the multiplier-free SignSGD step actually LEARNS:
+// Verifies, under plain g++ (no Vitis), that the integer SignSGD step actually LEARNS:
 // fix one (obs -> policy*, value*) example, run N training steps, and assert the L1 loss falls
 // substantially (the gradient + sign-product update + pow2 re-quantization are wired correctly).
 // Also checks determinism and int16 range. This is the training analogue of the LM kernel's tb;
 // bit-exactness against the Python SignSGD mirror is the host harness (tests/test_muzero_kernel.py).
+// CSIM is functional evidence only; DSP use is established by a matching synthesis report.
 //
 // Compile: g++ -O2 -std=c++17 -DCSIM_ONLY -I.. -I. forge_train_step_muzero_train.cpp \
 //              forge_train_step_muzero_train_tb.cpp -o tb_muzero_train && ./tb_muzero_train
@@ -88,7 +89,7 @@ int main() {
     std::printf("loss: start %d -> best %d (deployed via early-stop), last %d  (baseline %d; best is %.0f%% below baseline)\n",
                 (int)loss0, (int)loss_min, (int)loss_last, (int)baseline,
                 100.0 * (baseline - loss_min) / baseline);
-    std::printf(fails == 0 ? "[tb_muzero_train] PASS (zero-DSP SignSGD training converges, CSIM)\n"
+    std::printf(fails == 0 ? "[tb_muzero_train] PASS (functional SignSGD training CSIM)\n"
                            : "[tb_muzero_train] FAIL (%d checks)\n", fails);
     return fails == 0 ? 0 : 1;
 }

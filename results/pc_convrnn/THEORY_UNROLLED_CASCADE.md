@@ -2,7 +2,8 @@
 
 Extends `results/pc_depth_traction/THEORY_CASCADE_EQUIVALENCE.md` (conditions C1–C3)
 from feedforward MLP/conv stacks to (a) the full MorphSSM LM stack and (b) recurrent
-tropical networks via unrolling. Branch `pc-morphssm`.
+tropical networks via unrolling. This note was developed on the historical
+`pc-morphssm` branch and is now integrated into `main`.
 
 ## 1. The corollary
 

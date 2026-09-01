@@ -10,13 +10,13 @@ Most use synthetic data; read each script's arguments before starting a longer r
 | `closure_ablation.py` | Compare ingredients in a closure-oriented recipe | `python examples/closure_ablation.py` |
 | `closure_ce.py` | Exercise the closure-aware loss path | `python examples/closure_ce.py` |
 | `backend_dispatch.py` | Inspect logical devices and CPU dispatch | `python examples/backend_dispatch.py` |
-| `fpga_quickstart.py` | Exercise the optional FPGA entry point | `python examples/fpga_quickstart.py` |
+| `fpga_quickstart.py` | Inspect the FPGA catalog, fail-closed match, and PyTorch fallback | `python examples/fpga_quickstart.py` |
 | `lion_vs_signsgd.py` | Compare two sign-oriented optimizers | `python examples/lion_vs_signsgd.py` |
 | `topk_softening.py` | Inspect soft and hard top-k routing | `python examples/topk_softening.py` |
 | `tropical_muzero.py` | Run the experimental planning demonstration | `python examples/tropical_muzero.py` |
 
 The source and any additional flags are in the
-[`examples/` directory](https://github.com/nyuolab/tikitorch/tree/pc-morphssm/examples).
+[`examples/` directory](https://github.com/nyuolab/tikitorch/tree/main/examples).
 
 !!! caution "Examples are not closure certificates"
 

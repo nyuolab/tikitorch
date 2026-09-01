@@ -4,7 +4,7 @@ The deterministic perfect-information domain where the tropical / max-backup the
 is strongest, and the canonical AlphaZero/MuZero setting (TicTacToe -> Connect4 ->
 chess). This module provides ``TicTacToe`` (with an exact minimax oracle) and a
 ``TwoPlayerKnownModel`` adapter so the negamax ``TropicalMCTS`` (``players=2``) can
-be validated to play PERFECTLY before any learned net or scale-up.
+be checked against TicTacToe's exact oracle before any learned net or scale-up.
 
 State is ``(board, to_play)`` with ``board`` a length-9 tuple (0 empty, 1/2 marks)
 and ``to_play`` in {1, 2}. Actions are cell indices 0..8.
@@ -243,16 +243,16 @@ class BoardGameModel:
 
 
 class AlphaZeroBoardModel:
-    """Wraps a net + game for AlphaZero-style MCTS: the TRUE game model in the tree.
+    """Wrap a net + game for AlphaZero-style MCTS using explicit game state in the tree.
 
     Unlike :class:`BoardGameModel` (pure MuZero — learned latent dynamics inside the tree, legality
-    only at the root), this evaluates every node at its REAL state: transitions use the game's exact
-    rules, terminals use the exact outcome, and legal moves are injected at EVERY node. The (zero-DSP)
-    net supplies only the policy PRIOR and the leaf VALUE; search quality then scales with depth
-    largely independent of net quality, and deeper search => stronger play (it cannot be fooled by a
-    weak learned model or waste sims on illegal moves). This is the right setting for board games where
-    we HAVE the simulator (Connect4/chess); the rules are integer compare/branch logic — still
-    multiplier-free, so the closed/zero-DSP story holds (net = shift+add kernel, tree = game logic)."""
+    only at the root), this evaluates every node at the state represented by the game object:
+    transitions, terminal outcomes, and legal moves are supplied at every node. The net supplies the
+    policy prior and leaf value. This can avoid learned-model and illegal-action errors, but deeper
+    search is not guaranteed to improve every position or weak prior. Nor does integer-heavy game
+    logic make the complete system zero-DSP: the Python MCTS path includes PUCT multiplication,
+    square root, min-max division, and floating-point tree statistics, and the configured net may
+    contain dense or categorical arithmetic boundaries."""
 
     def __init__(self, net, game):
         self.net = net

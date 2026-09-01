@@ -570,9 +570,10 @@ class TropicalAdam(toptim.Optimizer):
 
 
 # =============================================================================
-# Closed ADAPTIVE optimizers: recover Adam's per-parameter magnitude scaling
-# using only sign / compare / power-of-two shift -- verified zero-DSP by
-# tikitorch.audit.assert_training_closed. The magnitude tier is read with
+# Software-closure-oriented ADAPTIVE optimizers: recover Adam's per-parameter
+# magnitude scaling using sign / compare / power-of-two shift. Validate a concrete
+# executed recipe with tikitorch.audit.assert_training_closed; physical resource use
+# still requires synthesis evidence. The magnitude tier is read with
 # torch.frexp (exponent = floor(log2|x|)+1 = a leading-bit / priority-encoder on
 # FPGA); the integer shift is turned into a power-of-two step by GATHERING from a
 # constant table (never `2**tier` / ldexp, which lower to a transcendental `pow`).

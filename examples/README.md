@@ -11,7 +11,7 @@ audit of the complete executed recipe supports a closure claim.
 | [`train_sequential_mnist.py`](train_sequential_mnist.py) | A vanilla PyTorch training loop over sequential MNIST (28×28 read as a length-784 sequence of scalar pixels) using a tropical model and optimizer. |
 | [`closure_ablation.py`](closure_ablation.py) | A recipe-boundary ablation: change soft/hard routing, projection, and optimizer choices one at a time and inspect the accuracy/closure trade-off. |
 | [`backend_dispatch.py`](backend_dispatch.py) | The backend seam: logical `tt.device`, the op registry, byte-identical CPU dispatch, and transparent one-time-warned fallback. Runs CPU-only. |
-| [`fpga_quickstart.py`](fpga_quickstart.py) | The `model.fpga()` interface across CPU fallback, a local host-reference bridge, and a compatible native F2 runner; backend provenance remains explicit. |
+| [`fpga_quickstart.py`](fpga_quickstart.py) | Safe FPGA catalog inspection, conservative structural matching, PyTorch fallback, and the checks required before registering a custom LOCAL or F2 runner. |
 | [`tropical_muzero.py`](tropical_muzero.py) | A Tropical MuZero research demo that trains on GridWorld, compares with a value-iteration oracle, and exports supported dyadic weights to a shift schedule. |
 
 ## Run
@@ -23,7 +23,7 @@ python examples/quickstart.py
 # sequential MNIST — synthetic smoke (no torchvision download)
 python examples/train_sequential_mnist.py --smoke
 
-# sequential MNIST — real data
+# sequential MNIST — real data (first install: pip install -e ".[vision]")
 python examples/train_sequential_mnist.py --epochs 5 --batch-size 128
 
 # closure-penalty ablation
@@ -32,7 +32,7 @@ python examples/closure_ablation.py
 # backend seam (logical devices, dispatch, transparent fallback) — CPU-only
 python examples/backend_dispatch.py
 
-# FPGA quickstart — one-line accelerate(); CPU fallback with no board
+# FPGA quickstart — catalog/match inspection and PyTorch fallback
 python examples/fpga_quickstart.py
 
 # Tropical MuZero — planner demo + dyadic shift-schedule export

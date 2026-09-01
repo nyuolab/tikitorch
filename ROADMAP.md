@@ -20,7 +20,8 @@ TikiTorch configuration is multiplier-free.
 - [x] Recipe-scoped closure guide distinguishing structural, executed-path,
       full-training-step, and physical-build evidence.
 - [x] Green fast tests, lint, docs build, and isolated native-kernel tests.
-- [ ] Reconcile the development branch with the repository's default branch.
+- [x] Reconcile the development branch with the repository's default branch
+      (`pc-morphssm` integrated into `main` at merge commit `0a12c8b`).
 - [ ] Freeze the first documented public/experimental API inventory.
 - [ ] Publish versioned documentation and a release candidate.
 - [ ] Run install/import/example smoke tests from the built wheel and source

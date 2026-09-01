@@ -10,15 +10,16 @@ holds three module-global tables and the single fallback rule that makes the sea
 
 Design invariants:
 
-* **Additive / byte-identical.** The CPU implementations are the *same callable
+* **Additive / same callable.** The CPU implementations are the *same callable
   objects* exported by :mod:`tikitorch.functional` (registered via
   :func:`_autoregister_cpu_ops`). ``dispatch('tropical_linear', 'cpu')`` returns
-  ``functional.tropical_linear`` itself — zero overhead, zero behavior change.
+  ``functional.tropical_linear`` itself. Registry lookup still has normal Python
+  overhead and does not make a claim about other implementations.
   Nothing here edits or wraps ``functional``.
 * **Transparent fallback.** Requesting an op for a device that has no
   implementation (or whose backend is unavailable) returns the CPU implementation
-  and emits a one-time :class:`BackendFallbackWarning`. Correctness never breaks;
-  performance degrades gracefully.
+  and emits a one-time :class:`BackendFallbackWarning`. The CPU reference semantics
+  are then used; backend equivalence must be established separately.
 """
 from __future__ import annotations
 
@@ -63,15 +64,17 @@ class BackendCapabilities:
     ``on_device_training``: runs forward+backward+update on device.
     ``integer_only``      : operates in the integer-exact / multiplier-free domain.
 
-    The FPGA backend ships Tier-1 as ``model_binding=True, op_dispatch=False``;
-    Tier-2 (custom codegen) flips ``op_dispatch`` to ``True`` and fills the empty
-    op table — with no public API change.
+    The bundled FPGA backend conservatively reports only model wrapping
+    (``model_binding=True, op_dispatch=False``). It reports neither on-device
+    training nor integer-only execution because no safe native runner ships.
+    An external backend may declare broader capabilities only for the concrete
+    implementation it supplies and validates.
     """
 
     op_dispatch: bool = False
     model_binding: bool = False
     on_device_training: bool = False
-    integer_only: bool = True
+    integer_only: bool = False
     notes: str = ""
 
 
@@ -194,7 +197,7 @@ def dispatch(op_name: str, device_type: Union[str, Device] = "cpu") -> Callable:
         _warn_fallback(
             ("dispatch", op_name, dev),
             f"tikitorch op {op_name!r} has no available {dev!r} implementation; "
-            f"falling back to the CPU reference (correct, slower). "
+            f"falling back to the registered CPU reference. "
             f"This warning is shown once per (op, device).",
         )
         return cpu_impl

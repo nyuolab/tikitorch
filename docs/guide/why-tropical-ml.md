@@ -10,6 +10,29 @@ y_j = max_i (x_i + w_ji)
 That primitive is interesting for machine learning for three separate reasons. They
 should not be collapsed into one claim.
 
+## Why TikiTorch is useful beside PyTorch
+
+PyTorch supplies the general tensor, autograd, module, optimizer, and CPU/GPU ecosystem.
+TikiTorch is an independent project that keeps those workflows while adding a connected
+research path:
+
+- train with hard tropical routes or differentiable relaxations, then compare the
+  softened and hardened representations explicitly;
+- audit registered structure, an executed forward path, or a concrete
+  forward--loss--backward--optimizer step rather than inferring closure from a class
+  name;
+- retain and replay route certificates for selected VJPs in a declared finite operator
+  set with deterministic ties;
+- compare conventional global autograd with experimental Forward-Forward and
+  predictive-coding local-learning APIs; and
+- carry narrowly specified recipes into repository HLS kernels and AWS F2 experiments,
+  where software checks can be paired with synthesis, timing, and silicon evidence.
+
+No item in that path implies official affiliation with the PyTorch project, complete
+PyTorch compatibility, or a general accuracy, speed, memory, or energy advantage. The
+opportunity is to study representation, learning, verification, and deployment together
+on a familiar host substrate.
+
 ## 1. It changes the representation
 
 A hard tropical layer selects a winning input rather than forming a dense weighted
@@ -56,6 +79,12 @@ capabilities from measured hardware configurations. In summary:
 
 - The PyTorch-shaped library surface and recipe-scoped software auditing are
   established by implementation and tests.
+- Route-certificate replay is exact for the registered selected-VJP operator set and
+  recorded tie rules. Current retained-payload measurements are configuration-specific,
+  not process-peak-memory, traffic, or latency results.
+- Forward-Forward and predictive-coding components expose experimental local-learning
+  comparisons; they do not establish a general accuracy or biological-plausibility
+  advantage.
 - Specific F2 builds support narrow multiplier-free inference and learning-execution
   results under their recorded configurations.
 - A small fabric-trained MNIST model has a measured held-out result, with explicit

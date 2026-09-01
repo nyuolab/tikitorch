@@ -1,10 +1,12 @@
-# Connect4 — fully multiplier-free net + multiply-free training (the honest result)
+# Connect4 — dyadic net and closure-oriented training recipe
 
 _Run on EC2 (c5.9xlarge, 36 cores). Net: dyadic tropical CORES **and** DyadicLinear heads — closure audit
-returns `[]` (fully zero-DSP, no nn.Linear). Training: AlphaZero-style true-model self-play (256 sims,
-40×48 games) distilled into the dyadic policy via the closure-faithful **perceptron** loss (argmax of
-MCTS visits) + **L1** value + sign-only **TropicalSGD**. So forward, backward, and update are all
-multiplier-free. Score = win + 0.5·draw vs negamax, random openings, 40 games._
+returns `[]` for the audited model recipe (no `nn.Linear`). Training: AlphaZero-style explicit-game
+self-play (256 sims, 40×48 games) distilled into the dyadic policy via **perceptron** loss (argmax of
+MCTS visits) + **L1** value + sign-only **TropicalSGD**. Those selected model/update operators admit a
+compare/add/shift recipe; this does not make the Python MCTS loop zero-DSP, and no physical resource
+claim follows without a configuration-matched synthesis report. Score = win + 0.5·draw vs negamax,
+random openings, 40 games._
 
 | sims | TRAINED d2 / d3 | UNTRAINED d2 / d3 |
 |---|---|---|
@@ -14,9 +16,10 @@ multiplier-free. Score = win + 0.5·draw vs negamax, random openings, 40 games._
 
 ## What this shows (and the negative result)
 
-1. **The fully-tropical net is real and competitive via depth.** `closure_violations == []` (multiplier-free
-   confirmed on-box), and the **untrained** net + AlphaZero search **crushes negamax d2/d3** (0.79→0.98
-   vs d2 as sims rise). Competitive Connect4, fully multiply-free, is achieved — by the *search*.
+1. **The audited dyadic net is competitive via search depth in this benchmark.**
+   `closure_violations == []` for the model recipe, and the **untrained** net + AlphaZero-style search
+   scores 0.79→0.98 vs d2 as simulations rise. The result belongs to the combined Python search and
+   net; the search itself includes multiplication, square root, and division.
 
 2. **The multiply-free TRAINING recipe (perceptron + SignSGD) COLLAPSES the policy — it makes the agent
    WORSE.** Trained vs untrained is catastrophic at low sims (**0.025 vs 0.787** at 100 sims) and no better
@@ -36,16 +39,19 @@ the wrong move. This is the same "training narrows the policy" pathology seen ea
 
 Honest state after this run: **none of the recipes tried learn a policy prior that beats uniform+search.**
 The AlphaZero search carries the strength; the net's prior is, at best, neutral and at worst harmful. The
-clear next levers (all keep it multiply-free), as a falsifiable to-do, not a claim:
-- **Distill the FULL visit distribution, not the argmax** — a closure-faithful soft loss (e.g.
-  `TropicalCrossEntropyFn`'s `(shift_softmax − onehot)` gradient) preserves calibration the perceptron throws away.
+clear next levers, as falsifiable to-dos rather than closure claims, are:
+- **Distill the FULL visit distribution, not the argmax** — the current exact soft cross-entropy does
+  this, while retaining explicit softmax/log/multiply arithmetic. `TropicalCrossEntropyFn` instead
+  uses a row-balanced **hard-target** gradient; it is a separate candidate recipe and does not preserve
+  the full visit distribution.
 - **Anti-collapse**: entropy/KL-to-uniform regularization or a visit-count temperature so the prior stays soft.
-- **Gentler updates**: sign-only SignSGD with no lr decay over-sharpens logits; an integer lr_shift schedule
-  (decay) or magnitude-aware-but-still-closed update may stop the over-confidence.
+- **Gentler updates**: sign-only SignSGD with no lr decay over-sharpens logits; an integer
+  `lr_shift` schedule or a separately audited magnitude-aware update may stop the over-confidence.
 - **Or lean on the VALUE head** (which guides search more robustly than a collapsed policy prior) and treat
   the policy prior as secondary.
 
-Bottom line: **fully multiply-free + competitive (via depth) is done; a multiply-free TRAINING recipe that
-*improves* the prior is still open** — and this run rules out naive perceptron+SignSGD as that recipe.
+Bottom line: the audited dyadic model recipe is competitive via depth in this benchmark; a training
+recipe that reliably *improves* the prior is still open. A whole-system multiplier/resource result
+also remains open and must be established on a concrete implementation.
 
 _Reproduce: `scripts/run_fully_tropical_connect4.py`. Data: `connect4_fully_tropical.json`._

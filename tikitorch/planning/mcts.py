@@ -18,11 +18,11 @@ MCTS over a learned-or-known model, with the two ingredients that are tropical:
         so it interpolates between the tropical max and the robust mean and lets
         us tune away max-backup's noise fragility while staying tropical-leaning.
 
-The PUCT exploration bonus (the ``sqrt`` and the multiply) and the value
-normalisation (a divide) are *declared host/DSP boundaries* -- small, per-node,
-off the load-bearing argmax/backup path. Tree statistics are held in a Python
-tree here (the CPU reference); the flat-tensor / URAM-resident layout is the
-Stage-7 hardware mapping.
+The PUCT exploration bonus (the ``sqrt`` and multiplies), value normalization
+(a divide), and mean/top-k statistics are explicit arithmetic boundaries in the
+executed selection/backup path. Tree statistics are held in a Python tree here
+(the CPU reference); a flat-tensor / URAM-resident implementation is a proposed
+hardware mapping, not an artifact supplied by this module.
 
 The model is any object exposing the MuZero inference interface::
 

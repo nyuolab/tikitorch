@@ -1,69 +1,117 @@
 # Building the TikiTorch FPGA native driver (`_libtikifpga`)
 
-`tikitorch.fpga` talks to the silicon-validated kernels through a small
-native shared library, `_libtikifpga`. **This library is not shipped in the
-wheel** (platform/ABI mismatch, and it needs the Xilinx toolchain to build).
-Without it, `tikitorch.fpga` transparently falls back to CPU — everything still
-runs, just not on a board. This guide is how to build it and run on AWS F2.
+`tikitorch.fpga` is an experimental integration boundary. The wheel does not
+ship `_libtikifpga`, a configuration-matched FPGA image, or a safe bundled
+training-step runner. Without an explicitly completed binding contract, an
+accelerated wrapper uses its ordinary PyTorch fallback.
 
-> You cannot build this in a generic sandbox/CI: it requires the bundled HLS
-> sources, a C++17 compiler, and (for the board path) the Xilinx XRT runtime and
-> an F2 instance. The Python side is complete and tested without it.
+> A loaded library, a catalog entry, a structural match, and physical FPGA
+> execution are different facts. LOCAL is a host-reference endpoint, not a
+> board. Neither LOCAL nor a native-library load establishes synthesis, timing,
+> resource use, silicon exactness, or performance.
 
-## What the loader expects
+## Catalog inspection is not model matching
 
-`tikitorch/fpga/_native.py` `dlopen`s the library and binds these extern-C
-symbols (see `_BRIDGE_SYMBOLS` there):
+The default `KernelCache` records these fixed HLS artifacts:
+
+| entry | ABI | buffer-words constant | fixed recipe |
+|---|---|---|---|
+| `forge_train_step` | `FUSED_5` | `FT_BUFFER_WORDS` | V=128, D=128, DFF=512, Lmax=128, 1 LM layer |
+| `forge_train_step_2layer` | `FUSED_6` | `FT2_BUFFER_WORDS` | same dimensions, 2 LM layers |
+| `forge_train_step_3layer` | `FUSED_6` | `FT3_BUFFER_WORDS` | same dimensions, 3 LM layers |
+| `forge_train_step_morph` | `FUSED_5` | `MD_BUFFER_WORDS` | D=64, N=4, K=4, L=64, dilation cap 16 |
+| `forge_train_step_morph_ecg` | `FUSED_5` | `FT_BUFFER_WORDS_E` | D=128, N=8, K=7, L=5000, dilation cap 32 |
+
+`lookup(model_type, config)` returns a record for a compact catalog key. It does
+not inspect a model and is never permission to execute:
+
+```python
+import tikitorch.fpga as fpga
+
+cache = fpga.KernelCache.default()
+record = cache.lookup(
+    "TropicalTransformer",
+    fpga.LMKernelConfig(V=128, D=128, n_layers=1),
+)
+print(record.entry if record else "no catalog record")
+```
+
+`match(model)` first performs that lookup and then checks the complete
+model-observable structural recipe: secondary dimensions, hard/soft operator
+variants, attention configuration, normalization, heads, biases, and named
+parameter regions. Ambiguity returns `None`. Stock model constructions currently
+fail closed. The one-layer LM entry is also forced to miss because the retired
+flat-parameter runner cannot safely marshal its layout.
+
+Even a non-`None` structural match does not cover facts that only a runner and
+build manifest can establish:
+
+- runtime tensor shapes, sequence lengths, dtypes, and value ranges;
+- learning-rate, threshold, loss, and optimizer-mode contracts;
+- named parameter packing, including every bias region, and synchronization back;
+- quantization scales, saturation, and retained scale metadata;
+- native symbol, ABI arity, buffer-word count, source/image identity, and transport;
+- agreement with the functional testbench and the target synthesized image.
+
+## What loading and availability mean
+
+On import, `_native.load()` searches for `_libtikifpga`, calls `dlopen`, and binds
+the expected ctypes signatures. It does **not** call `tt_fpga_open`, probe LOCAL,
+or probe a board. A returned `NativeHandle` establishes only that the library and
+expected symbols loaded.
+
+The later `fpga.is_available()` probe calls the bridge's legacy-named
+`tt_fpga_board_present`. LOCAL returns 1 for a usable host endpoint, so
+`is_available()` and `device_count()` describe native endpoints, not necessarily
+physical FPGA devices.
+
+`AcceleratedModel.bound` becomes true only when the backend has a usable endpoint,
+`KernelCache.match(model)` succeeds, and an application explicitly registered a
+runner for that entry. It means the wrapper will call that runner. It does not
+prove the runner's runtime/build checks or a physical-board path. `strict=True`
+only turns a missing binding into `NativeUnavailable` instead of fallback; it
+does not strengthen a custom runner.
+
+## Native bridge ABI
+
+The bridge must export:
 
 ```c
-void* tt_fpga_open(const char* xclbin_or_null);          // open device/context
+void* tt_fpga_open(const char* transport_arg_or_null);
 void  tt_fpga_close(void* h);
-int   tt_fpga_board_present(void* h);                     // 0/1
-void* tt_fpga_alloc(void* h, long words);                // int32 buffer
+int   tt_fpga_board_present(void* h);  /* endpoint usable; LOCAL may return 1 */
+void* tt_fpga_alloc(void* h, long words);
 void  tt_fpga_free(void* h, void* buf);
 void  tt_fpga_load_weights(void* h, void* buf, const int16_t* w, long n);
 void  tt_fpga_save_weights(void* h, void* buf, int16_t* w, long n);
 int   tt_fpga_run(void* h, const char* entry, void* buf, int mode,
-                  int a1, int a2, int a3, int layer_id);  // rc==0 on success
+                  int a1, int a2, int a3, int layer_id);
+void  tt_fpga_write_region(void* h, void* buf, long offset_words,
+                           const int32_t* src, long n);
+void  tt_fpga_read_region(void* h, void* buf, long offset_words,
+                          int32_t* dst, long n);
 ```
 
-`tt_fpga_run` dispatches by `entry` (the kernel symbol, e.g.
-`forge_train_step_2layer`) and the canonical mode codes
-`FWD_LOSS=0, BWD=1, SIGNSGD=2`. The trailing `layer_id` is consumed only by the
-6-int (`KernelABI.FUSED_6`) kernels (2-/3-layer LM); the 5-int (`FUSED_5`)
-kernels (`forge_train_step`, `forge_train_step_morph[_ecg]`) ignore it.
+The bridge uses canonical modes `FWD_LOSS=0`, `BWD=1`, and `SIGNSGD=2`.
+`FUSED_6` entries consume `layer_id`; `FUSED_5` entries ignore it. The current
+FPGA-PCI implementation is narrower: it ignores `entry`, `buf`, and `layer_id`
+and targets one fixed 5-int AXI-Lite register map and BAR4 convention. It cannot
+drive the 2-/3-layer ABI without an extension.
 
-## The two ABIs and the kernel buffer
+## Build a LOCAL host-reference library
 
-The bundled HLS sources (locate them with `tikitorch.hardware.hls_dir()`) export:
-
-| entry | ABI | buffer-words const (`.hpp`) | shape |
-|---|---|---|---|
-| `forge_train_step` | 5-int | `FT_BUFFER_WORDS` | V=128 D=128 D_FF=512 L=128, 1 layer |
-| `forge_train_step_2layer` | 6-int | `FT2_BUFFER_WORDS` | …, 2 layers |
-| `forge_train_step_3layer` | 6-int | `FT3_BUFFER_WORDS` | …, 3 layers |
-| `forge_train_step_morph` | 5-int | `MD_BUFFER_WORDS` | D=64 L=4 K=4 Lseq=64 |
-| `forge_train_step_morph_ecg` | 5-int | `FT_BUFFER_WORDS_E` | D=128 L=8 K=7 Lseq=5000 |
-
-These are exactly the entries seeded into `KernelCache.default()`.
-
-## Build — LOCAL mode (no board, bit-exact validation)
-
-The kernels compile as plain C++ (the `forge_hls_types.hpp` shim maps `ap_int<>`
-to `int16_t`/`int32_t` under g++). Wrap them with a `bridge.cpp` that implements
-the symbols above against the kernel C functions and a heap buffer:
-
-The easiest way is the helper script (auto-detects compiler/OS, sets the flags),
-then the quickstart:
+LOCAL needs the bundled HLS sources and a C++17 compiler. The helper builds the
+one-layer kernel library and exports its path:
 
 ```bash
-eval "$(bash scripts/build_fpga_local.sh --export)"   # 1-layer LM kernel + sets TIKITORCH_FPGA_LIB
-python examples/fpga_quickstart.py                    # binds + trains on the kernel (dsp=0)
+eval "$(bash scripts/build_fpga_local.sh --export)"
+python -m examples.fpga_quickstart
 ```
 
-By hand it is one `g++`/`clang++` call — but note the **`-DCSIM_ONLY` and
-`-DTT_KERNEL_<which>`** defines: without them `bridge.cpp` compiles no kernel to
-dispatch and every `tt_fpga_run` returns rc `-99`.
+The quickstart intentionally demonstrates catalog inspection and fail-closed
+fallback. Building LOCAL no longer auto-registers the retired one-layer runner.
+
+The equivalent manual build is:
 
 ```bash
 HLS=$(python -c "import tikitorch.hardware as h; print(h.hls_dir())")/forge_kernels
@@ -74,76 +122,73 @@ g++ -O2 -std=c++17 -fPIC -shared -DCSIM_ONLY -DTT_KERNEL_1LAYER \
 export TIKITORCH_FPGA_LIB=$PWD/_libtikifpga.so
 ```
 
-`forge_train_step` is the 1-layer LM kernel; it ships a reference runner, so a
-`TropicalTransformer(d_model=128, n_layers=1, vocab_size=128, task_type="lm")`
-binds out of the box. For another kernel, pass its `-DTT_KERNEL_2LAYER` /
-`…_3LAYER` / `…_MORPH` / `…_MORPH_ECG` and matching `.cpp`, and register a runner
-for it (see `runners.py`).
+Use the matching `-DTT_KERNEL_2LAYER`, `-DTT_KERNEL_3LAYER`,
+`-DTT_KERNEL_MORPH`, or `-DTT_KERNEL_MORPH_ECG` define and source for another
+artifact. Without `-DCSIM_ONLY` and a `-DTT_KERNEL_*` selection, LOCAL dispatch
+has no compiled kernel.
 
-LOCAL mode runs the kernel math on the host (no `xrt`), so `board_present()`
-returns 1 and you can validate your **on-board runner** (see below) against the
-bundled `forge_train_step_*_tb.cpp` testbench — which is the silicon-validated
-reference for the fused sequence — before ever touching real silicon.
+Validate a prospective runner against the corresponding
+`forge_train_step_*_tb.cpp`. LOCAL exercises host-compiled kernel math and bridge
+marshalling only; it does not exercise routing, PCIe, board state, or silicon.
 
-## Build — XRT mode (AWS F2 silicon)
+## Physical-FPGA transports
 
-On an F2 instance with an `.xclbin` in hand, build `bridge.cpp` in XRT mode
-(implement the symbols with `xrt::device`/`xrt::kernel`/`xrt::bo`, mirroring the
-`host_training_xrt.cpp` flow in the source monorepo — that file is *not*
-bundled in this package):
+The archived AWS F2 route uses the AWS FPGA SDK's `fpga_pci`/`fpga_mgmt`
+interfaces and the bridge's `-DTT_FPGA_PCI` mode:
 
 ```bash
-g++ -O2 -std=c++17 -fPIC -shared -DTT_FPGA_XRT \
-    -I/opt/xilinx/xrt/include -I"$HLS" \
-    bridge.cpp \
-    /opt/xilinx/xrt/lib/libxrt_coreutil.so \
+SDK=/path/to/aws-fpga/sdk/userspace
+g++ -O2 -std=c++17 -fPIC -shared -DTT_FPGA_PCI \
+    -I"$SDK/include" \
+    tikitorch/fpga/bridge.cpp \
+    -L"$SDK/lib" -lfpga_mgmt -lrt \
     -o _libtikifpga.so
 export TIKITORCH_FPGA_LIB=$PWD/_libtikifpga.so
 ```
 
-Point `tt_fpga_open` at the `.xclbin` path.
+This requires an accessible AFI that exactly matches the bridge register map,
+buffer layout, runner, and BAR convention. The repository does not ship a public
+AFI or guarantee that a historical AGFI is accessible across accounts or regions.
 
-## The last mile: an on-board runner
+For a supported XRT device and configuration-matched xclbin:
 
-Transport + ABI are wired. The remaining step is the **on-board runner** — a
-registered plug-in that owns the whole on-board step for one kernel: it marshals
-the model's (float) parameters into the kernel's INT16 weight order, **drives the
-exact fused sequence the kernel's testbench prescribes**, syncs trained weights
-back, and returns a loss proxy. This is deliberately one unit because the fused
-sequence is *buffer-layout-coupled* (e.g. the K/V cache regions are zeroed
-directly in the buffer between the forward and backward phases) — it is not a
-generic loop. It is kernel-specific and **none ship by default**; a model is only
-ever *bound* (runs on board) once a runner exists for its kernel.
-
-Author the runner to mirror the bundled, silicon-validated testbench for the
-kernel exactly. The kernel arg slots are `(buffer, mode, arg1, arg2, arg3[, layer_id])`
-with, for FWD/BWD, **arg1 = position index `m`**, **arg2 = input token**, **arg3 =
-target** (FWD only); for SIGNSGD, arg1 = `lr`, arg2 = `threshold`
-(see `forge_train_step_2layer.cpp` arg docs). For the 2-/3-layer LM kernels
-(`forge_train_step_2layer_tb.cpp`): clear caches → forward all positions per layer
-(layers `0..n-1`) passing `m` in arg1, the **input token in arg2 for layer 0 only**
-(`-1` for later layers), and the **target in arg3 for the final layer** (`-1`
-otherwise) → clear caches → backward per layer in reverse (`n-1..0`) over positions
-in reverse (same per-layer token-in-arg2-for-layer-0 convention, arg3 = 0) → one
-`SIGNSGD(lr, threshold, 0, -1)`. The morph kernels (`forge_train_step_morph*_tb.cpp`)
-instead run a single whole-sequence `FWD(0,0,0)` → `BWD(0,0,0)` → `SIGNSGD(lr, th, 0)`
-with the sequence pre-staged in the buffer (no per-token loop).
-
-```python
-import tikitorch.fpga as fpga
-
-def run_2layer(handle, spec, model, tokens, *, targets, lr, threshold):
-    # tokens/targets are the batched (B, L) inputs from train_step.
-    # 1) marshal model weights -> kernel INT16 buffer order
-    #    [embed, W_head, (s_q, s_k, W1, b1, W2, b2) x n_layers]
-    # 2) drive the validated forge_train_step_2layer_tb.cpp sequence via handle
-    # 3) sync trained INT16 weights back into `model`; return the loss proxy
-    ...
-
-fpga.register_board_runner("forge_train_step_2layer", run_2layer)
+```bash
+g++ -O2 -std=c++17 -fPIC -shared -DTT_FPGA_XRT \
+    -I/opt/xilinx/xrt/include \
+    tikitorch/fpga/bridge.cpp \
+    /opt/xilinx/xrt/lib/libxrt_coreutil.so \
+    -o _libtikifpga.so
+export TIKITORCH_FPGA_LIB=$PWD/_libtikifpga.so
+export TT_FPGA_XCLBIN=/path/to/configuration-matched.xclbin
 ```
 
-With a board present, a matching kernel, and a registered runner,
-`fpga.accelerate(model).bound` becomes `True` and `train_step` drives the fused
-loop on silicon. Validate the runner against LOCAL mode and the testbench first,
-then move to XRT. See `tikitorch/hardware/README.md` for the closure→silicon mapping.
+The XRT route is an alternate transport, not the FPGA-PCI path used for the
+archived F2 records.
+
+## Implementing the runner last mile
+
+No safe runner is bundled or registered. The compatibility function
+`register_reference_runners()` raises `NativeUnavailable`; it cannot reactivate
+the historical one-layer marshaller, whose generic parameter flattening used the
+wrong named-region order and omitted `B1`/`B2` seed/sync.
+
+A custom runner has the signature:
+
+```python
+def run_kernel(handle, spec, model, tokens, *, targets, lr, threshold):
+    validate_runtime_inputs(tokens, targets, lr, threshold, spec)
+    validate_loaded_build_manifest(handle, spec)
+    # Allocate spec.buffer_words_const words for the verified build.
+    # Pack every parameter by explicit name -> header offset, including biases.
+    # Drive the exact testbench sequence and reject every transport error.
+    # Read every updated region back by name and preserve quantization metadata.
+    return loss_proxy
+
+fpga.register_board_runner("forge_train_step_2layer", run_kernel)
+```
+
+Registration is an explicit trust boundary, not validation performed by
+TikiTorch. Before enabling `strict=True`, add tests that sentinel-fill every
+named parameter region, reject off-by-one runtime lengths and invalid dtypes or
+ranges, verify the ABI/buffer manifest, and compare the observable record first
+with C-simulation/LOCAL and then with the exact synthesized image.

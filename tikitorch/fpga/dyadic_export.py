@@ -1,15 +1,16 @@
-"""tikitorch.fpga.dyadic_export — freeze a trained dyadic net to a zero-DSP SHIFT SCHEDULE.
+"""Export a trained dyadic network to a signed shift schedule.
 
 A :class:`tikitorch.nn.DyadicLinear` constrains every weight to a signed power of two,
 ``w = sign * 2^k`` (:func:`tikitorch.nn.dyadic_quantize`). On FPGA fabric that is a
-sign-controlled bit-SHIFT feeding an add-tree -- no multiplier, no DSP. This module exports
+sign-controlled bit shift feeding an add-tree without a data-path multiplier. This module exports
 a trained net's dyadic layers to an integer ``(sign, exponent)`` schedule the HLS kernel
 generator consumes, and VERIFIES the schedule reproduces the net's *deployed* forward
-exactly (the closure check: deploy is the quantized forward, which this schedule is).
+within a declared tolerance. Physical DSP utilization is a property of the synthesized
+build, not of this exporter.
 
     from tikitorch.fpga.dyadic_export import export_net, verify_schedule
     sched = export_net(trained_dyadic_muzero_net)
-    assert not verify_schedule(net, sched)        # empty list => bit-exact
+    assert not verify_schedule(net, sched)        # empty list => within tolerance
 """
 import torch
 import torch.nn.functional as F
@@ -46,9 +47,11 @@ def export_net(net):
 
 
 def verify_schedule(net, sched, n=128, atol=1e-4):
-    """Return the layers whose exported schedule does NOT reproduce the deployed forward
-    (empty list => bit-exact). The deployed forward IS the dyadic-quantized forward, so an
-    unclipped export must match exactly up to float round-off."""
+    """Return layers whose schedule differs from the deployed forward beyond ``atol``.
+
+    The deployed forward is the dyadic-quantized forward, so an unclipped export
+    should agree up to floating-point evaluation order and round-off.
+    """
     mods = dict(net.named_modules())
     bad = []
     for name, ls in sched.items():

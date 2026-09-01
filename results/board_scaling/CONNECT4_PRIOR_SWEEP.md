@@ -1,8 +1,10 @@
-# Learning a tropical policy prior — the clean apples-to-apples sweep (Connect4, fully multiply-free)
+# Learning a tropical policy prior — the clean apples-to-apples Connect4 sweep
 
-_Goal: does a MULTIPLY-FREE training recipe make the dyadic policy prior **help** low-sim search? Net: dyadic
-tropical cores + dyadic heads (closure audit returns `[]` — fully zero-DSP), AlphaZero true-model tree,
-sign-only TropicalSGD. Score = win+0.5·draw vs negamax, random openings, **n=40 games/cell**. Each recipe runs
+_Goal: does a closure-oriented training recipe make the dyadic policy prior **help** low-sim search?
+Net: dyadic tropical cores + dyadic heads (the model closure audit returns `[]`), AlphaZero-style
+explicit-game tree, sign-only TropicalSGD. This audit does not cover PUCT/min-max arithmetic, exact
+softmax/loss branches, or physical DSP use. Score = win+0.5·draw vs negamax, random openings,
+**n=40 games/cell**. Each recipe runs
 TRAINED **and** UNTRAINED in the **same run** over the sim grid [100,200,400] at negamax depths d2/d3, so this
 is a genuine apples-to-apples table. The diagnostic the study defined: does the learned prior beat the untrained
 net at low sims (100)?_
@@ -32,10 +34,11 @@ not a strong trained net — see Findings._
 
 ## Findings (honest; this clean run is more deflationary than the partial run)
 
-1. **The multiply-free substrate is competitive — this part is solid.** All 7 recipes audit closure `[]`
-   (zero `nn.Linear`, fully zero-DSP forward) and play credibly vs negamax: 83% of all cells (trained or
+1. **The audited dyadic model is competitive in this sweep.** All 7 recipes report model closure `[]`
+   (zero `nn.Linear`) and play credibly vs negamax: 83% of all cells (trained or
    untrained) score ≥0.6, range 0.35–0.975. **This substrate result stands independently of the prior-learning
-   question** — the fully-tropical net is competitive via search depth regardless of whether training helps.
+   question** — the dyadic net is competitive via search depth here regardless of whether training helps.
+   It is not a whole-system resource result.
 
 2. **No collapse.** Every recipe — including bare perceptron+SignSGD — sits in 0.6–0.9 everywhere. There is no
    catastrophic policy collapse to "solve" in this clean run (the partial run's perceptron 0.025 @100 is not
@@ -58,7 +61,7 @@ not a strong trained net — see Findings._
    and most per-cell trained-vs-untrained deltas (33/42 within the single-comparison 2σ band) are noise. Only
    recipe-level 6-cell aggregates are trustworthy, and only `ce`+entropy 0.1 survives as a clean training win.
 
-**Honest bottom line:** a trained multiply-free prior *can* help at low sims, but only under one specific recipe
+**Honest bottom line:** a trained dyadic prior *can* help at low sims, but only under one specific recipe
 (`ce`+entropy 0.1) and only weakly — it is **not** the general collapse-and-rescue phenomenon the prior commit
 claimed. This converges with the board-scaling verdict (substrate scales structurally; the prior-learning win is
 narrow and compute-/seed-limited, and is shown supervised, not robustly in the self-play loop).
@@ -75,8 +78,8 @@ Two headline numbers from the partial sweep do **not** survive the clean, thread
   Δ = −0.016). It is neither a 0.90 winner nor a winner at all; the honest standout is `ce`+entropy 0.1.
 
 The loss-design work the partial run motivated is unaffected and stands on its own: the row-balanced,
-closure-faithful `tropical_cross_entropy` (softmax row-sum scattered at the target so `sum(grad)==0` for exact
-*and* shift-LUT) and the entropy/temperature levers are sound engineering, and the sign-training gradient-row-bias
+row-balanced `tropical_cross_entropy` (softmax row-sum scattered at the target so `sum(grad)==0` for exact
+*and* shift-LUT) and the entropy/temperature levers are useful engineering, and the sign-training gradient-row-bias
 failure mode is real and documented elsewhere (the Shakespeare LM bakeoff: shift-softmax gradient-bias collapse,
 found and fixed). It simply did not dominate this Connect4 self-play setting.
 

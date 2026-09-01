@@ -17,10 +17,10 @@
 // Per-step JSONL: {"step":k,"acc":...,"wcrc":...,"preds16":[...16...]}
 //
 // Build (macOS clang or linux g++):
-//   REPO=/Users/ekoermann/Documents/tikitorch
-//   HLS="$REPO/tikitorch/hardware/hls/forge_kernels"
+//   TT_REPO="$(git rev-parse --show-toplevel)"
+//   HLS="$TT_REPO/tikitorch/hardware/hls/forge_kernels"
 //   clang++ -O2 -std=c++17 -Wno-unknown-pragmas -Wno-unused-label \
-//       -I"$HLS" -I"$REPO/tikitorch/hardware/hls" \
+//       -I"$HLS" -I"$TT_REPO/tikitorch/hardware/hls" \
 //       golden_morph_lm.cpp "$HLS/forge_train_step_morph_lm.cpp" \
 //       -o /tmp/golden
 //   /tmp/golden /tmp/buffer_init.bin > /tmp/golden_traj.jsonl

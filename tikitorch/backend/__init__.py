@@ -1,8 +1,8 @@
-"""tikitorch.backend — the pluggable, FPGA-first execution-backend seam.
+"""tikitorch.backend — the pluggable execution-backend seam.
 
-TikiTorch's whole workload collapses to one tropical primitive, which makes it an
-unusually clean target for non-GPU accelerators. This package is the *seam* those
-accelerators plug into — a small, PyTorch-flavored dispatch layer:
+Several TikiTorch operators have compact compare/add-oriented implementations,
+which makes them useful targets for non-GPU accelerator experiments. This package
+is the seam those accelerators plug into: a small, PyTorch-flavored dispatch layer.
 
 * :class:`Device` / :func:`device` — a logical device handle (``tt.device('fpga')``),
   spelled like ``torch.device`` but living one level up (tropical tensors stay
@@ -13,12 +13,13 @@ accelerators plug into — a small, PyTorch-flavored dispatch layer:
 * :func:`register_op` / :func:`dispatch` — a per-device op registry with
   **transparent CPU fallback**: an op with no available device implementation
   silently runs the CPU reference (one-time :class:`BackendFallbackWarning`).
-  Correctness never breaks; performance degrades gracefully.
+  The registered CPU reference is returned with a warning. Equivalence remains the
+  responsibility of the registered implementation and its tests.
 * :func:`to` — a logical mover, the ``.to(device)`` analogue.
 
 The CPU backend is registered at import and **auto-binds every op in
 :mod:`tikitorch.functional` as the default implementation** — the *same* callable
-objects, so the existing CPU path is byte-identical and carries zero overhead.
+objects. Dispatch lookup itself still has ordinary Python call overhead.
 The seam is consulted only when a non-CPU device is explicitly requested.
 
 Idiomatic usage::
@@ -115,7 +116,7 @@ def default_device(dev: Union[str, Device]) -> Iterator[Device]:
 def to(obj, device: Union[str, Device, None] = None):
     """Move a model (logically) to a TikiTorch device — the ``.to(device)`` analogue.
 
-    * ``nn.Module`` + CPU device  -> the module unchanged (zero overhead).
+    * ``nn.Module`` + CPU device  -> the same module object, unchanged.
     * ``nn.Module`` + a backend that *can* bind models (``capabilities().model_binding``,
       e.g. ``'fpga'``) -> ``backend.accelerate(obj)``. This holds regardless of board
       availability: the returned wrapper itself runs on device when bound and does the
@@ -126,8 +127,8 @@ def to(obj, device: Union[str, Device, None] = None):
       stay on torch CPU; the logical device only selects a backend), plus a
       one-time warning.
 
-    Never raises for an unsupported device — the whole point of the seam is that an
-    unsupported target degrades to CPU rather than erroring.
+    Unsupported logical devices fall back to CPU with a warning. Errors raised by the
+    selected implementation itself are not swallowed.
     """
     dev = _as_device(device) if device is not None else _DEFAULT_DEVICE
 

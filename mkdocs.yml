@@ -2,9 +2,7 @@ site_name: TikiTorch
 site_description: PyTorch-shaped infrastructure for tropical and hard-routed deep learning.
 repo_url: https://github.com/nyuolab/tikitorch
 repo_name: nyuolab/tikitorch
-edit_uri: edit/pc-morphssm/docs/
-exclude_docs: |
-  research/CLAIM_LEDGER.md
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -85,3 +83,4 @@ nav:
           - algorithmic: api/algorithmic.md
   - Research:
       - Scope and evidence: research/index.md
+      - Claim ledger: research/CLAIM_LEDGER.md

@@ -32,12 +32,12 @@ Use for: long sequences, streaming/clinical signals (ECG), LM. `kernel_size`,
 
 ## TropicalTransformer — attention by routing
 
-Replaces softmax attention with **tropical attention**: score queries↔keys by an
-L1 / L∞ / Hilbert distance, then **argmax-gather** the values (route to one key per
-query) instead of a softmax-weighted mix.
+Replaces softmax attention with **tropical attention**: score queries and keys by
+a max-plus inner product or an L1 / L∞ / Hilbert distance, then route each output
+coordinate to a winning key instead of forming a softmax-weighted mixture.
 
 ```text
-tokens ─► Embed+Pos ─►┌──────────── TropicalTransformerBlock × n_layers ───────────┐─► Norm ─► Head ─► logits
+tokens ─► Embed ─►┌──────────── TropicalTransformerBlock × n_layers ───────────┐─► Norm ─► Head ─► logits
                       │  Tropical norm                                               │            [tropical
                       │      │                                                      │             or linear]
                       │      ▼                                                      │
@@ -49,7 +49,8 @@ tokens ─► Embed+Pos ─►┌──────────── TropicalTr
 ```
 
 Use for: content-routing tasks (induction/copy), LM where attention matters.
-`score_variant` picks the distance; `use_shift_attn` selects the dyadic shift attention.
+`score_variant` picks the score family; `use_shift_attn` selects additive
+position-shift attention without learned Q/K/V projection matrices.
 
 ## MoTE — mixture of tropical experts
 
@@ -89,7 +90,7 @@ image ─►┌──────────── MorphConvBlock × len(channe
 Use for: image-classification experiments with learned dilation/erosion features.
 Compare `head_type="linear"` and `head_type="tropical"` as an explicit ablation rather
 than treating the head choice as a performance-neutral replacement. See
-[notebook 03](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/03_vision_cnn.ipynb).
+[notebook 03](https://github.com/nyuolab/tikitorch/blob/main/notebooks/03_vision_cnn.ipynb).
 
 ## Heads and other boundaries
 

@@ -6,9 +6,14 @@
 loop* — forward, loss conditioning, backward, weight update — is
 machine-audited multiplier-free (Level-B closure: adds, compares, shifts,
 table lookups only) reaches **2.79 bits/byte** on tiny-shakespeare BPE-1024,
-vs **2.27 bpb** for a parameter-matched nanoGPT trained with AdamW — a gap of
-0.52 bpb at this budget, with the strict curve still descending. The same
-update rule runs on F2 silicon (on-chip training validated, zero DSP blocks).
+while a parameter-matched nanoGPT trained with AdamW reaches **2.27 bpb**. These
+are reported endpoints at unequal token budgets (13.8M versus 3.46M), not a
+matched-compute quality gap; the strict curve is still descending. Separate,
+configuration-specific F2 experiments execute the same update family on
+fabric. The archived D128 MorphSSM build reports use zero DSP blocks; the D512
+archive lacks a final routed-resource report, so no physical zero-DSP result is
+assigned to it. Neither experiment establishes that the 2.79-bpb checkpoint
+itself was trained on F2.
 
 ## Panel data and provenance
 
@@ -26,49 +31,68 @@ update rule runs on F2 silicon (on-chip training validated, zero DSP blocks).
 | **nanoGPT on NVIDIA A10G (CUDA, g5.xlarge)** | **107,091** | **1.46–1.49 mJ** | **both MEASURED** (nvidia-smi board power @5 Hz, active avg 72 W; bounds = active-phase vs whole-window; results/lm_gpu_baseline/). Quality reproduced vs MPS: 3.5563 vs 3.5561 val CE |
 | nanoGPT on Apple GPU (MPS) | 188,492 | ≈0.13 mJ | tok/s measured; energy ROUGH (25 W package assumption, not instrumented) |
 | MorphSSM strict, host MPS | 1,072 | ≈23 mJ | tok/s measured; energy ROUGH (same caveat; no fused tropical kernels — implementation artifact) |
-| 2-layer attention-LM kernel, **F2 silicon** | 772 | ≈9.0 mJ | tok/s measured on silicon (on-chip training validated, DSP=0, AGFI `agfi-0a845113b088cf62e`); energy WNS-derived, not power-rail |
-| **fully-tropical morph-LM (config B), F2 SILICON — 1 kernel (rw64)** | **14,236** | **~0.3 mJ (core)** | **MEASURED, bit-exact** (`agfi-050b219d4090fb8d6`, fused mode 3, DSP=0, WNS −0.020 ns). One kick = 30 on-fabric steps (fwd + CE loss + bwd + signSGD), 0.270 s, `wcrc 14650122959732499763`, acc 0→0.30. ~4 W Vccint core. |
-| **morph-LM F2 — N=2 replicated** | **26,522** | **~0.3 mJ (core)** | **MEASURED, both bit-exact** (`agfi-04a1a35443210687e`). 2.00× linear; wall UNCHANGED (0.290 s, both instances finish the same ms → true parallel). |
-| **morph-LM F2 — N=4 replicated (SLR-local max)** | **53,001** | **~0.3 mJ (core)** | **MEASURED, all 4 bit-exact** (`agfi-0c4cde06e2161099a`, WNS −0.173 ns). 4.00× linear (4×13,250); per-kernel 13,250 == single-kernel → URAM offload throughput-neutral. **= 49.5 % of the GPU.** |
-| morph-LM F2 — N=8 (GPU-parity) | ~106,000 | ~0.3 mJ (core) | **PROJECTED** from the measured 4× linearity; needs URAM/BRAM rebalancing past the shell's per-SLR URAM reservation (1+1+2=4 today). |
+| 2-layer attention-LM kernel, **F2 silicon** | 772 | ≈9.0 mJ | historical tok/s measurement (DSP=0, AGFI `agfi-03098a84aba9aba04`, WNS about −0.197 ns); energy is a derived estimate, not a measured power rail or full-card value; negative WNS makes this preliminary |
+| **fully-tropical morph-LM (config B), F2 SILICON — 1 kernel (rw64)** | **14,236** | **~0.3 mJ (core)** | **MEASURED; archived observable record matched its host golden** (`agfi-050b219d4090fb8d6`, fused mode 3, DSP=0, WNS −0.020 ns). One kick = 30 on-fabric steps (fwd + CE loss + bwd + signSGD), 0.270 s, `wcrc 14650122959732499763`, acc 0→0.30. ~4 W Vccint core. |
+| **morph-LM F2 — N=2 replicated** | **26,522** | **~0.3 mJ (core)** | **MEASURED; both instances' observable records matched their references** (`agfi-04a1a35443210687e`, WNS −0.097 ns). **1.86×** aggregate throughput relative to the measured N=1 run; wall 0.290 s and both instances finished in the same millisecond. |
+| **morph-LM F2 — N=4 replicated (SLR-local max)** | **53,001** | **~0.3 mJ (core)** | **MEASURED; all four instances' observable records matched their references** (`agfi-0c4cde06e2161099a`, WNS −0.173 ns). **3.72×** aggregate throughput relative to N=1; 13,250 tok/s per replica. |
+| morph-LM F2 — N=8 extrapolation | ~106,000 | — | **PROJECTED, not built or measured.** A simple throughput extrapolation of 2× N=4; it would require URAM/BRAM rebalancing past the shell's current per-SLR reservation (1+1+2=4 replicas). No N=8 energy value is claimed. |
 
-**The replication result:** the whole training loop is multiplier-free (DSP=0) and runs entirely on the F2 fabric, bit-exact to the host golden. Replicating the kernel across the VU47P's 3 SLRs scales throughput **perfectly linearly — measured 2.00× at N=2 and 4.00× at N=4** — because the N kernels run in true parallel (wall-clock unchanged; all instances complete within 0.1 ms of each other). This closes the gap to nanoGPT from **~7.5×** (1 kernel) to **~2.0×** (N=4 = 53,001 vs 107,091 tok/s). The earlier single-kernel number (3,827 tok/s, the v8 AFI) was superseded by on-chip-grad + resident-weight + URAM-offload optimizations (14,236 tok/s/kernel) and then by replication. N=4 is the SLR-local maximum (per-kernel ~122 URAM vs CL-pblock URAM/SLR 176/192/~320); N=8 GPU-parity is projected, not built.
+The AGFI identifiers above are historical, account/region-specific provenance.
+They are not bundled release artifacts and may be private, inaccessible, or
+deregistered.
 
-**Energy honesty (unchanged):** ~4 W is the **Vccint core rail only**, NOT total-card — the F2 card draws more (transceivers, DDR, shell) and `fpga-describe` does not expose the full rail. Per-token core energy (~0.3 mJ) is ~N-invariant (power and throughput both scale with N). We do **not** claim a board-to-board energy win over the GPU's 1.46 mJ/tok (board). A true comparison needs external full-card instrumentation (PMBus) — the one remaining measurement.
+**The replication result:** in this D128 build family, the whole training loop
+runs on the F2 fabric and the synthesis reports zero DSP blocks. The archived
+observable record—rather than every internal signal—matched the corresponding
+host reference for each instance. Replication produced **1.86× aggregate
+throughput at N=2 and 3.72× at N=4** relative to the measured 14,236-token/s
+N=1 run, or about 93% replica efficiency in both cases. Instances ran in
+parallel and completed within 0.1 ms of one another, but the 13,250-token/s N=4
+per-replica rate is below the N=1 rate. The earlier 3,827-token/s v8 result was
+superseded within this kernel family by on-chip-gradient, resident-weight, and
+URAM-offload changes before replication. N=4 is the demonstrated SLR-local
+maximum (per-kernel ~122 URAM versus CL-pblock URAM/SLR 176/192/~320). N=8 is
+only an extrapolation. These are within-family scaling ratios, not GPU speedups;
+the GPU row uses a different model and optimizer. The N=1, N=2, and N=4 builds
+also have small negative WNS (−0.020 ns, −0.097 ns, and −0.173 ns), so the
+throughput result is preliminary pending timing closure with margin.
 
-Note (the actual punchline): the fully-tropical morph-LM **trains end-to-end on
-F2 silicon with the quality-grade CE loss, measured and bit-exact** to the host
-CSIM golden — the WHOLE training loop (fwd + CE loss + backward + signSGD) runs
-on the fabric in a single host kick (fused mode 3), 30 steps in 1.003 s =
-**3,827 tok/s**, learning (acc 0→0.30). The core (Vccint) rail draws a flat
-**3 W** (DSP=0; the rail barely moves idle→active) → ~0.78 mJ/tok, but this is
-the **user-logic core rail, NOT total-card power** — the F2 card draws more
-(transceivers, DDR, shell), and fpga-describe does not expose the full rail. So
-we do **not** claim a board-to-board energy win over the GPU's 1.46 mJ/tok
-(total board power). The honest, fully-measured claims are: (1) on-silicon
-CE training works, completely on fabric, and is bit-exact; (2) DSP=0 / zero
-multiplies; (3) **53,001 tok/s at N=4 (4× linear, ~2× slower wall than the
-A10G** — closing the single-kernel ~7.5× gap by hardware replication, every
-instance bit-exact); (4) ~4 W core. A true energy comparison needs external
-full-card instrumentation (PMBus / FPGA card power), the one remaining measurement. The MorphSSM-float CUDA run
-crashed at startup (results/lm_gpu_baseline/gpu_morph.log) — the tropical-on-CUDA
-datapoint is pending; MPS stands in for that arm.
+**Energy honesty:** ~4 W is the **Vccint core rail only**, not total-card—the
+F2 card also powers transceivers, DDR, and the shell, and `fpga-describe` does
+not expose the full rail. Per-token core energy (~0.3 mJ) is an incomplete
+core-rail quantity. We do **not** claim a board-to-board energy win over the
+GPU's 1.46 mJ/token board measurement. A defensible accelerator comparison
+still requires full-card instrumentation, timing closure with margin, and an
+iso-model/iso-quality baseline.
+
+Historical context: an earlier v8 single-kernel run executed the whole fused
+loop (forward + CE loss + backward + SignSGD) in one host kick: 30 steps in
+1.003 s, or **3,827 tok/s**, with observed accuracy 0→0.30. Its archived output
+fields matched the host CSIM record; WNS was −0.039 ns, so this was also not a
+timing-closed release artifact. The observed Vccint core rail was about
+**3 W**, yielding the incomplete core-rail quotient ~0.78 mJ/token; it was not
+a total-card measurement. The later D128 measurements above supersede that
+throughput result. The MorphSSM-float CUDA run crashed at startup
+(`results/lm_gpu_baseline/gpu_morph.log`), so a matched tropical-on-CUDA
+datapoint remains open; MPS stands in for that arm.
 
 ## What the figure does and does not claim
 
-- DOES: head-to-head quality at matched params/data/tokenizer, measured;
+- DOES: quality curves at matched parameters/data/tokenizer, measured, with
+  unequal endpoint token budgets disclosed;
   the strict arms' training loops contain zero multiplies (audited by
   `find_training_multiplies` with the documented ROM/LZC waivers); on-chip
-  training of this kernel family is silicon-validated; the new balanced
-  LUT-CE on-chip loss is bit-exact-validated and worth 2.4× accuracy over
-  the silicon's previous perceptron loss in end-to-end kernel training.
+  training of this kernel family is silicon-validated; the balanced LUT-CE
+  experiment's archived output fields match its reference record and reached
+  0.30 observed accuracy versus 0.195 at the end of the earlier
+  perceptron-loss experiment. These are resident-window diagnostics, not
+  held-out language quality.
 - DOES NOT: claim the 2.79 bpb model itself was trained end-to-end on the
   FPGA (full-budget from-scratch integer-lattice training is an open
   research problem — drift/freeze dichotomy, see LM_FPGA_VS_GPU_PLAN.md);
-  claim an energy win at this model scale (a modern SoC wins per-token
-  energy on 0.5–1M-param models; the pathway's energy case is projected,
-  not measured, and belongs to larger models and the on-fabric-adaptation
-  story); present a CUDA baseline (pending — MPS stands in, labeled).
+  claim an energy win at this model scale (full-card FPGA power and a matched
+  accelerator baseline remain open); present a matched tropical CUDA baseline
+  (pending—MPS stands in, labeled).
 
 Deployment design reflected in the figure: **warm-handoff** — train strict
 on host (the multiplier-free algorithm, where bit-shift lr decay works),

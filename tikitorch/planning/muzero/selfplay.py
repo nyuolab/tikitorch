@@ -67,9 +67,10 @@ def play_board_game(net, board_game, *, num_simulations=50, c_puct=1.25, backup=
     ``(obs, action, mcts_policy, value_target)`` with the value target the final
     game OUTCOME from that position's player-to-move perspective (+1/0/-1).
 
-    ``tree_model``: ``"muzero"`` runs the learned latent dynamics inside the tree (no simulator);
-    ``"alphazero"`` runs the game's TRUE rules in the tree (exact transitions/terminals/legality,
-    net = prior+leaf-value) — far stronger search per sim when the simulator is available."""
+    ``tree_model``: ``"muzero"`` runs learned latent dynamics inside the tree (no simulator);
+    ``"alphazero"`` carries the game object's explicit state and applies its transition, terminal,
+    and legality logic at every node (net = prior + leaf value). The latter avoids learned-model
+    transition errors, but is not guaranteed to be stronger for every net, game, or search budget."""
     from tikitorch.planning.muzero.games import BoardGameModel, AlphaZeroBoardModel
     gen = torch.Generator().manual_seed(seed)
     cfg = MCTSConfig(num_simulations=num_simulations, c_puct=c_puct, gamma=1.0,

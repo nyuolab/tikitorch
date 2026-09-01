@@ -29,7 +29,7 @@ y_j = max_i (W_ji + x_i)        # max-plus "dilation"
 No multiplications appear in this hard operator — only additions and comparisons. In `tikitorch` these are
 `tikitorch.functional.tropical_linear` / `tropical_dilation`, and the
 `nn.TropicalLinear` / `nn.TropicalDilation` modules. (See the runnable derivation in
-[notebook 02 — *The tropical semiring, by hand*](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/02_tropical_math.ipynb).)
+[notebook 02 — *The tropical semiring, by hand*](https://github.com/nyuolab/tikitorch/blob/main/notebooks/02_tropical_math.ipynb).)
 
 ## Erosion, dilation, and morphology
 
@@ -38,7 +38,7 @@ convolution of a signal with a structuring element *dilates* (spreads peaks); a
 min-plus convolution *erodes* (carves valleys). A tropical conv layer
 (`nn.TropicalConv2d`) is a *learned* structuring element — opening/closing
 structure that is far more expressive than dilation alone. This is the lens
-[notebook 03 — *A morphological CNN*](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/03_vision_cnn.ipynb)
+[notebook 03 — *A morphological CNN*](https://github.com/nyuolab/tikitorch/blob/main/notebooks/03_vision_cnn.ipynb)
 uses to build a vision model.
 
 ## Sparse, routed gradients

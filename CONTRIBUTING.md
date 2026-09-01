@@ -8,7 +8,7 @@ multiplier-free recipes. Contributions must keep that boundary explicit.
 ## Dev setup
 
 ```bash
-git clone --branch pc-morphssm --single-branch https://github.com/nyuolab/tikitorch.git
+git clone https://github.com/nyuolab/tikitorch.git
 cd tikitorch
 pip install -e ".[dev]"        # editable install + pytest + ruff
 ```
@@ -23,11 +23,11 @@ or test the library — the board-dependent tests self-skip without hardware.
 Run what CI runs — both must be green:
 
 ```bash
-ruff check .          # lint
+python -m ruff check .  # lint
 pytest -q             # fast building-block suite: closure, exactness, gradchecks
 ```
 
-CI (`.github/workflows/ci.yml`) runs this on Python 3.9, 3.11, and 3.12.
+CI (`.github/workflows/ci.yml`) runs this on Python 3.9 through 3.12.
 
 The end-to-end **training** tests (a tropical model learns an algorithmic task
 and generalizes) are marked `slow` and **deselected by default** — they validate
@@ -87,19 +87,6 @@ If you add a new op, layer, model, or optimizer:
   python notebooks/_build_notebooks.py
   ```
 
-## Docs & notebooks
-
-- The docs site is mkdocs + mkdocstrings: API pages are auto-generated from in-source
-  docstrings, and the prose **Guide** lives under `docs/guide/`. Build it with
-  `pip install -e ".[docs]" && mkdocs build` (what the CI docs job runs).
-- The tutorial notebooks are **generated** from
-  [`notebooks/_build_notebooks.py`](notebooks/_build_notebooks.py) (so they stay
-  diffable). Edit the generator, not the `.ipynb`, then regenerate:
-
-  ```bash
-  python notebooks/_build_notebooks.py
-  ```
-
 ## Code style
 
 - Library code under `tikitorch/` is held to the full ruff ruleset (see
@@ -110,11 +97,13 @@ If you add a new op, layer, model, or optimizer:
 
 ## PRs
 
-- Until the 0.2 branch is reconciled with the repository default, branch from the
-  maintained revision named in the installation guide. Keep the change focused
-  and describe the *why*.
+- Branch from current `main`. Keep the change focused and describe the *why*.
 - Green CI is required. A component advertised as closed must include the
   appropriate structural, executed-path, and (when relevant) full-step tests.
+
+Please follow [GOVERNANCE.md](GOVERNANCE.md) and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Report suspected vulnerabilities through
+the private process in [SECURITY.md](SECURITY.md), not a public issue.
 
 ## License
 

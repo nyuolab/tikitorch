@@ -1,7 +1,8 @@
-# PREREG — cascade PC trains fully tropical sequence models (branch `pc-morphssm`)
+# PREREG — cascade PC trains fully tropical sequence models
 
 Committed before any gate runs. Theory: `THEORY_UNROLLED_CASCADE.md`. Style follows
-`results/pc_depth_traction/PREREG.md`.
+`results/pc_depth_traction/PREREG.md`. This record was developed on the historical
+`pc-morphssm` branch and is now integrated into `main`.
 
 **PROGRAM GOAL (the north star, per user 2026-07-08):** enable the unique
 generative/relaxation behavior of predictive coding, performantly, via tropical

@@ -1,4 +1,4 @@
-"""run_chess_strength — lift the multiply-free chess agent above the random floor.
+"""run_chess_strength — test whether training lifts a dyadic chess agent above random.
 
 The chess SCAFFOLD (run_chess_scaffold.py) used the WEAK config: learned-dynamics tree
 (tree_model="muzero") + no anti-collapse, and trained pure-MuZero scored 0.071 vs random —
@@ -7,13 +7,13 @@ Meanwhile the AlphaZero true-rules tree (legal moves at every node) already hits
 UNTRAINED (chess_alphazero.json). This script applies the levers that fixed Connect4
 (CONNECT4_PRIOR_SWEEP.md) to chess and asks the apples-to-apples question:
 
-    with the STRONG (AlphaZero true-rules) tree, does TRAINING the multiply-free prior beat the
+    with the AlphaZero-style explicit-game tree, does TRAINING the dyadic prior beat the
     UNTRAINED control (same tree)? i.e. does the learned prior add to search, instead of collapsing?
 
 Levers: tree_model="alphazero" (biggest), policy_loss="ce" (full-dist soft-CE), entropy bonus +
-target-temp (anti-collapse), best-snapshot tracking (MuZero oscillates). Net stays fully multiply-free
-(dyadic cores + dyadic heads, closure []). Eval vs random + material(1-ply) (the scaffold's opponents,
-so numbers are comparable), trained vs untrained-control, BOTH with the configured tree.
+target-temp (anti-collapse), best-snapshot tracking (MuZero oscillates). The dyadic model reports a
+software closure audit, but exact loss/entropy and Python MCTS arithmetic remain outside that audit.
+Eval is vs random + material(1-ply), trained vs untrained-control, both with the configured tree.
 
     PYTHONPATH=<repo> python3 scripts/run_chess_strength.py [--tree alphazero --sims 64 --iters 20 \
         --games 24 --entropy 0.1 --target-temp 1.5 --workers N --eval 30 --tag run]
@@ -114,7 +114,7 @@ def main(a):
                       tau_start=1.0, tau_end=0.3, lr=a.lr, seed=0)
     mz = BoardMuZero(Chess, cfg)
     viol = find_closure_violations(mz.net)
-    print(f"[{a.tag}] closure audit (empty = fully multiply-free): {viol or 'NONE'}", flush=True)
+    print(f"[{a.tag}] model closure audit (does not cover loss/MCTS): {viol or 'NONE'}", flush=True)
     print(f"[{a.tag}] chess strength: tree={a.tree} loss={a.policy_loss} entropy={a.entropy} "
           f"temp={a.target_temp} | {a.sims} sims, {a.iters}x{a.games} games, {a.workers} workers", flush=True)
 

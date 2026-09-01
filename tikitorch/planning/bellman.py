@@ -7,10 +7,11 @@ Deterministic value iteration is exactly a ``(max,+)`` recurrence::
 The successor lookup ``V_k[succ[s, a]]`` is a pure gather (the "backward = gather"
 property), the per-state ``max_a`` is the argmax routing reused throughout
 TikiTorch (``torch.max`` already routes its gradient only through the winner),
-and the discount ``gamma`` is multiply-free when it is ``1.0`` (shortest-path /
-undiscounted) or a power of two (an arithmetic shift). A general float ``gamma``
-is a *declared* DSP boundary -- the same status as ``residual_scale`` in the
-sequence blocks. Default ``gamma=1.0`` keeps the layer ``assert_closed``-clean.
+and the discount ``gamma`` has a multiplication-free abstract recipe when it is
+``1.0`` (shortest-path / undiscounted) or can be lowered to an arithmetic shift
+when it is a supported power of two. The PyTorch reference still spells this as
+a multiplication. A general float ``gamma`` is a declared software-closure
+boundary; physical DSP use depends on a concrete lowering and synthesis report.
 
 :func:`max_plus_power_iteration` computes the max-plus eigenvalue (= maximum mean
 cycle = optimal average-reward gain) and its eigenvector (the relative-value
@@ -34,8 +35,8 @@ class TropicalValueIteration(nn.Module):
     Args:
         n_states (int): state-space dimension ``S``.
         n_actions (int): action-space dimension ``A``.
-        gamma (float): discount. ``1.0`` or ``2**-k`` is multiply-free; a
-            general float is a declared boundary.
+        gamma (float): discount. ``1.0`` or supported ``2**-k`` values admit an
+            identity/shift lowering; a general float is a declared boundary.
         tau (float): ``0`` for the hard backup (argmax, sparse gradient); ``>0``
             for the soft logsumexp relaxation (``tropical_softmax`` over actions).
         n_sweeps (int | None): number of backups per :meth:`forward` (the

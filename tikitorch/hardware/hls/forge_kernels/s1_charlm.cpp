@@ -43,8 +43,9 @@
 // ceiling is the CAPACITY (needs S2, a new AFI). If it can, the existing AFI suffices and we hunt the best
 // (ideally mult-free) host optimizer.
 //
-// CLI: /tmp/s1charlm --opt {kernel-pm1|mf-accum-m1|fpmaster-m2} --regime {0|1} --N <windows> --K <batch>
-//      --lr <float> --eval_every <n> --seed <s>   (legacy positional form still works for kernel-pm1)
+// CLI: /tmp/s1charlm --data <tinyshakespeare.txt> --opt {kernel-pm1|mf-accum-m1|fpmaster-m2}
+//      --regime {0|1} --N <windows> --K <batch> --lr <float> --eval_every <n> --seed <s>
+//      (legacy positional form still works for kernel-pm1; data defaults to data/tinyshakespeare.txt)
 
 #include <cstdio>
 #include <cstdlib>
@@ -452,6 +453,7 @@ int main(int argc, char** argv) {
     double wd      = 0.0;     // AdamW decoupled weight decay on the m2 masters (TRAIN_ALL stabilizer; --wd)
     int eval_every = 500;
     unsigned seed  = 4242u;
+    std::string data_path = "data/tinyshakespeare.txt";
     // legacy positional: <N> <regime> <eval_every> <seed>  (only if argv[1] is not a --flag)
     if (argc > 1 && argv[1][0] != '-') {
         N          = atoi(argv[1]);
@@ -476,6 +478,7 @@ int main(int argc, char** argv) {
             else if (a == "--wd")         wd         = atof(nx("0.0"));
             else if (a == "--eval_every") eval_every = atoi(nx("500"));
             else if (a == "--seed")       seed       = (unsigned)atoi(nx("4242"));
+            else if (a == "--data")       data_path  = nx("data/tinyshakespeare.txt");
             else { fprintf(stderr, "[charlm] unknown flag %s\n", a.c_str()); return 1; }
         }
     }
@@ -492,7 +495,7 @@ int main(int argc, char** argv) {
                    : (regime == CHARLM_TRAIN_FROM_IDENTITY) ? "TRAIN_FROM_IDENTITY(all train, identity init)"
                                                             : "FREEZE";
 
-    load_data("/Users/ekoermann/Documents/tikitorch/data/tinyshakespeare.txt");
+    load_data(data_path.c_str());
 
     double uni_bpc = 0, bi_bpc = 0;
     baselines(uni_bpc, bi_bpc);

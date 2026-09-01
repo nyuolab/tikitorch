@@ -1,9 +1,12 @@
 """Closed-optimizer bake-off.
 
 Runs the full grid (TASKS x ARMS x SEEDS) of ``evaluate_task`` to decide whether
-any CLOSED (zero-DSP, ``assert_training_closed``-verified) adaptive optimizer closes
-the "closure tax" -- the gap by which sign-only closed optimizers trail the
+any software-closed (``assert_training_closed``-verified) adaptive optimizer closes
+the "closure tax" -- the gap by which sign-only closure-oriented optimizers trail the
 non-closed Adam proxy on the algorithmic-reasoning tasks.
+
+The audit classifies a software recipe; it does not establish FPGA DSP use without a
+configuration-matched lowering and synthesis report.
 
 Arms:
   * 6 CLOSED optimizers (closed=True, tropical forward): puretropical, tropicaladam,

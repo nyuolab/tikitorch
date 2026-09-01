@@ -5,14 +5,15 @@ planning task for three cores and reports the value-iteration-oracle metrics (ag
 agreement; solve_frac = fraction of starts the greedy policy solves):
 
   * tropical-maxplus : current axis-aligned cores (baseline)
-  * tropical-dyadic  : multiplier-free OBLIQUE cores (the fix; repr+pred dyadic, dynamics maxplus)
+  * tropical-dyadic  : shift/add-oriented OBLIQUE cores (repr+pred dyadic, dynamics maxplus)
   * dense            : full-precision matched control (the bar)
 
 GridWorld value is a (min,+) cost-to-go — the tropical-FAVORABLE prior — so this validates that the
 dyadic core (a) trains end-to-end in the real MCTS loop and (b) does NOT regress on the favorable case;
 the dyadic EXPRESSIVITY advantage itself was established on oblique/smooth value in the probes
 (results/capacity_probe/FIX_FINDINGS.md). Uses AdamW to isolate the CORE effect from the optimizer; the
-multiplier-free closed optimizer (TropicalSGD) is a separate axis (--optimizer).
+software-closure-oriented optimizer (TropicalSGD) is a separate axis (``--optimizer``). The full
+Python loop retains MCTS, normalization, and loss arithmetic boundaries.
 
     PYTHONPATH=<repo-root> python3 scripts/run_dyadic_muzero.py --mode smoke | --mode full
 """

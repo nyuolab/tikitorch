@@ -12,7 +12,7 @@ dependencies. A GPU or FPGA is not required for the normal CPU path.
 ## Editable development install
 
 ```bash
-git clone --branch pc-morphssm --single-branch https://github.com/nyuolab/tikitorch.git
+git clone https://github.com/nyuolab/tikitorch.git
 cd tikitorch
 python -m pip install -e ".[dev]"
 ```
@@ -38,14 +38,24 @@ mkdocs serve
 
 `mkdocs serve` prints the local URL and rebuilds pages as they change.
 
+## Optional vision examples
+
+The sequential-MNIST example has a dependency-free synthetic `--smoke` path.
+Install the vision extra before downloading and training on real MNIST:
+
+```bash
+python -m pip install -e ".[vision]"
+python examples/train_sequential_mnist.py --epochs 5 --batch-size 128
+```
+
 ## FPGA support
 
 The Python FPGA namespace is included with the base package. Native drivers, vendor
 tools, board images, and archived build products are intentionally managed outside
 `pip`. Start with the repository's
-[FPGA build guide](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/tikitorch/hardware/BUILD_GUIDE.md)
+[FPGA build guide](https://github.com/nyuolab/tikitorch/blob/main/tikitorch/hardware/BUILD_GUIDE.md)
 and the
-[external-artifact manifest](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/results/fpga_silicon/s1_afibuild/ARTIFACTS.md).
+[external-artifact manifest](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/s1_afibuild/ARTIFACTS.md).
 
 Without compatible hardware, the library remains usable on CPU/GPU. Whether an FPGA
 entry point falls back, raises, or binds a native implementation is API-specific; see

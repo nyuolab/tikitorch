@@ -107,8 +107,8 @@ DDR4. The host stages the buffer into DDR via the DMA-PCIS BAR4 (`fpga_pci_write
 
 **Honest reading:** the zero-DSP MuZero chess forward kernel **executes real inference on F2 silicon** at a
 **measured** 9.22 ms / 108 inf-s (validates the ~126 inf/s C-synth estimate). The per-inference Vccint is
-**below the board sensor's ~±2 W resolution** against the shell+DDR4 baseline — i.e., the 14%-of-SLR
-multiply-free datapath draws so little it's lost in the platform floor. So the J/inference is a whole-rail
-(shell-dominated) bound, not a kernel-isolated figure. NOT comparable to a GPU MCTS move (tiny dyadic forward
+**not resolvable at the board sensor's ~±2 W precision** against the shell+DDR4 baseline. This does not
+identify the kernel's incremental draw. The J/inference is therefore a whole-rail (shell-dominated)
+bound, not a kernel-isolated figure. NOT comparable to a GPU MCTS move (tiny dyadic forward
 pass ≠ resnet + search). Driver `tikitorch/fpga/silicon/muzero_ddr_power.c`; runner
 `scripts/run_muzero_ddr_f2_dynpower.sh`; package `tikitorch/hardware/hdk/cl_forge_muzero_ddr/`.

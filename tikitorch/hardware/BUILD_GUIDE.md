@@ -5,10 +5,15 @@ implement the TikiTorch tropical learning loop directly in FPGA fabric, plus
 the synthesis scripts and a guide to taking them all the way to **silicon** on
 an AWS EC2 F2 instance (AFI = Amazon FPGA Image).
 
-The headline result: a complete tropical language-model **training step**
-(forward + loss + backward + sign-SGD update) runs on the FPGA using **zero DSP
-blocks** — only comparators, adders, and bit-shifts. This is the physical
-realization of TikiTorch's algebraic-closure claim.
+The reported D128 and D512 MorphSSM configurations execute a complete tropical
+language-model **training step** (forward + loss + backward + sign-SGD update)
+on FPGA fabric. The archived D128 build reports use **zero DSP blocks**. The
+D512 archive contains its execution record and source recipe but not a final
+routed-resource report, so this guide does not assign D512 a physical zero-DSP
+result. Build-specific evidence is not a blanket statement about every kernel
+or future build, and a release claim also needs the operator/source audit
+described below—DSP=0 alone does not rule out multiplication synthesized into
+LUTs.
 
 ---
 
@@ -46,8 +51,8 @@ These kernels correspond to the `tikitorch.models` tropical LM
 
 The `*_tb.cpp` testbenches compile with plain `g++` (the `forge_hls_types.hpp`
 shim swaps `ap_int<N>` for `int16_t`/`int32_t` when `__VITIS_HLS__` is not
-defined). Use this to verify the integer kernel matches the PyTorch reference
-before spending synthesis time:
+defined). Use this to compare selected integer-kernel outputs with a host
+reference before spending synthesis time:
 
 ```bash
 cd tikitorch/hardware/hls/forge_kernels
@@ -60,8 +65,9 @@ Match it against the PyTorch model run with hard tropical ops (`tau=0`,
 
 > **WARNING — the host golden does NOT cover the synthesis path.** The `*_tb.cpp`
 > / `golden_*.cpp` harnesses compile the `#else` scalar path (no `__VITIS_HLS__`/
-> `__SYNTHESIS__`). A green bit-exact golden proves the **math**, not the
-> **hardware**: it does NOT exercise the `wide_t`/`ap_int<>` burst path, so it
+> `__SYNTHESIS__`). A green golden proves only the **host-path observables that
+> the harness actually compares**, not the complete math or **hardware**. It does
+> NOT exercise the `wide_t`/`ap_int<>` burst path, so it
 > misses the silicon-only bug classes below. Treat the golden as necessary, not
 > sufficient — re-run a CSIM-vs-silicon check (or HLS C/RTL co-sim) after any
 > change to a burst, an offset, an `ap_int<>` width, or a table.
@@ -103,13 +109,16 @@ vitis_hls -f synth_2layer.tcl     # 2-layer
 vitis_hls -f synth_3layer.tcl     # 3-layer
 ```
 
-Check the synthesis report for the two things that matter:
+Check the synthesis report and generated operator tables for the gates that
+matter:
 
-- **DSP = 0** — confirms the multiplier-free closure claim physically.
+- **DSP = 0 for the named build**, plus an empty multiplier/operator report and
+  source-level closure audit. Zero DSP is an important physical observation,
+  but by itself it does not exclude LUT-based multipliers.
 - **WNS (Worst Negative Slack) >= 0** at the target period, or the AFI build
-  will fail timing. (In practice the validated builds land at WNS around
-  -0.15 to -0.20 ns and required one or two AFI rebuilds to close timing; see
-  the lessons below.)
+  misses timing. Several archived experimental builds landed around WNS
+  -0.15 to -0.20 ns; those are preliminary measurements, not timing-closed
+  release artifacts. Rebuild and re-verify after any timing fix.
 
 ---
 
@@ -153,16 +162,19 @@ hung one:
   once). Build artifacts (checkpoints/.dcp/to_aws tarballs) stay gitignored; the
   sources do not. See `hdk/cl_forge_morph_lm/README.md`.
 
-### Reference operating point (from the validated 1- and 2-layer builds)
+### Historical operating points (configuration-specific)
 
-- 1-layer tropical LM, D=128 / V=128 / L=128, ~1200 tok/s with a C host
-  driver (about 15x over the Python host baseline).
-- 2-layer tropical LM trained end-to-end on F2 silicon: ~770 tok/s, about
-  9 mJ/token, WNS around -0.197 ns — the first multilayer NN training on FPGA
-  with **zero DSPs**.
+- 1-layer tropical LM, D=128 / V=128 / L=128, ~1200 tok/s with the historical
+  C host driver. The archive does not define a sufficiently controlled Python
+  denominator, so this is not a host-language or accelerator speedup claim.
+- 2-layer tropical LM trained end-to-end on F2 silicon: ~770 tok/s, with a
+  derived ~9 mJ/token estimate and WNS around -0.197 ns. The energy value is
+  not a measured full-card power result, and the negative WNS means this build
+  missed timing; retain it as historical experimental context, not a
+  timing-closed performance or priority claim.
 
-Your numbers will vary with part, clock closure, and host driver; treat these
-as the order of magnitude to expect.
+Your numbers will vary with part, timing closure, and host driver. Treat these
+as archived operating points, not guaranteed performance or release support.
 
 ---
 
@@ -173,10 +185,12 @@ as the order of magnitude to expect.
 | tropical attention block    | `tikitorch.nn.TropicalShiftAttention` (tau=0, hard)              |
 | dilation -> erosion FFN     | `tikitorch.nn.TropicalDilation` -> `tikitorch.nn.TropicalLinear`|
 | sign-SGD weight update      | `tikitorch.optim.SignSGD` / `tikitorch.optim.PureTropicalSGD`   |
-| fused `forge_train_step`    | one `loss.backward(); opt.step()` over a token window           |
+| fused `forge_train_step`    | `tikitorch.fpga.AcceleratedModel.train_step(...)` for a matched runner |
 
 Train and validate in PyTorch with `tikitorch`, anneal `tau -> 0`, quantize to
-INT16, verify against the `*_tb.cpp` testbench, then synthesize and build the
-AFI. No parameter copying is needed between the soft-trained and hard-deployed
-forms — the same weight tensors drive both paths (Maslov-dequantization
-curriculum).
+INT16, compare the selected observables against the `*_tb.cpp` testbench, then
+synthesize and build the AFI. A host checkpoint can seed hard deployment, but
+the native runner must quantize and marshal parameters into the kernel-specific
+INT16 layout, synchronize updated values back when needed, and re-verify the
+target image. Ordinary `compute_loss(); backward(); opt.step()` remains the
+PyTorch path; use `AcceleratedModel.train_step(...)` for the fused native path.

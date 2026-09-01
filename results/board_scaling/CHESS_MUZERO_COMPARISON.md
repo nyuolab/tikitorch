@@ -1,29 +1,32 @@
-# Chess: multiply-free TikiTorch vs MuZero — a 4-axis comparison (quality / throughput / energy / silicon)
+# Chess: dyadic TikiTorch vs MuZero — a 4-axis comparison (quality / throughput / energy / silicon)
 
 > **Status: all 4 axes measured; adversarially honesty-audited against source files (silicon axis re-audited
 > 2026-06-15 after the 512-bit streaming-kernel rewrite).** Quality (axis 1, CPU), throughput + energy
-> (axes 2–3, measured GPU + C-synth-derived FPGA), and silicon (axis 4, chess-scale C-synth) are all filled.
+> (axes 2–3, measured GPU plus measured forward-FPGA invocation and C-synth-derived training), and
+> silicon (axis 4, routed forward kernel plus C-synth training kernel) are all filled.
 > **Silicon headline: the FORWARD kernel RUNS INFERENCE ON REAL F2. PCIM AFI (agfi-0b2c228a17e516e0a):
 > routed DSP=0, WNS +0.123 ns, loads + PCIM-clean, but host-DRAM-PCIM not drivable on EC2 (IOMMU). DDR-variant
 > AFI (agfi-085dca07f374aa1cd, WNS +0.154 ns): kernel reads on-card DDR4 — MEASURED 9.22 ms/inference, 108
-> inf/s, whole-rail ≈0.074 J/inference (the DSP=0 core's dynamic draw is below the board Vccint sensor floor).
+> inf/s, whole-rail ≈0.074 J/inference (incremental kernel draw is unresolved at the sensor precision).
 > C-synth: 14%-of-SLR LUT, timing met with
 > margin); the TRAIN kernel is research-track (DSP=0 confirmed, but 184%-of-SLR LUT + C-synth timing miss).**
 > Mirrors `results/lm_shakespeare/fig_hallmark_lm.md`.
 
 ## Executive summary (the honest answer)
 
-Multiply-free TikiTorch chess matches MuZero-on-GPU **only structurally** — it runs the same
-self-play→replay→K-step loop and its kernels synthesize **zero-DSP** — but it does **not win** on any axis as
-measured. **Quality:** chess strength was **not lifted** — the trained agent stays below its untrained control
+TikiTorch chess matches the MuZero software structure only at the interface level: it runs a
+self-play→replay→K-step Python loop, but the loop includes MCTS, normalization, loss, and orchestration
+boundaries. Separate configuration-specific forward and training HLS kernels report DSP=0; they do not
+implement or certify the whole loop. The system does **not win** on any axis as measured. **Quality:**
+chess strength was **not lifted** — the trained agent stays below its untrained control
 (scaffold 0.071 vs 0.393; the AlphaZero-tree + anti-collapse lift gave deltas −0.125 / +0.000 / −0.166, z up
 to ≈−1.7 at n=12: no detectable training benefit), a compute/data gap (~5 orders below DeepMind) plus untried
 levers (legal-move masking), **not** a substrate gap; DeepMind is the literature ceiling only. **Throughput/
-energy:** the only *measured* arm is reference MuZero on one A10G (1.42 self-play moves/s, 54.6 train
-samples/s; end-to-end 47.6 J/move, GPU-active 3.7 J/move — GPU ~93% idle, chess self-play is CPU-bound). The
-FPGA throughput figures (126 inf/s fwd, 40/s train; from the streaming-kernel latencies) are
-**C-synth-derived, NOT comparable** to the GPU arm (tiny dyadic net vs resnet; estimate vs measured) — no FPGA
-throughput or energy win is proven, and the GPU actually wins the learner direction (54.6 vs 40 samples/s). **Silicon:** the defensible claim is the
+energy:** the reference MuZero loop is measured on one A10G (1.42 self-play moves/s, 54.6 train
+samples/s; end-to-end 47.6 J/move, GPU-active 3.7 J/move — GPU ~93% idle, chess self-play is CPU-bound).
+The FPGA forward kernel is measured at 108 invocations/s on F2; the 40/s training figure remains
+C-synth-derived. Neither is directly comparable to the GPU loop (tiny dyadic kernel vs resnet;
+kernel invocation vs full search/training), so no FPGA throughput or energy win is proven. **Silicon:** the defensible claim is the
 **zero-DSP FORWARD inference kernel** — chess-scale C-synth DSP=0, LUT 61.5k (14% of one SLR), timing met with
 margin (est 2.920 ns vs 4.00 ns target), 7.92 ms — silicon-ready and the AFI target. The **TRAIN kernel is NOT
 AFI-viable**: its chess-scale streaming rewrite C-synths at 184% of one SLR's LUT (804k, zero-DSP build →
@@ -34,15 +37,15 @@ multiplies to a DSP48 by default). But DSP=0 here is **LUT-positive** (740k→80
 move to fabric) and does not touch the timing miss — train stays research-track. All silicon numbers are Vitis
 **C-synthesis estimates** EXCEPT the forward kernel, which is now **place-and-routed (WNS +0.123 ns,
 post-route) and AFI-registered** (`afi-0ae3ac657a1fbbc7e` / `agfi-0b2c228a17e516e0a`, 2026-06-15); the train
-kernel remains C-synth-only. On-silicon **load + Vccint power is still pending** (Stage 3) — so there is still
-**no routed energy/power figure yet**, but the routed-timing-met claim is no longer a C-synth estimate.
+kernel remains C-synth-only. The DDR forward AFI's whole-rail Vccint is measured, but the incremental
+kernel power is unresolved at the board sensor's precision.
 
 **Honest framing (the standing caption).** This is a **systems comparison, not a strength contest.** The
-chess-quality gap to DeepMind is a **compute/search gap** (TPU-pod scale, ~800-sim MCTS, tens of millions of
-self-play games), **not a substrate gap**: the zero-DSP net runs the same MuZero loop end-to-end on chess and
-its training loss falls monotonically (27.55→12.00). The structural pitch is a **sub-watt-class zero-multiplier
-fabric vs a ~72 W GPU** — but note the FPGA **power/energy is unmeasured** (`[missing]`, no P&R/AFI); any
-specific FPGA-watt number would be fabrication, so the energy case is qualitative + projected, not won.
+tested budget is far below large-scale published chess training, but these results do not isolate compute
+from model, target, action-encoding, or optimization limits. The dyadic Python configuration runs end-to-end
+and its loss falls (27.55→12.00); that is not a whole-loop zero-DSP result. The forward DDR AFI has a measured
+whole-rail energy bound, but the kernel's incremental dynamic draw is unresolved at the sensor precision, so there
+is no kernel-isolated energy comparison or demonstrated full-system win.
 
 **Provenance tags:** `[measured]` ran and recorded · `[to-measure]` produced by the runs below ·
 `[citable]` from the literature (source given) · `[projected]` arithmetic extrapolation, not silicon ·
@@ -68,7 +71,7 @@ structural demonstrator. They do **not** share a strength column.
 _Note the MuZero relativity: no published MuZero-vs-Stockfish chess Elo exists; do not synthesize a transitive
 "MuZero ~3400 vs Stockfish" number._
 
-### 1B. TikiTorch multiply-free chess (measured locally — structural, below strength)
+### 1B. TikiTorch dyadic chess (measured locally — structural, below strength)
 
 | arm | metric (n) | value | source |
 |---|---|---|---|
@@ -81,8 +84,9 @@ _Note the MuZero relativity: no published MuZero-vs-Stockfish chess Elo exists; 
 | training loss | curve over 8 iters | **27.55 → 12.00** (monotonic) | `[measured]` chess_scaffold.json |
 
 **The lift attempt (2026-06-13): AlphaZero tree + anti-collapse — did NOT lift chess.** Applied the
-Connect4-winning levers (true-rules AZ tree + soft-CE + entropy/target-temp; fully multiply-free, closure
-`[]`) and compared trained vs untrained-control at *matched* sims=48, n=12, 12×16=192 self-play games:
+Connect4 levers (explicit-game AZ tree + soft-CE + entropy/target-temp; dyadic model with software
+closure audit `[]`) and compared trained vs untrained-control at *matched* sims=48, n=12,
+12×16=192 self-play games. The audit does not include the Python loss or MCTS path:
 
 | recipe (AZ tree, matched sims=48) | trained vs random | untrained-control vs random | Δ | loss |
 |---|---|---|---|---|
@@ -93,7 +97,7 @@ Connect4-winning levers (true-rules AZ tree + soft-CE + entropy/target-temp; ful
 | **`az_mask` (+ LEGAL MASKING + 2.5× self-play: 480 games, sims48, n=20)** | **0.475** | **0.500** | **−0.025** | 12.8→8.5 |
 
 **Follow-up (2026-06-14): the faithful setup (legal masking) + 2.5× self-play STILL does not lift chess.**
-Added canonical AlphaZero/MuZero legal-move masking to training (multiply-free; closure `[]`) — the
+Added canonical AlphaZero/MuZero legal-move masking to training (dyadic model audit `[]`) — the
 `az_mask` row above — and scaled self-play 2.5× (480 games). Trained 0.475 vs its untrained control 0.500
 (Δ −0.025, within noise at n=20); no collapse (mode_frac ~0.01). So **even with the same setup as default
 MuZero (masking) and more compute, the trained prior does not beat untrained** — the compute/data wall holds.
@@ -182,7 +186,7 @@ thermally-throttling laptop SoC — report ranges). resnet params from the basel
 |---|---|---|---|
 | **reference MuZero, A10G** | **end-to-end 47.6 J/move (1237 mJ/sample)** ‖ **GPU-active 3.7 J/move (96.8 mJ/sample)** | nvidia-smi power×dt @5 Hz; 67.5 W whole-window / 73.7 W GPU-active | `[measured]` (power.csv) |
 | TikiTorch chess FORWARD kernel, **FPGA (on real F2 silicon)** | **Vccint 8–10 W (loaded, kernel IDLE)** — measured on f2.6xlarge with the AFI loaded (`agfi-0b2c228a17e516e0a`); this is the shell + DSP=0 CL static draw, **NOT** inference power | `fpga-describe-local-image -M`, 5 samples (8/9 W last/avg, 10 W max); PCIM clean (0 protocol errors) | `[measured-partial]` loaded/idle only |
-| TikiTorch chess FORWARD kernel, FPGA — **inference (dynamic), DDR AFI** | **MEASURED on F2 silicon: kernel runs from on-card DDR4 — 9.22 ms/inference, 108 inf/s (4000 kicks, AP_DONE ret=0). Whole-rail Vccint ~7–10 W during inference, statistically identical to idle (9 W) → the DSP=0 kernel's dynamic draw is BELOW the ~±2 W sensor floor against the shell+DDR4 baseline. Whole-rail energy bound ≈ 8 W × 9.22 ms ≈ 0.074 J/inference (shell-dominated, NOT kernel-isolated).** | F2 `muzero_ddr_power.c` (fpga_pci BAR4 stage + kick loop) + `-M`; agfi-085dca07f374aa1cd | `[measured]` (DDR rebuild; supersedes the PCIM-IOMMU block) |
+| TikiTorch chess FORWARD kernel, FPGA — **inference (dynamic), DDR AFI** | **MEASURED on F2 silicon: kernel runs from on-card DDR4 — 9.22 ms/inference, 108 inf/s (4000 kicks, AP_DONE ret=0). Whole-rail Vccint ~7–10 W during inference is statistically indistinguishable from idle (9 W), so incremental kernel draw is unresolved at the ~±2 W sensor precision. Whole-rail energy bound ≈ 8 W × 9.22 ms ≈ 0.074 J/inference (shell-dominated, NOT kernel-isolated).** | F2 `muzero_ddr_power.c` (fpga_pci BAR4 stage + kick loop) + `-M`; agfi-085dca07f374aa1cd | `[measured]` (DDR rebuild; supersedes the PCIM-IOMMU block) |
 | _(PCIM variant — superseded)_ | PCIM-to-host AFI loads + issues clean reads but EC2 won't IOMMU-grant a raw hugepage → kernel stalls (never runs). Rebuilt to read on-card DDR (the row above) to get a drivable inference. | `muzero_pcim_power.c` | `[diagnosed]` |
 | TikiTorch, CPU | not measured | — | `[to-measure]`/`[projected]` |
 | DeepMind | not published per-move | — | `[missing]` |
@@ -197,12 +201,11 @@ row reports the same split. NB: an earlier placeholder "~0.7–1.7 mJ-class IF i
 but that was the **loaded/idle** rail. The **DDR-variant AFI now RUNS inference on silicon** (kernel reads
 on-card DDR4, 9.22 ms/inference, 108 inf/s, measured) — so a whole-rail energy bound exists:
 ≈ 8 W × 9.22 ms ≈ **0.074 J/inference**. CAVEAT, load-bearing: this is the **whole Vccint rail** (shell + DDR4
-controller + CL), and during-inference Vccint (7–10 W) is **statistically identical to idle** — the DSP=0
-kernel's own dynamic draw is **below the ~±2 W sensor resolution**, so the J/inference is shell+DDR-dominated
-and the kernel's isolated energy is **unmeasurable at this sensor granularity** (itself a finding: a 14%-of-SLR
-multiply-free datapath is lost in the platform baseline). Honest on-silicon claim: **the kernel runs from DDR
-at a measured 9.22 ms/108 inf-s; whole-rail ≈0.074 J/inference; the multiply-free core's dynamic power is below
-the board sensor's floor.** NOT comparable to a GPU MCTS "move" (tiny dyadic forward pass ≠ resnet + search)._
+controller + CL), and during-inference Vccint (7–10 W) is **statistically identical to idle**. The
+kernel's incremental draw is therefore unresolved at the ~±2 W sensor precision, so the J/inference
+is shell+DDR-dominated and not a kernel-isolated energy measurement. Honest on-silicon claim: **the
+kernel runs from DDR at a measured 9.22 ms/108 inf-s, with a whole-rail bound of ≈0.074 J/inference.**
+NOT comparable to a GPU MCTS "move" (tiny dyadic forward pass ≠ resnet + search)._
 
 _The GPU energy caveat is load-bearing: in a Python MuZero loop, CPU-side MCTS dominates wall-clock, so
 end-to-end mJ/move over-attributes energy to the GPU. We commit to reporting **both** the end-to-end number
@@ -218,14 +221,14 @@ active-avg vs whole-window (1.46–1.49 mJ)._
 | **TikiTorch chess-scale FORWARD kernel** (initial inference) — **ROUTED + AFI + LOADS ON F2** | DSP, area, timing, on-silicon | **DSP=0; LUT 61,542 (14% of one SLR) / FF 26,167; 133 BRAM; 0 URAM; C-synth 7.92 ms / est 2.920 ns; POST-ROUTE WNS = +0.123 ns (MET, first-pass); AFI agfi-0b2c228a17e516e0a LOADS on f2.6xlarge (slot ok, PCIM 0 protocol errors, Vccint 8–10 W loaded/idle)** | `[measured]` Vivado P&R (post_route_timing.rpt) + on-F2 `fpga-describe-local-image -M`; MUZERO_CHESS_FWD_AFI.md |
 | **TikiTorch chess-scale TRAIN kernel** (bwd + SignSGD) — **research-track, NOT AFI-viable** | DSP, latency, area, timing | **DSP=0** (csynth-CONFIRMED via pointer-walk + `config_op mul -impl fabric`; the DSP=195 as-synth was integer address-stride `o*IN` mults — a templating-only attempt left it at 195, HLS binds const-mults to DSP); **4,580,220 cyc = 24.86 ms; LUT 803,743 (184% of one SLR — DSP=0 moved the address muls to fabric, +63k vs the 195-DSP build) / FF 268,643 (31%); 324 BRAM (24%); 65 URAM (20%); est 5.427 ns > 4.00 ns target (timing MISS)** | `[measured]` Vitis **C-synth** (512-bit streaming rewrite, zero-DSP build); forge_train_step_muzero_train_CHESS_csynth.rpt |
 | _(reference: pre-streaming chess kernels, 2026-06-13, superseded)_ | DSP, latency, LUT | fwd DSP=0 / 12.70 ms / 83,485 LUT · train DSP=1 / 33.05 ms / 89,759 LUT | `[measured]` C-synth; small-area but per-element HBM access, not the deployable streaming kernel — superseded by the streaming rows above |
-| any TikiTorch MuZero **AFI / P&R / on-silicon power** | timing closure, power-rail energy | **NEVER routed**; csynth-timing-met ≠ silicon (the only routed sibling, char-LM, failed WNS −1.557 ns before closing v6) | `[missing]` — gated behind a strength result |
+| complete MuZero loop or **training-kernel AFI / P&R / on-silicon power** | timing closure, power-rail energy | **not implemented/routed**; the forward DDR AFI above is the only on-silicon MuZero component recorded here | `[missing]` — separate from the forward-kernel result |
 | reference GPU / DeepMind | DSP/area | N/A — different substrate (that asymmetry *is* the point) | `[missing]` |
 
-_Axis-4 caveats: all numbers are Vitis HLS **C-synthesis estimates** at chess dims (OBS=769, L=64, A=4096) on
-the F2 part (xcvu47p), 4.00 ns / 250 MHz target. They are NOT place-and-route, NOT silicon, NOT an AFI — and
-csynth-timing-met does **not** imply silicon closure (the char-LM precedent: WNS −1.557 ns appeared only at
-route). **The forward kernel is the defensible silicon claim** (DSP=0, 14%-SLR LUT, timing met with margin —
-comfortable single-SLR fit). **The train kernel is research-track**: at DSP=0 its 184%-of-SLR LUT is
+_Axis-4 caveats: the training row is a Vitis HLS **C-synthesis estimate** at chess dims
+(OBS=769, L=64, A=4096) on the F2 part (xcvu47p), 4.00 ns / 250 MHz target; C-synth timing does not imply
+route closure. The forward row has separate route, AFI, and F2 records and is the scoped silicon claim
+(DSP=0 for that kernel, post-route timing met, measured host-to-DDR invocation). **The train kernel is
+research-track**: at DSP=0 its 184%-of-SLR LUT is
 mandatorily multi-SLR (HLS will not auto-partition a single C function across SLRs) and it misses C-synth
 timing — it needs an area+partition rewrite (URAM-stage the resident matrices, II-fold the 4096-way head, or
 split into SLR-sized `hls::stream`/FIFO sub-kernels) before it is a silicon target. The DSP=195→0 fix

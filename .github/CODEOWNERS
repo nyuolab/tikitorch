@@ -1,12 +1,13 @@
 # Code owners for TikiTorch — auto-requests the maintainer's review on PRs touching
-# these paths. NOTE: whether owner review is *required* is a branch-protection
-# setting; under the current "require PR + green CI" rule this notifies rather than
-# blocks. Replace @RespectableGlioma if the GitHub handle differs.
+# these paths. CODEOWNERS only requests review; it does not enforce approval
+# unless a repository ruleset or branch-protection rule is configured separately.
+# No such enforcement is assumed here. Replace @RespectableGlioma if the GitHub
+# handle differs.
 
 # Global owner.
 *                          @RespectableGlioma
 
-# Closure-critical library surface — the multiplier-free (zero-DSP) invariant lives here.
+# Software-closure-critical library surface. Physical DSP claims remain build-specific.
 /tikitorch/nn/             @RespectableGlioma
 /tikitorch/functional.py   @RespectableGlioma
 /tikitorch/models/         @RespectableGlioma
@@ -14,7 +15,25 @@
 /tikitorch/cli.py          @RespectableGlioma
 /tikitorch/__init__.py     @RespectableGlioma
 /tikitorch/fabric/         @RespectableGlioma
+/tikitorch/fpga/           @RespectableGlioma
+/tikitorch/hardware/       @RespectableGlioma
+
+# Claim-bearing evidence and manuscripts.
+/papers/                   @RespectableGlioma
+/results/                  @RespectableGlioma
+/docs/research/CLAIM_LEDGER.md @RespectableGlioma
 
 # Governance & CI must not be weakened without owner sign-off.
 /.github/                  @RespectableGlioma
 /pyproject.toml            @RespectableGlioma
+/README.md                 @RespectableGlioma
+/CHANGELOG.md              @RespectableGlioma
+/CITATION.cff              @RespectableGlioma
+/LICENSE                   @RespectableGlioma
+/NOTICE                    @RespectableGlioma
+/CODE_OF_CONDUCT.md        @RespectableGlioma
+/CONTRIBUTING.md           @RespectableGlioma
+/GOVERNANCE.md             @RespectableGlioma
+/RELEASING.md              @RespectableGlioma
+/SECURITY.md               @RespectableGlioma
+/THIRD_PARTY_NOTICES.md    @RespectableGlioma

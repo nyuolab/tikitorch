@@ -32,12 +32,15 @@ Any magic, direction, length, or checksum mismatch raises ``WireError`` (a desyn
 stream fails loudly instead of training on garbage). TCP preserves order per socket, so
 the same tag-order assertion as ``ThreadLink`` guards the schedule.
 
+Decoding also enforces ``MAX_WIRE_NDIM``, ``MAX_WIRE_AXIS_LENGTH``, and
+``MAX_WIRE_PAYLOAD_BYTES`` before reading the payload.  These are per-frame resource
+bounds, not authentication or an aggregate connection quota.
+
 Unlike ``ThreadLink`` there is no transport-cost model / double-buffering here — a TCP
 hop has a *real* cost, measured by the existing ``LinkStats`` wait/byte counters.
 """
 from __future__ import annotations
 
-import math
 import queue
 import socket
 import struct
@@ -57,6 +60,16 @@ _HDR = struct.Struct("<IqBBB")   # magic, tag, direction, dtype code, ndim
 _LEN = struct.Struct("<Q")       # payload_len
 _CRC = struct.Struct("<I")       # crc32(payload) trailer
 
+# Receiver resource limits.  These are deliberately part of the wire boundary rather
+# than socket-buffer tuning: peer-controlled dimensions and lengths must be rejected
+# before ``recv_exact`` allocates the payload bytearray.  The per-axis cap also closes
+# the zero-sized-array corner case, where a huge dimension would otherwise evade the
+# payload limit.  Applications needing larger frames can raise these module-level
+# limits consistently on every peer.
+MAX_WIRE_NDIM = 32
+MAX_WIRE_PAYLOAD_BYTES = 64 * 1024 * 1024
+MAX_WIRE_AXIS_LENGTH = MAX_WIRE_PAYLOAD_BYTES
+
 # dtype code <-> numpy dtype (fixed-width, endian-free-on-wire: we send native little-endian)
 _DTYPES = {0: "<f8", 1: "<f4", 2: "<f2", 3: "<i8", 4: "<i4", 5: "<i2",
            6: "i1", 7: "<u8", 8: "<u4", 9: "<u2", 10: "u1", 11: "?"}
@@ -68,14 +81,62 @@ class WireError(RuntimeError):
 
 
 # -- message framing ----------------------------------------------------------------
+def _validate_shape_and_length(shape, itemsize: int, payload_len: int) -> None:
+    """Validate peer-controlled tensor metadata without overflowing an integer product.
+
+    This function must run before the payload is read: ``_TcpEndpoint`` implements a
+    read by allocating exactly the requested number of bytes.
+    """
+    if payload_len > MAX_WIRE_PAYLOAD_BYTES:
+        raise WireError(
+            f"payload_len {payload_len} exceeds wire limit {MAX_WIRE_PAYLOAD_BYTES}"
+        )
+
+    for axis, size in enumerate(shape):
+        if size < 0:
+            raise WireError(f"negative shape axis {axis}: {size}")
+        if size > MAX_WIRE_AXIS_LENGTH:
+            raise WireError(
+                f"shape axis {axis} length {size} exceeds wire limit "
+                f"{MAX_WIRE_AXIS_LENGTH}"
+            )
+
+    # A zero axis fixes the element count at zero.  Axis lengths were bounded above
+    # so even such shapes remain safe for NumPy to represent.
+    if any(size == 0 for size in shape):
+        expected = 0
+    else:
+        max_elements = MAX_WIRE_PAYLOAD_BYTES // itemsize
+        elements = 1
+        for size in shape:
+            if elements > max_elements // size:
+                raise WireError(
+                    f"tensor shape {shape} exceeds wire payload limit "
+                    f"{MAX_WIRE_PAYLOAD_BYTES}"
+                )
+            elements *= size
+        expected = elements * itemsize
+
+    if payload_len != expected:
+        raise WireError(
+            f"payload_len {payload_len} != prod{shape} * {itemsize} (desync?)"
+        )
+
+
 def encode_msg(tag: int, direction: int, arr: np.ndarray) -> bytes:
     """Frame one (tag, direction, array) message per the wire protocol above."""
     arr = np.asarray(arr)
-    if not arr.flags.c_contiguous:      # (not ascontiguousarray: that would promote 0-d to 1-d)
-        arr = arr.copy(order="C")
     code = _DTYPE_CODE.get(arr.dtype)
     if code is None:
         raise TypeError(f"dtype {arr.dtype} not supported on the wire")
+    if arr.ndim > MAX_WIRE_NDIM:
+        raise ValueError(f"array ndim {arr.ndim} exceeds wire limit {MAX_WIRE_NDIM}")
+    try:
+        _validate_shape_and_length(arr.shape, arr.dtype.itemsize, arr.nbytes)
+    except WireError as exc:
+        raise ValueError(f"array exceeds wire limits: {exc}") from exc
+    if not arr.flags.c_contiguous:      # (not ascontiguousarray: that would promote 0-d to 1-d)
+        arr = arr.copy(order="C")
     payload = arr.tobytes()
     return b"".join((
         _HDR.pack(MAGIC, tag, direction, code, arr.ndim),
@@ -95,11 +156,12 @@ def _decode_stream(read) -> tuple[int, int, np.ndarray]:
         raise WireError(f"unknown dtype code {code}")
     if direction not in (DIR_FWD, DIR_BWD):
         raise WireError(f"bad direction byte {direction}")
+    if ndim > MAX_WIRE_NDIM:
+        raise WireError(f"ndim {ndim} exceeds wire limit {MAX_WIRE_NDIM}")
     shape = struct.unpack(f"<{ndim}q", read(8 * ndim)) if ndim else ()
     (plen,) = _LEN.unpack(read(_LEN.size))
     dt = np.dtype(_DTYPES[code])
-    if any(s < 0 for s in shape) or plen != dt.itemsize * math.prod(shape):
-        raise WireError(f"payload_len {plen} != prod{shape} * {dt.itemsize} (desync?)")
+    _validate_shape_and_length(shape, dt.itemsize, plen)
     payload = read(plen)
     (crc,) = _CRC.unpack(read(_CRC.size))
     if crc != zlib.crc32(payload) & 0xFFFFFFFF:
@@ -336,17 +398,19 @@ class TcpLink(NeighborLink):
 # -- chain builders -------------------------------------------------------------------
 def make_tcp_chain(num_stages: int, boundary: int, role: str, base_port: int = 41000,
                    host: str = "127.0.0.1", quantize=None, connect_timeout_s: float = 10.0,
-                   io_timeout_s=None) -> list[TcpLink]:
+                   io_timeout_s=None, listen_host: str = "127.0.0.1") -> list[TcpLink]:
     """Build ONE process's links for a chain split at ``boundary`` with a single TCP hop.
 
     Call it twice, in two processes (possibly on two machines):
       * ``role="left"``  hosts stages ``[0, boundary)``   — links returned for those stages
       * ``role="right"`` hosts stages ``[boundary, num_stages)``
     Intra-process hops are local queues; the boundary hop is TCP. The RIGHT process
-    LISTENS on ``base_port`` (forward) and ``base_port+1`` (backward, bound on all
-    interfaces); the LEFT process CONNECTS to ``host`` (the right box's address) — so
-    only one box needs a reachable address, and either side may start first
-    (connects retry for ``connect_timeout_s``).
+    LISTENS on ``listen_host:base_port`` (forward) and ``listen_host:base_port+1``
+    (backward); the LEFT process CONNECTS to ``host`` (the right box's address) — so
+    only one box needs a reachable address, and either side may start first. The safe
+    listener default is loopback; a cross-machine deployment must opt in to a specific
+    reachable interface (or ``0.0.0.0``) and apply the trust boundary documented in
+    ``SECURITY.md``. Connects retry for ``connect_timeout_s``.
     """
     if not 0 < boundary < num_stages:
         raise ValueError(f"boundary must split the chain: 0 < {boundary} < {num_stages}")
@@ -375,10 +439,10 @@ def make_tcp_chain(num_stages: int, boundary: int, role: str, base_port: int = 4
         for l in idx:
             links.append(TcpLink(
                 l, num_stages,
-                fwd_in=({"listen": ("", base_port)} if l == boundary else fq[l]),
+                fwd_in=({"listen": (listen_host, base_port)} if l == boundary else fq[l]),
                 fwd_out=(fq[l + 1] if l + 1 < num_stages else None),
                 bwd_in=bq[l],
-                bwd_out=({"listen": ("", base_port + 1)} if l == boundary
+                bwd_out=({"listen": (listen_host, base_port + 1)} if l == boundary
                          else bq[l - 1]),
                 **kw))
     return links

@@ -139,8 +139,8 @@ char-soup with speaker-tag structure only.
   pip-installed kanervasforge submodule copy of tikitorch (sys.path quirk);
   code-diff audit found only doc/comment deltas plus block-dropout impl
   (nn.Dropout vs TropicalDropout — identical at eval), so those numbers
-  stand. All v3 runs force the canonical repo via
-  `PYTHONPATH=/Users/ekoermann/Documents/tikitorch`.
+  stand. All v3 runs force the canonical checkout via
+  `PYTHONPATH=<repository-root>`.
 - **Library fix in this round:** `tropical_value_pull_iter_topk` crashed for
   Lv < k (1-token generation prompts); fixed in `tikitorch/functional.py`
   (`rank_bias[:kk]` + backward zero-pad), unit-tested.
@@ -277,7 +277,7 @@ bits-per-byte (the tokenizer-independent metric; val_tokens_per_byte
 ## Repro (key arms)
 
 ```bash
-export PYTHONPATH=/Users/ekoermann/Documents/tikitorch
+export PYTHONPATH="$(git rev-parse --show-toplevel)"
 # dense references (tuned)
 python scripts/nanogpt_shakespeare.py --runs dense --steps 1500 --device mps --adam-lr 3e-3 --tag dense_lr3e-3
 python scripts/nanogpt_shakespeare.py --runs dense-conv --steps 1500 --device mps --adam-lr 3e-3 --tag denseconv_lr3e-3

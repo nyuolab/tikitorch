@@ -19,11 +19,12 @@ Same data / same eval.  Sequential scan over T for the two recurrences.
 Run:  python scripts/tropical_max_retrieval.py
 """
 import math, time, json, sys
+from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-sys.path.insert(0, "/Users/ekoermann/Documents/tikitorch")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tikitorch.nn import dyadic_quantize, DyadicLinear
 
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"

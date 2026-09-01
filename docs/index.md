@@ -1,9 +1,10 @@
 # TikiTorch
 
-TikiTorch is a PyTorch-shaped library for experiments with tropical and hard-routed
-deep learning. It provides familiar `nn`, `optim`, `functional`, and `models`
+TikiTorch is an independent companion for tropical and hard-routed research in the
+PyTorch ecosystem. It provides familiar `nn`, `optim`, `functional`, and `models`
 namespaces while reusing PyTorch tensors, autograd, modules, devices, and training-loop
-conventions.
+conventions. “PyTorch-shaped” describes that interoperability, not affiliation or
+endorsement by the PyTorch project.
 
 ```python
 import torch
@@ -16,7 +17,19 @@ y = layer(x)
 print(y.shape)  # torch.Size([8, 3])
 ```
 
-TikiTorch is currently research software at version 0.2. It does not promise complete
+The distinguishing feature is the combination rather than any single layer:
+
+| PyTorch provides | TikiTorch adds |
+| --- | --- |
+| General tensors, autograd, modules, optimizers, and CPU/GPU execution | Hard and relaxed max-plus, min-plus, morphological, dyadic, and routed models |
+| A mature general-purpose training workflow | Structural, executed-forward, and full-training-step closure audits for a concrete recipe |
+| Ordinary saved tensors and autograd graphs | Packed forward-route records and selected-VJP replay for supported hard operators |
+| Extensible software and compiler foundations | Experimental local-learning APIs and repository HLS/F2 paths with build-specific evidence |
+
+This lets a study connect representation, optimization, route semantics, and deployment
+boundaries while continuing to use PyTorch as the underlying tensor and autograd system.
+
+TikiTorch is currently research software at version 0.2.0. It does not promise complete
 PyTorch API compatibility, optimized eager-GPU performance, or multiplier-free
 execution for every configuration.
 
@@ -27,6 +40,7 @@ execution for every configuration.
 | Install and run a first model | [Installation](get-started/installation.md) → [Quickstart](get-started/quickstart.md) |
 | Port a familiar PyTorch loop | [Migrating from PyTorch](guide/migration.md) |
 | Learn the algebra | [Tropical algebra](guide/foundations.md) |
+| Evaluate the opportunities and trade-offs | [Why tropical for ML/DL?](guide/why-tropical-ml.md) |
 | Select a model, loss, and optimizer | [Choosing a recipe](guide/choosing-a-model.md) |
 | Check a multiplier-free claim | [Auditing closure](guide/closure.md) |
 | Look up a class or function | [API reference](api/index.md) |
@@ -38,8 +52,14 @@ execution for every configuration.
 - Morphological sequence, vision, attention, and mixture-of-experts models.
 - Sign-, shift-, and counter-oriented optimizers alongside PyTorch interoperability.
 - Structural, executed-path, and full-training-step closure audits.
+- Forward-Forward and predictive-coding experiments with local objectives and updates.
 - Serialization, profiling, backend dispatch, and opt-in FPGA paths.
 - Operator-scoped route-certificate replay for supported hard-routed graphs.
+
+The route-certificate and hardware paths are evidence-bounded research capabilities.
+Exact replay is conditional on the registered operators and deterministic tie rules;
+software closure reports cover only the configured and executed recipe; and current F2
+results do not establish a general speed, accuracy, or energy advantage over PyTorch.
 
 The [quickstart](get-started/quickstart.md) demonstrates the normal library workflow.
 The [research section](research/index.md) separately tracks measured results, draft

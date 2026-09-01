@@ -3,13 +3,15 @@
 This is the **only** place TikiTorch touches native code. It loads a shared
 library (``_libtikifpga``) built out-of-band from the bundled HLS sources +
 a thin C bridge (see :doc:`BUILD_NATIVE.md`) and binds the two verified extern-C
-ABIs plus the buffer/board helpers.
+ABIs plus the buffer/endpoint helpers.
 
-**It degrades gracefully.** :func:`load` searches for the library and returns a
-:class:`NativeHandle` on success, or ``None`` on *any* failure — missing library,
-missing XRT runtime, or a board-probe miss. It NEVER raises and it NEVER calls a
-board. In this repo/sandbox and in CI there is no library, so :func:`load`
-returns ``None`` and the whole FPGA path transparently falls back to CPU.
+**It degrades gracefully.** :func:`load` searches for the library, calls
+``dlopen``, and binds the expected symbols. It returns a :class:`NativeHandle`
+on success or ``None`` when no candidate can be loaded and bound. Loading does
+not call ``tt_fpga_open`` or probe an endpoint; a handle proves only library/ABI
+availability. The later backend availability probe may open LOCAL host-reference
+or physical-FPGA state. Without a usable endpoint the wrapper falls back to its
+PyTorch path.
 
 The library is intentionally *not* shipped in the wheel (platform/ABI mismatch);
 point the loader at a local build via ``$TIKITORCH_FPGA_LIB`` or drop the built
@@ -30,7 +32,7 @@ MODE_SIGNSGD = 2
 _BRIDGE_SYMBOLS = (
     "tt_fpga_open",        # (const char* xclbin_or_null) -> void* handle
     "tt_fpga_close",       # (void* handle)
-    "tt_fpga_board_present",  # (void* handle) -> int (0/1)
+    "tt_fpga_board_present",  # legacy name: endpoint usable (LOCAL also returns 1)
     "tt_fpga_alloc",       # (void* handle, long words) -> void* buffer
     "tt_fpga_free",        # (void* handle, void* buffer)
     "tt_fpga_load_weights",   # (void* handle, void* buffer, const int16_t* w, long n)
@@ -43,10 +45,11 @@ _BRIDGE_SYMBOLS = (
 
 
 class NativeUnavailable(RuntimeError):
-    """Raised on the ``strict=True`` opt-in path when no native handle is present.
+    """Raised when a caller requires a native binding that cannot be established.
 
-    :func:`load` itself returns ``None`` rather than raising; this is the explicit
-    error a strict caller asked for.
+    :func:`load` itself returns ``None`` rather than raising. Strict acceleration
+    and direct runner calls use this exception to reject fallback or an incomplete
+    binding contract explicitly.
     """
 
 
@@ -54,8 +57,9 @@ class NativeHandle:
     """A thin wrapper over a loaded ``_libtikifpga`` and its argtype bindings.
 
     Constructed only by :func:`load`. Holds the ``ctypes.CDLL`` and the bound
-    functions. :meth:`board_present` is the on-board probe used by
-    ``FpgaBackend.is_available``.
+    functions. :meth:`board_present` retains the native ABI's legacy name but is
+    the endpoint-usability probe used by ``FpgaBackend.is_available``. A LOCAL
+    host-reference endpoint may report usable.
     """
 
     def __init__(self, lib, libpath: str) -> None:
@@ -63,7 +67,7 @@ class NativeHandle:
         self.libpath = libpath
 
     def board_present(self) -> bool:
-        """Probe whether a usable FPGA board is attached (never raises)."""
+        """Probe whether the native endpoint is usable; LOCAL may return ``True``."""
         try:
             handle = self._lib.tt_fpga_open(None)
             if not handle:
@@ -91,7 +95,8 @@ def load(libpath: Optional[str] = None) -> Optional[NativeHandle]:
 
     Search order: an explicit ``libpath``, then ``$TIKITORCH_FPGA_LIB``, then a
     bundled ``_libtikifpga.{so,dylib,dll}`` next to this module. Returns ``None``
-    if nothing loads or the symbols/argtypes don't bind.
+    if nothing loads or the symbols/argtypes don't bind. This function does not
+    open the transport or run ``tt_fpga_board_present``.
     """
     import ctypes
 

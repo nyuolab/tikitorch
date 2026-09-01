@@ -50,10 +50,11 @@ class FpgaAccelerable:
 
     ``model = model.fpga()`` is the one-liner that mirrors ``model.cuda()``: it
     returns a DDP-style :class:`~tikitorch.fpga.accelerate.AcceleratedModel` that
-    runs the fused training step on a board when one is *bound* (board present +
-    shape matches a compiled kernel + an on-board runner is registered) and is a
-    transparent CPU fallback otherwise — so the call is always safe, on any
-    machine. The inverse (unwrap to the plain model) is ``accelerated.cpu()`` /
+    invokes a native runner only when one is *bound* (usable endpoint + full
+    structural kernel match + explicitly registered runner) and uses the
+    ordinary PyTorch path otherwise. A bound LOCAL endpoint still executes on
+    the host, and the custom runner owns runtime and build-identity checks. The
+    inverse (unwrap to the plain model) is ``accelerated.cpu()`` /
     ``accelerated.to(tt.device('cpu'))`` on the returned wrapper.
 
     The mixin is intentionally dependency-free and imports :mod:`tikitorch.fpga`
@@ -66,7 +67,7 @@ class FpgaAccelerable:
         """Wrap ``self`` for FPGA execution (``tikitorch.fpga.accelerate``).
 
         With ``strict=True`` raises :class:`~tikitorch.fpga.NativeUnavailable`
-        instead of falling back when the model cannot bind to a board.
+        instead of falling back when the complete native binding is unavailable.
         """
         import tikitorch.fpga as _fpga
 

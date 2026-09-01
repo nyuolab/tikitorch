@@ -892,12 +892,14 @@ class MorphMLP(FpgaAccelerable, nn.Module):
 
 
 class TropicalTransformer(FpgaAccelerable, nn.Module):
-    """Transformer built entirely from tropical semiring operations.
+    """Transformer whose attention and FFN cores use tropical operators.
 
-    Attention uses max-plus scoring + argmax selection.
-    FFN uses TropicalDilation -> TropicalLinear (tropical rational map).
-    All operations in the transformer blocks are comparisons + additions —
-    zero multiplications.
+    Attention supports max-plus or distance scoring with hard value routing, and
+    the FFN uses TropicalDilation -> TropicalLinear (a tropical rational map).
+    The hardened core is comparison/addition-oriented, but soft ``tau>0`` paths,
+    dropout, normalization, pooling, the loss, and optimizer remain part of the
+    executed recipe. Use :mod:`tikitorch.audit` before making a closure claim;
+    hardware resource claims require a configuration-matched build report.
 
     Args:
         d_model: model dimension (default 256)
@@ -908,7 +910,8 @@ class TropicalTransformer(FpgaAccelerable, nn.Module):
         tau: temperature for soft attention; 0.0 is hard tropical (default 0.0)
         use_shift_attn: use TropicalShiftAttention (no Q/K/V projections)
         max_seq_len: max sequence length for shift-attention tables (default 1024)
-        score_variant: "dot_product" (default) or "l_inf"
+        score_variant: "dot_product" (default), "l_inf", "l1", "hilbert", or
+            "hilbert_asym"
         shift_mode: "free" (default) or "rope_relative"
         task_type: "classification" (default) or "lm"
         vocab_size: vocabulary size when task_type == "lm" (default 32000)

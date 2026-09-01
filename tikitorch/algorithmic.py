@@ -802,14 +802,15 @@ def evaluate_task(task_name: str, *, attention: str = "tropical",
 
     # Level-B closed training: hard forward (no anneal/logsumexp), a closure-faithful
     # loss (perceptron ±1 grad for class / L1 sign grad for reg), and a sign-only
-    # optimizer (SignSGD, sign-gated add). The whole step is multiplier-free --
-    # verify with tikitorch.audit.assert_training_closed. Non-closed default keeps
-    # the Adam + tau-anneal + cross-entropy GPU proxy.
+    # optimizer (SignSGD, sign-gated add). The configured executed step is intended
+    # to be software-closed; check it with tikitorch.audit.assert_training_closed.
+    # Physical multiplier/DSP use still requires a matched compiled build. The
+    # non-closed default keeps the Adam + tau-anneal + cross-entropy GPU proxy.
     if closed:
         import tikitorch.optim as _optim
         from tikitorch.functional import tropical_perceptron_loss
-        # All closed (zero-DSP) optimizers -- verify with assert_training_closed.
-        # lr = 2^-lr_shift (a power-of-2 bit-shift on FPGA).
+        # Software-closure-oriented optimizers -- verify the concrete executed step
+        # with assert_training_closed. lr = 2^-lr_shift can map to a hardware shift.
         import math as _math
         lr_shift = max(1, min(12, round(-_math.log2(max(lr, 1e-9)))))
         if closed_opt == "tropicaladam":

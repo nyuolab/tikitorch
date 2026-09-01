@@ -1,18 +1,20 @@
 """tikitorch.fpga.accelerate — the DDP-style AcceleratedModel wrapper.
 
-``model = tt.fpga.accelerate(model)`` is the headline entry point, deliberately
-analogous to ``model = DistributedDataParallel(model)``: it wraps a model and you
-keep your ordinary training loop. The wrapper:
+``model = tt.fpga.accelerate(model)`` wraps a model while preserving normal
+``nn.Module`` registration and delegation. The wrapper:
 
 * registers the inner model as a submodule, so ``.parameters()`` / ``.state_dict()``
   / optimizers work unchanged;
 * delegates ``forward`` / ``compute_loss`` / ``param_count`` and proxies other
   attributes (``task_type``, ``set_tau``, ...) to the inner model;
-* when **bound** (board present + shape matched + on-board runner registered), runs
-  the fused on-board training step via :meth:`AcceleratedModel.train_step`;
-* when **unbound** (the case in this repo/CI), is a *transparent CPU fallback*: it
-  calls the inner model's own ``compute_loss``/optimizer verbatim, so results are
-  byte-identical to the unwrapped model — never an error.
+* is **bound** only with a usable native endpoint, a full model-observable
+  structural match, and an explicitly registered runner;
+* when unbound, calls the inner model's ordinary PyTorch loss/backward/optimizer
+  path and emits one fallback warning from :meth:`train_step`.
+
+No safe runner ships by default. ``bound`` means that the wrapper will delegate
+to an application-supplied runner; it does not establish runtime tensor validity,
+build-manifest identity, or physical FPGA execution. LOCAL is a host endpoint.
 """
 from __future__ import annotations
 
@@ -29,7 +31,7 @@ from .kernels import KernelSpec
 
 
 class AcceleratedModel(nn.Module):
-    """A model wrapped for FPGA execution (bound on board, else CPU fallback)."""
+    """A model wrapper for explicit native runners, with a PyTorch fallback."""
 
     def __init__(self, model: nn.Module, *, spec: Optional[KernelSpec], native,
                  device: Device, optimizer=None) -> None:
@@ -54,11 +56,12 @@ class AcceleratedModel(nn.Module):
 
     @property
     def bound(self) -> bool:
-        """``True`` iff this model actually executes on the board.
+        """Whether all dispatch prerequisites for a native runner are present.
 
-        Requires a native handle, a matched kernel spec, *and* a registered on-board
-        runner for that kernel (the last hardware-validated mile). When any is
-        missing the wrapper runs on CPU.
+        This checks a usable handle supplied by the backend, a structural match,
+        and explicit runner registration. The runner remains responsible for
+        runtime inputs, named buffer layout, ABI/build identity, and transport
+        mode; a bound LOCAL endpoint still executes on the host.
         """
         return (
             self._native is not None
@@ -67,14 +70,24 @@ class AcceleratedModel(nn.Module):
         )
 
     def _unbound_reason(self) -> str:
+        reasons = []
         if self._native is None:
-            return ("no FPGA board / native driver available (strict=True). "
-                    "Build the driver per tikitorch/fpga/BUILD_NATIVE.md or omit strict.")
+            reasons.append("no usable native endpoint")
         if self.kernel_spec is None:
-            return (f"no compiled kernel matches model {type(self.module).__name__} "
-                    f"of this shape (strict=True). See KernelCache.default() for the allow-list.")
-        return (f"no on-board runner registered for kernel {self.kernel_spec.entry!r} "
-                f"(strict=True). See tikitorch/fpga/BUILD_NATIVE.md.")
+            reasons.append(
+                f"no full structural kernel match for {type(self.module).__name__} "
+                "(catalog lookup alone is insufficient)"
+            )
+        elif not has_board_runner(self.kernel_spec):
+            reasons.append(
+                f"no explicitly registered runner for {self.kernel_spec.entry!r}"
+            )
+        detail = "; ".join(reasons) if reasons else "unknown binding failure"
+        return (
+            f"native FPGA binding unavailable (strict=True): {detail}. "
+            "See tikitorch/fpga/BUILD_NATIVE.md; strict mode does not validate a "
+            "custom runner's runtime inputs or build manifest."
+        )
 
     # -- delegation ---------------------------------------------------------
 
@@ -82,7 +95,7 @@ class AcceleratedModel(nn.Module):
         return self.module(*args, **kwargs)
 
     def compute_loss(self, x, y):
-        """Compute the model's loss (always the inner model's own CPU computation)."""
+        """Compute the loss through the inner model's ordinary PyTorch path."""
         return self.module.compute_loss(x, y)
 
     @property
@@ -106,12 +119,13 @@ class AcceleratedModel(nn.Module):
     # -- training -----------------------------------------------------------
 
     def train_step(self, x, targets=None, *, lr=None, threshold=None, optimizer=None) -> float:
-        """One training step. On board when :attr:`bound`; else a CPU fallback.
+        """Run one native fused step when bound, otherwise use PyTorch.
 
-        The bound path drives the fused ``FWD_LOSS -> BWD -> SIGNSGD`` loop on the
-        FPGA. The fallback path runs the inner model's own
+        The bound path delegates to the explicitly registered runner, which may
+        target LOCAL host-reference execution or a physical FPGA transport. The
+        fallback path runs the inner model's own
         ``compute_loss(x, targets).backward()`` + ``optimizer.step()/zero_grad()``
-        (byte-identical to training the unwrapped model) and warns once.
+        and warns once.
         """
         if self.bound:
             from ._session import run_board_step
@@ -124,7 +138,7 @@ class AcceleratedModel(nn.Module):
         if targets is None:
             raise ValueError(
                 "AcceleratedModel.train_step(x, targets): targets are required on the "
-                "CPU-fallback path (or run the ordinary loop: "
+                "PyTorch-fallback path (or run the ordinary loop: "
                 "loss = model.compute_loss(x, y); loss.backward(); opt.step())."
             )
         self._warn_fallback_once()
@@ -159,6 +173,14 @@ class AcceleratedModel(nn.Module):
         if isinstance(device, Device):
             if device.is_cpu:
                 return self.module
+            if device.type != "fpga":
+                raise ValueError(
+                    f"AcceleratedModel accepts logical 'cpu' or 'fpga' devices, got {device!s}"
+                )
+            if device.index not in (None, 0):
+                raise ValueError(
+                    f"unsupported FPGA endpoint {device!s}; only 'fpga' and 'fpga:0' are available"
+                )
             self.device = device
             return self
         return super().to(device, *args, **kwargs)
@@ -168,18 +190,22 @@ class AcceleratedModel(nn.Module):
             self._fallback_warned = True
             warnings.warn(
                 f"tikitorch.fpga: model {type(self.module).__name__} is running on the "
-                f"CPU fallback ({self._unbound_reason_short()}). Results are correct; "
-                f"see tikitorch/fpga/BUILD_NATIVE.md to run on a board.",
+                f"PyTorch fallback ({self._unbound_reason_short()}). No native runner "
+                f"was invoked; see tikitorch/fpga/BUILD_NATIVE.md for the explicit "
+                f"binding contract.",
                 BackendFallbackWarning,
                 stacklevel=2,
             )
 
     def _unbound_reason_short(self) -> str:
+        reasons = []
         if self._native is None:
-            return "no board available"
+            reasons.append("no usable native endpoint")
         if self.kernel_spec is None:
-            return "no matching compiled kernel"
-        return "no on-board runner for the matched kernel"
+            reasons.append("no full structural kernel match")
+        elif not has_board_runner(self.kernel_spec):
+            reasons.append("no explicitly registered runner")
+        return "; ".join(reasons) if reasons else "binding unavailable"
 
     def __repr__(self) -> str:
         spec = self.kernel_spec.entry if self.kernel_spec is not None else None

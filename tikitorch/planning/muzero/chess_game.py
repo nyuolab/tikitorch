@@ -1,12 +1,12 @@
 """tikitorch.planning.muzero.chess_game — Chess as a two-player MuZero game.
 
 The third rung of the AlphaZero/MuZero ladder (TicTacToe -> Connect4 -> **chess**). A thin
-wrapper over ``python-chess`` exposing the same game interface as :mod:`games` (``Chess`` plugs
-straight into :class:`board_agent.BoardMuZero`). The point is to show the multiplier-free,
-zero-DSP tropical substrate **scales structurally to chess** — same self-play -> replay -> K-step
-training loop, same closed optimizer — NOT to match DeepMind-scale strength (reported MuZero used
-TPU-pod compute and beats Stockfish; full-strength training is infeasible on a workstation, so
-this is the pipeline scaffold + a small-scale learning proof, benchmarked vs a random mover).
+wrapper over ``python-chess`` exposes the same game interface as :mod:`games` (``Chess`` plugs
+straight into :class:`board_agent.BoardMuZero`). This is a pipeline scaffold: it demonstrates that
+the same self-play, replay, and K-step training interfaces accept a chess-sized action space. It is
+not a chess-strength result or a whole-loop hardware result. Dyadic network components are intended
+for shift/add lowering, while search, normalization, losses, and orchestration remain explicit
+boundaries unless a concrete implementation is separately audited and synthesized.
 
 Representation choices (kept deliberately simple for the scaffold):
   * state  = ``(fen, to_play)`` — FEN is a hashable board key; ``to_play`` 1=white, 2=black.

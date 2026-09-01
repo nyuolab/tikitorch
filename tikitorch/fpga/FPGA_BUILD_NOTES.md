@@ -1,43 +1,55 @@
 # TikiTorch FPGA build & silicon notes
 
-Single source of truth for taking `model.fpga()` to real AWS F1/F2 silicon: the
-on-board **run** flow (load an AFI, train over PCIe), the **AFI build** flow (HLS →
-DCP → AFI), the validated AGFI registry, the timing-failure history + root cause, and
-the operational gotchas. Consolidates what was scattered across the source monorepo
-build scripts and the project memory.
+Technical notes for the historical `model.fpga()` AWS F2 experiments: the
+on-board **run** flow (load a compatible AFI, train over PCIe), the **AFI build**
+flow (HLS → DCP → AFI), the account-specific AGFI inventory, the recorded
+timing-failure history, and operational gotchas. These notes consolidate
+project records; they are not a promise of public AFI availability or generic
+board support.
 
-> Status legend: **[validated]** proven on silicon · **[blocked]** known failure ·
-> **[infra]** monorepo-coupled tooling (see "Where the scripts live").
+> Status legend: **[validated]** observed for the named historical silicon
+> configuration · **[blocked]** known failure · **[infra]** monorepo-coupled
+> tooling (see "Where the scripts live").
 
 ---
 
 ## 0. TL;DR
 
-- **On-silicon training works** [validated]: `model.fpga()` binds a tropical model to
-  an F2 board (`bound=True`, **dsp=0**) and runs the whole fwd→bwd→sign-SGD step on the
-  board. A 2026-06 run evolved **99.5 % of params** (229872/231040) over 50 `train_step()`s.
+- **A configuration-specific on-silicon path ran** [validated]: a 2026-06 F2
+  run used the FPGA-PCI bridge, the one-layer runner, and a compatible
+  account-specific AFI to execute the whole fwd→bwd→sign-SGD step. The logged
+  before/after observation found **99.5% of parameters changed**
+  (229872/231040) over 50 `train_step()` calls. The associated build record
+  reports DSP=0. `bound=True` or the `KernelSpec.dsp` field alone is not board
+  evidence: LOCAL host-reference mode can also bind, and the DSP field is
+  metadata rather than a live synthesis probe.
 - **The on-board optimizer is the hardware sign-SGD kernel**, baked into the AFI — you
   cannot swap optimizers (e.g. frexpmag) without building a new AFI.
-- **A clean *live loss curve* is blocked** [blocked]: every AFI rebuild fails post-route
-  timing. Root cause (below): the monolithic kernel's critical path needs **~14.3 ns
-  (~70 MHz)**, below the slowest standard shell clock (125 MHz) → no clock recipe closes
-  it. The fix is HLS pipelining of a 512-bit select, not a clock tweak.
+- **A clean *live loss curve* is blocked** [blocked]: the AFI rebuilds recorded
+  below failed post-route timing. Root cause (below): the monolithic kernel's
+  critical path needs **~14.3 ns (~70 MHz)**, below the slowest standard shell
+  clock (125 MHz) → no standard shell-clock recipe closes this unpipelined
+  build. The fix is HLS pipelining of a 512-bit select, not a clock tweak.
 
 ---
 
 ## 1. The two flows
 
-### A. Run on silicon (`model.fpga()` over PCIe) — [validated]
-Runs **on** an f1/f2 instance with the `aws-fpga` SDK. Loads a pre-built AGFI, compiles
-the `fpga_pci` native bridge (`tikitorch/fpga/bridge.cpp`, `-DTT_FPGA_PCI`), and drives
-the same `AcceleratedModel.train_step()` chain proven in LOCAL mode — now over PCIe.
+### A. Run on silicon (`model.fpga()` over PCIe) — [validated configuration]
+Runs **on** an F2 instance with the `aws-fpga` SDK. It loads a compatible AGFI,
+compiles the `fpga_pci` native bridge (`tikitorch/fpga/bridge.cpp`,
+`-DTT_FPGA_PCI`), and drives the same `AcceleratedModel.train_step()` call
+sequence exercised in LOCAL host-reference mode—now through PCIe to the named
+image. LOCAL does not validate the synthesized path.
 
 ```
 load AGFI (fpga-load-local-image) → build _libtikifpga.so (bridge.cpp, TT_FPGA_PCI)
   → sudo python: m.fpga(strict=True).train_step(x, y, lr=1, threshold=0)
 ```
-Result on success: `BOUND on silicon: True | kernel: forge_train_step | dsp: 0` and the
-parameter-evolution count. The Python side is unchanged; only the transport differs.
+The historical log prints `BOUND on silicon: True | kernel: forge_train_step |
+dsp: 0` plus the parameter-change count. Here, board execution is established
+by the loaded FPGA-PCI transport and run context, not by `bound=True`; `dsp: 0`
+echoes kernel metadata and must be paired with the archived build report.
 
 ### B. Build an AFI (HLS → DCP → AFI) — [infra]
 Runs **on** a z1d build instance (Xilinx tools). Pipeline:
@@ -53,33 +65,37 @@ silicon failure mode) — the build aborts before the slow Vivado step if not.
 
 ---
 
-## 1b. MuZero dyadic kernels — HLS-validated on the F2 part [validated, 2026-06-09]
+## 1b. MuZero dyadic kernels — HLS C-synthesis only [2026-06-09]
 
-The zero-DSP dyadic MuZero kernels (`forge_train_step_muzero.cpp` forward-inference +
-`forge_train_step_muzero_train.cpp` on-chip SignSGD training) **pass Vitis HLS 2024.1
-C-synthesis on the real F2 part `xcvu47p-fsvh2892-2L-e` at the 4.0 ns / 250 MHz target:**
+The dyadic MuZero kernels (`forge_train_step_muzero.cpp` forward inference and
+`forge_train_step_muzero_train.cpp` SignSGD path) have Vitis HLS 2024.1
+C-synthesis reports targeting the F2 device part `xcvu47p-fsvh2892-2L-e` at
+4.0 ns / 250 MHz. They have not completed DCP/AFI build or silicon validation:
 
 | kernel | DSP | est. clock | latency (cycles) | LUT | FF | BRAM |
 |---|---|---|---|---|---|---|
 | `forge_train_step_muzero` (fwd) | **0** | **2.920 ns** | **bounded: 25,539** (~102 µs) | 109165 (8% dev) | 60552 | 2 |
 | `forge_train_step_muzero_train` (fwd+bwd+SignSGD) | **0** | 2.920 ns (clock est. only) | **UNBOUNDED — HLS reports `?`** | 96330 (7% dev) | 39860 | 2 |
 
-The vendor synthesizer's DSP operation table is **empty** for both — every "multiply" mapped to
-shift+add LUT logic, and the `/MZ_L` (=/32) normalization mapped to LUTs (not a DSP divide).
-**DSP=0 is solid for both.** But read the rest carefully (corrected 2026-06-09 after artifact re-audit):
+The HLS reports' DSP operation tables are **empty** for both: operations map to
+shift/add LUT logic, and the `/MZ_L` (=/32) normalization maps to LUTs rather
+than a DSP divide. Thus DSP=0 is an HLS-reported property of these named builds,
+not a routed or on-board result.
 
-- **Forward kernel: genuinely measured** — DSP=0, latency *bounded* at 25,539 cycles, clock 2.920 ns.
-  This is a real, schedulable, complete initial-inference datapath.
-- **Training kernel: NOT a complete/bounded learner yet.** DSP=0 holds and 2.920 ns is reported, but
+- **Forward kernel:** HLS scheduled a bounded 25,539-cycle latency and reported
+  DSP=0 with a 2.920 ns clock estimate. This is a C-synthesis result for the
+  initial-inference datapath, not measured silicon execution.
+- **Training kernel: NOT a complete/bounded learner yet.** HLS reports DSP=0 and 2.920 ns, but
   that is only the **AXI-wrapper clock estimate** — HLS could not **bound the latency** (every
   cycle/interval field is `?`, because `nearest_pow2`'s leading-bit `while` loop has a data-dependent
   trip count). It is also **initial-inference only** (returns −1 for the dynamics stage; no K-step
-  unroll, no reward head). So it is a validated **zero-DSP arithmetic primitive**, not a finished
-  on-fabric learner. To make it real: bound `nearest_pow2` to a fixed ≤15-iteration loop, add the
+  unroll, no reward head). So it is an HLS-synthesized **zero-DSP arithmetic
+  primitive**, not a finished on-fabric learner. To make it real: bound
+  `nearest_pow2` to a fixed ≤15-iteration loop, add the
   dynamics unroll + reward head, re-synthesize, and report the *actual* bounded latency.
 - **"Low-risk P&R" was an overstatement — corrected.** A clean HLS *C-synthesis* estimate is **not** a
-  P&R timing guarantee: per §3, the only MuZero-family kernel ever placed-and-routed (the char-LM)
-  **FAILED post-route timing** (WNS −1.557 ns) despite plausible HLS numbers. The HLS estimate is
+  P&R timing guarantee: per §3, a related monolithic char-LM build **FAILED
+  post-route timing** (WNS −1.557 ns) despite plausible HLS numbers. The HLS estimate is
   encouraging, but **P&R timing closure is a genuine open risk** until an AFI is actually built.
 
 Reports: `results/fpga_silicon/forge_train_step_muzero{,_train}_csynth.rpt`.
@@ -89,17 +105,22 @@ widens an `ap_int<32>` to `ap_int<33>`, and `relu`'s `data_t vs int 0`. Fix is a
 the negative/zero branch (`(acc_t)(-v)`, `(data_t)0`); semantics-preserving under the g++ CSIM shim.
 Synthesize early — the CSIM (g++) build does NOT catch these.
 
-STILL TODO: the full HLS→DCP→AFI build (flow B, ~3 h P&R + ~1–2 h AFI gen on z1d) then the
-f2.6xlarge on-board run. Build infra (`aws_build_dcp_from_cl.py` etc.) is monorepo-coupled — adapt
-`KERNEL_DIR`/top to `forge_train_step_muzero{,_train}` and reuse this part/clock.
+STILL TODO: the full HLS→DCP→AFI build and an F2 on-board run. The historical
+build infrastructure is monorepo-coupled; porting it to these kernel tops needs
+its own validation rather than assuming a parameter-only adaptation.
 
 ---
 
-## 2. Validated AGFI registry (account 739966866637, us-east-1)
+## 2. Historical AGFI inventory (account 739966866637, us-east-1)
+
+These identifiers record the private account/region used for the experiments.
+They are not distributed with TikiTorch, may be deregistered or inaccessible to
+other accounts, and are not release-supported defaults. Reproduction requires
+building or obtaining an authorized, layout-compatible image.
 
 | AGFI | name | notes |
 |---|---|---|
-| `agfi-0a845113b088cf62e` | `cl_forge_train_step_v7_monolithic` | **the default** for `model.fpga()` char-LM; bound, dsp=0, 99.5 % params evolved |
+| `agfi-0a845113b088cf62e` | `cl_forge_train_step_v7_monolithic` | historical one-layer script default; FPGA-PCI run observed 99.5% of parameters change; associated record reports DSP=0 |
 | `agfi-0507f7d451ea7c338` | `cl_forge_train_step_tier1_d128_v128` | tier-1 D=128 V=128 |
 | `agfi-03098a84aba9aba04` | `cl_forge_train_step_2layer` | 2-layer LM |
 | `agfi-042a4d0cf6f63b3fd` | `cl_forge_train_step_3layer` | 3-layer LM |
@@ -111,12 +132,14 @@ List them: `aws ec2 describe-fpga-images --profile <p> --region us-east-1 --quer
 
 ## 3. Timing-failure history + ROOT CAUSE  — [blocked]
 
-The on-silicon **parameter-evolution proof is exact**, but a **live loss curve** is not
-yet achievable, because the loss readout reads `grad_logit` at the bundled
+The archived on-silicon observable is a before/after parameter-change count
+(229872/231040), not a bit-exact internal trajectory or learning-quality result.
+A **live loss curve** is not yet achievable, because the loss readout reads
+`grad_logit` at the bundled
 `forge_buffer.hpp` offset, and the currently-registered AFIs are layout-rebuilds whose
 `grad_logit` offset differs from the originally-validated (now-deregistered) AGFI — so
 the accuracy proxy pins at a constant. The fix is to **rebuild a layout-matched AFI**…
-but every rebuild has failed post-route timing:
+but each rebuild recorded in this history failed post-route timing:
 
 | attempt | target | result |
 |---|---|---|
@@ -128,8 +151,8 @@ but every rebuild has failed post-route timing:
 **ROOT CAUSE (the actionable finding):** at an 8 ns HLS target, `vitis_hls` estimates the
 monolithic kernel needs **14.345 ns (~70 MHz)**, gated by a **512-bit `select` operation**
 (`w_new`, `forge_train_step.cpp:552`). That is *below the slowest standard shell-clock
-floor* (clk_main_a0 = 125 MHz / 8 ns), so **no clock recipe can ever close it** — the
-slower-clock lever is exhausted. Closing timing requires **HLS pipelining / registering the
+floor* (clk_main_a0 = 125 MHz / 8 ns), so **no standard shell-clock recipe can
+close this unpipelined build**—the slower-clock lever is exhausted. Closing timing requires **HLS pipelining / registering the
 512-bit critical path** (a kernel change), not a build-flag change.
 
 Fix candidates (next work): (a) `#pragma HLS PIPELINE`/register the wide `w_new` select to
@@ -158,14 +181,17 @@ kernel to a slower auxiliary clock (clk_extra_*). Each needs a rebuild (~3 h) + 
 
 ## 5. Instances / costs
 
+These are dated June 2026 environment notes and rough historical prices, not
+current quotes. Check current AWS availability and pricing before use.
+
 | role | type | AMI | ~cost | notes |
 |---|---|---|---|---|
 | run on silicon | `f2.6xlarge` | `ami-092fc5deb8f3c0f7d` | ~$13.65/hr | aws-fpga SDK; terminate after the run |
 | AFI build | `z1d.6xlarge` | `ami-092fc5deb8f3c0f7d` | ~$1.1/hr | Vivado P&R ~2h43m + AWS AFI gen ~1–2 h |
 | GPU benchmarks | `g5.4xlarge` (A10G) | `ami-05603a42e5254c4bb` | ~$1.6/hr | image/seq closed benchmarks |
 
-Profile `NYUMCResearchAdminFullAccess-739966866637`, key `mnemo-dev`, SG `sg-0efe5c4b6eeb6fda6`,
-region `us-east-1`. **Always terminate after** (these are billable).
+Use a profile, key pair, security group, region, and FPGA image authorized in
+your own account. **Always terminate after** (these instances are billable).
 
 ---
 
@@ -176,8 +202,10 @@ In this repo (`scripts/`), standalone:
 - `run_tikitorch_f2_silicon.sh` — provision an f2.6xlarge + run the verify (launch/monitor/download/terminate).
 - `run_tikitorch_gpu_benchmarks.sh` — provision a g5.4xlarge + run the closed image/seq benchmarks.
 
-Still in the source monorepo (kernel-build infra, forge-coupled — flow B): `run_hdk_build_train_step.sh`,
-`run_hdk_build_remote.sh` (HLS→CL→DCP→S3), `create_afi.sh` (DCP→AGFI). The HLS kernel source is
-vendored here at `tikitorch/hardware/hls/forge_kernels/` (identical to the monorepo's `forge/`
-copy), so a standalone build flow is a clean follow-up — the only adaptation is `KERNEL_DIR` and
-the rsync source path.
+The historical flow-B orchestration remains in the source monorepo:
+`run_hdk_build_train_step.sh`, `run_hdk_build_remote.sh` (HLS→CL→DCP→S3), and
+`create_afi.sh` (DCP→AGFI). Kernel sources are vendored here under
+`tikitorch/hardware/hls/forge_kernels/`, but a standalone AFI build from this
+release has not yet been demonstrated. Port and verify the orchestration,
+constraints, CL package, paths, and target-specific checks before claiming a
+standalone build.

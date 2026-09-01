@@ -9,7 +9,7 @@ import time
 import urllib.request
 import urllib.error
 
-GFX = "/Users/ekoermann/Documents/tikitorch/results/graphics"
+GFX = os.path.dirname(os.path.abspath(__file__))
 
 # --- load .env ---
 env = {}

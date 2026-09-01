@@ -10,12 +10,14 @@ Validates the cross-instance transport against the ThreadLink reference:
 """
 import multiprocessing as mp
 import os
+import struct
 import threading
 import time
 
 import numpy as np
 import pytest
 
+import tikitorch.fabric.tcp_link as tcp_wire
 from tikitorch.fabric import PipelineRunner, make_thread_links
 from tikitorch.fabric.stages import make_linear_pipeline
 from tikitorch.fabric.tcp_link import (
@@ -79,6 +81,75 @@ def test_wire_roundtrip():
     bad_payload[-8] ^= 0xFF                                      # flip a payload byte
     with pytest.raises(WireError, match="checksum"):
         decode_msg(bad_payload)
+
+
+def _frame_prefix(shape, payload_len, *, ndim=None, dtype_code=10):
+    """Build metadata only; limit failures must occur before absent payload bytes are read."""
+    if ndim is None:
+        ndim = len(shape)
+    return b"".join((
+        struct.pack("<IqBBB", tcp_wire.MAGIC, 0, DIR_FWD, dtype_code, ndim),
+        struct.pack(f"<{len(shape)}q", *shape),
+        struct.pack("<Q", payload_len),
+    ))
+
+
+def test_wire_rejects_untrusted_resource_sizes_before_payload_read():
+    # An excessive rank is rejected from the fixed header, before reading its shape.
+    header_only = _frame_prefix((), 0, ndim=tcp_wire.MAX_WIRE_NDIM + 1)
+    with pytest.raises(WireError, match=r"ndim .* exceeds wire limit"):
+        decode_msg(header_only)
+
+    # These buffers intentionally end after their metadata.  Seeing the stated limit
+    # errors (rather than "truncated message") proves no payload read was requested.
+    too_large = tcp_wire.MAX_WIRE_PAYLOAD_BYTES + 1
+    with pytest.raises(WireError, match=r"payload_len .* exceeds wire limit"):
+        decode_msg(_frame_prefix((too_large,), too_large))
+
+    # The product check rejects before multiplying beyond the configured bound.
+    with pytest.raises(WireError, match=r"tensor shape .* exceeds wire payload limit"):
+        decode_msg(_frame_prefix((tcp_wire.MAX_WIRE_AXIS_LENGTH, 2), 0))
+
+    # A zero axis cannot be used to smuggle an otherwise unbounded dimension through.
+    with pytest.raises(WireError, match=r"shape axis 1 length .* exceeds wire limit"):
+        decode_msg(_frame_prefix((0, tcp_wire.MAX_WIRE_AXIS_LENGTH + 1), 0))
+
+
+def test_wire_rejects_invalid_shape_and_length_before_payload_read():
+    with pytest.raises(WireError, match="negative shape axis"):
+        decode_msg(_frame_prefix((-1,), 0))
+    with pytest.raises(WireError, match=r"payload_len 3 != prod\(4,\) \* 1"):
+        decode_msg(_frame_prefix((4,), 3))
+
+
+def test_wire_encoder_applies_limits_before_contiguous_copy():
+    # broadcast_to creates a constant-size view; a misplaced contiguous conversion
+    # would allocate the peer-sized buffer before enforcing the wire bound.
+    oversized_view = np.broadcast_to(
+        np.array(1, dtype=np.uint8),
+        (tcp_wire.MAX_WIRE_PAYLOAD_BYTES + 1,),
+    )
+    assert not oversized_view.flags.c_contiguous
+    with pytest.raises(ValueError, match="array exceeds wire limits"):
+        encode_msg(0, DIR_FWD, oversized_view)
+
+
+def test_split_chain_listener_defaults_to_loopback_and_wildcard_is_explicit(monkeypatch):
+    captured = []
+
+    class FakeLink:
+        def __init__(self, stage, num_stages, **kwargs):
+            captured.append((stage, num_stages, kwargs))
+
+    monkeypatch.setattr(tcp_wire, "TcpLink", FakeLink)
+    make_tcp_chain(4, 2, "right")
+    assert captured[0][2]["fwd_in"] == {"listen": ("127.0.0.1", 41000)}
+    assert captured[0][2]["bwd_out"] == {"listen": ("127.0.0.1", 41001)}
+
+    captured.clear()
+    make_tcp_chain(4, 2, "right", listen_host="0.0.0.0")
+    assert captured[0][2]["fwd_in"] == {"listen": ("0.0.0.0", 41000)}
+    assert captured[0][2]["bwd_out"] == {"listen": ("0.0.0.0", 41001)}
 
 
 # -- 2. all-TCP chain == ThreadLink ---------------------------------------------------

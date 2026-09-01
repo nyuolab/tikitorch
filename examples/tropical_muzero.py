@@ -36,7 +36,7 @@ print(f"\nbest snapshot: optimal-action agreement {best['agree']:.0%} | "
 tt.assert_closed(mz.net, allow={"Linear"})
 print("closure: structural audit passes with linear heads as declared boundaries")
 
-# Freeze the dyadic weights to a bit-exact (sign, exponent) SHIFT SCHEDULE — the FPGA deploy
+# Freeze dyadic weights to a (sign, exponent) shift schedule and verify within tolerance.
 # artifact — and verify it reproduces the trained forward exactly.
 import tikitorch.fpga as fpga
 sched = fpga.export_net(mz.net)

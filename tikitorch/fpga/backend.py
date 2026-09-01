@@ -1,14 +1,15 @@
-"""tikitorch.fpga.backend — the FpgaBackend (Tier-1 model binding).
+"""tikitorch.fpga.backend — fail-closed whole-model native binding.
 
-Registers ``'fpga'`` into the :mod:`tikitorch.backend` seam. Its capability set is
-the honest Tier-1 shape: ``model_binding=True`` (whole fused training-step), and
-``op_dispatch=False`` (per-op kernels are Tier-2, F-gated — the :meth:`ops` table
-is intentionally empty so every tropical op resolves to the CPU fallback today).
+The backend registers the ``'fpga'`` wrapper seam but no per-op implementation.
+It can wrap a model and fall back to the model's PyTorch path; native execution
+additionally requires a usable endpoint, a full structural kernel match, and an
+application-supplied runner. No safe runner ships by default.
 
-``is_available()`` is ``True`` only when a native driver loaded *and* a board is
-present — ``False`` in this repo/CI. The whole-model offload contract is honored
-through :meth:`accelerate`, which returns a DDP-style wrapper (bound on board,
-transparent CPU fallback otherwise).
+``is_available()`` reports native endpoint usability, not physical-board
+presence. In particular, a LOCAL host-reference endpoint may return ``True``.
+The conservative capability declaration describes built-in behavior: it does
+not claim on-device training or integer-only execution merely because catalog
+artifacts or externally registered runners exist.
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ from .kernels import KernelCache
 
 
 class FpgaBackend(Backend):
-    """TikiTorch FPGA backend: Tier-1 whole-model fused-step binding over the seam."""
+    """Whole-model wrapper with fail-closed, explicitly supplied native runners."""
 
     name = "fpga"
 
@@ -40,11 +41,14 @@ class FpgaBackend(Backend):
 
     def capabilities(self) -> BackendCapabilities:
         return BackendCapabilities(
-            op_dispatch=False,        # Tier-2 (custom codegen) flips this on
-            model_binding=True,       # Tier-1: bind a whole model to a fused kernel
-            on_device_training=True,  # fwd + bwd + sign-SGD all on board
-            integer_only=True,        # INT16 weights / INT32 grads, DSP=0
-            notes="Tier-1 fused whole-training-step binding; per-op dispatch is Tier-2.",
+            op_dispatch=False,
+            model_binding=True,
+            on_device_training=False,
+            integer_only=False,
+            notes=(
+                "Fail-closed model wrapper and PyTorch fallback; native fused-step "
+                "execution requires an explicitly registered, build-specific runner."
+            ),
         )
 
     def ops(self) -> dict:
@@ -54,12 +58,12 @@ class FpgaBackend(Backend):
                    optimizer=None, strict: bool = False):
         """Wrap ``model`` in an :class:`~tikitorch.fpga.accelerate.AcceleratedModel`.
 
-        Binds to a compiled kernel iff a board is available, the model's shape
-        matches an entry in the :class:`KernelCache`, *and* an on-board runner is
-        registered for that kernel (:func:`~tikitorch.fpga.register_board_runner`).
-        Otherwise returns a transparent CPU-fallback wrapper (or raises
-        :class:`NativeUnavailable` when ``strict=True``). Idempotent: re-wrapping an
-        ``AcceleratedModel`` rebinds its inner module rather than nesting wrappers.
+        Native binding requires a usable endpoint, a full model-observable
+        structural match from :class:`KernelCache`, and an explicitly registered
+        kernel-specific runner. Otherwise the wrapper uses its PyTorch fallback,
+        or raises :class:`NativeUnavailable` when ``strict=True``. Strict mode does
+        not replace the runtime and build-manifest validation owned by a custom
+        runner. Re-wrapping an ``AcceleratedModel`` never nests wrappers.
         """
         from .accelerate import AcceleratedModel  # local import: avoid cycle
 
@@ -67,9 +71,17 @@ class FpgaBackend(Backend):
             model = model.module  # idempotent: never nest wrappers
 
         dev = device if isinstance(device, Device) else make_device(device or "fpga")
+        if dev.type != self.name:
+            raise ValueError(
+                f"FPGA acceleration requires logical device type 'fpga', got {dev!s}"
+            )
+        if dev.index not in (None, 0):
+            raise ValueError(
+                f"unsupported FPGA endpoint {dev!s}; only 'fpga' and 'fpga:0' are available"
+            )
         spec = self._cache.match(model)
-        on_board = self.is_available()
-        native = self._native if on_board else None
+        endpoint_usable = self.is_available()
+        native = self._native if endpoint_usable else None
         return AcceleratedModel._build(
             model, spec=spec, native=native, device=dev, optimizer=optimizer, strict=strict,
         )
@@ -85,5 +97,5 @@ class FpgaBackend(Backend):
         return self._native
 
     def device_count(self) -> int:
-        """Number of usable boards (0 when unavailable)."""
+        """Number of usable native endpoints; LOCAL may contribute one."""
         return 1 if self.is_available() else 0

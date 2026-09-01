@@ -13,7 +13,7 @@ body:
     attributes:
       label: Proposed API or approach
       description: >
-        If it's a new op/layer/optimizer, does it preserve the multiplier-free
+        If it's a new op/layer/optimizer, does it preserve the declared software
         closure (compare/add/bit-shift only)? See CONTRIBUTING.md.
     validations:
       required: true

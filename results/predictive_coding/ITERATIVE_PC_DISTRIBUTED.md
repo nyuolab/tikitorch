@@ -129,9 +129,9 @@ Two tools, two hardware targets:
 ## Reproduce
 
 ```
-P=/Users/ekoermann/Documents/tikitorch
-PYTHONPATH=$P python scripts/pc_dyadic_deep.py nudge 16 32 48 64   # soft-nudge convergence vs backprop
-PYTHONPATH=$P python scripts/pc_dyadic_deep.py harden             # multi-seed async robustness + depth scan
-PYTHONPATH=$P python scripts/pc_dyadic_deep.py hybrid 16          # accuracy<->async frontier
-PYTHONPATH=$P python -m pytest tests/test_predictive_coding.py -q -k "nudge or async"
+TT_REPO="$(git rev-parse --show-toplevel)"
+PYTHONPATH=$TT_REPO python scripts/pc_dyadic_deep.py nudge 16 32 48 64   # soft-nudge convergence vs backprop
+PYTHONPATH=$TT_REPO python scripts/pc_dyadic_deep.py harden             # multi-seed async robustness + depth scan
+PYTHONPATH=$TT_REPO python scripts/pc_dyadic_deep.py hybrid 16          # accuracy<->async frontier
+PYTHONPATH=$TT_REPO python -m pytest tests/test_predictive_coding.py -q -k "nudge or async"
 ```

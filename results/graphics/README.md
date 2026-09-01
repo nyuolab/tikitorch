@@ -1,25 +1,16 @@
-# TODO  →  see results/pc_depth_traction/ (EXP_RESULTS.md, PREREG.md, THEORY_*.md)
-1. Run these experiments:
+# Historical predictive-coding programme graphics
 
-[DONE] Exp 1: cascade-vs-relaxation divergence vs depth (L=2/4/8/16). RESULT: gradient cosine
-= 1.00000 at ALL depths, sync AND async — the equivalence is exact and does NOT compound with
-depth. (softmax/LN attribution needs the transformer relaxation port — the G2b gap — flagged.)
+Status: archived research communication from 2026-07-03, not the current
+TikiTorch README, manuscript, or release claim surface. The ontogenic-agent
+programme now belongs in a sibling repository; this archive makes no claim that
+an agent or cloud instance is currently running. Revalidate every number and
+projection against the current claim ledger before reusing a panel publicly.
 
-[DONE] Exp 2: PC-vs-BP bpb gap vs depth, 3 seeds, + dyadic-BP arm to split "PC vs BP" from
-"dyadic vs float" — the central traction figure. RESULT: deep PC HAS traction. Both taxes small
-& bounded (substrate +0.02→+0.11 plateau; rule tax NEGATIVE ~−0.2, i.e. local PC WINS), flat
-depth 4→16. Caveat: matched-DATA not matched-COMPUTE (relax ~10-20× FLOPs at depth) — a quality
-gain traded for settling compute (the trade the fabric makes cheap).
+The underlying depth experiments and theory notes are preserved under
+`results/pc_depth_traction/`. Their historical summaries used matched data but
+not matched compute and should not be promoted into a systems advantage.
 
-2. [DONE] Proof cascade ≡ settled iterative PC → THEORY_CASCADE_EQUIVALENCE.md (feedforward
-graph C1 + chain-rule loss C2 + converged stable settling C3 ⇒ cascade = closed-form fixed
-point; grounded in the measured grad-checks; Exp 1 is the empirical confirmation).
-
-3. [LIVE] The living ontogenic agent works — Organism v0 (ontogenic_learner/organism/) is
-running its 14-day pilot on EC2 (i-0ea5e986108ac2a00): always-on, gated, restart-safe to the
-bit, zero incidents. Interact: `python -m ontogenic_learner.organism.cli status|sample|report`.
-
-# PC-TikiTorch — project graphics
+## PC-TikiTorch project graphics
 
 Schematics for the predictive-coding-on-FPGA-fabric program: scaling LLM training across
 AWS F2 FPGAs using **predictive coding** as the local learning rule and **tropical/dyadic
@@ -34,10 +25,10 @@ Each figure exists in three forms:
   generated from the PNG + the prompts baked into `nb_generate.py`. These are the
   presentation-grade images.
 
-Numbers current as of **2026-07-03**, sourced from
-`results/predictive_coding/{THROUGHPUT_ROADMAP,FLAGSHIP_SILICON_RESULT,README}.md` on the
-`tropical-predictive-coding` branch (worktree `/tmp/tt-pc`). If a run lands that changes a
-headline number (e.g. the S=8 rebuild), update the SVG text, re-render, and regenerate.
+Numbers were frozen on **2026-07-03** from the then-current predictive-coding
+research records. Historical branch and worktree names are not reproduction
+instructions. Before reuse, update the SVG text from current, immutable evidence,
+re-render, and regenerate.
 
 ---
 
@@ -46,8 +37,8 @@ headline number (e.g. the S=8 rebuild), update the SVG text, re-render, and rege
 ### 01 — Big picture (`01_big_picture`)
 The one-slide thesis: three pillars (tropical/dyadic arithmetic · predictive coding · FPGA
 fabric) converging on what is measured on silicon today, with the 124M north star clearly
-labeled as projected. **Use this first** — for README headers, talks, or explaining the
-project in one image.
+labeled as projected. It was the historical opening slide; do not use it as a
+current README header without a fresh claim review.
 
 ### 02 — Backprop vs predictive coding (`02_backprop_vs_pc`)
 Why the learning rule had to change: backprop's global gradient chain / weight transport /

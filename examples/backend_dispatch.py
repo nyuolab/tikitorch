@@ -24,14 +24,14 @@ print("device(cpu)         :", repr(cpu), "| is_cpu:", cpu.is_cpu)
 print("device(fpga:0)      :", repr(fpga), "| str:", str(fpga))
 
 # 3) The CPU implementation of every tropical op is auto-registered as the SAME
-#    callable functional exports — dispatch on CPU is byte-identical, zero overhead.
+#    callable functional exports. Registry lookup still has ordinary Python overhead.
 linear_cpu = tt.backend.dispatch("tropical_linear", "cpu")
 assert linear_cpu is F.tropical_linear
 print(f"\n#cpu ops registered : {len(tt.backend.list_ops('cpu'))}")
 print("dispatch('tropical_linear','cpu') is functional.tropical_linear:", linear_cpu is F.tropical_linear)
 
 # 4) Transparent fallback: ask for an op on a device with no kernel. You get the
-#    correct CPU implementation back, plus a ONE-TIME perf warning. Never an error.
+#    registered CPU reference back, plus a ONE-TIME fallback warning.
 tt.backend._reset_fallback_warnings()
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")

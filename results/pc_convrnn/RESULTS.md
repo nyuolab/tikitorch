@@ -1,7 +1,8 @@
-# Results — cascade PC trains fully tropical sequence models (`pc-morphssm`)
+# Results — cascade PC trains fully tropical sequence models
 
 Pre-registration: `PREREG.md` (committed before runs). Theory: `THEORY_UNROLLED_CASCADE.md`.
-Verdicts below are stated against the pre-registered criteria. [measured] unless noted.
+Verdicts below are stated against the pre-registered criteria. [measured] unless noted. The
+work was developed on the historical `pc-morphssm` branch and is now integrated into `main`.
 
 ## G0 — adjoint correctness: PASS [measured]
 

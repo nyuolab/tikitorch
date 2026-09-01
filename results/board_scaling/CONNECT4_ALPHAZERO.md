@@ -1,10 +1,10 @@
-# Connect4 — AlphaZero-style (true model in tree) + zero-DSP dyadic net
+# Connect4 — AlphaZero-style explicit-game tree + dyadic net
 
-_Score = win + 0.5·draw vs depth-limited negamax, random openings (30 games). The TRUE game model in
-the MCTS tree (exact transitions / terminals / legality at every node) + the dyadic net as prior +
-leaf value. Still **multiplier-free**: the net is the shift+add kernel, the tree is integer game-rule
-logic. The point: this is the **competitive path** for board games (where we have the simulator), and
-it sails past the negamax-d2/d3 wall that pure-MuZero (learned model in the tree) could not._
+_Score = win + 0.5·draw vs depth-limited negamax, random openings (30 games). The explicit Connect4
+state transition, terminal, and legality logic runs at every MCTS node; the dyadic net supplies the
+prior and leaf value. This avoids learned-transition errors, but it is not a multiplier-free
+whole-system result: PUCT and min-max normalization retain multiply/square-root/divide boundaries.
+At the tested budgets this configuration passes the d2/d3 wall seen with the learned-model tree._
 
 ## Depth is the lever (untrained dyadic net — the search does the work)
 
@@ -15,8 +15,9 @@ it sails past the negamax-d2/d3 wall that pure-MuZero (learned model in the tree
 | 800 | 1.00  | **0.88** | **0.75** |
 | *pure-MuZero (learned model) @200* | *0.58* | *0.00* | *0.00* |
 
-Depth **monotonically demolishes the depth-2/3 wall** — with an *untrained* net, so it is the search
-(true terminals + legality), not the net, doing it. The pure-MuZero learned-model tree is stuck at 0.
+Scores rise monotonically across this tested simulation grid with an *untrained* net, supporting the
+interpretation that explicit terminals and legality drive the gain here. This finite sweep is not a
+general guarantee that deeper search always improves play.
 
 ## What training buys (trained vs untrained, AlphaZero tree)
 
@@ -29,7 +30,8 @@ Depth **monotonically demolishes the depth-2/3 wall** — with an *untrained* ne
 **Honest read:** depth dominates; training's sim-efficiency benefit here is **small and within n=30
 noise** (trained edges untrained vs d2 by ~0.05–0.08, but vs d3 it is mixed and *worse* at 50 sims,
 0.20 vs 0.53 — consistent with the light 720-game training slightly *narrowing* the policy). So the
-zero-DSP net + AlphaZero search is already **competitive via depth** (≈0.82/0.87 vs d2/d3 at 200 sims),
+dyadic net + AlphaZero-style search is already **competitive via depth** in this benchmark
+(≈0.82/0.87 vs d2/d3 at 200 sims),
 but the net's prior is **not yet good enough to clearly reduce the sims needed**. Making the prior
 genuinely valuable (a real sim-efficiency win → cheaper/faster FPGA actors) is what the **M1** levers
 are for — more self-play, anti-collapse (entropy/KL), n-step value bootstrap — NOT crossing the wall

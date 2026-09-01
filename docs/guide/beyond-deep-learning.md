@@ -3,7 +3,7 @@
 The min-plus semiring did not start in deep learning — it is the native algebra of
 **dynamic programming, shortest paths, and scheduling**, and it underpins a small
 family of **classical ML** methods. The punchline of this page (and of
-[notebook 06 — *Beyond deep learning*](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/06_beyond_deep_learning.ipynb)):
+[notebook 06 — *Beyond deep learning*](https://github.com/nyuolab/tikitorch/blob/main/notebooks/06_beyond_deep_learning.ipynb)):
 the *exact same* `min`-plus matmul that is a tropical NN layer is also the
 Floyd–Warshall update — so an algorithm and a network layer are the same primitive.
 
@@ -79,4 +79,4 @@ are **one operation** — `min`/`max` of sums — wearing different hats. That i
 substrate can be useful for add/compare hardware studies and combinatorial reasoning,
 and why TikiTorch ships classical and algorithmic modules next to the neural ones. This
 is an algebraic connection, not a general performance guarantee. For the runnable tour,
-open [notebook 06](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/06_beyond_deep_learning.ipynb).
+open [notebook 06](https://github.com/nyuolab/tikitorch/blob/main/notebooks/06_beyond_deep_learning.ipynb).

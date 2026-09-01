@@ -53,6 +53,14 @@ def test_cpu_backend_registered_and_available():
     assert B.get_backend("does-not-exist") is None
 
 
+def test_backend_capabilities_default_to_no_claims():
+    caps = B.BackendCapabilities()
+    assert caps.op_dispatch is False
+    assert caps.model_binding is False
+    assert caps.on_device_training is False
+    assert caps.integer_only is False
+
+
 # --- op auto-registration + byte-identical CPU dispatch -------------------
 
 def test_cpu_ops_autoregistered_cover_functional():

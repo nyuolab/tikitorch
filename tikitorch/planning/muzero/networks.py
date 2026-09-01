@@ -52,9 +52,10 @@ def _set_tau(module, tau):
 
 def _make_proj(kind, in_features, out_features, tau):
     """Core projection factory. ``"maxplus"`` -> the (axis-aligned) TropicalProjection;
-    ``"dyadic"`` -> the multiplier-free OBLIQUE DyadicTropicalProjection (closes the §2a
-    underfit on smooth/oblique value — see results/capacity_probe/FIX_FINDINGS.md). Both
-    are zero-DSP; dyadic adds oblique reach via signed power-of-two (shift+add) monomials."""
+    ``"dyadic"`` -> the oblique DyadicTropicalProjection used in the §2a capacity
+    experiments (see results/capacity_probe/FIX_FINDINGS.md). Its quantized weights admit
+    a shift/add implementation; actual FPGA DSP use depends on the concrete lowering and
+    must be established by synthesis."""
     if kind == "dyadic":
         return ttnn.DyadicTropicalProjection(in_features, out_features, tau=tau)
     return ttnn.TropicalProjection(in_features, out_features, tau=tau)
@@ -66,14 +67,16 @@ def _make_proj(kind, in_features, out_features, tau):
 
 
 def _lin(in_dim, out_dim, dyadic):
-    """A linear readout: ``nn.Linear`` (declared DSP boundary) or ``DyadicLinear`` (signed
-    power-of-two weights -> shift+add, multiplier-free / zero-DSP) for a FULLY tropical net."""
+    """Select ``nn.Linear`` or a power-of-two-weight ``DyadicLinear`` readout.
+
+    ``DyadicLinear`` is intended for shift/add lowering. This software choice alone is
+    not a physical zero-DSP guarantee; that claim requires a specific synthesis report.
+    """
     return ttnn.DyadicLinear(in_dim, out_dim) if dyadic else nn.Linear(in_dim, out_dim)
 
 
 class ScalarHead(nn.Module):
-    """Plain scalar regression head (raw == scalar; MSE loss). L1 (``l1_loss``) is the
-    closure-faithful (multiplier-free, ±1-gradient) alternative used by the tropical recipe."""
+    """Plain scalar regression head (raw == scalar) trained with L1 loss."""
 
     def __init__(self, in_dim, dyadic=False):
         super().__init__()
@@ -177,7 +180,7 @@ class TropicalPrediction(nn.Module):
                  dyadic_heads=False):
         super().__init__()
         self.mix = _make_proj(proj_kind, latent_dim, latent_dim, tau)
-        # policy head: DyadicLinear (shift+add) for a fully multiplier-free net, else nn.Linear boundary
+        # DyadicLinear exposes a shift/add-oriented readout; nn.Linear is the dense boundary.
         self.policy_head = _lin(latent_dim, n_actions, dyadic_heads)
         self.value_head = _make_value_head(latent_dim, value_support, dyadic=dyadic_heads)
 
@@ -204,12 +207,14 @@ class TropicalMuZeroNet(nn.Module):
                  value_support=None, reward_support=None,
                  core_kind="maxplus", dyn_kind="maxplus", dyadic_heads=False):
         super().__init__()
-        # core_kind controls the OBLIQUE-needing cores (repr encode + pred value/policy
-        # readout): "maxplus" (axis-aligned, default) | "dyadic" (multiplier-free oblique,
-        # closes the §2a underfit). Dynamics stays "maxplus" by default — it is the MCTS
+        # core_kind controls the oblique-needing cores (representation encoding and
+        # prediction mixing): "maxplus" (axis-aligned, default) | "dyadic" (power-of-two
+        # oblique projections used in the §2a capacity experiment). Dynamics stays
+        # "maxplus" by default — it is the MCTS
         # hot loop and was a wash in tropical (results/capacity_probe/COMPONENT_FINDINGS.md).
-        # dyadic_heads=True makes the policy/value/reward readouts DyadicLinear too, so the WHOLE
-        # net is multiplier-free / zero-DSP (no nn.Linear boundary) — the fully-tropical deploy net.
+        # dyadic_heads=True also replaces dense readouts with DyadicLinear. It narrows the
+        # software recipe's multiply sites, but min-max scaling and categorical heads retain
+        # explicit arithmetic boundaries and hardware closure still requires synthesis.
         self.n_actions = n_actions
         self.repr = TropicalRepresentation(obs_dim, latent_dim, tau=tau, proj_kind=core_kind)
         self.dyn = TropicalDynamics(latent_dim, n_actions, tau=tau, reward_support=reward_support,

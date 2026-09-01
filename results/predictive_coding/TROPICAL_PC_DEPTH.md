@@ -558,16 +558,16 @@ accuracy (a non-target, per Path 5).
 ## Reproduce
 
 ```
-P=/Users/ekoermann/Documents/tikitorch        # canonical repo (see env note)
-PYTHONPATH=$P python scripts/pc_depth_probe.py smoke    # closure + sanity learn
-PYTHONPATH=$P python scripts/pc_depth_probe.py depth    # baseline vs identity, depth 2-32 (blobs)
-PYTHONPATH=$P python scripts/pc_depth_probe.py mnist    # MNIST baseline vs identity
-PYTHONPATH=$P python scripts/pc_active_probe.py         # identity-gap bistability sweep
-PYTHONPATH=$P python scripts/pc_ceiling_probe.py        # max-plus primitive ceiling (backprop+Adam)
-PYTHONPATH=$P python scripts/pc_dyadic_probe.py         # PATH 2 step 1: dyadic vs dense ceiling
-PYTHONPATH=$P python scripts/pc_dyadic_train.py         # PATH 2 step 2: dyadic PC depth curve (Adam)
-PYTHONPATH=$P python scripts/pc_dyadic_train.py rescue  #   (settle-stability rescue grid)
-PYTHONPATH=$P python scripts/pc_dyadic_train.py signsgd # multiplier-free pure-sign update + per-sample identity
+TT_REPO="$(git rev-parse --show-toplevel)"              # canonical repo (see env note)
+PYTHONPATH=$TT_REPO python scripts/pc_depth_probe.py smoke    # closure + sanity learn
+PYTHONPATH=$TT_REPO python scripts/pc_depth_probe.py depth    # baseline vs identity, depth 2-32 (blobs)
+PYTHONPATH=$TT_REPO python scripts/pc_depth_probe.py mnist    # MNIST baseline vs identity
+PYTHONPATH=$TT_REPO python scripts/pc_active_probe.py         # identity-gap bistability sweep
+PYTHONPATH=$TT_REPO python scripts/pc_ceiling_probe.py        # max-plus primitive ceiling (backprop+Adam)
+PYTHONPATH=$TT_REPO python scripts/pc_dyadic_probe.py         # PATH 2 step 1: dyadic vs dense ceiling
+PYTHONPATH=$TT_REPO python scripts/pc_dyadic_train.py         # PATH 2 step 2: dyadic PC depth curve (Adam)
+PYTHONPATH=$TT_REPO python scripts/pc_dyadic_train.py rescue  #   (settle-stability rescue grid)
+PYTHONPATH=$TT_REPO python scripts/pc_dyadic_train.py signsgd # multiplier-free pure-sign update + per-sample identity
 PYTHONPATH=$P python scripts/pc_dyadic_train.py signbest #   (tune the no-momentum pure-sign update)
 PYTHONPATH=$P python scripts/pc_dyadic_train.py signfix # magnitude-aware dyadic-backward update (matches Adam)
 PYTHONPATH=$P python scripts/pc_dyadic_train.py deepwall # PATH 3: locate the depth wall (no tricks)

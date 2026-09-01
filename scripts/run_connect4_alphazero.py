@@ -1,9 +1,8 @@
-"""run_connect4_alphazero — the competitive Connect4 path: AlphaZero-style MCTS (TRUE game model in
-the tree) + the zero-DSP dyadic net as prior/leaf-value. Quantifies (a) that depth beats negamax-d2/d3
-and (b) that TRAINING the net buys sim-efficiency — the trained net reaches a given strength at FEWER
-simulations than an untrained one (the net's real job when the simulator does the lookahead).
+"""Run a Connect4 AlphaZero-style explicit-game tree with a dyadic prior/value net.
 
-All multiplier-free: the net is the shift+add kernel; the tree is integer game-rule logic.
+The sweep measures scores across search budgets and compares trained and untrained nets. Dyadic
+layers admit a shift/add-oriented export, but the Python search includes PUCT multiplication, square
+root, min-max division, and floating-point statistics; this is not a whole-system resource claim.
 
     PYTHONPATH=<repo> python3 scripts/run_connect4_alphazero.py
 """
@@ -64,16 +63,16 @@ def main():
 
     os.makedirs(OUT, exist_ok=True)
     open(os.path.join(OUT, "connect4_alphazero.json"), "w").write(json.dumps(
-        {"note": "AlphaZero-style (true model in tree) + dyadic zero-DSP net; score=win+0.5draw, "
-                 "random openings, 30 games. Depth beats d2/d3; this measures what (light) training "
-                 "buys on top (sim-efficiency, if any) — interpret vs n=30 noise (SE~0.09).",
+        {"note": "AlphaZero-style explicit-game tree + dyadic net; model closure and full Python "
+                 "search/resource closure are separate. score=win+0.5draw, random openings, 30 "
+                 "games. This measures what light training buys, if anything; interpret vs n=30 "
+                 "noise (SE~0.09).",
          "results": res}, indent=2))
-    md = ["# Connect4 — AlphaZero-style (true model in tree) + zero-DSP dyadic net", "",
-          "_Score = win + 0.5*draw vs depth-limited negamax, random openings (30 games). The TRUE game "
-          "model in the MCTS tree (exact transitions/terminals/legality) + the dyadic net as prior/leaf "
-          "value. Still multiplier-free (net = shift+add; rules = integer logic). Shows (a) depth beats "
-          "the negamax-d2/d3 wall that pure-MuZero couldn't; (b) what light training buys on top "
-          "(sim-efficiency, if any) — read vs n=30 noise._", "",
+    md = ["# Connect4 — AlphaZero-style explicit-game tree + dyadic net", "",
+          "_Score = win + 0.5*draw vs depth-limited negamax, random openings (30 games). The game "
+          "object supplies transitions, terminals, and legality at each node; the dyadic net supplies "
+          "the prior and leaf value. PUCT and min-max normalization remain arithmetic boundaries. "
+          "The sweep measures depth and any light-training sim-efficiency effect; read vs n=30 noise._", "",
           "| sims | trained vs d2 | untrained vs d2 | trained vs d3 | untrained vs d3 |",
           "|---|---|---|---|---|"]
     for sims in sims_grid:

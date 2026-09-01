@@ -23,7 +23,7 @@ Submodules:
     tikitorch.nn          — tropical layer Modules (a la torch.nn)
     tikitorch.optim       — sign-, shift-, and counter-oriented optimizer variants
     tikitorch.models      — ready-to-use tropical architectures
-    tikitorch.autodiff    — exact forward-route certificates and replay VJPs
+    tikitorch.autodiff    — operator-scoped forward-route certificates and replay VJPs
     tikitorch.hardware    — HLS kernels + an AFI/silicon build guide
     tikitorch.backend     — pluggable execution-backend seam (logical devices + dispatch)
     tikitorch.fpga        — the FPGA backend (DDP-style fpga.accelerate(model))
@@ -39,28 +39,16 @@ from tikitorch._hardware import HardwareCostProfile  # noqa: F401
 
 # The pluggable backend seam (depends only on functional + torch + stdlib). It
 # registers the CPU backend and auto-binds the functional ops as the default
-# implementation, so the existing CPU path stays byte-identical and zero-overhead.
+# implementation, so CPU dispatch returns the existing reference callables.
 from tikitorch import backend  # noqa: F401
 from tikitorch.backend import device, to  # noqa: F401  (tt.device(...) / tt.to(...))
 
-# optim and models are guarded so that
-# `import tikitorch` never hard-fails while the package is being assembled.
-try:  # pragma: no cover - import guard
-    from tikitorch import optim  # noqa: F401
-except Exception:  # noqa: BLE001
-    optim = None  # type: ignore[assignment]
-
-try:  # pragma: no cover - import guard
-    from tikitorch import models  # noqa: F401
-except Exception:  # noqa: BLE001
-    models = None  # type: ignore[assignment]
-
-# The FPGA backend self-registers into the seam on import. Guarded like
-# optim/models so a missing native layer never breaks `import tikitorch`.
-try:  # pragma: no cover - import guard
-    from tikitorch import fpga  # noqa: F401
-except Exception:  # noqa: BLE001
-    fpga = None  # type: ignore[assignment]
+# Core public namespaces fail loudly if their Python imports are broken. Optional
+# native FPGA availability is handled inside ``tikitorch.fpga`` and is not a reason
+# to hide a package error behind ``None``.
+from tikitorch import optim  # noqa: F401
+from tikitorch import models  # noqa: F401
+from tikitorch import fpga  # noqa: F401
 
 # Closure verification, tropical-geometry tools, classical tropical ML, and
 # structured pruning (always importable; depend only on functional/nn/torch).
@@ -82,25 +70,13 @@ from tikitorch.serialization import save, load  # noqa: F401
 from tikitorch import profile  # noqa: F401
 from tikitorch.profile import profile_model, format_report  # noqa: F401
 
-# The soft-to-hard Trainer is finalized like optim/models; guard so a missing
-# dependency never hard-fails ``import tikitorch``.
-try:  # pragma: no cover - import guard
-    from tikitorch import train  # noqa: F401
-    from tikitorch.train import Trainer  # noqa: F401
-except Exception:  # noqa: BLE001
-    train = None  # type: ignore[assignment]
-    Trainer = None  # type: ignore[assignment]
-
-# Tropical Forward-Forward (forward-only, backprop-free local learning). Guarded
-# like optim/models so a mid-assembly dependency never breaks ``import tikitorch``.
-try:  # pragma: no cover - import guard
-    from tikitorch import forward_forward  # noqa: F401
-    from tikitorch.forward_forward import (  # noqa: F401
-        TropicalFFLayer, TropicalFFNet, TropicalFFTrainer,
-    )
-except Exception:  # noqa: BLE001
-    forward_forward = None  # type: ignore[assignment]
-    TropicalFFLayer = TropicalFFNet = TropicalFFTrainer = None  # type: ignore[assignment]
+# Reference trainer and local-learning namespace are part of the public Python API.
+from tikitorch import train  # noqa: F401
+from tikitorch.train import Trainer  # noqa: F401
+from tikitorch import forward_forward  # noqa: F401
+from tikitorch.forward_forward import (  # noqa: F401
+    TropicalFFLayer, TropicalFFNet, TropicalFFTrainer,
+)
 
 # Top-level convenience re-exports: architectures and optimizers are reachable
 # directly (``tt.MorphSSM``, ``tt.PureTropicalSGD``) as well as via submodule
@@ -111,29 +87,22 @@ _top = ["__version__", "functional", "nn", "autodiff", "optim", "models", "Hardw
         "assert_closed_runtime", "assert_training_closed", "find_runtime_multiplies",
         "find_training_multiplies", "closure_report",
         "assert_no_multiply", "closed", "ClosureViolation",
-        "backend", "device", "to",
+        "backend", "device", "to", "fpga", "train", "Trainer",
+        "forward_forward", "TropicalFFLayer", "TropicalFFNet", "TropicalFFTrainer",
         "serialization", "save", "load", "profile", "profile_model", "format_report"]
-if fpga is not None:
-    _top += ["fpga"]
-if Trainer is not None:
-    _top += ["train", "Trainer"]
-if forward_forward is not None:
-    _top += ["forward_forward", "TropicalFFLayer", "TropicalFFNet", "TropicalFFTrainer"]
-if models is not None:
-    from tikitorch.models import (  # noqa: F401
-        MorphSSM, TropicalTransformer, MoTE, MoTEModel,
-        TropicalMLP, TropicalSequenceModel, MorphMLP,
-        TropicalForwardForward, DyadicForwardForward,
-    )
-    _top += ["MorphSSM", "TropicalTransformer", "MoTE", "MoTEModel",
-             "TropicalMLP", "TropicalSequenceModel", "MorphMLP",
-             "TropicalForwardForward", "DyadicForwardForward"]
-if optim is not None:
-    from tikitorch.optim import (  # noqa: F401
-        SignSGD, TropicalSGD, PureTropicalSGD, TropicalLion, TropicalAdam,
-        FrexpMagnitudeSGD, CountAgreementSGD, ExponentEMAAdam, PerLayerStepSGD,
-    )
-    _top += ["SignSGD", "TropicalSGD", "PureTropicalSGD", "TropicalLion", "TropicalAdam",
-             "FrexpMagnitudeSGD", "CountAgreementSGD", "ExponentEMAAdam", "PerLayerStepSGD"]
+from tikitorch.models import (  # noqa: F401
+    MorphSSM, TropicalTransformer, MoTE, MoTEModel,
+    TropicalMLP, TropicalSequenceModel, MorphMLP,
+    TropicalForwardForward, DyadicForwardForward,
+)
+_top += ["MorphSSM", "TropicalTransformer", "MoTE", "MoTEModel",
+         "TropicalMLP", "TropicalSequenceModel", "MorphMLP",
+         "TropicalForwardForward", "DyadicForwardForward"]
+from tikitorch.optim import (  # noqa: F401
+    SignSGD, TropicalSGD, PureTropicalSGD, TropicalLion, TropicalAdam,
+    FrexpMagnitudeSGD, CountAgreementSGD, ExponentEMAAdam, PerLayerStepSGD,
+)
+_top += ["SignSGD", "TropicalSGD", "PureTropicalSGD", "TropicalLion", "TropicalAdam",
+         "FrexpMagnitudeSGD", "CountAgreementSGD", "ExponentEMAAdam", "PerLayerStepSGD"]
 
 __all__ = _top

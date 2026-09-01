@@ -1,54 +1,66 @@
-"""FPGA API quickstart using a local reference bridge or compatible native binding.
+"""Inspect the FPGA catalog and exercise the fail-closed PyTorch fallback.
 
-No board is needed to exercise the interface. Build the local host-reference
-bridge, then run this script:
-
-    eval "$(bash scripts/build_fpga_local.sh --export)"
-    python examples/fpga_quickstart.py
-
-Without the bridge the script runs the software audit and prints how to enable
-the native path. A local bridge is not FPGA execution or synthesis evidence.
-Compatible AWS F2 runners use the same high-level API; see
-`tikitorch/fpga/BUILD_NATIVE.md` for backend-specific requirements.
+This example does not require a board or native library, and it does not claim
+native training. Even with a LOCAL host-reference library loaded, no safe runner
+is bundled or auto-registered. See ``tikitorch/fpga/BUILD_NATIVE.md`` before
+supplying a custom runner. From a source checkout, run it as
+``python -m examples.fpga_quickstart`` so imports resolve to that checkout.
 """
+
 import torch
 
 import tikitorch as tt
 import tikitorch.fpga as fpga
-from tikitorch.audit import assert_closed, find_runtime_multiplies
 
-# A model whose shape matches the bundled 1-layer LM kernel (V=128, D=128,
-# n_layers=1) — the kernel that ships a reference on-board runner, so the model
-# actually BINDS (the 2-/3-layer + morph kernels need a runner you supply).
-model = tt.models.TropicalTransformer(d_model=128, n_heads=4, n_layers=1, d_ff=512,
-                                      max_seq_len=128, task_type="lm", vocab_size=128)
 
-# (1) Properties you can verify with NO hardware ------------------------------
-assert_closed(model)                                                   # structural module audit
-muls = find_runtime_multiplies(model, torch.randint(0, 128, (1, 64)))  # dynamic: trace a real forward
-spec = fpga.KernelCache.default().match(model)                         # the compiled kernel this model maps to
-print("closure audit :  assert_closed PASS")
-print(f"runtime multiplies in the traced step :  {muls}")
-print(f"maps to kernel :  {spec.entry!r}   dsp={spec.dsp}   (d_ff={spec.d_ff}, l_max={spec.l_max})")
+cache = fpga.KernelCache.default()
+key = fpga.LMKernelConfig(V=128, D=128, n_layers=1)
+record = cache.lookup("TropicalTransformer", key)
 
-# (2) Train on the kernel — LOCAL host-faithful bridge or real F2 silicon ------
-# `model.fpga()` is the headline: one line, analogous to DistributedDataParallel.
-accel = model.fpga()
-if not accel.bound:
-    print("\n[CPU fallback] no native bridge/board, so the model runs on CPU.")
-    print("To exercise the local host-reference bridge, run:")
-    print('    eval "$(bash scripts/build_fpga_local.sh --export)"')
-    print("    python examples/fpga_quickstart.py")
-    raise SystemExit(0)
+print("Catalog inspection (not a compatibility check):")
+if record is None:
+    print("  no one-layer LM record")
+else:
+    print(f"  entry={record.entry!r}, d_ff={record.d_ff}, l_max={record.l_max}")
+    print(f"  recorded build-specific DSP field={record.dsp}")
 
-print(f"\nbound on kernel {spec.entry!r}  (fpga.is_available()={fpga.is_available()}). training 5 steps:")
-flat = lambda: torch.cat([p.detach().reshape(-1) for p in model.parameters()])
-before = flat().clone()
-tokens = torch.randint(0, 128, (64,))
-targets = torch.randint(0, 128, (64,))
-for i in range(5):
-    loss = accel.train_step(tokens, targets=targets, lr=2, threshold=0)  # the fused fwd+bwd+SignSGD kernel step
-    print(f"  step {i}:  kernel loss-proxy = {loss:.4f}")
-changed = int((before != flat()).sum())
-print(f"\nparams changed through the native binding: {changed}/{before.numel()}")
-print("This run does not by itself establish FPGA execution or a physical resource claim.")
+# This stock model shares the compact catalog key but not the full HLS recipe.
+# match() checks all model-observable structural properties and returns None on
+# ambiguity; the retired one-layer flat-parameter runner is also never eligible.
+model = tt.models.TropicalTransformer(
+    d_model=128,
+    n_heads=4,
+    n_layers=1,
+    d_ff=512,
+    max_seq_len=128,
+    use_shift_attn=True,
+    dropout=0.0,
+    task_type="lm",
+    vocab_size=128,
+)
+matched = cache.match(model)
+print(f"full structural match: {matched.entry if matched is not None else None}")
+
+optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+accelerated = fpga.accelerate(model, optimizer=optimizer)
+print(f"native endpoint usable: {fpga.is_available()}")
+print(f"native runner bound: {accelerated.bound}")
+
+# Because this model is unbound, train_step uses the inner model's PyTorch path
+# and emits one BackendFallbackWarning. It cannot call a native kernel here.
+tokens = torch.randint(0, 128, (2, 16))
+targets = torch.randint(0, 128, (2, 16))
+loss = accelerated.train_step(tokens, targets)
+print(f"PyTorch fallback loss: {loss:.6f}")
+
+try:
+    fpga.accelerate(model, strict=True)
+except fpga.NativeUnavailable as exc:
+    print(f"strict mode rejected the incomplete binding: {exc}")
+
+print("\nA custom native binding additionally requires:")
+print("  1. a full structural match (catalog lookup alone is insufficient);")
+print("  2. runtime shape/dtype/range and named-buffer validation;")
+print("  3. native symbol/ABI/buffer and build-manifest verification;")
+print("  4. an explicitly registered kernel-specific runner.")
+print("LOCAL satisfies only the host-endpoint part of that contract, not board execution.")

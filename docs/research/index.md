@@ -9,7 +9,7 @@ archived evidence, explicit limitations, and a reproduction path.
 When descriptions disagree, use this order:
 
 1. Raw artifacts and executable tests.
-2. The canonical [research claim ledger](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/docs/research/CLAIM_LEDGER.md).
+2. The canonical [research claim ledger](CLAIM_LEDGER.md).
 3. Paper workspaces and result summaries.
 4. General documentation, examples, and manuscript prose.
 
@@ -22,8 +22,8 @@ ledger entry.
 | Workstream | Workspace | Boundary |
 | --- | --- | --- |
 | TikiTorch library | [source and API docs](../api/index.md) | PyTorch-shaped, not complete PyTorch compatibility or production maturity |
-| Multiplier-free learning on FPGA | [`papers/multiplier_free_fpga`](https://github.com/nyuolab/tikitorch/tree/pc-morphssm/papers/multiplier_free_fpga) | Build- and task-specific results; matched CUDA, timing, power, and replication gates remain explicit |
-| Forward traces as differentiation certificates | [`papers/route_certificates`](https://github.com/nyuolab/tikitorch/tree/pc-morphssm/papers/route_certificates) | Exact selected-VJP replay for a declared finite operator set, not a new gradient or arbitrary PyTorch graph |
+| Multiplier-free learning on FPGA | [`papers/multiplier_free_fpga`](https://github.com/nyuolab/tikitorch/tree/main/papers/multiplier_free_fpga) | Build- and task-specific results; D128 replication is preliminary pending timing closure, while matched CUDA and full-card power remain open |
+| Forward traces as differentiation certificates | [`papers/route_certificates`](https://github.com/nyuolab/tikitorch/tree/main/papers/route_certificates) | Exact selected-VJP replay for a declared finite operator set, not a new gradient or arbitrary PyTorch graph |
 
 Paper source is kept separate from the installed package and user documentation. Draft
 manuscripts are working research artifacts, not release guarantees.
@@ -32,7 +32,7 @@ manuscripts are working research artifacts, not release guarantees.
 
 Begin with the relevant paper README and follow its exact commit, environment, script,
 and artifact references. Large FPGA build products may remain outside Git; the
-[artifact manifest](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/results/fpga_silicon/s1_afibuild/ARTIFACTS.md)
+[artifact manifest](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/s1_afibuild/ARTIFACTS.md)
 records retrieval locations and checksums.
 
 For software behavior, use the default test suite and the focused command documented by

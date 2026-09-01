@@ -2,12 +2,12 @@
 
 This is the canonical idiomatic-usage demo for TikiTorch. It reads each 28x28
 MNIST image as a length-784 sequence of scalar pixels (``input_dim=1``) and
-classifies it with a multiplier-free ``MorphSSM`` (alternating max-plus /
-min-plus morphological convolutions). The optimizer is ``PureTropicalSGD`` — a
-strictly multiplier-free update (power-of-2 learning rate applied as a bit
-shift, integer-counter momentum). The whole forward + backward + step loop is
-therefore mathematically closed under the tropical semiring: comparisons and
-additions only, no hardware multipliers.
+classifies it with a ``MorphSSM`` (alternating max-plus/min-plus morphological
+convolutions). The optimizer is ``PureTropicalSGD``, whose default update is
+shift- and counter-oriented. This example deliberately trains with a soft
+relaxation and the model's default classification loss, so it is not a
+multiplier-free full-step recipe. Use the closure audit with a hardened model,
+declared loss, reverse rule, and optimizer before making that claim.
 
 The training loop below is deliberately a plain, vanilla PyTorch loop — the
 point is that swapping in tropical layers/optimizers requires *no* change to how
@@ -15,9 +15,9 @@ you write training code.
 
 Usage::
 
-    python examples/train_sequential_mnist.py                 # tiny smoke run
+    python examples/train_sequential_mnist.py --smoke          # tiny synthetic run
+    python examples/train_sequential_mnist.py                  # real MNIST, 1 epoch
     python examples/train_sequential_mnist.py --epochs 5 --batch-size 128
-    python examples/train_sequential_mnist.py --smoke          # 1 step, fake data
 
 torchvision is only needed for the real dataset; pass ``--smoke`` to run on
 synthetic data with no downloads (handy for CI).
@@ -32,7 +32,13 @@ import tikitorch.optim as optim
 
 def get_dataloaders(batch_size: int, data_root: str):
     """Real sequential-MNIST loaders via torchvision (lazy import)."""
-    from torchvision import datasets, transforms
+    try:
+        from torchvision import datasets, transforms
+    except ImportError as exc:
+        raise SystemExit(
+            'Real MNIST requires torchvision. Install `pip install -e ".[vision]"` '
+            "or pass --smoke for synthetic data."
+        ) from exc
     from torch.utils.data import DataLoader
 
     # Flatten 1x28x28 -> (784, 1): a length-784 sequence of scalar pixels.
@@ -77,7 +83,7 @@ def main():
                    help="PureTropicalSGD learning rate = 2^-lr_shift (bit shift).")
     p.add_argument("--data-root", type=str, default="./data")
     p.add_argument("--smoke", action="store_true",
-                   help="Run 1 epoch on tiny synthetic data (no torchvision/downloads).")
+                   help="Run 1 epoch on tiny synthetic data (no torchvision or downloads).")
     p.add_argument("--max-steps", type=int, default=0,
                    help="If >0, stop each epoch after this many steps (quick demo).")
     args = p.parse_args()
@@ -97,7 +103,7 @@ def main():
     ).to(device)
     print(f"MorphSSM params: {model.param_count:,}")
 
-    # --- idiomatic: a multiplier-free optimizer, plugged in like any optim ---
+    # --- idiomatic: a shift-oriented optimizer, plugged in like any optim ---
     opt = optim.PureTropicalSGD(model.parameters(), lr_shift=args.lr_shift,
                                 momentum_bits=4)
 

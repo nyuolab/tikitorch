@@ -3,12 +3,14 @@
 Max-plus / min-plus is the native algebra of dynamic programming and planning:
 value iteration ``V <- max_a(R + gamma V)`` is a ``(max,+)`` matrix-vector
 product, shortest path is repeated min-plus matmul, and Viterbi / DTW are
-``(max/min,+)`` trellis recurrences. This submodule provides those primitives as
-differentiable, multiplier-free TikiTorch layers -- the planning/RL application
-layer, building toward a tropical MCTS / Tropical MuZero.
+``(max/min,+)`` trellis recurrences. This submodule provides hard tropical
+primitives with compare/add/gather software recipes, plus soft relaxations and
+planning/RL reference code that deliberately retain additional arithmetic.
 
-Everything here reduces to comparisons and additions only, so it maps onto the
-same inlined max-plus PE used by the HLS training kernels.
+Do not infer whole-module or FPGA resource closure from the package name: soft
+reductions, discounting, MCTS selection/normalization, losses, and learned-model
+boundaries must be audited for the exact configuration, and a physical DSP claim
+requires a matching synthesis report.
 
     import tikitorch.planning as planning
 

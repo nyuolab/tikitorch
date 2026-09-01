@@ -1,14 +1,12 @@
-"""run_fully_tropical_connect4 — the FULLY multiplier-free Connect4 agent, trained + benchmarked.
+"""Train and benchmark a Connect4 agent with dyadic cores and heads.
 
-Net: dyadic tropical CORES + DYADIC heads (zero nn.Linear -> closure audit returns []) — fully zero-DSP.
-Training: AlphaZero-style true-model self-play (strong visit targets) distilled into the dyadic policy via
-the closure-faithful PERCEPTRON loss (argmax-of-visits, 2-hot silicon grad) + L1 value + sign-only
-TropicalSGD. So forward, backward (sign-product == sign(autograd grad)), and update are all multiply-free.
-Benchmarks trained vs untrained at increasing sims vs negamax d2/d3 (random openings) — i.e. does training
-a FULLY-tropical net buy sim-efficiency on top of the depth that already beats the wall.
+The net has dyadic tropical cores and dyadic heads (zero ``nn.Linear``). Its model closure audit is
+reported separately from the exact loss, Python MCTS, and physical implementation. Training uses
+AlphaZero-style explicit-game self-play and configurable policy loss, entropy, target temperature,
+L1 value, and TropicalSGD. Several configurations execute powers, exact softmax/log, multiplication,
+or division, so the complete loop must not be described as multiplier-free or zero-DSP.
 
-Designed to run on EC2 (many cores -> more self-play). Prints the closure audit so the multiply-free
-claim is self-checking.
+Designed to run on EC2 (many cores -> more self-play). Prints the scoped model closure audit.
 
     PYTHONPATH=<repo> python3 scripts/run_fully_tropical_connect4.py [--sims 256 --iters 40 --games 48 --workers N]
 """
@@ -59,7 +57,7 @@ def main(a):
                       tau_start=1.0, tau_end=0.1, lr=a.lr, seed=0, eval_every=999, eval_games=2)
     probe = BoardMuZero(Connect4, cfg)
     viol = find_closure_violations(probe.net)
-    print(f"[{a.tag}] closure audit (empty for fully multiply-free): {viol or 'NONE'}", flush=True)
+    print(f"[{a.tag}] model closure audit (does not cover loss/MCTS): {viol or 'NONE'}", flush=True)
     print(f"[{a.tag}] recipe: policy_loss={a.policy_loss} entropy={a.entropy_coef} temp={a.target_temp} "
           f"lr={a.lr} | {a.sims} sims, {a.iters}x{a.games} games, {a.workers} workers...", flush=True)
     probe.run(log=lambda s: None)
@@ -76,8 +74,9 @@ def main(a):
     os.makedirs(OUT, exist_ok=True)
     out = os.path.join(OUT, f"connect4_fully_tropical_{a.tag}.json")
     open(out, "w").write(json.dumps(
-        {"note": "FULLY multiplier-free Connect4 (dyadic cores+heads, soft-CE/perceptron + entropy/temp + "
-                 "L1 + SignSGD, AlphaZero tree). closure_violations must be []. score=win+0.5draw, 40 games.",
+        {"note": "Connect4 with dyadic cores+heads and AlphaZero-style explicit-game tree. "
+                 "closure_violations audits the model only, not loss/MCTS or FPGA resources. "
+                 "score=win+0.5draw, 40 games.",
          "config": {"sims": a.sims, "iters": a.iters, "games": a.games}, **res}, indent=2))
     print(f"[{a.tag}] [saved] {out}")
     print(f"DONE_FT_{a.tag}")

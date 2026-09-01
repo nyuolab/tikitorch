@@ -2,11 +2,13 @@
 real exported dyadic net (forward AND dynamics).
 
 The C++ CSIM testbench cross-checks the kernel against an independent recompute on RANDOM buffer values.
-This goes further: it builds an actual fully-dyadic TropicalMuZeroNet, runs the real EXPORT -> PACK path
+This goes further: it builds a dyadic ``TropicalMuZeroNet``, runs the real EXPORT -> PACK path
 (net weights -> (sign,exp) schedule -> the MZ buffer layout) — the path the MuZero AFI never exercised
 (it was power-tested with zero weights) — invokes the compiled kernel via ctypes, and checks the kernel
 reproduces an INDEPENDENT NumPy integer reference of the fabric spec, BIT-EXACTLY, for mode 0 (forward)
 and mode 1 (dynamics). This validates export + packing offsets + the kernel arithmetic together.
+The scope is only these fixed-point forward/dynamics records; it excludes policy softmax, MCTS,
+losses, optimizer behavior, and the rest of the MuZero loop.
 
 The "fabric net" is the deployed spec: dyadic-quantized weights, int16 activations, int32 accumulate,
 submean normalization (replacing TropicalLayerNorm/_minmax_unit, as the kernel does), gather embedding.

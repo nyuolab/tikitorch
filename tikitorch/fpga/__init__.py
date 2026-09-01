@@ -1,30 +1,29 @@
-"""tikitorch.fpga — the FPGA backend for TikiTorch.
+"""tikitorch.fpga — an experimental FPGA/native integration for TikiTorch.
 
-Importing this module detects a board (via a native driver) and registers an
-``'fpga'`` backend into :mod:`tikitorch.backend`. The headline entry point is the
-DDP-style wrapper::
+Importing this module loads an optional native library and registers an
+``'fpga'`` backend into :mod:`tikitorch.backend`. A loaded library may expose a
+LOCAL host-reference endpoint or a compatible physical-FPGA endpoint; loading
+the library alone does not open or probe either one.
 
-    import tikitorch as tt
-    import tikitorch.fpga as fpga
+The bundled :class:`KernelCache` serves two distinct purposes. ``lookup()``
+inspects a catalog record by its compact key and is not a compatibility check.
+``match(model)`` additionally validates the full model-observable structural
+recipe represented by that record. Stock model constructors currently fail this
+conservative match, and no safe bundled runner is registered automatically.
 
-    model = tt.models.TropicalTransformer(d_model=128, n_layers=2,
-                                          task_type="lm", vocab_size=128)
-    model = fpga.accelerate(model)        # bound on a board (see below); else CPU fallback
-    print(fpga.is_available(), model.bound)
+``accelerate(model)`` therefore returns a PyTorch-fallback wrapper unless all of
+the following are present: a usable native endpoint, a structural match, and an
+explicitly registered kernel-specific runner. A custom runner must still check
+runtime tensor shapes, dtypes and ranges; named buffer marshalling; quantization;
+native symbol/ABI identity; and a configuration-matched build manifest. The
+``bound`` flag means that the wrapper is eligible to invoke that runner. It is
+not proof of those runner-owned checks or of physical FPGA execution; LOCAL is a
+host endpoint.
 
-    # keep your ordinary tropical training loop unchanged:
-    loss = model.compute_loss(x, y); loss.backward(); opt.step()
-
-**Honest scope (Tier 1).** The bundled silicon kernels are *fused whole-training-
-step monoliths* (no multi-kernel mux), so ``accelerate`` binds a whole *model* to
-a compiled kernel — it is not per-op ``.to('fpga')`` dispatch (that is Tier 2,
-F-gated). A model is *bound*
-(runs on silicon) only when **all three** hold: a board is present, its shape
-matches a compiled kernel, *and* an on-board runner is registered for that kernel
-(:func:`register_board_runner`) — the hardware-validated last mile, of which
-**none ship by default** (see ``BUILD_NATIVE.md``). On a machine with no board, no
-matching kernel, or no runner (this repo, CI) everything transparently falls back
-to CPU and stays correct.
+The bundled kernels are fused training-step monoliths, not per-op
+``.to('fpga')`` implementations. See ``examples/fpga_quickstart.py`` for safe
+catalog and fallback inspection, and ``BUILD_NATIVE.md`` before registering a
+custom runner.
 
 This package never ``import forge`` — the HLS sources it references are the copies
 bundled under :mod:`tikitorch.hardware`.
@@ -67,55 +66,50 @@ __all__ = [
     "NativeUnavailable",
     "register_board_runner",
     "register_reference_runners",
-    # dyadic (multiplier-free) weight -> zero-DSP shift-schedule export
+    # dyadic weight -> software shift-schedule export
     "export_net",
     "verify_schedule",
     "export_layer",
     "reconstruct_weight",
 ]
 
-# Load the native driver (None in this repo / CI), build the kernel allow-list,
-# and register the singleton backend into the seam. Guarded so a half-built native
-# layer can never make `import tikitorch.fpga` (or `import tikitorch`) fail. The
-# singleton is module-private (``_backend``) so it does not shadow the
-# ``tikitorch.fpga.backend`` submodule attribute; reach it via :func:`get_backend`.
-_native_handle: Optional[NativeHandle] = None
-_backend: Optional[FpgaBackend] = None
-try:
-    _native_handle = _native.load()
-    _backend = FpgaBackend(native=_native_handle, cache=KernelCache.default())
-    _backend.register()
-    # Install the bundled reference runner(s). Harmless without a board: a model
-    # only ever *binds* when a native handle is also present (none here / in CI),
-    # so auto-registering just makes `.fpga()` work out-of-the-box once
-    # `_libtikifpga` is built (LOCAL or XRT) — no extra call needed.
-    register_reference_runners()
-except Exception:  # noqa: BLE001 — never break import on backend bring-up
-    _backend = None
+# Load the optional native driver (``None`` in a normal wheel/CI), build the kernel
+# allow-list, and register the singleton backend. ``_native.load`` owns the narrow
+# missing-library/ABI fallback; programming errors in registration fail loudly.
+_native_handle: Optional[NativeHandle] = _native.load()
+_backend: Optional[FpgaBackend] = FpgaBackend(
+    native=_native_handle, cache=KernelCache.default())
+_backend.register()
+# No runner is registered here. The historical one-layer flat-parameter runner
+# was unsafe; ``register_reference_runners()`` remains only as a fail-loud
+# compatibility hook. Applications must explicitly register a validated custom
+# runner for a specific kernel/build contract.
 
 
 def get_backend() -> Optional[FpgaBackend]:
-    """The registered :class:`FpgaBackend` singleton (``None`` if registration failed)."""
+    """Return the registered :class:`FpgaBackend` singleton."""
     return _backend
 
 
 def is_available() -> bool:
-    """``True`` iff a native driver loaded and a board is present (``False`` here)."""
+    """Whether a native endpoint is usable (a LOCAL host endpoint may be usable)."""
     return _backend is not None and _backend.is_available()
 
 
 def device_count() -> int:
-    """Number of usable FPGA boards (0 when unavailable)."""
+    """Number of usable native endpoints; LOCAL may report one host endpoint."""
     return _backend.device_count() if _backend is not None else 0
 
 
 def accelerate(model, *, device: Union[str, Device] = "fpga", optimizer=None,
                strict: bool = False) -> AcceleratedModel:
-    """Wrap ``model`` for FPGA execution (bound on a board, CPU fallback otherwise).
+    """Wrap ``model`` for native-kernel execution (PyTorch fallback otherwise).
 
     See :class:`~tikitorch.fpga.accelerate.AcceleratedModel`. With ``strict=True``,
-    raises :class:`NativeUnavailable` instead of falling back when the model cannot
-    run on a board.
+    raises :class:`NativeUnavailable` unless an endpoint, full structural match,
+    and explicitly registered runner are all present. Strict mode disables the
+    fallback; it cannot validate a custom runner's runtime inputs or build
+    manifest. A bound LOCAL bridge executes on the host.
     """
     if isinstance(model, AcceleratedModel):
         model = model.module  # idempotent: never nest wrappers

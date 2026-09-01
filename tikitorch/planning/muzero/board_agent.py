@@ -4,9 +4,10 @@ The Connect4 (and TicTacToe / chess-later) training loop: two-player self-play v
 negamax MCTS over the learned net -> a board replay buffer (positions labelled with
 the game OUTCOME) -> K-step unrolled training (value->outcome, policy->MCTS visits,
 reward->0). Skill is measured as win/draw/loss vs a fixed depth-limited negamax
-opponent. Fully TikiTorch-native: tropical nets + closed optimizer (TropicalSGD);
-``mean`` backup (the verified adversarial-correct backup); ``net_kind="dense"`` is
-the matched control for the head-to-head.
+opponent. The default arm uses a TikiTorch tropical net and ``TropicalSGD``;
+``net_kind="dense"`` supplies the matched control. This Python reference loop is
+not a whole-system multiplier-free or zero-DSP implementation: MCTS selection,
+normalization, losses, and some configurable heads retain arithmetic boundaries.
 """
 
 from dataclasses import dataclass
@@ -75,17 +76,18 @@ def _run_worker(seed):
 @dataclass
 class BoardConfig:
     net_kind: str = "tropical"
-    core_kind: str = "maxplus"          # tropical cores: "maxplus" | "dyadic" (multiplier-free oblique)
-    dyadic_heads: bool = False          # True -> DyadicLinear policy/value/reward heads (fully zero-DSP net)
+    core_kind: str = "maxplus"          # "maxplus" | shift/add-oriented "dyadic" projections
+    dyadic_heads: bool = False          # True -> shift/add-oriented DyadicLinear readouts
     tree_model: str = "muzero"          # MCTS tree: "muzero" (learned dynamics) | "alphazero" (true rules)
     policy_loss: str = "ce"             # "ce" (full-distribution soft x-ent) | "perceptron" (argmax-only)
     policy_entropy_coef: float = 0.0    # >0 adds an entropy bonus to the policy (anti prior-collapse)
     target_temp: float = 1.0            # >1 softens the visit target before distillation (anti-collapse)
     legal_mask: bool = False            # mask illegal-move logits in the policy loss (canonical AlphaZero/MuZero
-                                        # does this; multiply-free: a select to a large-negative before the
-                                        # shift-softmax). The AZ-tree already masks at search; this fixes TRAINING
+                                        # does this). The mask itself is a select, but loss normalization and
+                                        # softmax remain explicit arithmetic boundaries. The AZ-tree already
+                                        # masks at search; this fixes TRAINING
                                         # so a tiny net doesn't burn capacity suppressing ~4066 illegal chess logits.
-    optimizer: str = "tropicalsgd"      # closed (multiply-free) by default
+    optimizer: str = "tropicalsgd"      # closure-oriented default; audit the executed optimizer recipe
     latent_dim: int = 64
     dense_hidden_mult: int = 3          # widen dense cores to param-match the tropical net
     tau: float = 1.0
@@ -219,10 +221,10 @@ class BoardMuZero:
           * target_temp > 1: soften the visit target (flatter prior, harder to over-sharpen).
           * policy_entropy_coef > 0: add an entropy BONUS (maximize policy entropy) -> anti-collapse.
           * legal (mask, cfg.legal_mask): set illegal-move logits to a large-negative BEFORE the softmax
-            so the distribution lives on legal moves only (canonical AlphaZero/MuZero). masked_fill is a
-            SELECT (no multiply) -> stays zero-DSP; on-fabric it is shift_softmax with masked exp2 -> ~0.
-        For SignSGD the update is sign(grad), so the on-fabric realization (shift_softmax / sign-product)
-        is bit-equivalent in its updates; ce's softmax/log is the one host transcendental (LUT on-chip)."""
+            so the distribution lives on legal moves only (canonical AlphaZero/MuZero). ``masked_fill``
+            is a selection operation, but the executed Python losses below also use powers, division,
+            exact softmax/log, and optional entropy arithmetic. No on-fabric or bit-equivalence claim is
+            established by this reference implementation."""
         import torch.nn.functional as F
         c = self.cfg
         if c.target_temp != 1.0:                       # temper the target FIRST: t^(1/T) renormalized
@@ -236,11 +238,10 @@ class BoardMuZero:
         if c.policy_loss == "perceptron":
             base = tropical_perceptron_loss(logits, target_dist.argmax(-1))
         elif c.policy_loss == "tropce":
-            # balanced, calibrated, closure-faithful CE to the best move (argmax of visits). Its gradient
-            # scatters the softmax ROW-SUM at the target so sum(grad)==0 per row for ANY normalization
-            # (exact OR shift_softmax) -> no sign-training row-bias drift (the on-fabric collapse mode the
-            # other instance flagged). The deployable hard-target distillation; softmax="lut" is the fully
-            # multiplier-free on-chip form. Soft-distribution balance would need s*target (a multiply).
+            # Hard-target CE with a row-balanced gradient: it scatters the softmax row sum at the
+            # target, so sum(grad) == 0 for either supported normalization. This call executes the
+            # exact-softmax software path. A LUT/shift lowering is a separate implementation recipe
+            # that requires configuration-matched verification; it is not exercised here.
             base = tropical_cross_entropy(logits, target_dist.argmax(-1), softmax="exact")
         else:                                          # "ce": full-distribution soft cross-entropy
             base = -(target_dist * F.log_softmax(logits, -1)).sum(-1).mean()

@@ -1,7 +1,8 @@
 """``tt-closure`` — command-line closure auditor.
 
-Loads a model by dotted spec and asserts it is multiplier-free (zero-DSP), reusing
-:mod:`tikitorch.audit`. Exit code 0 = closed, 1 = a multiply-bearing module was found
+Loads a model by dotted spec and applies TikiTorch's structural software-closure
+audit, reusing :mod:`tikitorch.audit`. Exit code 0 = no registered structural
+violation, 1 = a multiply-bearing registered module was found
 (or 2 for a bad spec) — so it composes as a CI gate.
 
     tt-closure tikitorch.models:TropicalForwardForward
@@ -36,7 +37,7 @@ def main(argv=None) -> int:
 
     parser = argparse.ArgumentParser(
         prog="tt-closure",
-        description="Assert a tikitorch model is multiplier-free (zero-DSP).",
+        description="Apply TikiTorch's structural software-closure audit to a model.",
     )
     parser.add_argument(
         "target", help="dotted spec 'pkg.module:factory' returning an nn.Module")
@@ -61,7 +62,7 @@ def main(argv=None) -> int:
     except AssertionError as exc:   # ClosureViolation subclasses AssertionError
         print(f"NOT CLOSED: {args.target}\n{exc}", file=sys.stderr)
         return 1
-    print(f"CLOSED: {args.target} is multiplier-free (zero-DSP)")
+    print(f"SOFTWARE-CLOSED (STRUCTURAL): {args.target}")
     return 0
 
 

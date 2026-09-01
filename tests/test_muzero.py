@@ -133,10 +133,10 @@ def test_agent_loop_runs(core_kind):
 
 
 def test_dyadic_core_is_zero_dsp_and_oblique():
-    """The dyadic MuZero cores are declared zero-DSP layers (structurally recognized by
-    assert_closed, like the maxplus cores), their deployed weights are exact powers of two
-    (the authoritative zero-DSP check, via dyadic_export.verify_schedule), and their input
-    gradient is genuinely OBLIQUE (>1 nonzero) — unlike the axis-aligned maxplus core."""
+    """Audit dyadic cores, verify their exported power-of-two schedule, and check obliqueness.
+
+    These are software/export properties, not a physical zero-DSP result; synthesis is separate.
+    """
     import tikitorch as tt
     fpga = pytest.importorskip("tikitorch.fpga")
     env, net = _net(latent=16, core_kind="dyadic")
@@ -144,7 +144,7 @@ def test_dyadic_core_is_zero_dsp_and_oblique():
     fcv = tt.audit.find_closure_violations
     assert fcv(net) == fcv(_net(core_kind="maxplus")[1])
     tt.assert_closed(net, allow={"Linear"})
-    # authoritative: deployed dyadic weights are exact powers of two, bit-exactly reconstructable
+    # The exported dyadic weights are exact powers of two and exactly reconstructable.
     sched = fpga.export_net(net)
     assert sched and fpga.verify_schedule(net, sched) == []
     # oblique: the dyadic repr encoder routes gradient to many inputs (vs maxplus ~1)

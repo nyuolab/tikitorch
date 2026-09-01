@@ -85,6 +85,6 @@ explicitly does not support a general end-to-end energy advantage.
 ## Still stuck?
 
 - Read the runnable [notebooks](notebooks.md) — each isolates one idea.
-- Check [CONTRIBUTING](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/CONTRIBUTING.md)
+- Check [CONTRIBUTING](https://github.com/nyuolab/tikitorch/blob/main/CONTRIBUTING.md)
   for the closure invariant and dev setup.
 - Open an issue with a minimal repro and the output of `find_closure_violations(model)`.

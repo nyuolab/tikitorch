@@ -171,9 +171,9 @@ class TropicalCoinChangeDP(nn.Module):
     HONEST FRAMING: at unit edge cost the layer *is* the algorithm — exact by
     construction, a strong STRUCTURAL PRIOR (like a fixed-transition Viterbi), not a
     solution gradient descent "discovers". Its point is that it makes the task
-    representable **closed / zero-DSP** (which the generic tropical aggregations cannot
-    — they plateau at ~0 F1) and gives an exact reference head; it is not a learned
-    win. Length-/amount-generalizes by construction.
+    representable with a software-closed add/compare/gather recipe (which the generic
+    tropical aggregations cannot—they plateau at ~0 F1) and gives an exact reference
+    head; it is not a learned win or a physical zero-DSP certificate.
     """
 
     def __init__(self, tau: float = 0.0):

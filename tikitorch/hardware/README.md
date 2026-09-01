@@ -1,31 +1,33 @@
 # TikiTorch Hardware: HLS Kernels and the FPGA / Silicon Path
 
-This directory ships the **High-Level Synthesis (HLS) C++ kernels** that
-implement the TikiTorch tropical learning loop directly in FPGA fabric, the
-Vitis HLS synthesis scripts, host-side testbenches, and a guide to taking the
-kernels all the way to **silicon** on an AWS EC2 **F2** instance (AFI = Amazon
-FPGA Image).
+This directory ships **High-Level Synthesis (HLS) C++ kernels** for specific
+hard, quantized TikiTorch recipes, together with Vitis HLS scripts, host-side
+testbenches, and a guide to taking those kernels to **silicon** on an AWS EC2
+**F2** instance (AFI = Amazon FPGA Image).
 
-The headline claim of TikiTorch — *algebraic closure of the learning loop* — is
-that a complete training step (forward + loss + backward + weight update) can be
-expressed entirely in the tropical (max-plus / min-plus) semiring, whose only
-primitive operations are **compare, add, and bit-shift**. None of those needs a
-multiplier. These kernels are the physical proof: a full on-chip training step
-that synthesizes to **zero DSP blocks** — only LUTs, carry chains, and
-flip-flops.
+Selected hard recipes can express their declared forward, routed reverse, and
+dyadic update using **compare, add, and bit-shift** operations. Closure is a
+property of that complete recipe and executed path, not of every TikiTorch
+operator. Soft routing, ordinary losses or heads, host arithmetic, and other
+optimizer settings can leave the closed subset. A configuration-matched HLS
+operator/resource report and routed implementation are therefore the physical
+evidence for a compiled kernel; software structure alone does not prove DSP
+utilization.
 
-> **Measured headline (PTB-XL ECG MorphSSM core, `forge_train_step_morph_ecg`):**
-> **1,207 tok/s**, **5.8 mJ/token**, **DSP = 0**, **WNS = +0.009 ns** (timing
-> closes with positive slack at the 250 MHz target). See the manuscript for the
-> full table; numbers are quoted in §6.
+> **Historical PTB-XL MorphSSM-core operating point
+> (`forge_train_step_morph_ecg`):** **1,207 tok/s**, a **derived 5.8 mJ/token
+> estimate** (not measured full-card energy), **DSP = 0** for the reported
+> build, and **WNS = +0.009 ns** (positive slack at the 250 MHz target). This is
+> configuration-specific core evidence; the host-owned embed, head, and loss
+> remain outside that kernel. See §6 for the preserved record and its limits.
 
 ---
 
-## 1. The closure -> hardware mapping (why there are no multipliers)
+## 1. Recipe-scoped closure -> hardware mapping
 
-A conventional NN training step is dominated by `y = W @ x` and its transpose in
-the backward pass — i.e. multiply-accumulate, which on an FPGA means **DSP
-slices**. TikiTorch replaces multiply-accumulate with the tropical semiring:
+A conventional NN training step is dominated by `y = W @ x` and its transpose
+in the backward pass. In the supported hard kernel recipes below, the
+corresponding data path uses tropical reductions and selected-gradient routing:
 
 | Conventional (ring `(+, ×)`) | Tropical (`(max, +)` / `(min, +)`)        | FPGA primitive            |
 |------------------------------|-------------------------------------------|---------------------------|
@@ -34,27 +36,30 @@ slices**. TikiTorch replaces multiply-accumulate with the tropical semiring:
 | `dL/dW = x ⊗ δ` (dense)      | scatter `δ` to the **argmax/argmin** tap  | index store + add (coeff 1)|
 | `W -= lr * grad`             | `W -= lr * sign(grad)`, `lr = 2^-s`       | sign bit + bit-shift add  |
 
-Three consequences make the datapath multiplier-free **by construction**:
+For those declared recipes, three choices avoid data-dependent multiplication:
 
 1. **Forward.** A tropical "matmul" is a tree of adders feeding a tree of
-   max/min comparators. No partial products, so no DSPs — just carry chains and
-   LUT comparators.
+   max/min comparators, so the algorithm has no partial products. The synthesis
+   report, rather than the source-level algebra, determines whether a particular
+   FPGA build uses DSP blocks for any arithmetic.
 2. **Backward.** Because max-plus / min-plus is piecewise-linear, the local
    Jacobian is a **selection matrix**: the gradient at an output routes, with
    coefficient exactly 1, to the single input that won the max/min. The kernels
    *save the winning index* (`argmax`/`argmin`) on the forward pass and, on the
    backward pass, **sparse-scatter** the incoming gradient to that index — an
    indexed add, never a multiply.
-3. **Update.** Weights are updated with **sign-SGD** (`W -= lr·sign(grad)`).
+3. **Update.** These recipes update weights with **sign-SGD**
+   (`W -= lr·sign(grad)`).
    With a power-of-two learning rate `lr = 2^-s`, the update is a sign test
    plus an arithmetic shift-add. `PureTropicalSGD` keeps even the momentum and
-   noise integer (an int counter + an LFSR), so the *entire optimizer* is
-   shift/add/compare too.
+   noise integer (an int counter + an LFSR), giving a shift/add/compare update
+   path for the corresponding non-adaptive configuration.
 
-The only `*` that survives in the C++ is **address arithmetic** on small loop
-counters (`c*K`, `l*D*D`, the ring-buffer base, the dilated time index
-`t - k*dil`) — index computation, not a data-path multiply. The synthesis
-report confirms `DSP = 0`.
+In the listed kernel sources, remaining `*` expressions are intended for
+**address arithmetic** on loop counters (`c*K`, `l*D*D`, the ring-buffer base,
+and related index calculations), rather than model-data products. Confirm that
+intent for each exact configuration in its HLS operator and utilization reports;
+a report from one configuration does not transfer to another.
 
 These kernels correspond directly to TikiTorch Python:
 
@@ -65,7 +70,7 @@ These kernels correspond directly to TikiTorch Python:
 | morph depthwise conv + proj  | `tikitorch.nn.MorphConv1d` (`DepthwiseMorphConv1d`) + tropical projection     |
 | MorphSSM core (`*_morph*`)   | `tikitorch.models.MorphSSM` (`task_type="classification"`, mean-pool head)    |
 | sign-SGD weight update       | `tikitorch.optim.SignSGD` / `tikitorch.optim.PureTropicalSGD`                 |
-| fused `forge_train_step*`    | one `loss.backward(); opt.step()` over a token window / sequence             |
+| fused `forge_train_step*`    | the corresponding recipe-specific reverse/update over a token window / sequence |
 
 The workflow is: train and validate in PyTorch with TikiTorch, anneal `tau -> 0`
 (soft tropical -> hard tropical), quantize weights to INT16, verify against the
@@ -101,7 +106,7 @@ hls/
     forge_train_step_morph_tb.cpp         # morph-core g++ testbench (toy task learns)
     synth_morph.tcl                       # Vitis HLS csynth script (small config)
 
-    # ---- MorphSSM core scaled to PTB-XL ECG (the headline result) ----
+    # ---- MorphSSM core scaled to the historical PTB-XL ECG reference ----
     forge_buffer_morph_ecg.hpp            # ECG config: D=128, L_LAYERS=8, K=7, L_SEQ=5000, DIL_CAP=128
     forge_train_step_morph_ecg.cpp        # STREAMING morph-core kernel (DDR-resident big tensors)
     forge_train_step_morph_ecg_tb.cpp     # bit-exact-vs-CPU-reference testbench
@@ -118,11 +123,12 @@ hls/
   (0 = fwd+loss, 1 = bwd, 2 = sign-SGD) so the host owns the per-window loop.
 
 - **`forge_train_step_2layer` / `forge_train_step_3layer`.** The same fused
-  training step stacked to 2 and 3 tropical layers (their own
-  `forge_buffer_{2,3}layer.hpp` layouts). The 2-layer kernel was the first
-  *multilayer* NN trained end-to-end on FPGA silicon with zero DSPs; the 3-layer
-  kernel showed depth saturates at this D=128/V=128 operating point (width is
-  the next binding constraint).
+  training-step structure stacked to 2 and 3 tropical layers (their own
+  `forge_buffer_{2,3}layer.hpp` layouts). The archived 2-layer configuration
+  ran training updates on FPGA and its matching record reports DSP = 0; the
+  3-layer experiment showed depth saturation at this D=128/V=128 operating
+  point. These observations do not establish priority or generalize beyond the
+  listed configurations.
 
 - **`forge_train_step_morph` (MorphSSM core, small config).** A monolithic
   single kernel implementing the **morphological** core instead of attention:
@@ -137,7 +143,7 @@ hls/
   shapes). Maps to `tikitorch.models.MorphSSM` /
   `tikitorch.nn.DepthwiseMorphConv1d`.
 
-- **`forge_train_step_morph_ecg` (MorphSSM core, PTB-XL ECG — headline).**
+- **`forge_train_step_morph_ecg` (MorphSSM core, PTB-XL ECG reference).**
   The morph core scaled to the manuscript ECG config
   (`D=128, L_LAYERS=8, K=7, L_SEQ=5000, dilation cap 2^7 = 128`). Identical
   math to `forge_train_step_morph`, but **streaming**: the big per-(layer,t)
@@ -150,8 +156,8 @@ hls/
   at output `(c,t)` to input `(c, t - k·dil)` — a *future* timestep under
   reverse iteration). The residual-stream activation *values* are never stored:
   because the core is piecewise-linear, backward routes purely through the saved
-  argmax **indices** with coefficient 1. This is the kernel behind the §6
-  headline numbers.
+  argmax **indices** with coefficient 1. This is the kernel behind the
+  historical §6 operating point.
 
 ---
 
@@ -198,19 +204,22 @@ vitis_hls -f synth.tcl             # 1-layer LM
 vitis_hls -f synth_2layer.tcl      # 2-layer LM
 vitis_hls -f synth_3layer.tcl      # 3-layer LM
 vitis_hls -f synth_morph.tcl       # MorphSSM core, small config
-vitis_hls -f synth_morph_ecg.tcl   # MorphSSM core, ECG config (headline)
+vitis_hls -f synth_morph_ecg.tcl   # MorphSSM core, ECG reference config
 ```
 
 Each script writes
-`<proj>/solution1/syn/report/<top>_csynth.rpt`. Check the two things that
-matter:
+`<proj>/solution1/syn/report/<top>_csynth.rpt`. Inspect the HLS operator and
+resource tables for the exact source, flags, and dimensions being built. A
+reported **DSP = 0** supports only that compiled datapath; it is not a proof
+that every kernel, TikiTorch operator, or host-orchestrated training loop uses
+zero DSP blocks.
 
-- **DSP = 0** — confirms the multiplier-free closure claim *physically* in the
-  utilization table. (Every kernel in this directory synthesizes to 0 DSPs.)
-- **WNS (Worst Negative Slack) >= 0** at the target period, or the downstream
-  AFI build will fail timing. The ECG kernel closes with **WNS = +0.009 ns**;
-  some of the earlier LM builds landed slightly negative (around -0.15 to
-  -0.20 ns) and needed an AFI rebuild or two to close — see the lessons in §5.
+Timing closure is established separately by the downstream routed report:
+**WNS (Worst Negative Slack) must be >= 0** at the stated target. The archived
+ECG configuration reports **WNS = +0.009 ns**. Earlier LM artifacts around
+-0.15 to -0.20 ns miss the target and must not be called timing-closed. A
+different rebuild closes timing only if its own nonnegative routed report is
+preserved and cited; closure cannot be inferred from a negative-WNS artifact.
 
 ---
 
@@ -253,31 +262,38 @@ one:
 
 ---
 
-## 6. Reference operating points (measured)
+## 6. Historical reference records (mixed measured and derived values)
 
-From the silicon-validated builds (your numbers vary with part, clock closure,
-and host driver; treat these as the order of magnitude):
+The table preserves earlier configuration-specific operating points. Throughput,
+reported utilization, and numeric WNS entries are historical observations;
+energy entries are derived estimates rather than measured full-card energy.
+Your numbers will vary with part, clock closure, and host driver, so treat these
+as order-of-magnitude context rather than release guarantees.
 
-| Kernel                          | Config                         | Throughput   | Energy        | DSP | WNS        |
-|---------------------------------|--------------------------------|--------------|---------------|-----|------------|
-| `forge_train_step` (1-layer LM) | D=128, V=128, L=128            | ~1,200 tok/s | —             | 0   | (closed)   |
-| `forge_train_step_2layer`       | 2-layer LM, D=128, V=128       | ~770 tok/s   | ~9.0 mJ/token | 0   | -0.197 ns  |
-| `forge_train_step_3layer`       | 3-layer LM, D=128, V=128       | (depth-saturated, ~same as 2-layer) | — | 0 | (closed) |
-| **`forge_train_step_morph_ecg`**| **D=128, L=8, K=7, L_SEQ=5000**| **1,207 tok/s** | **5.8 mJ/token** | **0** | **+0.009 ns** |
+| Kernel                          | Config                         | Throughput   | Derived energy estimate | DSP in listed build | Routed WNS |
+|---------------------------------|--------------------------------|--------------|-------------------------|---------------------|------------|
+| `forge_train_step` (1-layer LM) | D=128, V=128, L=128            | ~1,200 tok/s | —                       | 0                   | not listed here |
+| `forge_train_step_2layer`       | 2-layer LM, D=128, V=128       | ~770 tok/s   | ~9.0 mJ/token           | 0                   | -0.197 ns (miss) |
+| `forge_train_step_3layer`       | 3-layer LM, D=128, V=128       | (depth-saturated, ~same as 2-layer) | — | 0 | not listed here |
+| **`forge_train_step_morph_ecg`**| **D=128, L=8, K=7, L_SEQ=5000**| **1,207 tok/s** | **5.8 mJ/token** | **0** | **+0.009 ns (pass)** |
 
 Notes:
 
-- The **1-layer LM** was the first end-to-end LM training step on F2 silicon
-  (~1,200 tok/s with a C host driver, ~15x over the Python-host baseline).
-- The **2-layer LM** was the first *multilayer* NN trained end-to-end on FPGA
-  with zero DSPs (~770 tok/s, ~9.0 mJ/token, WNS -0.197 ns — it closed timing on
-  an AFI rebuild).
-- The **morph_ecg** kernel is the manuscript headline: a full MorphSSM training
-  step over a 5,000-sample PTB-XL ECG sequence at **1,207 tok/s, 5.8 mJ/token,
-  DSP = 0, and WNS = +0.009 ns** (positive slack — timing closes outright).
+- The historical **1-layer LM** run reports ~1,200 tok/s with a C host driver
+  and ~15x relative to its Python-host baseline. That comparison is specific to
+  those two host paths, not a general accelerator speedup or priority claim.
+- The listed **2-layer LM** build reports ~770 tok/s and DSP = 0. Its
+  ~9.0 mJ/token value is derived, and **WNS = -0.197 ns means this artifact
+  missed timing**. A claim about any later rebuild requires that rebuild's own
+  routed report.
+- The **morph_ecg core** record reports a 5,000-sample PTB-XL configuration at
+  **1,207 tok/s**, a **derived 5.8 mJ/token estimate**, **DSP = 0** for the
+  listed build, and **WNS = +0.009 ns**. It covers the fused morph-core
+  forward/reverse/update; embed, classification head, and loss are host-owned.
 
-Every entry has **DSP = 0**: the tropical learning loop is closed, end to end,
-with nothing but comparators, adders, and bit-shifts.
+All four rows record **DSP = 0 for the listed compiled configurations**. That
+does not establish zero DSPs for unlisted builds or multiplier-free closure for
+their host boundaries, other recipes, or TikiTorch as a whole.
 
 ---
 

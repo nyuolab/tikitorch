@@ -1,13 +1,12 @@
-# Scaling MuZero from GridWorld → Connect4 → Chess (multiplier-free, zero-DSP substrate)
+# Scaling tropical MuZero from GridWorld → Connect4 → Chess
 
-**What this is.** A benchmark of TikiTorch's multiplier-free (max-plus / dyadic, zero-DSP) MuZero
-as it scales up the AlphaZero/MuZero ladder: GridWorld (prior) → Connect4 → chess. **What this is
-NOT:** a strength match to reported MuZero. Reported MuZero (Schrittwieser et al., *Nature* 2020)
-reaches **superhuman** chess (matching AlphaZero, beating Stockfish under match conditions) using
-**TPU-pod compute and millions of self-play games**. These runs are workstation-CPU, **tens–hundreds**
-of self-play games, tens of MCTS sims. The contribution is: (1) the **same** multiplier-free
-self-play→replay→K-step-training loop runs **structurally end-to-end** on Connect4 and chess; and
-(2) **honest, adversarially-checked** measurements of what that tractable scale buys.
+**What this is.** A benchmark of TikiTorch max-plus/dyadic MuZero configurations as they scale up
+the AlphaZero/MuZero ladder: GridWorld (prior) → Connect4 → chess. **What this is NOT:** a strength
+match to large-scale published systems or evidence that the executed Python loop is physically
+zero-DSP. The model closure audit covers selected software operators; MCTS PUCT/min-max arithmetic,
+losses, normalization, and orchestration remain boundaries. These runs use workstation CPU,
+**tens–hundreds** of self-play games, and tens of MCTS simulations. They show that the same software
+interfaces execute end-to-end on Connect4 and chess and record what that tractable scale buys.
 
 > This write-up was reviewed by a 3-lens adversarial honesty pass (statistics / claim-vs-data /
 > reproducibility); the corrections it raised are folded in below. Score = **win + 0.5·draw**.
@@ -42,8 +41,8 @@ self-play→replay→K-step-training loop runs **structurally end-to-end** on Co
 
 ## Connect4 — dyadic vs max-plus vs dense (original deterministic-eval gauntlet — see UPDATE above)
 
-Two-player negamax-MCTS self-play (latent 64, **48 sims, 20 iters × 16 games**, closed TropicalSGD —
-multiplier-free), then a gauntlet vs depth-limited negamax of **increasing** strength. The n=4
+Two-player negamax-MCTS self-play (latent 64, **48 sims, 20 iters × 16 games**, closure-oriented
+TropicalSGD configuration), then a gauntlet vs depth-limited negamax of **increasing** strength. The n=4
 aggregates below were produced by the `connect4-robust-sweep` workflow driving
 `scripts/_one_board_run.py` (4 seeds/arm, one process per core); the committed `scaling_connect4_*.jsonl`
 files hold smaller 1–2-seed runs at slightly different settings, so individual seeds there will differ.
@@ -72,12 +71,12 @@ it is **not** part of the trained-net gauntlet, hence listed separately.)
   self-play loop** — all three cores are bottlenecked alike by search/data, not representation. An
   honest null result for the thesis *at this scale*.
 
-## Chess — pipeline scaffold (dyadic, multiplier-free)
+## Chess — pipeline scaffold (dyadic configuration)
 
 Chess is wired via `tikitorch.planning.muzero.chess_game.Chess` (python-chess; 4096-action
 `from*64+to` encoding, queen-promotion collapse; 769-d piece-plane obs; 80-ply cap; optional material
 adjudication of capped games). It plugs into the **identical** `BoardMuZero` loop. Two dyadic runs
-(closed TropicalSGD), each evaluated over **14 games (n=1 run, percentages below)** vs a random mover,
+(TropicalSGD), each evaluated over **14 games (n=1 run, percentages below)** vs a random mover,
 a greedy 1-ply material grabber, and an **untrained control** (a fresh net's MCTS agent) to isolate
 whether training helped.
 
@@ -89,9 +88,10 @@ whether training helped.
 (W/D/L are **percentages of 14 games**; data: `chess_scaffold_pure.json`, `chess_scaffold_adjudicated.json`.)
 
 **Honest reading:**
-- **The pipeline scales:** the multiplier-free net runs the full chess self-play→training loop
-  end-to-end and the **training loss falls monotonically** (it fits the MCTS targets) — the substrate
-  is not the blocker.
+- **The interface scales:** the dyadic configuration runs the chess self-play→training loop
+  end-to-end and the **training loss falls monotonically** (it fits these MCTS targets). This is an
+  execution and optimization observation, not evidence that the substrate is the only remaining
+  blocker or that the full loop has a multiplier-free hardware implementation.
 - **But the learned agent is *not* competitive at this compute** — it **loses to a random mover**
   (0.07–0.14) and is **worse than the untrained control** (0.39–0.46). Diagnosis: at the 80-ply cap
   with ~10-sim search over a 4096-way action space, MCTS targets are too weak/noisy and the policy head
@@ -109,23 +109,19 @@ whether training helped.
 
 ## Benchmark vs reported MuZero — the honest gap
 
-| domain | reported result | this work (tractable, multiplier-free, zero-DSP) |
+| domain | reported result | this work (tractable tropical/dyadic configurations) |
 |---|---|---|
-| GridWorld | n/a | **95–97% optimal-action agreement, 4/5 solved** (prior; dyadic + closed optimizer) |
+| GridWorld | n/a | **95–97% optimal-action agreement, 4/5 solved** (prior; dyadic + TropicalSGD) |
 | Connect4 | **game-theoretically solved in 1988** (Allis — *classical* search, cheap; AlphaZero also masters it) | beats the random floor at d1 only in point estimate; **0.00 vs d2+** — does not learn the game at this compute |
-| Chess | **superhuman**, beats Stockfish (MuZero/AlphaZero; TPU-pod, millions of games) | pipeline runs end-to-end, loss falls; agent **below random** — search/data-starved |
+| Chess | large-scale published systems report superhuman play | pipeline runs end-to-end, loss falls; agent **below random** in these runs |
 
-**Bottom line.** The multiplier-free, zero-DSP substrate **scales structurally** to Connect4 and chess
-on the *same* code path that reaches 95–97% on GridWorld — and it is *not* the bottleneck (chess loss
-falls monotonically). What it does **not** do at workstation compute is reach competitive play on the
-harder games: Connect4 stalls at depth-1, chess collapses below random. Note the gap is **compute**, of
-two different kinds: for **chess**, reaching reported MuZero strength genuinely needs the large-scale
-search + self-play (sims, games, steps) that TPU pods provide — the FPGA actor/learner scale-up this
-substrate is designed for. For **Connect4**, the *game* is cheaply solvable by classical search (1988),
-so our depth-2 stall reflects *our* tractable-MuZero training budget, not the game's difficulty. Either
-way the lever is compute/search, the known and expected one — not an algorithmic or substrate change.
-The dyadic oblique-core advantage that is clear in supervised value-fitting is **masked** by this
-bottleneck in the self-play loop; separating the cores would itself require the scaled-up regime.
+**Bottom line.** The same tropical/dyadic software interfaces execute on GridWorld, Connect4, and
+chess. They do **not** reach competitive play on the harder games at the tested budget: Connect4
+stalls at depth-1 and chess falls below random. More search/data is one plausible lever, but these
+runs do not isolate compute from model, target, action-encoding, or optimization limitations. The
+dyadic oblique-core advantage seen in supervised value fitting does not separate in this self-play
+loop; establishing why requires a controlled scaled study. Hardware closure is a separate question
+for a configuration-matched exported recipe and synthesis report.
 
 _Reproduce: `scripts/run_board_scaling.py` (Connect4 sweep) and `scripts/_one_board_run.py` (single
 seed; driven in parallel by the `connect4-robust-sweep` workflow for the n=4 table);

@@ -2,9 +2,10 @@
 
 The hard (tau=0) tropical value pull routes each output (i, d) through a SINGLE
 key (its argmax), giving a one-index-per-output gradient. ``value_topk_k`` softens
-that: each output averages its k best keys, so the gradient flows to k keys --
-denser, and still strictly add/compare-only (no logsumexp, no multiply, unlike a
-tau>0 soft relaxation).
+that: each output averages its k best keys, so the gradient flows to k keys.
+The mean introduces a division (and masking can make its denominator data
+dependent), so this particular softening is not a strictly closed hard path.
+Use ``tropical_value_pull_iter_topk`` for the sum-combined add/compare variant.
 
 This is presented as an ABLATION, not a guaranteed win. Densifying the gradient
 is necessary but not sufficient: averaging the top-k also changes the forward
@@ -143,7 +144,7 @@ def main():
     print("-" * 42)
     base = evals[ks[0]]
     best_k = max(evals, key=evals.get)
-    print("gradient density rises with k (the softening mechanism, multiplier-free).")
+    print("gradient density rises with k (the mean-combined softening mechanism).")
     print(f"best eval_acc at k={best_k}: {evals[best_k]:.4f}  "
           f"(vs k={ks[0]}: {base:.4f}, delta {evals[best_k]-base:+.4f})")
     if evals[best_k] <= base + 1e-4:

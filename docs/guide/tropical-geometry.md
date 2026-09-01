@@ -4,7 +4,7 @@ One of the deepest reasons tropical algebra belongs in deep learning: a feed-for
 network with piecewise-linear activations (ReLU, max-pooling, maxout, and the
 morphological ops here) **is** a tropical object. This page is the conceptual
 companion to
-[notebook 05 — *Tropical geometry*](https://github.com/nyuolab/tikitorch/blob/pc-morphssm/notebooks/05_tropical_geometry.ipynb);
+[notebook 05 — *Tropical geometry*](https://github.com/nyuolab/tikitorch/blob/main/notebooks/05_tropical_geometry.ipynb);
 the runnable code lives there.
 
 ## ReLU networks are tropical rational maps

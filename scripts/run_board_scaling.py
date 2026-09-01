@@ -1,13 +1,13 @@
 """run_board_scaling — scale the two-player MuZero loop from TicTacToe to Connect4.
 
-Benchmarks the multiplier-free dyadic tropical MuZero against the max-plus core and a dense
+Benchmarks dyadic tropical MuZero against the max-plus core and a dense
 control on Connect4 (6x7), the canonical AlphaZero/MuZero scale-up after TicTacToe. Board value
 is the win/draw/loss OUTCOME — an OBLIQUE, non-lattice function of the position, exactly where
-the max-plus core is predicted to underfit and the dyadic (multiplier-free oblique) core should
+the max-plus core is predicted to underfit and the dyadic oblique core should
 hold up. Skill is reported as score (win + 0.5*draw) in a gauntlet vs depth-limited negamax
 opponents of INCREASING strength (depths 1..3), so we see skill-vs-opponent-strength, not a
-single number. Reported MuZero/AlphaZero solve Connect4 (perfect first-player win); this is the
-tractable-compute, zero-DSP-substrate analogue.
+single number. A software closure audit of selected model operators does not cover the Python
+MCTS/loss path or establish FPGA DSP use.
 
     PYTHONPATH=<repo-root> python3 scripts/run_board_scaling.py --mode smoke|full --game connect4
 """
@@ -100,9 +100,8 @@ def summarize(out, mode, game_name, optimizer, depths):
     lines = [f"# {game_name.title()} MuZero scaling — dyadic vs maxplus vs dense ({optimizer})", "",
              "_Two-player negamax-MCTS self-play; score = win + 0.5*draw in a gauntlet vs depth-limited "
              "negamax of increasing strength. Board value is the OBLIQUE win/draw/loss outcome. "
-             "Reported MuZero/AlphaZero SOLVE Connect4 (perfect play); this is the tractable-compute, "
-             "multiplier-free (zero-DSP) analogue — the point is the substrate scales structurally, and "
-             "that the dyadic oblique core holds up where max-plus underfits._", "",
+             "This tractable-compute study compares dyadic, max-plus, and dense models. A software "
+             "model-closure audit does not cover MCTS/loss arithmetic or establish FPGA DSP use._", "",
              f"| arm | n | best vs neg-d2 (train) | {hdr} (gauntlet, mean) |",
              "|---|---|---|" + "---|" * len(depths)]
     for arm in ["tropical-maxplus", "tropical-dyadic", "dense"]:

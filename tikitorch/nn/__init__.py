@@ -939,8 +939,9 @@ class TropicalPerceptronLoss(nn.Module):
 class TropicalBatchShift(nn.Module):
     """Tropical-native normalization: subtract batch mean per feature.
 
-    Centers activations around zero without multiplications.
-    Only uses subtractions — FPGA-friendly.
+    The eager reference uses ``mean`` and subtraction. A fixed-size,
+    power-of-two reduction can lower its constant division to a shift, but this
+    module alone is not a hardware-closure or zero-DSP certificate.
     """
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

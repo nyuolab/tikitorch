@@ -16,14 +16,13 @@
 }
 
 \newcommand{\tikitorch}{\textsc{TikiTorch}}
-\newcommand{\todo}[1]{\textcolor{red!70!black}{\textbf{TODO:} #1}}
+\newcommand{\gate}[1]{\textcolor{orange!55!black}{\textbf{Open gate.} #1}}
 \newcommand{\systemname}{Multiplier-Free Learning on FPGA}
 
 \title{\systemname:\\
 Closing the Forward--Backward--Update Loop on Real Silicon}
-\author{Anonymous authors\\
-\small Author list and affiliations to be finalized}
-\date{Internal draft --- August 2026}
+\author{Authors and affiliations to be confirmed}
+\date{Evidence-bounded discussion draft --- September 2026}
 
 \begin{document}
 \maketitle
@@ -32,10 +31,11 @@ Closing the Forward--Backward--Update Loop on Real Silicon}
 \fcolorbox{red!55!black}{red!4}{%
 \begin{minipage}{0.93\linewidth}
 \textbf{Draft status.}
-This document is an evidence-bounded paper scaffold, not a submission-ready
-manuscript.  Reported numbers are tied to committed artifacts.  Missing
-iso-model CUDA, disjoint-stream, timing-report, and full-card-power experiments
-are marked explicitly and must not be inferred from the present results.
+This document is an evidence-bounded discussion draft, not a submission-ready
+manuscript.  Reported numbers are tied to committed artifacts; unresolved
+comparisons are labeled as such.  Missing iso-model CUDA, disjoint-stream,
+timing-closed, and full-card-power experiments are explicit decision gates and
+must not be inferred from the present results.
 \end{minipage}}
 \end{center}
 
@@ -53,17 +53,20 @@ training recipe before synthesis.
 
 On an AWS F2 FPGA, a four-layer, width-512 morphological state-space language
 model executes forward, loss, backward, and SignSGD in one fused invocation.
-The 30-step silicon result is bit-for-bit identical to the C-simulation golden
-result, and a 2,000-step invocation processes 256,000 token positions at 612
+The archived observable record from a 30-step silicon run---resident accuracy,
+weight checksum, and sampled predictions---matches its C-simulation golden
+record bit for bit; this is not an exhaustive comparison of every internal
+signal.  A 2,000-step invocation processes 256,000 token positions at 612
 token/s.  This run repeats one resident 128-token window and therefore
 establishes execution and persistent weight evolution, not language-model
 generalization.  Separately, a two-layer dyadic network trained entirely on
 fabric reaches 74.75\% test accuracy on 16-by-16 MNIST; an independent software
-path evaluates the exported fabric-trained weights at 74.13\%.  These results
-show that a complete multiplier-free learning loop can execute exactly on real
-silicon and can produce weights that generalize on a small task.  They do not
-yet establish an energy or throughput advantage over a matched GPU system;
-those comparisons are left as required submission gates.
+path evaluates the exported weights at 74.13\%.  The 0.62-point difference is
+unresolved pipeline variation until both evaluators use frozen identical
+inputs and preprocessing.  Together, the artifacts establish feasibility of a
+complete multiplier-free learning loop on real silicon and held-out utility on
+a small task.  They do not establish an energy or throughput advantage over a
+matched GPU system; those comparisons remain required submission gates.
 \end{abstract}
 
 \section{Introduction}
@@ -105,18 +108,25 @@ Our current evidence answers these questions with complementary artifacts:
   check, an executed operator trace, and a full-training check.  It also
   documents where each check is necessary but not sufficient.
   \item A four-layer width-512 MorphSSM character model runs an entire fused
-  learning loop on F2.  Thirty updates are bit-exact against C simulation; a
-  single 2,000-update invocation sustains 612 token/s over 256,000 processed
-  token positions.
+  learning loop on F2.  The archived observable fields after 30 updates match
+  C simulation bit for bit; a single 2,000-update invocation sustains 612
+  token/s over 256,000 processed token positions.
+  \item A D128 replica build measures 1.86$\times$ aggregate throughput at two
+  replicas and 3.72$\times$ at four, relative to the one-replica result.  These
+  are preliminary within-family scaling measurements, not timing-closed
+  accelerator speedups.
   \item A two-layer dyadic classifier is trained from scratch on the same class
   of multiplier-free fabric operations and reaches 74.75\% on held-out
-  downsampled MNIST, with a 74.13\% independent evaluation of the exported
-  weights.
+  downsampled MNIST.  A second evaluator obtains 74.13\% from the exported
+  weights; the discrepancy remains an explicit reproduction gate.
 \end{itemize}
 
-We do \emph{not} claim state-of-the-art accuracy, a new differentiation rule,
-weight-transport-free learning, or a GPU efficiency win.  The experiments are
-designed to establish an exact end-to-end feasibility result and to identify
+The contribution is therefore a scoped systems demonstration: a recipe-level
+closure contract, a fused on-silicon forward--loss--reverse--update state
+transition with a matching observable reference record, and a separate
+fabric-only learning result.  We do \emph{not} claim state-of-the-art accuracy,
+a new differentiation rule, weight-transport-free learning, or a GPU
+efficiency win.  The experiments establish end-to-end feasibility and expose
 the measurements required for a fair systems comparison.
 
 \section{Scope and terminology}
@@ -136,10 +146,12 @@ addition to algebraic closure because source-level index expressions may be
 implemented differently by a compiler.
 
 ``Zero DSP'' is a stronger physical observation, not the definition.  The
-MorphSSM builds report zero DSP blocks.  The MNIST build binds one DSP block as
-an adder but reports zero DSP multipliers; its model-data path is still
-multiplier-free.  The paper therefore avoids using ``zero DSP'' as a synonym
-for all results.
+reported D128 MorphSSM builds use zero DSP blocks.  The D512 execution record is
+paired here with source-level recipe evidence, but its final routed-resource
+report is not yet in the public artifact bundle, so we do not assign it a
+physical zero-DSP result.  The MNIST build binds one DSP block as an adder but
+reports zero DSP multipliers; its model-data path is still multiplier-free.  The
+paper therefore avoids using ``zero DSP'' as a synonym for all results.
 
 \subsection{Three evidence levels}
 
@@ -195,7 +207,7 @@ and update---running on an FPGA.  The update uses the sign of accumulated
 gradients, related to signSGD \cite{bernstein2018signsgd}, but our paper makes no
 new convergence claim for sign optimization.
 
-\todo{Complete a systematic related-work matrix before submission.  For every
+\gate{Complete a systematic related-work matrix before submission.  For every
 closest system, record which of forward, loss, backward, optimizer, synthesis,
 routing, on-silicon execution, and held-out learning are demonstrated.  Remove
 or retain novelty language only after this audit.}
@@ -256,6 +268,30 @@ general compiler from every \tikitorch{} model.  The host stages data, invokes
 the kernel, and reads results, while the forward, loss-gradient, reverse sweep,
 and optimizer execute in fabric.
 
+Figure~\ref{fig:dataflow} makes the execution boundary explicit.  Host
+readback is diagnostic: it observes weights or predictions but does not apply
+an update.  Within a kick, model state and optimizer state cross every fabric
+stage without returning to host control.
+
+\begin{figure}[t]
+\centering
+\small
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{c@{\;$\rightarrow$\;}c@{\;$\rightarrow$\;}c@{\;$\rightarrow$\;}c@{\;$\rightarrow$\;}c@{\;$\rightarrow$\;}c}
+\fbox{\shortstack{Host stage\\inputs, targets}} &
+\fbox{\shortstack{Fabric\\forward}} &
+\fbox{\shortstack{Fabric\\loss}} &
+\fbox{\shortstack{Fabric\\reverse}} &
+\fbox{\shortstack{Fabric\\update}} &
+\fbox{\shortstack{Host\\readback}} \\
+\end{tabular}
+\caption{Fused training-kick boundary.  Weights, route/work buffers, gradient
+state, and optimizer state remain under fabric control from forward execution
+through update.  Host staging and optional readback are orchestration and
+measurement, respectively.}
+\label{fig:dataflow}
+\end{figure}
+
 \subsection{MorphSSM language-model kernel}
 
 The scaled language model has a 128-symbol vocabulary, sequence length 128,
@@ -298,26 +334,29 @@ new gradient rule.
 \subsection{Platform and protocol}
 
 All silicon results reported here use an AWS EC2 F2 instance with a Xilinx
-Virtex UltraScale+ VU47P FPGA.  Exact artifact identifiers and immutable source
-commits are listed in Appendix~\ref{sec:artifact-ledger}.  ``Bit-exact'' means
+Virtex UltraScale+ VU47P FPGA.  Evidence commits and the pending release-level
+source identity are listed in Appendix~\ref{sec:artifact-ledger}.  ``Bit-exact'' means
 that the archived observable output record---including predictions and weight
 CRC where applicable---matches the C-simulation golden record exactly.  It
 does not mean that an unobserved internal signal has been exhaustively compared.
 
-\todo{Archive the final paper AFIs, HLS reports, post-route timing and
+\gate{Archive the final paper AFIs, HLS reports, post-route timing and
 utilization reports, host binaries, compiler versions, build flags, and
 machine-readable run manifests under one immutable release.  The D512 AFI
 executed successfully, but its final routed report must be copied into the
 public artifact bundle before submission.}
 
-\subsection{Exact D512 execution}
+\subsection{D512 execution and observable-record exactness}
 
 Table~\ref{tab:d512} reports the D512 fused invocations.  The 30-step silicon
 record and independently executed C-simulation record both contain resident
 accuracy 0.421875, weight CRC 10673268721020562856, and the same first 16
-predictions.  The archive therefore marks the run bit-exact.  Longer silicon
-invocations sustain 612 token/s and produce distinct weight CRCs and
-predictions, confirming that the update remains live.
+predictions.  These archived fields are bit-exact; the experiment does not
+claim an exhaustive comparison of unlogged internal arrays or signals.  Longer
+silicon invocations sustain 612 token/s.  Their CRCs differ from the 30-step
+record; the sampled predictions are unchanged at 200 steps and differ by 2,000
+steps, confirming that the observed update state remains live without
+overstating the shorter record.
 
 \begin{table}[t]
 \centering
@@ -329,28 +368,31 @@ step processes the same resident 128-token window in the current harness.}
 \toprule
 Updates & Token positions & Wall time (s) & Throughput (token/s) & Evidence \\
 \midrule
-30   & 3,840   & 6.2879   & 611 & bit-exact to C simulation \\
+30   & 3,840   & 6.2879   & 611 & archived fields match C simulation \\
 200  & 25,600  & 41.8356  & 612 & silicon; state changes \\
 2,000& 256,000 & 418.3963 & 612 & silicon; one fused invocation \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-This result is an exact execution and scaling demonstration, not a language
-quality result.  Repeating one window can change its resident-window accuracy
-without establishing held-out prediction or adaptation to a stream.
+This result demonstrates a fused execution and matching observable state
+transition, not exhaustive internal equivalence or language quality.  Repeating
+one window can change its resident-window accuracy without establishing
+held-out prediction or adaptation to a stream.
 
 \subsection{Preliminary D128 replication ladder}
 
 The committed D128 artifact reports 14,236 token/s for one fused MorphSSM
 kernel, 26,522 token/s for two replicas, and 53,001 token/s for four replicas.
-Every instance matched its reference record, and the model-data path synthesized
-with zero DSP blocks.  The two- and four-replica measurements show approximately
-linear scaling within that build family.
+Each replica's archived observable record matched its reference fields, and the
+model-data path synthesized with zero DSP blocks.  Relative to the single-kernel
+measurement, aggregate throughput is 1.86$\times$ at $N=2$ and 3.72$\times$ at
+$N=4$ (about 93\% of ideal replica scaling in both cases).  The ratios describe
+this build family only; they are not speedups over another accelerator.
 
 These values are preliminary context rather than a final comparative result.
-The one- and four-kernel routed reports have small negative WNS values
-($-0.020$ ns and $-0.173$ ns), the current comparison uses a different GPU
+The one-, two-, and four-kernel routed reports have small negative WNS values
+($-0.020$ ns, $-0.097$ ns, and $-0.173$ ns), the current comparison uses a different GPU
 model and optimizer, and reported FPGA power is the Vccint core rail rather
 than full-card power.  We therefore do not use this ladder to claim timing
 robustness, GPU parity, or an energy advantage.
@@ -365,9 +407,9 @@ not an iso-model or iso-quality accelerator comparison.}
 \toprule
 Replicas & Aggregate token/s & Scaling & DSP & Qualification \\
 \midrule
-1 & 14,236 & 1.00$\times$ & 0 & measured, bit-exact; WNS $-0.020$ ns \\
-2 & 26,522 & 2.00$\times$ reported & 0 & measured, both replicas exact \\
-4 & 53,001 & 4.00$\times$ reported & 0 & measured, all exact; WNS $-0.173$ ns \\
+1 & 14,236 & 1.00$\times$ & 0 & observable record matches; WNS $-0.020$ ns \\
+2 & 26,522 & 1.86$\times$ measured & 0 & both observable records match; WNS $-0.097$ ns \\
+4 & 53,001 & 3.72$\times$ measured & 0 & all observable records match; WNS $-0.173$ ns \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -402,9 +444,13 @@ Epoch & Test accuracy (\%) & Inclusive wall time (s) \\
 
 A separate Python path loads the exported integer weights and a freshly loaded
 MNIST test set and obtains 74.13\%.  The 0.62 percentage-point difference is
-consistent with the documented image-resize rounding difference between data
-pipelines.  More importantly, both evaluations use held-out examples and show
-that the fabric-produced weights encode a generalizing classifier.
+unresolved pipeline variation: the two records were produced through different
+preprocessing/evaluation paths, so the present evidence cannot assign the gap
+to resize rounding or to any other single cause.  Both evaluations are well
+above chance on held-out examples, which supports the narrower conclusion that
+the fabric-produced weights encode a generalizing classifier.  A frozen common
+input tensor and evaluator are required before treating the two numbers as a
+parity check.
 
 This is a structural correctness demonstration, not an MNIST accuracy or
 throughput result.  The images are downsampled, the model is small, predictions
@@ -412,12 +458,39 @@ are class-imbalanced, and the reported epoch time includes host evaluation.
 
 \section{Required submission experiments}
 
-The current artifact supports feasibility and exactness.  A publishable systems
-claim requires the following locked comparisons.
+The current artifacts support feasibility and scoped observable-record
+exactness.  A publishable comparative systems claim requires the following
+locked comparisons.
+
+\begin{table}[t]
+\centering
+\caption{Open gates and the claim each would unlock.  A gate changes the paper's
+claim boundary only after its artifacts are archived.}
+\label{tab:open-gates}
+\small
+\begin{tabular}{p{0.22\linewidth}p{0.31\linewidth}p{0.36\linewidth}}
+\toprule
+Gate & Minimum evidence & Claim unlocked \\
+\midrule
+Release artifact & Immutable source/build manifests, AFIs, HLS and routed
+reports & Reproducible physical-closure claim for each named build \\
+Timing closure & Non-negative setup/hold slack with margin & Headline D128
+replica throughput rather than preliminary execution context \\
+Frozen MNIST pipeline & Identical tensors and evaluator, repeated seeds,
+matched software arm & Reconciled held-out learning comparison \\
+Disjoint language stream & Pinned stream, checkpoints, held-out metric, and
+no-update control & Learning claim for the D512 model beyond resident replay \\
+Iso-model CUDA & Same model, numeric recipe, update, data, and accounting &
+Comparative throughput/latency statement \\
+Full-card power & Synchronized board-level idle/active measurements with
+uncertainty & Board-to-board energy statement \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Matched performance comparison}
 
-\todo{Implement an iso-model CUDA baseline for the same hard-routed model, loss,
+\gate{Implement an iso-model CUDA baseline for the same hard-routed model, loss,
 numeric representation, batch/window shape, update rule, and number of token
 positions.  Report end-to-end and kernel-only throughput, latency distribution,
 peak memory, memory traffic where measurable, and compilation/setup costs.}
@@ -429,7 +502,7 @@ quality and parameter count, with its algorithmic differences made explicit.
 
 \subsection{Disjoint-stream learning}
 
-\todo{Replace the resident-window repetition harness with a sequence of disjoint
+\gate{Replace the resident-window repetition harness with a sequence of disjoint
 training windows.  Pre-register held-out evaluation, identical token order,
 number of updates, initialization, and optimizer state.  Compare FPGA and
 reference trajectories at periodic checkpoints and confirm exactness or bound
@@ -441,11 +514,11 @@ three seeds and a no-update control.
 
 \subsection{Timing and power}
 
-\todo{Archive final post-route timing for every headline build and require
+\gate{Archive final post-route timing for every headline build and require
 non-negative setup/hold slack with margin.  Re-run any D128 replica result whose
 current WNS is negative before using it as a headline throughput result.}
 
-\todo{Measure full-card idle and active power with external or authoritative
+\gate{Measure full-card idle and active power with external or authoritative
 board-level instrumentation.  Separate shell/DDR/static power from dynamic
 kernel power; use synchronized sampling windows and report uncertainty.  Until
 then, retain only the statement that Vccint measurements are core-rail values
@@ -463,12 +536,14 @@ than resident-window accuracy.
 \section{Limitations}
 
 \begin{itemize}
-  \item The D512 experiment repeats one 128-token window.  It proves exact
-  execution, persistent updates, and sustained fused invocation, not held-out
-  language learning.
+  \item The D512 experiment repeats one 128-token window.  It demonstrates a
+  matching archived output record, persistent updates, and sustained fused
+  invocation, not exhaustive internal equivalence or held-out language
+  learning.
   \item The MNIST experiment is small and uses downsampled inputs.  Its value is
   that held-out accuracy is produced by fabric-only updates, not that 74.75\%
-  is competitive.
+  is competitive.  Its 74.75\% and 74.13\% evaluation paths are not yet frozen
+  to identical inputs and remain unreconciled.
   \item The FPGA kernels are shape-specialized monoliths.  This paper does not
   demonstrate a compiler for arbitrary \tikitorch{} programs.
   \item Closure is scoped to the compiled recipe.  Soft relaxations, ordinary
@@ -488,24 +563,31 @@ than resident-window accuracy.
 
 The committed artifacts establish two facts.  First, a complete learning state
 transition---forward, loss, backward, and update---can be expressed with
-compare, add, shift, mux, and lookup operations and can execute bit-exactly on
-real FPGA silicon at width 512.  Second, the same broad co-design principle can
-train a small classifier whose exported weights generalize to held-out data.
+compare, add, shift, mux, and lookup operations and can execute on real FPGA
+silicon at width 512 with its archived output fields matching C simulation bit
+for bit.  Second, the same broad co-design principle can train a small
+classifier whose exported weights perform well above chance on held-out data
+under two evaluation paths, although their 0.62-point difference remains
+unresolved.
 
 The next result must be comparative rather than merely demonstrative: a
 timing-closed release build, disjoint-stream learning, an iso-model CUDA arm,
 and full-card power.  Until those gates close, the defensible contribution is
-exact end-to-end multiplier-free learning on FPGA silicon, not superiority to
-modern GPU training.
+an end-to-end multiplier-free learning state transition on FPGA silicon with a
+scoped bit-exact observable record, plus fabric-only learning on a small held-out
+task---not superiority to modern GPU training.
 
 \appendix
 
 \section{Artifact and claim ledger}
 \label{sec:artifact-ledger}
 
-This draft was prepared against repository head
-\texttt{9d13474} (branch \texttt{pc-morphssm}).  The following claim-bearing
-artifacts already have immutable commits.
+The research branch was integrated into \texttt{main} at merge commit
+\texttt{0a12c8b}; this revised tree has not yet been assigned a release-candidate
+identity.  Its release-level provenance marker is
+\textit{immutable candidate identifier pending}; it must be replaced only after the
+candidate tree is clean, the paper is rebuilt, and the cited checks are rerun.
+The following claim-bearing evidence artifacts already have immutable commits.
 
 \begin{table}[h]
 \centering
@@ -515,23 +597,31 @@ artifacts already have immutable commits.
 \toprule
 Claim & Repository artifact & Commit \\
 \midrule
-D512 30-step bit-exact and 2,000-step execution &
+D512 30-step observable-record match and 2,000-step execution &
 \path{results/fpga_silicon/d512_verify/} & \texttt{ee3c775} \\
-D128 single/replica measurements and qualifications &
+D128 single/replica raw measurements &
 \path{results/lm_shakespeare/fig_hallmark_lm.md} & \texttt{0b33218} \\
+D128 1.86/3.72 arithmetic correction and complete WNS qualification &
+\path{results/lm_shakespeare/fig_hallmark_lm.md} & release commit pending \\
 MNIST fabric-only training and independent evaluation &
 \path{results/predictive_coding/ONFABRIC_TRAINING.md} and
 \path{results/predictive_coding/onfabric_train/} & \texttt{115a494} \\
 Closure-auditor implementation and scope &
-\path{tikitorch/audit.py} & source at draft head \\
+\path{tikitorch/audit.py} & release commit pending \\
 D512 fused kernel and buffer contract &
 \path{tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp} and
-\path{forge_buffer_morph_lm.hpp} & source at draft head \\
+\path{forge_buffer_morph_lm.hpp} & release commit pending \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The AFGI identifiers currently recorded by the artifacts are
+The historical \texttt{0b33218} summary retained the correct raw N=1, N=2,
+and N=4 throughputs but described their ratios as 2.00 and 4.00.  This candidate
+recomputes the displayed 1.86 and 3.72 ratios directly from those immutable raw
+measurements and records all three negative-WNS qualifications; the correction
+must receive the release identifier before submission.
+
+The AGFI identifiers currently recorded by the artifacts are
 \texttt{agfi-003a8a2f2b1ba7df7} for the D512 MorphSSM result and
 \texttt{agfi-0fdc38db9da6add74} for the MNIST training result.  AFIs are not
 assumed to remain publicly loadable; the release must include build inputs and
@@ -544,7 +634,7 @@ The D512 launcher is
 listed in \path{results/predictive_coding/ONFABRIC_TRAINING.md}.  These paths
 currently depend on an AWS account, FPGA tooling, and a compatible F2 image.
 
-\todo{Replace this sketch with a versioned artifact README containing exact
+\gate{Replace this sketch with a versioned artifact README containing exact
 container/toolchain versions, checksums, expected cost, expected wall time,
 one-command C-simulation, synthesis-only, and on-board tracks.}
 

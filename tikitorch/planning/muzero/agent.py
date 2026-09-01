@@ -4,7 +4,7 @@ Ties the tropical networks, the validated TropicalMCTS, self-play, and the repla
 buffer into the standard MuZero loop: alternate (self-play -> replay) with
 (sample -> K-step unrolled train). The backup operator is a swept hyperparameter
 (`topk` k=2 default here; `mean` the published-MuZero safe option, `max` the pure
-(max,+) bet). Losses: value and reward (MSE for a ScalarHead, categorical
+(max,+) bet). Losses: value and reward (L1 for a ScalarHead, categorical
 cross-entropy for a CategoricalHead), policy (cross-entropy to the MCTS visits).
 
 This is the CPU-scale vertical slice that validates the loop end-to-end; the
@@ -27,9 +27,9 @@ __all__ = ["MuZeroConfig", "TropicalMuZero"]
 
 @dataclass
 class MuZeroConfig:
-    net_kind: str = "tropical"    # "tropical" (multiplier-free) | "dense" (matched control)
-    core_kind: str = "maxplus"    # tropical cores: "maxplus" (axis-aligned) | "dyadic" (multiplier-free oblique)
-    optimizer: str = "tropicalsgd"  # "tropicalsgd"/"signsgd" (closed, multiply-free) | "adamw" (open baseline)
+    net_kind: str = "tropical"    # "tropical" recipe | "dense" control
+    core_kind: str = "maxplus"    # "maxplus" axis-aligned | "dyadic" power-of-two oblique
+    optimizer: str = "tropicalsgd"  # recipe optimizers or the AdamW baseline
     latent_dim: int = 64
     tau: float = 1.0
     tau_start: float = None       # if set with tau_end, anneal tau over training
@@ -189,14 +189,14 @@ class TropicalMuZero:
 
 
 def _make_optimizer(name, params, lr):
-    """TikiTorch closed (multiply-free) optimizer by default; AdamW for the open arm."""
+    """Choose a recipe optimizer, or AdamW for the conventional baseline arm."""
     name = name.lower()
     if name == "adamw":
         return torch.optim.AdamW(params, lr=lr)
     import tikitorch.optim as ttoptim
     if name == "signsgd":
         return ttoptim.SignSGD(params, lr=lr)           # W -= lr*sign(grad)
-    return ttoptim.TropicalSGD(params, lr=lr)            # closed: compare + add, zero DSP
+    return ttoptim.TropicalSGD(params, lr=lr)            # sign/update rule defined in optim
 
 
 def _ce(logits, target):

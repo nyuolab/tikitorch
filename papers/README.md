@@ -9,6 +9,9 @@ repository, not in these papers.
 The canonical wording authority is the [research claim
 ledger](../docs/research/CLAIM_LEDGER.md).
 
+For discussion with Xiang, start with the [two-paper handoff](XIANG_HANDOFF.md),
+then review each canonical PDF and its open experimental gates.
+
 ## Paper 1 — Forward traces as exact differentiation certificates
 
 Workspace: [`route_certificates/`](route_certificates/)
@@ -28,7 +31,7 @@ MorphSSM retained-state measurements.
 - typed and packed certificate schemas;
 - route-replay exactness and trajectory equivalence;
 - retained-state accounting and its boundary sensitivity; and
-- the compiled five-arm software comparison.
+- the target compiled five-arm software comparison, which remains open.
 
 **Does not own:** FPGA throughput, silicon learning, multiplier-free energy, a
 new gradient, generic activation-free learning, or ontogenic-agent behavior.
@@ -49,8 +52,9 @@ Workspace: [`multiplier_free_fpga/`](multiplier_free_fpga/)
 
 **Contribution:** co-design and physical validation of complete
 forward--loss--backward--update loops built from compare, add, shift, mux, and
-lookup operations, including exact D512 execution and held-out learning from a
-small fabric-trained classifier.
+lookup operations, including D512 fused execution with an exact archived
+observable-record match and held-out learning from a small fabric-trained
+classifier.
 
 **Owns:**
 
@@ -95,7 +99,7 @@ and evidence of external research use.
 | Result | Canonical paper | May be background elsewhere? |
 |---|---|---|
 | Selected-VJP certificate theorem and packing | Route certificates | Yes, one-paragraph citation |
-| 2.45--3.07x retained-state payload result | Route certificates | Yes, with the accounting boundary |
+| 1.97--2.96x portable retained-state result at a supplied-cotangent boundary | Route certificates | Yes, with the accounting boundary |
 | D512 fused F2 execution | FPGA | Yes, as hardware feasibility only |
 | Fabric-trained MNIST held-out accuracy | FPGA | Yes, as hardware feasibility only |
 | 2.4230 bpc F2 forward inference | FPGA | Yes, as deployment context |
@@ -121,8 +125,8 @@ and evidence of external research use.
 
 ## Immediate order of work
 
-1. Archive the current TikiTorch research branch and working artifacts remotely.
-2. Make the route-certificate integration and ordinary CI green.
+1. Select and archive an immutable TikiTorch candidate plus its working artifacts.
+2. Keep the integrated route-certificate implementation and ordinary CI green.
 3. Close the route paper's five-arm systems experiment.
 4. Close the FPGA paper's disjoint-stream, timing, CUDA, and power gates.
 5. Cut a stable TikiTorch release; pursue the software paper after adoption.

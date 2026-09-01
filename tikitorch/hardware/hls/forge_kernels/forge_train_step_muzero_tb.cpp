@@ -1,10 +1,11 @@
 // forge_train_step_muzero_tb.cpp — host-side CSIM for the dyadic MuZero forward kernel.
 //
 // Functional verification under plain g++ (no Vitis): the kernel compiles via the
-// forge_hls_types.hpp shim, runs the zero-DSP shift+add forward, and we check the outputs
+// forge_hls_types.hpp shim, runs the shift/add-oriented forward, and we check the outputs
 // are well-formed (int16 range), deterministic, and that the all-zero-weight case yields a
 // zero (bias-only) output. Bit-exactness vs the trained PyTorch net is the integration test
 // (export the shift schedule into this buffer via tikitorch.fpga.dyadic_export — next stage).
+// CSIM is functional evidence only; DSP use is established by a matching synthesis report.
 //
 // Compile: g++ -O2 -std=c++17 -DCSIM_ONLY -I.. -I. forge_train_step_muzero.cpp \
 //              forge_train_step_muzero_tb.cpp -o tb_muzero && ./tb_muzero
@@ -124,7 +125,7 @@ int main() {
     forge_train_step_muzero(buf.data(), 0, 0, 0, 0);
     for (int i = 0; i < MZ_A; i++) if (buf[OFF_POLICY + i] != 0) { std::printf("FAIL: zero-weights gave nonzero policy\n"); fails++; break; }
 
-    std::printf(fails == 0 ? "[tb_muzero] PASS (zero-DSP forward, CSIM)\n"
+    std::printf(fails == 0 ? "[tb_muzero] PASS (functional forward CSIM)\n"
                            : "[tb_muzero] FAIL (%d checks)\n", fails);
     return fails == 0 ? 0 : 1;
 }

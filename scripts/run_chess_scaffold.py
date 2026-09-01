@@ -1,11 +1,9 @@
-"""run_chess_scaffold — small-scale proof that the zero-DSP MuZero pipeline SCALES to chess.
+"""run_chess_scaffold — small-scale check that the MuZero interfaces run on chess.
 
-Full-strength chess MuZero needs TPU-pod compute (reported MuZero beats Stockfish); that is not
-reproducible on a workstation. This script instead proves the SUBSTRATE scales: the exact same
-multiplier-free dyadic tropical net + closed self-play -> replay -> K-step training loop used for
-TicTacToe/Connect4/GridWorld runs end-to-end on chess (python-chess env), the training loss falls
-(the net fits the MCTS policy/value targets), and the trained MCTS agent beats a random mover and a
-greedy material grabber. It is a PIPELINE proof + honest small-scale benchmark, not a strength claim.
+This runs the same self-play, replay, and K-step training interfaces on the ``python-chess``
+environment and records loss and small-sample strength metrics. The network uses dyadic components,
+but the Python MCTS, normalization, loss, and orchestration paths retain arithmetic boundaries. It
+is a pipeline scaffold, not a chess-strength result or a whole-system hardware/resource claim.
 
     PYTHONPATH=<repo-root> python3 scripts/run_chess_scaffold.py [--iters 4 --sims 8 --games 6 --eval 12]
 """
@@ -42,7 +40,7 @@ def main(a):
                       train_steps_per_iter=a.steps, batch=128, unroll=3, num_workers=a.workers,
                       tau_start=1.0, tau_end=0.3, lr=3e-3, seed=0)
     mz = BoardMuZero(Chess, cfg)
-    print(f"chess scaffold: dyadic tropical (multiplier-free), latent={cfg.latent_dim}, "
+    print(f"chess scaffold: dyadic tropical, latent={cfg.latent_dim}, "
           f"sims={cfg.num_simulations}, iters={cfg.iters}, games/iter={cfg.games_per_iter}")
 
     loss_curve = []
@@ -74,14 +72,14 @@ def main(a):
                untrained_vs_random=ctrl_rand)
     open(os.path.join(OUT, "chess_scaffold.json"), "w").write(json.dumps(res, indent=2))
 
-    md = ["# Chess MuZero scaffold — multiplier-free dyadic tropical (zero-DSP substrate)", "",
-          "_Pipeline-scaling proof, NOT a strength claim. Reported MuZero plays chess at superhuman "
-          "strength with TPU-pod compute; that is not workstation-reproducible. This shows the SAME "
-          "zero-DSP self-play->replay->K-step-training loop (python-chess env, 4096-action from-to "
-          "encoding, 769-d planes) runs end-to-end on chess, the training loss falls, and the trained "
-          "MCTS agent outplays a random mover and a 1-ply material grabber._", "",
+    md = ["# Chess MuZero scaffold — dyadic tropical configuration", "",
+          "_Pipeline scaffold, NOT a strength or whole-system hardware claim. The Python loop "
+          "(python-chess env, 4096-action from-to encoding, 769-d planes) runs end-to-end and the "
+          "table records the observed loss and match outcomes. Dyadic network components are "
+          "shift/add-oriented, while MCTS, normalization, loss, and orchestration retain explicit "
+          "arithmetic boundaries._", "",
           f"Config: dyadic tropical, latent {cfg.latent_dim}, {cfg.num_simulations} sims, {cfg.iters} "
-          f"iters x {cfg.games_per_iter} self-play games, closed TropicalSGD optimizer.", "",
+          f"iters x {cfg.games_per_iter} self-play games, TropicalSGD optimizer.", "",
           f"Training loss: {loss_curve[0]:.3f} -> {loss_curve[-1]:.3f} over {cfg.iters} iters "
           f"(curve {loss_curve}).", "",
           "| opponent | win | draw | loss | score |", "|---|---|---|---|---|"]

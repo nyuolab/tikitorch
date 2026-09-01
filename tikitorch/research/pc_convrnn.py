@@ -1,4 +1,4 @@
-"""Cascade PC trains fully tropical sequence models (branch pc-morphssm).
+"""Cascade predictive coding for fully tropical sequence models.
 
 Track 1 (primary): predictive-coding training of the REAL ``tt.models.MorphSSM``
 (bakeoff config) via a single-sweep cascade over frozen tropical routing — the
@@ -26,6 +26,8 @@ Usage::
     python scripts/pc_convrnn_charlm.py --gradcheck            # G0 quick gate
     python scripts/pc_convrnn_charlm.py --arms morphssm:bp morphssm:cascade
 """
+from __future__ import annotations
+
 import argparse
 import json
 import math

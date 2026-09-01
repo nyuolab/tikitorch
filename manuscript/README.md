@@ -1,6 +1,6 @@
 # Route-certificate manuscript handoff
 
-This is the root-level entry point for the draft assigned to Xiang:
+This is the root-level entry point for the discussion draft prepared for Xiang:
 **Forward Traces as Exact Differentiation Certificates in Hard-Routed
 Networks**.
 
@@ -37,14 +37,20 @@ Before changing a claim, check the
 
 The paper's durable contribution is an operator-scoped theorem and executable
 contract: for declared hard-routed operators, a forward trace can be a
-sufficient certificate for exact selected state and additive-parameter VJPs.
-It is ordinary reverse accumulation over a smaller, explicitly typed tape—not
-a new gradient rule and not generic activation-free learning.
+sufficient certificate for state and additive-parameter VJPs under a declared
+derivative selection. It is ordinary reverse accumulation over a smaller,
+explicitly typed tape—not a new gradient rule and not generic activation-free
+learning. The graph composition proof is intentionally direct; the scientific
+value is the operator contract, concrete replay fields, counterexamples,
+portable representation, and evidence.
 
 Do not promote the current retained-state result into a peak-memory or speed
-claim. The measured result is presently limited to a 2.45--3.07x reduction in
-retained-state payload versus the registered checkpoint boundary on three
-MorphSSM configurations, with boundary sensitivity disclosed in the paper.
+claim. Under a common supplied-output-cotangent boundary, the portable
+certificate is 1.97--2.96x smaller than checkpoint-retained state on the three
+measured MorphSSM configurations. Under the current replay interface, which
+retains logits and targets on both sides, the portable ratio is 1.69--2.79x.
+The current focused suite passes 38 core tests plus 37 integration,
+serialization, and benchmark-hardening tests.
 
 ### Gates that must close before submission
 
@@ -55,9 +61,10 @@ MorphSSM configurations, with boundary sensitivity disclosed in the paper.
    matching outputs and routes plus tolerance-gated parameter gradients and
    optimization trajectories. Preserve graph breaks, fallbacks, OOMs, and
    failed runs instead of filtering them away.
-3. **Complete all five arms on the actual MorphSSM workload:** eager autograd,
+3. **Complete all five target arms on the actual MorphSSM workload:** eager autograd,
    compiled autograd, checkpoint/recompute, compiled unpacked custom VJP, and
    compiled packed replay. Include packing and decoding in the measured cycle.
+   The checked-in Python cascade/packed runner is scaffolding, not this result.
 4. **Measure the systems question.** Report full-cycle latency, retained bytes,
    process or accelerator peak memory, recomputation events, and bytes moved at
    each scale under the same boundary accounting. Report warm-up, compilation,
@@ -66,7 +73,7 @@ MorphSSM configurations, with boundary sensitivity disclosed in the paper.
    provenance, not hand-edited manuscript values. Re-run the theorem,
    serializer, matched-DAG, trajectory, and actual-model audits from the pinned
    clean checkout.
-6. **Finish the submission surface.** Replace anonymous authorship, lock the
+6. **Finish the submission surface.** Confirm authorship, lock the
    venue style, complete the closest-prior-art matrix, audit theorem notation
    against implementation fields, and package a one-command artifact with an
    immutable release identifier.

@@ -43,7 +43,7 @@ def write_nb(name, cells):
 # Shared SETUP cell: install TikiTorch in Colab (or use a local checkout).
 SETUP = code(r"""
 # --- Setup: install TikiTorch (run once) ---
-# TikiTorch is research code, not on PyPI. In Colab, install from the repo.
+# Until a tagged package is published, Colab can install TikiTorch from `main`.
 try:
     import tikitorch  # already installed?
 except ImportError:
@@ -51,7 +51,7 @@ except ImportError:
     import subprocess, sys, os
     if not os.path.exists("tikitorch_repo"):
         subprocess.run(
-            ["git", "clone", "--branch", "pc-morphssm", "--single-branch",
+            ["git", "clone", "--branch", "main", "--single-branch",
              REPO_URL, "tikitorch_repo"],
             check=True,
         )

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=78.1.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ version = "0.2.0"
 description = "PyTorch-shaped infrastructure for tropical and hard-routed deep learning."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "GPL-3.0-or-later" }
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
 authors = [
     { name = "RespectableGlioma (EKO)" },
 ]
@@ -23,11 +24,13 @@ keywords = [
     "pytorch",
 ]
 classifiers = [
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Intended Audience :: Science/Research",
@@ -42,21 +45,32 @@ dependencies = [
 # at runtime (the util degrades to a warning) but required to exercise the
 # geometry tests, so it ships in the dev extra.
 dev = ["pytest", "ruff", "scipy"]
-# The FPGA backend is pure-Python + ctypes (stdlib); the native driver is built
-# out-of-band against the Xilinx toolchain (see tikitorch/fpga/BUILD_NATIVE.md),
-# so this extra intentionally adds no pip deps. It exists as a documented marker
-# (`pip install tikitorch[fpga]`); pybind11 / pyxrt are out-of-band build hints.
+# The FPGA Python namespace uses ctypes from the standard library, so this marker
+# extra intentionally adds no pip dependencies. Building a native driver or reproducing
+# the complete HLS/HDK path requires a source checkout, compatible AWS/Xilinx tooling,
+# and the instructions in tikitorch/fpga/BUILD_NATIVE.md and
+# tikitorch/hardware/BUILD_GUIDE.md; a wheel alone is not a hardware build environment.
 fpga = []
 # Build the API-reference docs site: `pip install -e ".[docs]"` then `mkdocs build`.
 docs = ["mkdocs-material", "mkdocstrings[python]"]
+# Real-MNIST examples load torchvision lazily; synthetic --smoke paths do not
+# require it.
+vision = ["torchvision"]
+# Build and validate release archives locally: `pip install -e ".[build]"`, then
+# `python -m build` and `python -m twine check dist/*`.
+build = ["build>=1.2", "twine>=5.0"]
 
 [project.urls]
 Homepage = "https://github.com/nyuolab/tikitorch"
 Repository = "https://github.com/nyuolab/tikitorch"
 Issues = "https://github.com/nyuolab/tikitorch/issues"
+Documentation = "https://github.com/nyuolab/tikitorch/tree/main/docs"
+Changelog = "https://github.com/nyuolab/tikitorch/blob/main/CHANGELOG.md"
+FPGA-Source-Guide = "https://github.com/nyuolab/tikitorch/blob/main/tikitorch/hardware/BUILD_GUIDE.md"
 
 [project.scripts]
-# Audit any model for multiplier-free (zero-DSP) closure from the shell:
+# Run the model's registered software closure checks from the shell. This is not a
+# synthesis report and does not establish physical DSP utilization:
 #   tt-closure tikitorch.models:TropicalForwardForward
 tt-closure = "tikitorch.cli:main"
 
@@ -78,9 +92,10 @@ line-length = 100
 target-version = "py39"
 
 [tool.ruff.lint.per-file-ignores]
-# __init__.py files curate the public API by re-importing symbols; those imports
-# are intentional re-exports, not dead code.
-"__init__.py" = ["F401"]
+# __init__.py files curate the public API by re-importing symbols. The package root
+# intentionally initializes foundational namespaces before its convenience re-exports,
+# so those imports are neither dead code nor accidentally late.
+"__init__.py" = ["E402", "F401"]
 # Tests favour compact setup lines (semicolons, short throwaway names). The
 # bug-catching F-rules (unused import/var, shadowing) stay ON.
 "tests/**" = ["E402", "E701", "E702", "E731", "E741"]
@@ -88,9 +103,6 @@ target-version = "py39"
 # are the teaching point, so the layout rules are relaxed here.
 "examples/**" = ["E401", "E402", "E701", "E702", "E731", "E741"]
 "scripts/**" = ["E401", "E402", "E701", "E702", "E731", "E741"]
-# Predictive-coding equations conventionally use `l` as a layer index throughout;
-# retaining that notation is clearer than a mechanical rename of this legacy module.
-"tikitorch/nn/predictive_coding.py" = ["E741"]
 # Notebooks re-import and re-assign freely across cells by design; lint only for
 # genuine syntax/logic errors, not style or per-cell redefinitions.
 "notebooks/**" = ["E401", "E402", "E701", "E702", "E731", "E741", "F401", "F811", "F841"]

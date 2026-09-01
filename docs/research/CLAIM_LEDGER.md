@@ -1,6 +1,6 @@
 # TikiTorch research claim ledger
 
-Status: canonical working ledger, 2026-08-31.
+Status: canonical working ledger, 2026-09-01.
 
 This file controls research wording for TikiTorch. A result may be described
 more narrowly than this ledger, but not more broadly without adding evidence
@@ -45,9 +45,9 @@ used to expand TikiTorch's claims.
 tropical and dyadic neural-network research, including operators, models,
 optimizers, auditing, serialization, and hardware paths.
 
-**Evidence:** [package metadata](../../pyproject.toml), [public import
-tests](../../tests/test_import.py), [architecture guide](../guide/architecture.md),
-and the [`tikitorch` package](../../tikitorch/).
+**Evidence:** [package metadata](https://github.com/nyuolab/tikitorch/blob/main/pyproject.toml), [public import
+tests](https://github.com/nyuolab/tikitorch/blob/main/tests/test_import.py), [architecture guide](../guide/architecture.md),
+and the [`tikitorch` package](https://github.com/nyuolab/tikitorch/tree/main/tikitorch/).
 
 **Do not claim:** complete PyTorch compatibility; production maturity; optimized
 performance for every operator; arbitrary-model FPGA compilation; or that every
@@ -66,9 +66,9 @@ levels: registered-module structure, an executed forward trace, and an executed
 forward--loss--backward--optimizer step. Power-of-two scaling is classified as
 a shift. HLS reports and silicon checks separately validate a compiled kernel.
 
-**Evidence:** [`tikitorch.audit`](../../tikitorch/audit.py), [audit
-tests](../../tests/test_audit.py), [training-closure
-tests](../../tests/test_dyadic_backward_closure.py), and FPGA synthesis evidence
+**Evidence:** [`tikitorch.audit`](https://github.com/nyuolab/tikitorch/blob/main/tikitorch/audit.py), [audit
+tests](https://github.com/nyuolab/tikitorch/blob/main/tests/test_audit.py), [training-closure
+tests](https://github.com/nyuolab/tikitorch/blob/main/tests/test_dyadic_backward_closure.py), and FPGA synthesis evidence
 listed below.
 
 **Required boundary language:**
@@ -94,8 +94,8 @@ reports, and an on-silicon known-answer test.
 
 ### TT-ROUTE-001 — Exact selected-VJP certificates
 
-**Status:** Draft evidence; implementation and artifacts are being re-homed in
-TikiTorch.
+**Status:** Draft evidence. The implementation and working artifacts are now in
+TikiTorch; clean release-candidate reproduction remains pending.
 
 **Allowed wording:** For a declared finite graph of trace-sufficient hard
 operators, the forward route plus required auxiliary fields and a supplied
@@ -103,17 +103,19 @@ output cotangent determines the selected state and additive-parameter VJPs.
 Certificates compose through the registered fan-out, residual, shared-parameter,
 and finite-unrolling rules under deterministic ties.
 
-**Evidence:** [route-certificate paper workspace](../../papers/route_certificates/),
-[claim boundary and preserved evidence](../../papers/route_certificates/README.md),
-[working implementation](../../tikitorch/autodiff/), [working result
-archive](../../results/route_certificates/), and route tests currently under
-[`tests/`](../../tests/).
+**Evidence:** [route-certificate paper workspace](https://github.com/nyuolab/tikitorch/tree/main/papers/route_certificates/),
+[claim boundary and preserved evidence](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/README.md),
+[working implementation](https://github.com/nyuolab/tikitorch/tree/main/tikitorch/autodiff/), [working result
+archive](https://github.com/nyuolab/tikitorch/tree/main/results/route_certificates/), and route tests currently under
+[`tests/`](https://github.com/nyuolab/tikitorch/tree/main/tests/).
 
-**Exactness evidence currently used by the draft:** 38 registered reference
-tests; a small residual-DAG comparison with maximum FP32 parameter-gradient
-difference `4.77e-7` from eager autograd; and maximum parameter difference
-`2.98e-8` after five SGD steps. Packed replay and the direct route reverse use
-the same selected reverse-mode computation.
+**Exactness evidence currently used by the draft:** 38 core registered-reference
+tests form the historical claim-bearing record; 37 additional integration,
+serialization, and benchmark-hardening tests pass in the current worktree and
+await clean release-candidate reproduction. A small residual-DAG comparison has
+maximum FP32 parameter-gradient difference `4.77e-7` from eager autograd and
+maximum parameter difference `2.98e-8` after five SGD steps. Packed replay and
+the direct route reverse use the same selected reverse-mode computation.
 
 **Do not claim:** a new gradient; a biologically distinct learning rule; generic
 activation-free training; route-index-only sufficiency; or coverage of dense
@@ -132,19 +134,22 @@ TikiTorch results.
 **Status:** Draft evidence, configuration-specific.
 
 **Allowed wording:** On three measured hard-routed MorphSSM configurations, the
-packed certificate payload is 2.45--3.07x smaller than the registered
-checkpoint-retained-state comparator without recomputation. At
-`d=128, L=4, T=96`, payload is 87,588 bytes, or 912.4 bytes/token, and the
-reported ratio is 2.97x.
+portable certificate is 1.97x, 2.74x, and 2.96x smaller than the registered
+checkpoint-retained-state comparator without recomputation when both sides are
+given the output cotangent. At `d=128, L=4, T=96`, the payload is 87,588 bytes,
+or 912.4 bytes/token; the portable certificate is 89,799 bytes and the
+boundary-matched ratio is 2.74x.
 
-**Accounting boundary:** those ratios use certificate payload. Including the
-portable directory and separately disclosed loss logits changes the three
-ratios to 1.70x, 2.49x, and 2.80x. Report both views.
+**Accounting boundary:** the primary supplied-cotangent ratios include the
+portable certificate directory. When the current replay interface retains
+loss logits and int64 targets, include those tensors on both sides; the resulting
+ratios are 1.69x, 2.48x, and 2.79x. Payload-only ratios (2.04x, 2.81x, and
+2.98x) are coding diagnostics, not the headline retained-state comparison.
 
-**Evidence:** [paper README](../../papers/route_certificates/README.md),
-[manuscript table](../../papers/route_certificates/main.tex), [accounting
-sensitivity](../../papers/route_certificates/supplement.tex), and [raw working
-results](../../results/route_certificates/actual_morphssm/).
+**Evidence:** [paper README](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/README.md),
+[manuscript table](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/main.tex), [accounting
+sensitivity](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/supplement.tex), and [raw working
+results](https://github.com/nyuolab/tikitorch/tree/main/results/route_certificates/actual_morphssm/).
 
 **Do not claim:** lower process RSS, allocator peak, accelerator peak, DRAM
 traffic, latency, energy, or generic whole-model activation memory. The small
@@ -166,8 +171,8 @@ measured 2.4230 held-out bits/character over 3,840 positions and matched the
 kernel-faithful C++ reference. The 62.5 MHz build closed timing with WNS
 `+0.392 ns`.
 
-**Evidence:** [result report](../../results/lm_shakespeare/S1_KV2_ON_SILICON.md)
-and [raw F2 log](../../results/lm_shakespeare/onfabric_gen/s1_kv2_f2_gen.txt).
+**Evidence:** [result report](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/S1_KV2_ON_SILICON.md)
+and [raw F2 log](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/onfabric_gen/s1_kv2_f2_gen.txt).
 
 **Do not claim:** on-fabric training of this quality result; competitive
 throughput; large-language-model scale; or model-generated text as a quantitative
@@ -181,23 +186,24 @@ manifest.
 **Secondary inference artifact:** the chess-scale forward kernel measured
 9.22 ms/inference (108.4 inference/s) over 4,000 F2 kicks with DSP=0 and routed
 timing closure. It is forward inference only; the corresponding training kernel
-misses timing and exceeds one SLR. See the [AFI report](../../results/fpga_silicon/MUZERO_CHESS_FWD_AFI.md)
-and [comparison audit](../../results/board_scaling/CHESS_MUZERO_COMPARISON.md).
+misses timing and exceeds one SLR. See the [AFI report](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/MUZERO_CHESS_FWD_AFI.md)
+and [comparison audit](https://github.com/nyuolab/tikitorch/blob/main/results/board_scaling/CHESS_MUZERO_COMPARISON.md).
 
-### TT-FPGA-TRAIN-001 — Exact D512 fused learning-loop execution
+### TT-FPGA-TRAIN-001 — D512 fused execution with an exact observable-record match
 
 **Status:** Measured execution; learning quality remains open.
 
 **Allowed wording:** A four-layer, width-512 MorphSSM kernel executes forward,
-LUT-loss gradient, reverse, and SignSGD entirely in one F2 invocation. A
-30-update run is bit-exact to its C-simulation record. A 2,000-update invocation
-processed 256,000 token positions in 418.3963 seconds, sustaining 612 token/s,
-with persistent weight-state change.
+LUT-loss gradient, reverse, and SignSGD entirely in one F2 invocation. The
+archived resident accuracy, weight CRC, and first 16 predictions from a
+30-update run match its C-simulation record bit for bit. A 2,000-update
+invocation processed 256,000 token positions in 418.3963 seconds, sustaining
+612 token/s, with persistent weight-state change.
 
-**Evidence:** [D512 verification archive](../../results/fpga_silicon/d512_verify/),
-especially [`BITEXACT`](../../results/fpga_silicon/d512_verify/BITEXACT),
-[`train_2000.err`](../../results/fpga_silicon/d512_verify/train_2000.err), and
-the [fused kernel](../../tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp).
+**Evidence:** [D512 verification archive](https://github.com/nyuolab/tikitorch/tree/main/results/fpga_silicon/d512_verify/),
+especially [`BITEXACT`](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/d512_verify/BITEXACT),
+[`train_2000.err`](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/d512_verify/train_2000.err), and
+the [fused kernel](https://github.com/nyuolab/tikitorch/blob/main/tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp).
 
 **Do not claim:** held-out language learning, 256,000 distinct tokens, a quality
 improvement, or a competitive accelerator result. The harness repeats one
@@ -215,10 +221,12 @@ an iso-model CUDA arm.
 **Allowed wording:** A two-layer dyadic network trained on 16-by-16 MNIST with
 forward, error routing, gradient accumulation, momentum, and update running on
 F2 reached 74.75% test accuracy. An independent Python path evaluated the
-exported fabric-trained weights at 74.13% on a freshly loaded test set.
+exported fabric-trained weights at 74.13% on a freshly loaded test set. The
+0.62 percentage-point difference is unresolved pipeline variation because the
+two evaluations did not freeze identical inputs and preprocessing.
 
-**Evidence:** [result report](../../results/predictive_coding/ONFABRIC_TRAINING.md)
-and [raw artifacts](../../results/predictive_coding/onfabric_train/).
+**Evidence:** [result report](https://github.com/nyuolab/tikitorch/blob/main/results/predictive_coding/ONFABRIC_TRAINING.md)
+and [raw artifacts](https://github.com/nyuolab/tikitorch/tree/main/results/predictive_coding/onfabric_train/).
 
 **Physical wording:** the model-data path has no multiplication. Synthesis used
 one DSP block as an adder and zero DSP multipliers; therefore call this
@@ -240,15 +248,19 @@ matched CPU/GPU recipe, isolated kernel timing, and a larger held-out task.
 
 **Allowed wording:** The archived D128 build family measured 14,236 token/s for
 one kernel, 26,522 token/s for two replicas, and 53,001 token/s for four replicas;
-instances matched their reference records and used zero DSP blocks.
+instances matched their reference records and used zero DSP blocks. Relative to
+the one-kernel measurement, aggregate throughput was 1.86x at two replicas and
+3.72x at four replicas; these are within-family scaling ratios, not accelerator
+speedups.
 
-**Evidence:** [hallmark result and provenance](../../results/lm_shakespeare/fig_hallmark_lm.md).
+**Evidence:** [hallmark result and provenance](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/fig_hallmark_lm.md).
 
-**Do not claim:** timing-robust throughput, GPU parity, iso-model speedup, or an
-energy win. Headline routed builds have small negative WNS (`-0.020 ns` and
-`-0.173 ns`), the current GPU denominator is a different model/optimizer, and
-FPGA power is a core rail rather than full-card power. The N=8 result is a
-projection, not a measurement.
+**Do not claim:** 2x/4x measured scaling, perfect linearity, timing-robust
+throughput, GPU parity, iso-model speedup, or an energy win. Headline routed
+builds have small negative WNS (`-0.020 ns`, `-0.097 ns`, and `-0.173 ns` for
+N=1, N=2, and N=4), the current GPU
+denominator is a different model/optimizer, and FPGA power is a core rail rather
+than full-card power. The N=8 result is a projection, not a measurement.
 
 **Upgrade gate:** timing closure with margin, repeat measurements, iso-model and
 iso-quality baselines, and full-card power.
@@ -261,8 +273,8 @@ The matched cascade/synchronous route reverse computes the selected backprop
 gradient. Its value is representation and hardware scheduling, not a distinct
 credit direction. State-settling variants that genuinely alter the dependency
 story are the scale-fragile variants. Evidence: [parallelism
-audit](../../results/predictive_coding/PARALLELISM.md) and [depth
-study](../../results/pc_depth_traction/EXP_RESULTS.md).
+audit](https://github.com/nyuolab/tikitorch/blob/main/results/predictive_coding/PARALLELISM.md) and [depth
+study](https://github.com/nyuolab/tikitorch/blob/main/results/pc_depth_traction/EXP_RESULTS.md).
 
 ### TT-NEG-002 — Asynchrony does not yield a free depth speedup
 
@@ -270,7 +282,7 @@ The exact-gradient async round tax grows roughly with depth and inverse
 participation. This removes the prior claim of a depth-growing throughput win
 over backprop. The surviving claim is scheduling tolerance on a suitable
 substrate, not measured GPU acceleration. Evidence: [parallelism
-audit](../../results/predictive_coding/PARALLELISM.md).
+audit](https://github.com/nyuolab/tikitorch/blob/main/results/predictive_coding/PARALLELISM.md).
 
 ### TT-NEG-003 — Strict closure currently carries a language-quality cost
 
@@ -278,22 +290,24 @@ In the matched Tiny Shakespeare host study, strict MorphSSM reached 2.793 bpb
 versus 2.273 for parameter-matched nanoGPT at the reported budgets. The 2.423
 bpc F2 inference model is a different character setup trained by kernel-faithful
 QAT and must not be substituted into that comparison. Evidence: [hallmark
-ledger](../../results/lm_shakespeare/fig_hallmark_lm.md) and the [fixed-point
-investigation](../../results/lm_shakespeare/S1_MULTFREE_CHARLM_WALL.md).
+ledger](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/fig_hallmark_lm.md) and the [fixed-point
+investigation](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/S1_MULTFREE_CHARLM_WALL.md).
 
 ### TT-NEG-004 — No present end-to-end energy win
 
 Core-rail measurements, WNS-derived estimates, and projected replicas do not
 support a board-to-board energy claim. Full-card FPGA power under a matched
 quality/workload protocol remains open. Evidence: [hallmark
-qualifications](../../results/lm_shakespeare/fig_hallmark_lm.md) and the [FPGA
-paper draft](../../papers/multiplier_free_fpga/main.tex).
+qualifications](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/fig_hallmark_lm.md) and the [FPGA
+paper draft](https://github.com/nyuolab/tikitorch/blob/main/papers/multiplier_free_fpga/main.tex).
 
 ## Next claim gates, in order
 
-1. **Archive:** commit the route-certificate implementation, tests, scripts,
-   raw rows, manuscripts, and this ledger on a fetched remote branch; bind every
-   result to a clean commit and environment manifest.
+1. **Archive:** finish and review the selected `main` release-candidate commit,
+   including the route-certificate implementation, tests, scripts, raw rows,
+   manuscripts, and this ledger; bind every result to that clean commit and an
+   environment manifest. Complete the separate all-ref provenance/history gate
+   before exposing the repository.
 2. **Library:** restore ordinary green CI, reconcile package/version/docs claims,
    and tag a reproducible release.
 3. **Route certificates:** complete the exact five-arm compiled comparison and
