@@ -1,25 +1,26 @@
-"""Phase 1 scale test: multiplier-free DYADIC convolutional nets on CIFAR-10/100.
+"""Phase 1 scale test: dyadic convolutional nets on CIFAR-10/100.
 
 This is the real Qi-et-al-scale comparison (they train deep VGG-style PC nets on
-CIFAR/Tiny-ImageNet). We carry the extra multiplier-free (+-2^k) constraint, so
-the honest question is: does a +-2^k dyadic VGG match a float VGG at depth?
+CIFAR/Tiny-ImageNet). We carry an extra +-2^k convolution/linear constraint, so
+the honest question is: does a dyadic VGG match a float VGG at depth?
 
 For convolutions the predictive-coding "cascade" (single-pass cached-routing
 backward) computes exactly the chain-rule gradient through the cached routing --
 which is precisely what autograd computes through the same forward. So we realize
-the cascade via autograd-through-the-dyadic-forward, and add the multiplier-free
-weight update as the conv analog of DyadicPCNet.set_mf_grads: backward hooks
+the cascade via autograd-through-the-dyadic-forward, and add a dyadic-operand
+weight-gradient contraction as the conv analog of DyadicPCNet.set_mf_grads: hooks
 capture each layer's input activation `a` and output-error `g`, quantize BOTH to
 +-2^k, and recompute the weight grad as a shift-add correlation (no multiply on
 fabric). The on-fabric cached-routing cascade produces the identical gradient.
+BatchNorm, cross-entropy, the optimizer, and the eager autograd realization are
+explicitly outside that internal closure claim.
 
 Modes:
   bp_float   -- float Conv2d/Linear VGG, backprop. The absolute ceiling.
-  bp_dyadic  -- DyadicConv2d/DyadicLinear (multiplier-free FORWARD), backprop
-                weight update. Isolates the cost of multiplier-free *inference*
-                (what deploys on the FPGA forward kernel).
-  cascade    -- dyadic forward + multiplier-free weight update (operand-quantized
-                grads). The fully multiplier-free learner.
+  bp_dyadic  -- DyadicConv2d/DyadicLinear forward, ordinary backprop weight
+                update. Isolates the cost of the dyadic conv/linear representation.
+  cascade    -- dyadic forward + operand-quantized weight gradients. This closes
+                the internal contraction, not the complete training recipe.
 
 Usage (matrix, what the EC2 runner invokes):
     python scripts/pc_scale_cifar.py --matrix --out results/predictive_coding/scale_cifar.jsonl

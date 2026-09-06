@@ -6,12 +6,14 @@ MNIST/Fashion-MNIST) and directly tests the two PC regimes against their honest
 baselines:
 
   cascade    -- DyadicPCNet single-pass cached-routing backward (the depth
-                solution; multiplier-free). Should track dyadic-backprop.
+                solution). Its internal routing and dyadic gradient surrogate
+                are shift-add oriented; this runner's Adam + CE boundaries are open.
   nudge      -- DyadicPCNet iterative nudged settling (the fully-local / async /
-                distributed regime). Expected ~85% of backprop at depth.
+                distributed regime). The corrected gamma-damped implementation
+                is pending a new full-scale measurement.
   bp_dyadic  -- a +-2^k (DyadicLinear) ReLU MLP trained by ordinary backprop+Adam.
-                The CLOSURE baseline: same multiplier-free forward, so the gap to
-                cascade isolates "PC vs backprop", not "dyadic vs float".
+                The dyadic-inference baseline: the gap to cascade isolates the
+                credit method rather than the deployed weight representation.
   bp_float   -- a plain float nn.Linear ReLU MLP trained by backprop+Adam. The
                 absolute ceiling: the gap to bp_dyadic is the price of being
                 multiplier-free.
@@ -20,19 +22,26 @@ Each (dataset, depth, mode, seed) run logs one JSON line with the test accuracy.
 
 Usage (full matrix, what the EC2 runner invokes):
     python scripts/pc_scale_mnist.py --matrix \
-        --out results/predictive_coding/scale_mnist.jsonl
+        --out results/predictive_coding/scale_mnist_gamma_damped.jsonl
 
 Usage (explicit):
     python scripts/pc_scale_mnist.py --datasets mnist fashion \
         --depths 4 8 16 32 --modes cascade bp_dyadic bp_float nudge \
-        --seeds 0 1 2 --epochs 5 --hidden 256 --batch 128
+        --seeds 0 1 2 --epochs 5 --hidden 256 --batch 128 \
+        --gamma 0.125 --beta 0.5
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.metadata
+import inspect
 import json
 import os
+import platform
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -43,6 +52,16 @@ from tikitorch.nn.predictive_coding import DyadicPCNet
 
 # Per-dataset (mean, std) for standardization.
 _NORM = {"mnist": (0.1307, 0.3081), "fashion": (0.2860, 0.3530)}
+_ALGORITHM_REVISION = "settle_nudge_gamma_applied_v2"
+_RESULT_SCHEMA = "tikitorch.pc_scale_mnist.v2"
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def load_dataset(name: str, data_root: str, device: torch.device):
@@ -130,7 +149,7 @@ def iterate(X, y, batch, gen):
 
 
 def run_one(mode, dims, train, test, *, seed, epochs, batch, lr, n_sweeps,
-            residual, device):
+            residual, device, gamma=0.125, beta=0.5):
     """Train one configuration; return a metrics dict."""
     torch.manual_seed(seed)
     gen = torch.Generator(device=device).manual_seed(seed)
@@ -139,7 +158,7 @@ def run_one(mode, dims, train, test, *, seed, epochs, batch, lr, n_sweeps,
     t0 = time.time()
 
     if mode in ("cascade", "nudge", "relax", "relax_async"):
-        net = DyadicPCNet(dims, residual=residual).to(device)
+        net = DyadicPCNet(dims, gamma=gamma, residual=residual).to(device)
         opt = torch.optim.Adam(net.parameters(), lr=lr)
         depth = len(dims) - 1
         rgen = torch.Generator().manual_seed(seed + 99)   # CPU: async draws are control-flow
@@ -147,9 +166,9 @@ def run_one(mode, dims, train, test, *, seed, epochs, batch, lr, n_sweeps,
             for xb, yb in iterate(Xtr, ytr, batch, gen):
                 if mode == "cascade":
                     net.train_step_cascade(xb, yb, opt, mode="dyadic")
-                elif mode == "nudge":               # state-settling (diverges at scale)
+                elif mode == "nudge":               # corrected gamma-damped state settling
                     net.train_step_nudge(xb, yb, opt, n_sweeps=n_sweeps,
-                                         mf_mode="dyadic")
+                                         beta=beta, mf_mode="dyadic")
                 elif mode == "relax":               # error-relaxation, sync (== cascade)
                     net.train_step_relax(xb, yb, opt, mode="dyadic")
                 else:                               # error-relaxation, heavy async
@@ -179,7 +198,7 @@ def run_one(mode, dims, train, test, *, seed, epochs, batch, lr, n_sweeps,
 
 
 def build_matrix(args):
-    """The standard scale matrix. nudge is settling-heavy, so cap its depth/epochs."""
+    """The standard scale matrix. Nudge is settling-heavy, so cap its depth."""
     jobs = []
     for dataset in args.datasets:
         for mode in args.modes:
@@ -200,17 +219,29 @@ def main():
     p.add_argument("--modes", nargs="+",
                    default=["cascade", "bp_dyadic", "bp_float", "nudge"])
     p.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
-    p.add_argument("--epochs", type=int, default=5)
+    p.add_argument("--epochs", type=int, default=3,
+                   help="epochs per mode (default: 3, sized for the EC2 backstop)")
     p.add_argument("--hidden", type=int, default=256)
     p.add_argument("--batch", type=int, default=128)
     p.add_argument("--lr", type=float, default=2e-3)
     p.add_argument("--n-sweeps", type=int, default=15, help="nudge settling sweeps")
+    p.add_argument("--gamma", type=float, default=0.125,
+                   help="nudge relaxation factor (default: 0.125)")
+    p.add_argument("--beta", type=float, default=0.5,
+                   help="nudge target-pull coefficient (default: 0.5)")
     p.add_argument("--residual", action="store_true",
-                   help="tropical residual skip (helps the iterative regime go deep)")
+                   help="apply matched residual variants to every benchmark mode")
     p.add_argument("--matrix", action="store_true",
                    help="run the standard scale matrix over all combos")
     p.add_argument("--data-root", default=os.environ.get("DATA_ROOT", "./_data"))
-    p.add_argument("--out", default="results/predictive_coding/scale_mnist.jsonl")
+    p.add_argument("--out",
+                   default="results/predictive_coding/scale_mnist_gamma_damped.jsonl")
+    p.add_argument("--append", action="store_true",
+                   help="append to an existing output (default: fail if it exists)")
+    p.add_argument("--protocol", choices=("matched", "archived-budget"),
+                   default="matched",
+                   help="matched uses common epochs/residual settings; archived-budget "
+                        "recreates the old nudge budget (3 epochs, no residual)")
     p.add_argument("--smoke", action="store_true",
                    help="tiny CPU sanity run (subset, 1 epoch)")
     args = p.parse_args()
@@ -224,7 +255,9 @@ def main():
         args.epochs = 1
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    jobs = build_matrix(args) if args.matrix or not args.modes else build_matrix(args)
+    if not args.append and os.path.exists(args.out):
+        p.error(f"output already exists: {args.out!r}; choose another path or pass --append")
+    jobs = build_matrix(args)
 
     # cache datasets once
     cache = {}
@@ -234,25 +267,73 @@ def main():
             (Xtr, ytr), (Xte, yte) = cache[d]
             cache[d] = ((Xtr[:2000], ytr[:2000]), (Xte[:2000], yte[:2000]))
 
+    script_path = Path(__file__).resolve()
+    predictive_coding_path = Path(inspect.getfile(DyadicPCNet)).resolve()
+    source_hashes = {
+        "pc_scale_mnist.py": _sha256(script_path),
+        "predictive_coding.py": _sha256(predictive_coding_path),
+    }
+    runtime = {
+        "python": platform.python_version(),
+        "torch": torch.__version__,
+        "torchvision": importlib.metadata.version("torchvision"),
+        "cuda": torch.version.cuda,
+        "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+        "source_commit": os.environ.get("SOURCE_COMMIT"),
+        "source_archive_sha256": os.environ.get("SOURCE_ARCHIVE_SHA256"),
+    }
+
     print(f"device={device}  jobs={len(jobs)}  out={args.out}", flush=True)
-    fout = open(args.out, "a")
-    for j, job in enumerate(jobs):
-        train, test = cache[job["dataset"]]
-        in_dim = train[0].shape[1]
-        dims = make_dims(in_dim, args.hidden, job["depth"])
-        ep = min(args.epochs, 3) if job["mode"] == "nudge" else args.epochs
-        residual = args.residual or (job["mode"] == "nudge")
-        m = run_one(job["mode"], dims, train, test, seed=job["seed"], epochs=ep,
-                    batch=args.batch, lr=args.lr, n_sweeps=args.n_sweeps,
-                    residual=residual, device=device)
-        rec = {**job, "hidden": args.hidden, "epochs": ep, "residual": residual,
-               "device": str(device), **m}
-        fout.write(json.dumps(rec) + "\n")
-        fout.flush()
-        print(f"[{j+1}/{len(jobs)}] {job['dataset']:8s} d{job['depth']:<3d} "
-              f"{job['mode']:10s} s{job['seed']}  test={m['test_acc']:.4f}  "
-              f"({m['wall_s']}s)", flush=True)
-    fout.close()
+    output_mode = "a" if args.append else "x"
+    try:
+        fout = open(args.out, output_mode, encoding="utf-8")
+    except FileExistsError:
+        p.error(f"output already exists: {args.out!r}; choose another path or pass --append")
+    with fout:
+        for j, job in enumerate(jobs):
+            train, test = cache[job["dataset"]]
+            in_dim = train[0].shape[1]
+            dims = make_dims(in_dim, args.hidden, job["depth"])
+            archived_nudge = (args.protocol == "archived-budget"
+                              and job["mode"] == "nudge")
+            ep = 3 if archived_nudge else args.epochs
+            residual = False if archived_nudge else args.residual
+            m = run_one(job["mode"], dims, train, test, seed=job["seed"], epochs=ep,
+                        batch=args.batch, lr=args.lr, n_sweeps=args.n_sweeps,
+                        gamma=args.gamma, beta=args.beta, residual=residual,
+                        device=device)
+            is_nudge = job["mode"] == "nudge"
+            rec = {
+                "schema": _RESULT_SCHEMA,
+                "algorithm_revision": _ALGORITHM_REVISION if is_nudge else None,
+                "runner_revision": "pc_scale_mnist_v2",
+                "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
+                **job,
+                "smoke": args.smoke,
+                "n_train": int(train[0].shape[0]),
+                "n_test": int(test[0].shape[0]),
+                "hidden": args.hidden,
+                "epochs": ep,
+                "batch": args.batch,
+                "lr": args.lr,
+                "residual": residual,
+                "optimizer": "Adam",
+                "protocol": args.protocol,
+                "mf_mode": "dyadic" if job["mode"] in ("cascade", "nudge", "relax",
+                                                        "relax_async") else None,
+                "n_sweeps": args.n_sweeps if is_nudge else None,
+                "gamma": args.gamma if is_nudge else None,
+                "beta": args.beta if is_nudge else None,
+                "device": str(device),
+                "runtime": runtime,
+                "source_sha256": source_hashes,
+                **m,
+            }
+            fout.write(json.dumps(rec) + "\n")
+            fout.flush()
+            print(f"[{j+1}/{len(jobs)}] {job['dataset']:8s} d{job['depth']:<3d} "
+                  f"{job['mode']:10s} s{job['seed']}  test={m['test_acc']:.4f}  "
+                  f"({m['wall_s']}s)", flush=True)
     print("DONE", flush=True)
 
 

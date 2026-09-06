@@ -4,6 +4,14 @@
 **Code:** `tikitorch/nn/predictive_coding.py` (`TropicalPCLayer`, `TropicalPCNet`),
 tests `tests/test_predictive_coding.py`, repro `scripts/pc_depth_probe.py`.
 
+> **Closure terminology (2026-09-06):** in the historical DyadicPCNet tables
+> below, “multiplier-free” describes the dyadic network-internal forward,
+> error-route, and/or weight-gradient operands named by each experiment. It does
+> not make the complete benchmark recipe closed: ordinary losses/Adam remain
+> where stated, and current state settling includes exact diagonal division.
+> The pure-TropicalPC smoke audit and fixed FPGA kernels are separate,
+> recipe-specific closure results.
+
 ## What this is
 
 A local, backprop-free, **multiplier-free** learning rule for the tropical
@@ -46,23 +54,25 @@ Two separate questions, two answers:
 So the depth study succeeds as an optimisation result and lands a clean negative
 on *pure max-plus* depth as a route to quality.
 
-3. **Does fixing the primitive fix the quality — and can training be fully
-   multiplier-free?** **Yes to both.** Swapping the lossy max-plus mixing for a
+3. **Does fixing the primitive fix the quality — and can the internal gradient
+   path use dyadic operands?** **Yes to both.** Swapping the lossy max-plus mixing for a
    **dyadic ±2^k shift-add** mixing + ReLU (`DyadicPCNet` — a multiplier-free
    oblique MLP) makes depth pay off: the local PC rule trains flat at **~0.88–
    0.91 to depth 12**, matching the dyadic backprop ceiling within noise. And the
-   **fully multiplier-free weight update** — quantizing *both* the error and the
+   **dyadic-operand weight-gradient contraction** — quantizing *both* the error and the
    activity to ±2^k so the weight-grad contraction is a shift-add tree —
    **matches Adam** (~0.89/0.92/0.88 at depth 2/4/8). The naive pure-±1 sign rule
    lagged at ~0.65–0.68; keeping the *magnitude* (within 2×) closed the gap. So
-   forward, inference, AND training are multiplier-free with no accuracy cost.
+   the forward/error/weight-gradient path uses dyadic operands with no measured
+   accuracy cost. Loss, optimizer, and settling boundaries are outside this claim.
    See "Path 2" below.
 
 4. **Can we go genuinely deep (toward ResNet)?** **Yes — the depth wall is
    solved.** Iterative settling still walls at ~depth 48 (a PC-settling problem;
    backprop on the same net is fine). The fix exploits a uniquely-tropical fact —
    **hard routing is discrete and cacheable** — to replace O(depth) settling with
-   a **single-pass cached-routing cascade** backward. Fully multiplier-free, it is
+   a **single-pass cached-routing cascade** backward. Its internal route and
+   weight-gradient datapath is shift-add-oriented, and it is
    **flat from depth 16 to 100 (0.84–0.90), matching backprop** (and fast: depth
    100 in ~30 s). See "Path 4" below.
 
@@ -280,11 +290,11 @@ the operands so every product is a shift and the contraction is an add-tree:
   ±2^k / ternary, so the contraction is a shift-add tree on fabric (the float-sim
   shows `aten.mm`; closure is the quantized-operand property,
   `test_dyadic_sign_product_identity_and_ternary`).
-- The one remaining sim-only multiply is the settling **step** `states -= γ·g`
-  with γ=0.1 (non-power-of-two; γ=0.5, the nearest shift, diverges → needs a
-  shift *schedule*). The energy's `**2` is likewise a sim artifact — on fabric
-  the settling routes the error (a subtractor) directly, so the square never
-  deploys.
+- The historical settling probe used a multiply in `states -= γ·g` when
+  `γ=0.1`; later power-of-two steps can map that scale to a shift. The current
+  `settle_nudge` solver also divides by an exact diagonal `D`, so a whole state-
+  settling step is **not** closed by the dyadic-operand argument. The energy's
+  `**2` is diagnostic host work rather than part of the proposed internal route.
 
 ## Path 3: tropical-native stability — pushing the depth wall
 
@@ -306,10 +316,10 @@ multiplier-free. Tested at depth 16 (MNIST 12×12, Adam probe, n_steps=128):
 | power-of-two precision `2^l·ε_l` | 0.087 | collapsed — 2^l gain blew up settling |
 
 The **tropical residual wins decisively**, and it scales — depth 16/24/32, with
-both Adam and the fully multiplier-free dyadic-backward update (plain dyadic PC
+both Adam and the dyadic-operand weight-gradient update (plain dyadic PC
 shown for contrast):
 
-| depth | residual (Adam) | residual (multiplier-free) | plain (Adam) |
+| depth | residual (Adam) | residual (dyadic-gradient operands) | plain (Adam) |
 |------:|----------------:|---------------------------:|-------------:|
 | 16 | 0.905 | 0.869 | 0.524 |
 | 24 | 0.906 | 0.854 | 0.087 (chance) |
@@ -320,7 +330,7 @@ shown for contrast):
 200 — 0.096 is the undersettled `n_steps=120` value, so the d32 row is not a
 matched-budget comparison for the plain column (it is at depths 16/24).
 
-Both the Adam and the fully multiplier-free update stay **flat to depth 32**
+Both the Adam and the dyadic-operand weight-gradient update stay **flat to depth 32**
 (0.91 / 0.86) where plain dyadic PC is at chance by depth 24. Note the depth-32
 result took a correction: a first pass with a capped `n_steps=120` gave only
 0.571, which **looked** like a new wall — but it was **undersettling**, not a
@@ -343,10 +353,11 @@ solved natively and multiplier-free. Exposed as `DyadicPCNet(residual=True)`.
 
 Direction A (the last sim-only multiply): the settling **step** `states -= γ·g`
 with **γ=2⁻³=0.125 (a right shift)** trains as well as the non-power-of-two 0.1
-(depth 16: 0.907 vs 0.905; γ=2⁻⁴ also fine — only γ=2⁻¹=0.5 was too big). Now the
-default, so the settling step is multiplier-free; the deploy datapath is shift-add
-end to end (the remaining op-trace multiplies — energy `**2`, dyadic matmul — are
-the documented sim artifacts that deploy as a subtractor / ±2^k shift-add).
+(depth 16: 0.907 vs 0.905; γ=2⁻⁴ also fine — only γ=2⁻¹=0.5 was too big). For
+those historical experiments this made the configured relaxation scaling
+shift-expressible. It does not close the current state solver's exact-`D` division or
+the complete loss/optimizer recipe; the dyadic **network-internal** route remains the
+shift-add opportunity.
 
 Honest negatives: the two other duals **did not help** — max-shift normalization
 collapsed training (reintroduced the target-scale pathology: logits shifted below
@@ -370,7 +381,7 @@ The uniquely-tropical fix exploits the fact that **tropical routing is discrete
 and cacheable**, which float PC cannot do. Forward once, caching the hard routing
 (ReLU masks, residual `max`-gates); then route error top-down in a **single
 O(depth) pass** (the Z-IL single-ordered-pass equivalence) instead of O(depth)
-iterative sweeps. It is fully multiplier-free:
+iterative sweeps. Its network-internal cascade path uses dyadic/ternary operands:
 
 - error propagation `delta @ W` with ±2^k weights is **shift-add even for real
   `delta`** (real × 2^k = exponent shift) — so error flows *exactly*, with no
@@ -380,10 +391,10 @@ iterative sweeps. It is fully multiplier-free:
 - only the weight-grad outer product is quantized (dyadic ±2^k, or ternary
   sign) — a shift-add / sign-XOR weight grad.
 
-**Result — flat to depth 100, matching backprop, fully multiplier-free** (width
+**Result — flat to depth 100, matching backprop, with a dyadic internal cascade path** (width
 64, MNIST 12×12, 15 epochs):
 
-| depth | iterative settling | **cascade (multiplier-free)** | backprop ref |
+| depth | iterative settling | **cascade (dyadic internal path)** | backprop ref |
 |------:|-------------------:|------------------------------:|-------------:|
 | 16 | 0.866 | 0.866 | 0.868 |
 | 32 | 0.836 | 0.890 | 0.867 |
@@ -400,10 +411,10 @@ confused by the dyadic grad's magnitude drift; the sign ignores it).
 
 Exposed as `DyadicPCNet.cascade_grads` / `train_step_cascade`. Honest caveats: it
 is the *single-pass* (Z-IL) form of PC, not the iterative-relaxation form — i.e.
-local, multiplier-free backprop enabled by cached hard routing; and the numbers
+neighbour-local backprop credit with a dyadic internal path enabled by cached hard routing; and the numbers
 are width-64, single-seed, 4k-subset MNIST (an MLP, not a conv ResNet). But the
-core claim holds: **the deep-PC depth wall is solved on the tropical substrate,
-multiplier-free, via hard-routing.**
+core claim holds: **this cached-hard-routing cascade avoids the measured depth wall
+while its internal credit operands remain dyadic.**
 
 ## Path 5: can we keep the ITERATIVE relaxation (not just the cascade) at depth?
 
@@ -443,8 +454,8 @@ only to depth ~32. So "iterative PC matching backprop at deep classification" wa
 the wrong target: it asks the prospective-config regime to beat backprop on
 backprop's home turf, where it is both stiff to compute and inherently different.
 
-**Standing result for the iterative regime:** it works to **depth ~32** (0.84 =
-backprop, true equilibrium, keeps PC's advantages, multiplier-free) — already
+**Standing historical result for the iterative regime:** it works to **depth ~32**
+(0.84 = backprop in that run, with dyadic internal operands) — already
 4–5× past the standard 5–7-layer PC wall. Deeper, use the cascade.
 
 **Does the iterative regime *earn its keep*? (prospective configuration test.)**
@@ -486,13 +497,14 @@ The cascade remains the robust practical learner.
   rule, and even full backprop + Adam caps deep tropical at < 0.5 on MNIST and
   degrades with depth. The max-plus/min-plus layer is information-lossy.
 
-- **Path 2 resolved it, including full training closure (`DyadicPCNet`):** fixing
+- **Path 2 resolved the internal datapath issue (`DyadicPCNet`):** fixing
   the *primitive* — dyadic ±2^k shift-add mixing + ReLU instead of lossy max —
   makes depth pay off. The local PC rule trains flat to depth 12 (~0.88–0.91), on
-  par with the dyadic backprop ceiling. And the **fully multiplier-free
-  magnitude-aware update** (quantize both backward operands to ±2^k →
+  par with the dyadic backprop ceiling. And the **dyadic-operand
+  magnitude-aware weight-gradient contraction** (quantize both backward operands to ±2^k →
   shift-add weight grad) **matches Adam** (~0.89/0.92/0.88) at **no accuracy
-  cost** — forward, inference, and the weight update are all multiplier-free.
+  cost** in these runs. This does not close the loss, optimizer, or state-solver
+  boundaries of the whole training recipe.
 
 - **Path 3 — tropical residual stabilizes settling to depth 32.** A **tropical
   residual** `max(relu(Wx), x)` (a free `max`, bounded/idempotent) keeps the
@@ -504,8 +516,8 @@ The cascade remains the robust practical learner.
 - **Path 4 — the cached-routing cascade SOLVES the depth wall.** Tropical routing
   is *discrete and cacheable* (float PC's isn't): forward once caching the hard
   routing, then route error top-down in a **single O(depth) pass** instead of
-  iterating settling. Fully multiplier-free (real-`delta` × ±2^k = shift-add
-  error flow; unit-gain skip highways; dyadic/sign weight grad). It is **flat
+  iterating settling. The internal path uses real-`delta` × ±2^k shift-add
+  error flow, unit-gain skip highways, and a dyadic/sign weight gradient. It is **flat
   from depth 16 to 100 (0.84–0.90), matching backprop**, where settling died at
   48 — and fast (depth 100 in ~30 s, single pass). This is the depth result.
 
@@ -519,17 +531,18 @@ The cascade remains the robust practical learner.
   Iterating harder is a *different* (prospective-config) regime whose value is
   continual-learning / inference, not deep-classification accuracy.
 
-**Bottom line.** Pure max-plus PC is fully multiplier-free but can't use depth
-(lossy primitive); the **dyadic** primitive + **magnitude-aware dyadic backward**
-give depth at the backprop ceiling with a shift-add training step; a **tropical
+**Bottom line.** The audited pure max-plus recipe can't use depth (lossy primitive);
+the **dyadic** primitive + **magnitude-aware dyadic backward** give depth at the
+backprop ceiling with a shift-add-oriented internal gradient path; a **tropical
 residual** (`max`) stabilizes it; and the **cached-routing cascade** — exploiting
 discrete, cacheable hard routing that float PC lacks — **solves the deep-PC depth
-wall, flat to depth 100 matching backprop, multiplier-free and single-pass** (and
+wall, flat to depth 100 matching backprop, dyadic-internal and single-pass** (and
 it *is* the backprop-matching limit of iterative PC). The full-relaxation regime
 is practical to depth ~32 and is where PC's prospective-config advantages live.
 The through-line: deep PC's failures are multiplicative, and the tropical
 substrate supplies the additive/discrete duals (bounded `max`, ±2^k shifts, cached
-routing) that fix them with only adds, compares, and shifts.
+routing) that provide add/compare/shift internal kernels. Whole-recipe closure is
+separate and includes the boundaries disclosed above.
 
 ## Next steps (toward a deep tropical-PC ResNet)
 

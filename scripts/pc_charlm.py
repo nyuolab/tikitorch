@@ -2,18 +2,20 @@
 trained)? — the architecture gate done right.
 
 The goal is NOT the cascade (which IS backprop, an ordered single-pass backward) — it is
-LOCAL PC: the iterative error-relaxation in its ASYNC / partial / stale form (neighbour-
-local, no global backward sweep, the parallelizable / fabric carrier). The fair question
-is final LM quality AT CONVERGENCE (not gradient-exactness, not a short budget): does
-async-local-PC match backprop on a real sequence task when adequately trained?
+LOCAL PC: iterative error-relaxation in its ASYNC / partial / stale form. Updates are
+neighbour-local and schedule-tolerant, but retain the same directional top-down credit
+relation as backprop. The fair question is final LM quality AT CONVERGENCE (not
+gradient-exactness, not a short budget): does async-local-PC match backprop on a real
+sequence task when adequately trained?
 
 Model: a feedforward CONTEXT char-LM (Bengio-style) = DyadicPCNet residual stack mapping a
-C-char one-hot context -> next char. Multiplier-free (±2^k DyadicLinear, max-residual),
-proper readout. Reuses the PROVEN local-PC machinery (error_relax_grads, async). No
-recurrence (the min-plus scan was unstable), no transformer — this isolates the question
-"can local PC train an LM" on the arch family the cascade/relax already handles.
+C-char one-hot context -> next char. Its DyadicLinear/max-residual internal path is
+shift-add-oriented; CE and the optimizer remain open boundaries. It reuses the measured
+error-relaxation machinery. No recurrence (the min-plus scan was unstable), no
+transformer — this isolates the question "can local PC train an LM" on the architecture
+family the cascade/relax paths already handle.
 
-Arms (all trained to convergence): bp_float (quality bar) | bp_dyadic (mult-free fwd, bp)
+Arms (all trained to convergence): bp_float (quality bar) | bp_dyadic (dyadic fwd, bp)
 | relax (sync local PC == cascade gradient) | relax_async (participation 0.5 + stale +
 random order — the FABRIC form). Bars: bigram floor; the bp twin. Metric: val bits/char.
 Run: PYTHONPATH=. python scripts/pc_charlm.py --epochs 12   (subset+few epochs to smoke)

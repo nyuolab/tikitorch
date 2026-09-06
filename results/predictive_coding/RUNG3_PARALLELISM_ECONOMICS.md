@@ -12,11 +12,12 @@ Local PC swaps backprop's **global** operations for **local** ones:
 | | backprop pays | local PC pays |
 |---|---|---|
 | backward credit | a global, ordered **backward sweep** | **O(L/p) local neighbour rounds** (measured) |
-| weight transport | keep `Wᵀ` in sync with `W` | **none** — the same forward `±2^k` weight carries the error (code-verified) |
-| gradient comms | a global **all-reduce** | **none** — credit is a local message-passing fixpoint |
-| synchronization | a global **barrier** per step | **none** — converges under any order / lag / partial participation (measured) |
+| feedback parameters | transpose action reuses forward parameters | **no separately learned feedback matrix**; a reverse transpose action still remains |
+| credit communication | implementation-dependent gradient collectives | adjacent-layer messages; no all-reduce in the measured sharded carrier |
+| scheduling | ordered dependencies remain | partial/stale/arbitrary-order schedules converge in the measured error-relax simulations |
 
-The economics question is just: **is the avoided global cost worth the O(L/p) local rounds,
+The economics question is just: **is replacing globally scheduled work with O(L/p)
+local rounds worthwhile,
 and where?**
 
 ## What is measured (the load-bearing facts)
@@ -35,47 +36,49 @@ and where?**
    random order — the frozen-routing system is triangular/nilpotent. And the async form
    reaches the **same final result** as sync (Rung 1 MLP within 0.1pp; Rung 2 conv
    **bit-identical** `relax_async` == `relax`).
-3. **No weight transport, credit local-in-space** — code-verified: the error route reuses
-   the forward `±2^k` weight (no transposed copy), and `E_l = A_lᵀ E_{l+1}` is a
-   neighbour-only fixpoint, not a global gradient object.
+3. **No separately learned feedback matrix; credit local-in-space** — code-verified:
+   the error route reuses the forward `±2^k` parameter tensor, and
+   `E_l = A_lᵀ E_{l+1}` is a neighbour-only fixpoint. The transpose action and
+   directional propagation through depth still remain.
 4. **The accuracy precondition holds** (Rungs 1–2): the local async credit reaches backprop
    quality — MLP *exact* match; competitive **conv within ~0.1 bpc** of float backprop,
-   fully multiplier-free. So the economics are **not** bought with an accuracy sacrifice.
+   with dyadic internal credit operands. Loss, optimizer, and data-path boundaries are
+   outside that operand-level claim.
 
 ## The honest crossover
 
-- **vs *synchronous* backprop** (GPipe-style): PC avoids the backward sweep, the barrier,
-  and the all-reduce, paying O(L/p) bounded local rounds. Where the global ops dominate
-  (large device count N, high inter-node latency), PC wins. (The `throughput_model.py`
+- **vs *synchronous* backprop** (GPipe-style): error-relaxation replaces the ordered
+  backward schedule and its collectives with O(L/p) local rounds. Where global ops dominate
+  (large device count N, high inter-node latency), PC wins. (The
+  `scripts/pc_throughput_model.py`
   sensitivity band: a structural ~2× from the missing backward sweep, before any comms.)
 - **vs *asynchronous* backprop** (Hogwild! / Downpour / PipeDream-1F1B): staleness-tolerance
   is **shared** — *not* PC-unique. Against this fair baseline, the throughput advantage
   largely evaporates; the band straddles 1× (overlap-dependent). **This is conceded.**
-- **What survives, and is the actual prize:** PC eliminates the **backward graph itself** —
-  no weight transport, no separate error datapath, credit is a local fixpoint. That makes
-  it runnable on **analog / in-memory / settling hardware where backprop has no physical
-  realization at all** (the EqProp / memristor lineage). There, the O(L/p) "rounds" are not
-  clocked digital steps — they are **continuous-time physical settling** (gate delays, ns),
-  and the round-tax being **depth-scale and bounded** (measured, Rung 3A) is exactly what
-  makes that settling converge quickly. This is a **substrate** property, not a GPU
-  throughput win.
+- **What survives:** error-relaxation expresses the same directional backward relation
+  as neighbour-local messages, reuses the forward parameter tensor, and tolerates
+  partial/stale/arbitrary-order scheduling. Those properties motivate an **analog /
+  in-memory / settling-hardware implementation**, where local dynamics might make the
+  measured O(L/p) propagation cost cheap. The repository has not built or timed that
+  mapping, and state settling — the path that could remove the ordered reverse phase —
+  still lacks corrected-gamma scale evidence and end-to-end closure. This is a
+  **substrate hypothesis**, not a GPU throughput win.
 
 ## The economics, stated plainly
 
-`net fabric advantage ≈ (global ops avoided) / (round-tax O(L/p))`. The denominator is now
-**measured and bounded** (depth-scale, RF-independent), and the credit it produces is
+`net fabric advantage ≈ (global scheduling/communication replaced) / (round-tax O(L/p))`. The denominator is now
+**measured** (depth-scale and RF-independent over the tested configurations), and the credit it produces is
 **exact** and reaches **backprop quality**. So the thesis no longer rests on any
-*algorithmic* unknown — the local async multiplier-free learner demonstrably works at
-backprop quality on MLP and competitive conv, async-robust, weight-transport-free, with a
-bounded round-tax. **It rests only on the hardware substrate existing**: an analog /
-in-memory / clockless-async fabric where backprop's global backward graph is the blocker
-and continuous-time local settling is cheap. That is the in-memory-compute / neuromorphic
-bet — a hardware question, not a learning-algorithm question.
+unknown about the frozen-routing credit signal in these tests: the dyadic internal path
+works at backprop-comparable quality on an MLP and conv and tolerates simulated async
+schedules. It still rests on untested algorithm/hardware interfaces, including the
+corrected state-settling behavior, full-recipe closure, physical reverse datapath, and
+real substrate economics. That is the in-memory-compute / neuromorphic bet.
 
 ## Honest scope (what is still NOT shown)
 
 - All of this is **structural + simulation-measured** (round-tax via gradient cosine;
-  async-robustness emulated in one process; weight-transport-freeness from the code). It is
+  async-robustness emulated in one process; parameter-tensor reuse from the code). It is
   **not** wall-clock throughput/energy on real async or analog hardware. That measurement —
   on a multi-node-async or in-memory-compute substrate — is the remaining claim to
   substantiate, and is the natural Rung 4.
@@ -86,9 +89,9 @@ bet — a hardware question, not a learning-algorithm question.
 ## Bottom line of the arc
 
 The scaling thesis — "local PC unlocks parallelism to outscale on fabrics" — is, after
-three rungs, **honestly bounded**: the *carrier* is real and measured (local async
-multiplier-free credit = backprop quality, async-robust, weight-transport-free,
-round-tax O(L/p) and RF-independent), so the only thing between here and the vision is a
-**substrate that rewards it** — which is a hardware bet (analog/in-memory/clockless), not
-an algorithmic gap. The GPU-throughput version of the claim does not survive the
-async-backprop comparison and is dropped; the substrate-enablement version stands.
+three rungs, **honestly bounded**: the frozen-routing carrier is measured (dyadic
+internal credit reaches backprop-comparable quality, tolerates simulated async schedules,
+and has O(L/p), RF-independent round-tax in the tested range). The path from that carrier
+to the vision still includes full-recipe closure, corrected state-settling validation,
+and a substrate that rewards locality. The GPU-throughput version of the claim does not
+survive the async-backprop comparison; the substrate version remains a research target.

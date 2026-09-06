@@ -82,6 +82,10 @@ listed below.
 - Soft routing (`tau > 0`), ordinary cross-entropy, dropout, dense heads,
   conventional normalization, and adaptive optimizers can leave the closed
   subset.
+- Historical research artifacts that set `training_closed=true` after waiving
+  division or transcendental operations are not passes under the public
+  no-waiver `strict-eager-v2` semantics; preserve the rows as provenance and
+  label the narrower internal-path result instead.
 - A software pass is not proof of zero multipliers after synthesis.
 
 **Do not claim:** “every TikiTorch operation contains no multiplication” or
@@ -271,8 +275,10 @@ iso-quality baselines, and full-card power.
 
 The matched cascade/synchronous route reverse computes the selected backprop
 gradient. Its value is representation and hardware scheduling, not a distinct
-credit direction. State-settling variants that genuinely alter the dependency
-story are the scale-fragile variants. Evidence: [parallelism
+credit direction. State-settling variants genuinely alter the dependency story,
+but the archived scale-fragility evidence for `settle_nudge` came from an
+implementation that ignored its configured `gamma` and used a unit step.
+Corrected-gamma scale behavior is pending rerun. Evidence: [parallelism
 audit](https://github.com/nyuolab/tikitorch/blob/main/results/predictive_coding/PARALLELISM.md) and [depth
 study](https://github.com/nyuolab/tikitorch/blob/main/results/pc_depth_traction/EXP_RESULTS.md).
 

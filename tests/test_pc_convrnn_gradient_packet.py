@@ -1,8 +1,16 @@
+import argparse
+import json
+
 import pytest
 import torch
 
 from tikitorch.nn import TropicalTopKModule
-from tikitorch.research.pc_convrnn import ConvRNNLM, MorphPCEngine, RouteCertificate
+from tikitorch.research.pc_convrnn import (
+    ConvRNNLM,
+    MorphPCEngine,
+    RouteCertificate,
+    run_one,
+)
 
 
 def _model():
@@ -19,6 +27,48 @@ def _model():
     model.eval()
     model.set_tau(0.0)
     return model
+
+
+class _TinyData:
+    vocab = 17
+
+    def batch(self, _split, batch_size, seq_len, gen):
+        x = torch.randint(0, self.vocab, (batch_size, seq_len), generator=gen)
+        y = torch.randint(0, self.vocab, (batch_size, seq_len), generator=gen)
+        return x, y
+
+
+def test_strict_run_audit_records_every_hit_and_fails_closed(tmp_path):
+    args = argparse.Namespace(
+        seed=0,
+        device="cpu",
+        d_model=8,
+        n_layers=1,
+        kernel=3,
+        dropout=0.0,
+        tau=0.0,
+        lam_min=2 ** -6,
+        opt="adamw",
+        loss="ce",
+        lr_shift=10,
+        adam_lr=1e-3,
+        pc_lr=1e-3,
+        strict_audit=True,
+        anneal=False,
+        out=tmp_path,
+        seq_len=6,
+    )
+
+    with pytest.raises(RuntimeError, match="strict closure audit failed"):
+        run_one("convrnn", "cascade", _TinyData(), args, tmp_path / "run.jsonl")
+
+    audit_lines = (tmp_path / "g5_audit.jsonl").read_text().splitlines()
+    rows = [json.loads(line) for line in audit_lines]
+    assert len(rows) == 1
+    assert rows[0]["audit_semantics"] == "strict-eager-v2"
+    assert rows[0]["training_closed"] is False
+    assert rows[0]["violations"]
+    assert rows[0]["waived"] == {}
 
 
 def test_compute_grads_matches_cascade_and_does_not_step():

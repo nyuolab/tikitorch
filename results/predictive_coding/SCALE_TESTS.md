@@ -10,49 +10,75 @@
 **Audited:** every headline claim below was adversarially re-checked against the raw
 JSONL (a workflow of independent verifiers); corrections from that audit are folded in.
 
+> **Implementation correction (2026-09-06):** only the state-settling `nudge`
+> rows in `scale_mnist.jsonl` were produced before `settle_nudge` began applying
+> its configured `gamma`; they therefore used an effective unit relaxation step.
+> Treat the nudge-collapse measurements and conclusions as historical, pending a
+> rerun with current code. Cascade, error-relaxation, backprop, and CIFAR results
+> do not use that method and are unaffected. The 18 affected raw records are
+> `scale_mnist.jsonl` lines 37–45 and 82–90; they intentionally remain unchanged
+> as provenance and do not record `gamma`. Corrected `pc_scale_mnist.py` reruns
+> default to `scale_mnist_gamma_damped.jsonl` and record `algorithm_revision`,
+> `protocol`, `gamma`, `beta`, `n_sweeps`, `epochs`, `residual`, `lr`, `batch`,
+> `smoke`, `n_train`, and `n_test`; do not append them to or merge them with the
+> legacy file. The default
+> `matched` protocol applies the requested epoch/residual settings to every mode.
+> `archived-budget` applies the archived three-epoch, non-residual budget to
+> `nudge` only, so corrected `gamma=0.125` and legacy-effective `gamma=1` can be
+> compared under the same historical budget.
+
 ## TL;DR
 
 Moving dyadic tropical PC off the 12×12 toy onto full datasets gives one strong
-positive, one confirmation, one genuine tropical win, and two honest negatives:
+positive, one confirmation, one genuine tropical win, one resolved negative, and
+one historical result awaiting a corrected-gamma rerun:
 
-- **CIFAR-10 (the headline):** a *fully multiplier-free* (±2^k) VGG-10 trained by
-  the cascade reaches **91.4%**, vs **92.2%** float (−0.80pp) — and the float twin
+- **CIFAR-10 (the headline):** a VGG-10 whose dyadic convolution/linear forward
+  and cascade weight-gradient operands are ±2^k reaches **91.4%**, vs **92.2%**
+  float (−0.80pp) — and the float twin
   (92.17% mean) essentially matches Qi et al.'s VGG-10 backprop number (92.21%), so
-  this is a calibrated **near-parity at Qi's scale under the harder multiplier-free
-  constraint they don't impose.**
-- **Multiplier-free *inference* is nearly free on conv** (`bp_dyadic` ≤1.4pp below
-  float on VGG; on the residual MLP it actually matches/beats float — see below).
+  this is calibrated **near-parity under a dyadic internal-datapath constraint they
+  do not impose.** BatchNorm, cross-entropy, and the SGD/Adam update remain outside
+  that measured closure boundary.
+- **The dyadic conv/linear *forward path* costs little accuracy** (`bp_dyadic`
+  ≤1.4pp below float on VGG; on the residual MLP it actually matches/beats float
+  — see below). This is not an audit of every inference operator.
 - **Tropical win:** the tropical max-residual is *more* depth-stable than float's
   additive residual (MNIST d32: dyadic 0.971 vs float 0.915).
 - **Negative 1 → RESOLVED:** the MLP cascade trailed backprop by ~2–5pp *only because
   it used an MSE top-error*; switching to **cross-entropy** (the new default) closes the
   gap to within seed noise (MNIST −0.1pp) — the same algorithm as the CIFAR `MFGrad`
   path. The two cascades are reconciled.
-- **Negative 2 → RESOLVED (see "The iterative regime, fixed" below):** the
-  state-settling **nudge** regime collapses to chance at full scale (its energy
-  diverges as weights grow). The fix is **error-relaxation** (frozen routing), which
-  is unconditionally stable, matches the cascade exactly, and keeps the async value.
+- **Historical negative 2 (see the correction above):** the archived
+  state-settling **nudge** runs collapsed to chance at full scale while using an
+  unintended unit relaxation step. **Error-relaxation** (frozen routing) remains
+  unconditionally stable, matches the cascade exactly, and keeps the async value;
+  current-gamma state settling still needs a full-scale rerun.
 
 ## Setup
 
 - **Datasets:** MNIST, Fashion-MNIST (784-dim, MLP); CIFAR-10 (VGG conv).
 - **Modes:**
   - `bp_float` — plain float net, backprop (the ceiling).
-  - `bp_dyadic` — ±2^k forward (`DyadicLinear`/`DyadicConv2d`), backprop weight
-    update. Tests multiplier-free **inference** (what the FPGA forward kernel does).
-  - `cascade` — fully multiplier-free: weight grads from operand-quantized (±2^k)
-    operands. On MLP this is `DyadicPCNet.train_step_cascade` (cached-routing
-    backward); on CIFAR it is the gradient-equivalent realized by `MFGrad` hooks
-    (autograd through the dyadic forward + per-layer operand quantization).
-  - `nudge` — the iterative soft-nudge settling regime (`train_step_nudge`).
+  - `bp_dyadic` — ±2^k convolution/linear forward
+    (`DyadicLinear`/`DyadicConv2d`), with an ordinary backprop weight update. It
+    isolates the deployed dyadic layer representation, not whole-model closure.
+  - `cascade` — weight gradients use operand-quantized (±2^k) operands. On MLP
+    this is `DyadicPCNet.train_step_cascade` (cached-routing backward); on CIFAR
+    it is the gradient-equivalent realized by `MFGrad` hooks (autograd through
+    the dyadic forward + per-layer operand quantization). CE, Adam/SGD, and
+    non-dyadic model operators are declared boundaries.
+  - `nudge` — the iterative soft-nudge settling regime (`train_step_nudge`); the
+    archived rows used an unintended effective `gamma=1`, while current-code
+    scale behavior is unmeasured.
 - **MLP:** hidden 256, depths 4/8/16/32; non-residual baseline (5 epochs; nudge 3)
   and a residual run (tropical max-skip; 8 epochs; depths 8/16/32).
 - **VGG:** vgg7/vgg10 (conv+BN+ReLU+maxpool, single FC head), 30 epochs, SGD+cosine.
 - Reference: Qi et al. 2025 report VGG-10 CIFAR-10 backprop = 92.21%.
 
-## CIFAR-10 — multiplier-free dyadic VGG (3 seeds, 30 epochs)
+## CIFAR-10 — dyadic-internal-path VGG (3 seeds, 30 epochs)
 
-| net | `bp_float` | `bp_dyadic` (±2^k fwd) | `cascade` (fully mult-free) |
+| net | `bp_float` | `bp_dyadic` (±2^k conv/linear fwd) | `cascade` (dyadic weight-gradient operands) |
 |---|---|---|---|
 | VGG-7  | 0.894 | 0.880 | 0.879 |
 | VGG-10 | **0.922** | **0.917** | **0.914** |
@@ -60,11 +86,11 @@ positive, one confirmation, one genuine tropical win, and two honest negatives:
 - `bp_float` VGG-10 = 0.9217 mean (seed-0 0.9221) ≈ Qi's 0.9221 → **baseline
   calibrated to their setup.**
 - `bp_dyadic` trails float by only **0.46pp** at VGG-10 (1.36pp at VGG-7):
-  multiplier-free inference is nearly free.
+  the dyadic convolution/linear forward path has little measured accuracy cost.
 - `cascade` vs `bp_dyadic` = **−0.35pp** at VGG-10 (a small but *consistent* deficit,
   ~1.5× the VGG-10 cascade seed spread of 0.23pp; VGG-7 spread is wider at 0.74pp);
   vs the float ceiling, `cascade` is **−0.80pp** (VGG-10), **−1.46pp** (VGG-7). So on
-  conv, fully multiplier-free training costs well under a point → **near-parity.**
+  conv, dyadic weight-gradient operands cost well under a point → **near-parity.**
 - Cost: cascade wall-clock ≈ 2× (285s vs 146s/run at VGG-10) — purely the `MFGrad`
   hooks recomputing weight grads in sim; on fabric that accumulation is shift-add.
 
@@ -75,8 +101,9 @@ positive, one confirmation, one genuine tropical win, and two honest negatives:
 | VGG-10 | 0.715 | 0.712 | 0.710 |
 | VGG-13 | 0.718 | 0.709 | 0.707 |
 
-Multiplier-free forward (`bp_dyadic`) is within **−0.29pp** of float at VGG-10 and
-**−0.90pp** at VGG-13; the fully-multiplier-free `cascade` within **−0.50 / −1.12pp**
+The dyadic convolution/linear forward (`bp_dyadic`) is within **−0.29pp** of float
+at VGG-10 and **−0.90pp** at VGG-13; the dyadic-gradient `cascade` is within
+**−0.50 / −1.12pp**
 of float (and ~−0.2pp vs `bp_dyadic`). So the ±2^k parity extends cleanly from 10 to
 **100 classes**, and the deeper VGG-13 holds (no collapse), though it does not improve
 over VGG-10 on this dataset. Data: `scale_cifar100.jsonl`.
@@ -138,32 +165,36 @@ On MNIST the cascade now matches `bp_dyadic` within seed noise and is **flat to 
 (0.974→0.973→0.970, flatter than float's 0.976→0.962→0.915); on Fashion it is within
 ~1pp and the gap *shrinks* with depth (the opposite of the old MSE behaviour). The
 softmax is a per-sample boundary op (over the 10 output classes); the network-internal
-credit assignment stays multiplier-free. Because the error-relaxation shares the
+credit path retains dyadic operands. Because the error-relaxation shares the
 top-error, **the iterative regime inherits the same fix** (sync == cascade(CE)). So
-"multiplier-free training = backprop at depth" now holds on both the MLP and CIFAR
-conv — the two paths are reconciled (same algorithm; the MLP was just handicapped by
-MSE).
+the **dyadic internal credit path** now tracks backprop at depth on both the MLP and
+CIFAR conv — the two paths are reconciled (same algorithm; the MLP was just
+handicapped by MSE). This result does not close the CE or optimizer boundary.
 
-### Negative: the iterative nudge regime
+### Historical negative: the legacy unit-step nudge regime
 
-`nudge` collapses to **chance (~0.10 test *and* train) at every tested depth
-(4/8/16; d32 not run) on both datasets**. On the 12×12 toy it reached ~0.76 at d16;
-at 784-dim it learns nothing with the toy's hyperparameters (γ/β/sweeps). Root-caused
-and fixed below.
+The archived `nudge` run collapsed to **chance (~0.10 test *and* train) at every
+tested depth (4/8/16; d32 not run) on both datasets**. On the 12×12 toy it reached
+~0.76 at d16. Because the archived implementation ignored its configured `gamma`
+and used a unit relaxation step, this is evidence about that historical recipe,
+not the corrected implementation. A full-scale rerun is required.
 
-## The iterative regime, fixed (error-relaxation)
+## A separately validated iterative regime: error-relaxation
 
-**Root cause (instrumented).** `settle_nudge` settles the *state* energy by
-preconditioned Gauss–Seidel. That iteration's stability depends on the weight
-magnitude, and as the dyadic weights grow during training the settle **diverges**:
+**Historical diagnosis (instrumented).** `settle_nudge` settles the *state* energy
+by preconditioned Gauss–Seidel. In the archived unit-step run, that iteration's
+stability depended on the weight magnitude, and as the dyadic weights grew during
+training the settle **diverged**:
 on full MNIST d4, epoch 0 reaches 0.81, then the settle energy blows up to ~10²⁰ by
-epoch 1 and accuracy falls to chance. Tuning cannot save it — β/sweeps best is 0.43
-(vs cascade 0.92), and *more* settling is *worse* (it over-settles out of the
-feed-forward basin). Two-phase EqProp doesn't help either: here the free phase **is**
-the feed-forward pass (eps_free ≈ 0), so the contrastive update reduces to the
+epoch 1 and accuracy falls to chance. Within that unit-step implementation,
+β/sweeps best was 0.43 (vs cascade 0.92), and *more* settling was *worse* (it
+over-settled out of the feed-forward basin). A two-phase EqProp variant did not
+help that archived configuration either: here the free phase **is** the
+feed-forward pass (eps_free ≈ 0), so the contrastive update reduced to the
 single-phase one.
 
-**The fix.** At the true equilibrium `dE/dx_l = 0` gives `E_l = A_l^T E_{l+1}` — the
+**A separately validated alternative.** At the true equilibrium `dE/dx_l = 0`
+gives `E_l = A_l^T E_{l+1}` — the
 equilibrium errors *are* the backprop/cascade error propagated top-down. So relax the
 **error** variables directly (with routing **frozen** at the feed-forward pass, like
 the cascade) instead of the state energy. With frozen routing this is a **triangular
@@ -188,11 +219,12 @@ Full MNIST, residual, 8 epochs, 3 seeds:
   fully converges, so at d32 it reaches the *identical* per-seed values. (The earlier
   single-seed depth-scan on a 5k subset showed the same: d4–d32 async within ~0.6pp.)
 
-So the iterative regime now **works at full scale** — local, no global backward
-controller, robust to partial participation / lag / no clock — i.e. it keeps the
-distributed/neuromorphic value the cascade's strict ordered pass cannot offer, while
-reaching the same credit signal. Honest framing: sync error-relaxation *is* the
-cascade; the **async capability** is the value-add, not new accuracy. Cost: the async
+So error-relaxation now **works at full MNIST scale in simulation**: its neighbour-local
+updates tolerate partial participation, lag, and arbitrary scheduling while reaching
+the same credit signal. It still has the same directional top-down dependency as the
+cascade, so it does not eliminate the backward relation. Honest framing: sync
+error-relaxation *is* the cascade; **schedule tolerance** is the value-add, not new
+accuracy or demonstrated hardware closure. Cost: the async
 draws (participation coin + order permutation) serialize on a GPU so the sim is slow;
 on genuinely async hardware they are free.
 
@@ -200,58 +232,85 @@ on genuinely async hardware they are free.
 
 - **Two different "cascade"s:** MLP uses `cascade_grads`; CIFAR uses `MFGrad` (the
   gradient-equivalent, not the literal settling loop). They are *not* the same code
-  path and they behave differently (CIFAR matches BP, MLP trails) — do not conflate.
+  path, so code-path equivalence should not be inferred from the shared label. With
+  matched cross-entropy top errors, both track their corresponding dyadic-backprop
+  baseline in the reported runs.
 - **Epoch budget:** non-residual baseline ran 5 epochs, residual 8. The d32 collapse
   is genuine (chance-level *train* acc = vanishing, not slow), but the 5-vs-8 epoch
   difference is a confound; non-residual was not re-run at 8 epochs.
-- **Narrow sweep:** single hidden width (256), single-FC-head VGG, 3 seeds, CIFAR-10
-  only (no CIFAR-100 / Tiny-ImageNet yet), no data-aug ablation.
+- **Narrow sweep:** single hidden width (256), single-FC-head VGG/ResNet variants,
+  three seeds for the principal MNIST/CIFAR runs, but only one Tiny-ImageNet seed;
+  no data-augmentation ablation or matched-architecture comparison to Qi's VGG-15.
 - **MNIST d16 is high-variance** (non-residual cascade spread 0.574–0.922) — both
   cascade and BP are mid-collapse there; treat d16 non-residual as transitional.
 - **Energy/throughput not measured** — these are accuracy results on GPU sim; the
-  multiplier-free advantage is a deploy-time (FPGA/ASIC) property, not shown here.
+  dyadic operands create a shift-add deployment opportunity, not a measured
+  whole-recipe or real-hardware advantage here.
 - **Async robustness is demonstrated in *simulation*** (we emulate partial
   participation / stale reads / random order); it is not a measurement on real
   asynchronous hardware.
 - **The error-relaxation async confirmation is MNIST-only** (the GPU run hit its
   time backstop on the sim-slow async mode before Fashion; the single-seed depth-scan
   covered both). State-settling `settle_nudge` is retained for the analog/physical
-  (voltage-relaxation) reading but is scale-fragile — use `train_step_relax`.
+  (voltage-relaxation) reading; its current-gamma scale behavior is unmeasured, so
+  use the validated `train_step_relax` path for now.
 
 ## Verdict
 
-Tropical/dyadic PC **scales to real tasks for the forward/cascade regime**: a fully
-multiplier-free VGG-10 hits CIFAR-10 parity with float backprop at Qi's scale, the
-±2^k forward is nearly free, and the tropical max-residual is a genuine depth-stability
-win. The **iterative/distributed regime now also works at full scale** via
-error-relaxation (sync == cascade; async within ~0.1pp), where the naive state-settling
-diverged. And the MLP cascade now **matches backprop at depth** once it uses a
-cross-entropy top-error (the prior 2–5pp gap was an MSE artifact) — reconciling it with
-the CIFAR `MFGrad` path. Net: the multiplier-free learners (cascade, error-relaxation
-sync/async) all track backprop at scale; the open frontier is bigger conv (CIFAR-100 /
-Tiny-ImageNet) and measured deploy energy.
+Tropical/dyadic PC **scales to real tasks for the forward/cascade regime**: a VGG-10
+with dyadic convolution/linear and internal weight-gradient operands hits CIFAR-10
+near-parity with float backprop at Qi's scale, and the tropical max-residual is a
+genuine depth-stability win. The **error-relaxation regime also works at full MNIST
+scale in simulation** (sync == cascade; async within ~0.1pp), where the archived unit-step
+state-settling run diverged. And the MLP cascade now **matches backprop at depth**
+once it uses a cross-entropy top-error (the prior 2–5pp gap was an MSE artifact) —
+reconciling it with the CIFAR `MFGrad` path. Net: the dyadic internal-credit variants
+track backprop at scale; full-step closure and measured deploy energy remain separate,
+open claims.
 
 ## Next steps
 
-1. **CIFAR-100 / Tiny-ImageNet, deeper VGG (vgg13/15)** — extend the calibrated
-   Qi-scale comparison; this is the strongest direction.
-2. **Cross-entropy for the cascade on CIFAR** — confirm the CE top-error (now default)
-   doesn't regress the already-matched CIFAR `MFGrad` numbers, and re-measure the
-   dyadic VGG with it.
+1. **Corrected state settling at scale** — run the matched default and the
+   `archived-budget` gamma control above before drawing conclusions about convergence
+   or scale fragility.
+2. **Matched Tiny-ImageNet architecture + multiple seeds** — replace the current
+   one-seed ResNet-18 result with a like-for-like VGG-15 comparison and uncertainty.
 3. **Error-relaxation at depth + on conv** — extend the async confirmation to Fashion
    and to the dyadic VGG (CIFAR), and push depth past 32.
-4. **Measure deploy metrics** (energy/throughput) for the dyadic VGG forward — that is
-   where the multiplier-free constraint is supposed to pay off.
+4. **Audit and measure the deploy recipe** — declare or close BatchNorm/pooling/loss/
+   optimizer boundaries, then measure energy/throughput for the resulting hard model.
 
 ## Reproduce
 
+The MNIST runner now defaults to `--protocol matched` and a three-epoch budget sized
+for the EC2 backstop: requested `--epochs` and `--residual` settings apply uniformly
+across modes. It writes
+`scale_mnist_gamma_damped.jsonl` by default and records `protocol`, effective epochs,
+effective residual setting, settling hyperparameters, algorithm revision, source
+hashes, runtime metadata, smoke/full status, and actual train/test counts per row.
+Keep this output separate from the historical file.
+
+For a controlled comparison against the affected archived nudge budget, use
+`--protocol archived-budget --modes nudge`. That protocol applies three epochs and
+`residual=false` to nudge only. Run `gamma=0.125` and `gamma=1` to isolate damping;
+the latter recreates the old *effective step*, but both rows come from corrected code
+and must not be presented as literal reproduction of the old binary/source state.
+
 ```
 export AWS_PROFILE=my-profile
-PC_TASK=mnist bash scripts/run_pc_scale_gpu.sh launch          # Phase 0 baseline
+PC_TASK=mnist bash scripts/run_pc_scale_gpu.sh launch          # matched protocol (default)
 PC_TASK=mnist PC_ARGS="--residual --depths 8 16 32 --modes cascade bp_dyadic bp_float --epochs 8" \
   bash scripts/run_pc_scale_gpu.sh launch                      # Phase 0b depth-fix
 PC_TASK=mnist PC_ARGS="--residual --depths 8 16 32 --modes relax relax_async cascade --epochs 8" \
   bash scripts/run_pc_scale_gpu.sh launch                      # iterative regime (error-relaxation)
 PC_TASK=cifar MAX_MINUTES=300 bash scripts/run_pc_scale_gpu.sh launch   # Phase 1
 # status | fetch | terminate ; results stream to S3 and self-terminate
+
+# Controlled gamma comparison (run in the prepared environment; distinct outputs):
+PYTHONPATH=. python scripts/pc_scale_mnist.py --matrix --protocol archived-budget \
+  --modes nudge --gamma 0.125 \
+  --out results/predictive_coding/scale_mnist_nudge_archived_budget_g0125.jsonl
+PYTHONPATH=. python scripts/pc_scale_mnist.py --matrix --protocol archived-budget \
+  --modes nudge --gamma 1 \
+  --out results/predictive_coding/scale_mnist_nudge_archived_budget_g1.jsonl
 ```

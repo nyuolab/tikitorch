@@ -21,6 +21,8 @@ import torch.nn.functional as F
 
 from tikitorch.nn import DyadicLinear, dyadic_quantize
 
+NUDGE_GAMMA = 0.125
+
 
 def get_mnist(down, n_train, n_test):
     from torchvision import datasets, transforms
@@ -133,8 +135,9 @@ class DeepDyadicPC(nn.Module):
     def _diag_precond(self, l, x):
         """Per-neuron diagonal Hessian of the state-l energy block (exact, because
         the binary gates kill the cross-terms): D[i] = 1 + Σ_j(active_j)·W[j,i]^2
-        (+ 1 where the residual skip won). Dyadic W -> W^2 = 2^(2k) -> D is an
-        add-tree of powers of two; 1/round_pow2(D) is a shift."""
+        (+ 1 where the residual skip won). Dyadic W makes D an add-tree of powers
+        of two, but these research solvers divide by exact D. A rounded power-of-two
+        preconditioner would be a different algorithm and has not been validated."""
         relu_mask, gate, has_skip, _, _ = self._route_l(l, x)
         active = relu_mask * gate if has_skip else relu_mask          # (B, out) in {0,1}
         W2 = dyadic_quantize(self.layers[l].weight) ** 2              # (out, in) = 2^(2k)
@@ -185,7 +188,8 @@ class DeepDyadicPC(nn.Module):
           alpha<1            -> DAMPED step (idea 1: stay nearer the basin)
           anneal=True        -> step ramps 0.25->1.0 over sweeps (idea 2: trust region)
           warm=True          -> cascade skip-init the latents (idea 3)
-        Reaches the PC equilibrium (keeps PC's advantages), multiplier-free."""
+        Finite sweeps approximate a PC equilibrium. The exact-D division is an
+        explicit open arithmetic boundary in this eager research solver."""
         if warm:
             states = self._cascade_latents(x0, target, warm_alpha)
         else:
@@ -204,10 +208,11 @@ class DeepDyadicPC(nn.Module):
     @torch.no_grad()
     def settle_nudge(self, x0, target, n_sweeps, beta=0.3, async_frac=1.0, gen=None,
                      stale=False, rand_order=False):
-        """NUDGED iterative settling (the convergent regime). The output layer is
-        FREE (init = feed-forward), softly pulled toward the target by `beta` —
-        the small-nudge / EqProp limit where PC converges near the feed-forward
-        basin. Diagonal-preconditioned GS.
+        """Gamma-damped NUDGED iterative settling. The output layer is FREE
+        (init = feed-forward) and softly pulled toward the target by `beta`.
+        Convergence is configuration-dependent and corrected benchmarks are
+        pending. This eager diagonal-preconditioned solver divides by exact D,
+        so its state-relaxation arithmetic is not a zero-DSP recipe.
 
         Async knobs (the distributed model the cascade CANNOT match — its backward
         sweep is strictly ordered, e_l needs e_{l+1}):
@@ -235,7 +240,7 @@ class DeepDyadicPC(nn.Module):
                 else:                                       # output: pred error + soft target nudge
                     grad = eps_l + beta * (states[l] - target)
                     D = 1.0 + beta
-                states[l] = states[l] - grad / D
+                states[l] = states[l] - self.gamma * grad / D
         return states
 
     @torch.no_grad()
@@ -412,7 +417,8 @@ def train_settle(model, Xtr, Ytr, Xte, Yte, epochs, settle_call, opt, bs=128, n_
 
 def train_nudge(model, Xtr, Ytr, Xte, Yte, epochs, n_sweeps, opt, beta=0.3,
                 async_frac=1.0, bs=128, n_classes=10, seed=0, **async_kw):
-    """Train with nudged iterative settling (the convergent regime).
+    """Train with gamma-damped nudged iterative settling.
+    Convergence and accuracy remain configuration-dependent.
     async_kw -> stale / rand_order (the harder distributed conditions)."""
     n = Xtr.shape[0]
     gen = torch.Generator().manual_seed(seed)
@@ -581,11 +587,12 @@ if __name__ == "__main__":
         depth = int(sys.argv[2]) if len(sys.argv) > 2 else 16
         dims = [d] + [width] * (depth - 1) + [10]
         n_sw, bs = max(12, depth), 128
-        print(f"== accuracy<->async frontier (depth {depth}): fraction p of SYNC cascade steps ==")
+        print(f"== accuracy<->async frontier (depth {depth}, gamma={NUDGE_GAMMA}): "
+              "fraction p of SYNC cascade steps ==")
         print(f"{'p (sync frac)':>13} {'acc':>7} {'sec':>6}")
         for p in (0.0, 0.1, 0.25, 0.5, 1.0):
             torch.manual_seed(0)
-            net = DeepDyadicPC(dims, residual=True)
+            net = DeepDyadicPC(dims, gamma=NUDGE_GAMMA, residual=True)
             opt = torch.optim.Adam(net.parameters(), lr=1e-3)
             gen = torch.Generator().manual_seed(0)
             t0 = time.time()
@@ -617,7 +624,7 @@ if __name__ == "__main__":
         def run(depth, n_sw, kw, seed):
             dims = [d] + [width] * (depth - 1) + [10]
             torch.manual_seed(seed)
-            net = DeepDyadicPC(dims, residual=True)
+            net = DeepDyadicPC(dims, gamma=NUDGE_GAMMA, residual=True)
             return train_nudge(net, Xtr2, Ytr2, Xte, Yte, ep, n_sw,
                                torch.optim.Adam(net.parameters(), lr=1e-3),
                                beta=0.5, seed=seed, **kw)
@@ -631,7 +638,8 @@ if __name__ == "__main__":
             ("HARD 50%+stale+rand",   dict(async_frac=0.5, stale=True, rand_order=True)),
         ]
         depth, n_sw = 16, 20
-        print(f"== async robustness, multi-seed (depth {depth}, {n_sw} rounds, seeds {seeds}) ==")
+        print(f"== async robustness, multi-seed (depth {depth}, {n_sw} rounds, "
+              f"gamma={NUDGE_GAMMA}, seeds {seeds}) ==")
         print(f"{'condition':>22} {'mean±std':>14}  per-seed")
         for name, kw in conditions:
             accs = [run(depth, n_sw, kw, s) for s in seeds]
@@ -648,8 +656,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if sys.argv[1:] and sys.argv[1] == "nudgesweep":
-        # Does soft-nudge CONVERGE to backprop with enough sweeps (vs hard-clamp's
-        # 0.67 plateau)? Scan sweeps at depth 32; small beta = closer to backprop.
+        # Corrected-damping rerun: test soft-nudge accuracy against sweep count
+        # (vs the separate hard-clamped solver's plateau) without presuming convergence.
         width, n_tr, ep = 64, 2000, 3
         Xtr2, Ytr2 = Xtr[:n_tr], Ytr[:n_tr]
         depth = int(sys.argv[2]) if len(sys.argv) > 2 else 32
@@ -672,13 +680,14 @@ if __name__ == "__main__":
 
         torch.manual_seed(0)
         a_bp = _bp(DeepDyadicPC(dims, residual=True))
-        print(f"== nudge convergence vs sweeps (depth {depth}); backprop = {a_bp:.3f} ==")
+        print(f"== nudge accuracy vs sweeps (depth {depth}, gamma={NUDGE_GAMMA}); "
+              f"backprop = {a_bp:.3f} ==")
         print(f"{'beta':>6} {'sw=depth':>9} {'sw=2depth':>10} {'sw=4depth':>10}")
         for beta in (0.1, 0.2):
             row = []
             for mult in (1, 2, 4):
                 torch.manual_seed(0)
-                net = DeepDyadicPC(dims, residual=True)
+                net = DeepDyadicPC(dims, gamma=NUDGE_GAMMA, residual=True)
                 acc = train_nudge(net, Xtr2, Ytr2, Xte, Yte, ep, mult * depth,
                                   torch.optim.Adam(net.parameters(), lr=1e-3), beta=beta)
                 row.append(f"{acc:0.3f}")
@@ -686,8 +695,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if sys.argv[1:] and sys.argv[1] == "nudge":
-        # CONVERGENCE: does the soft-NUDGE iterative regime converge AND match
-        # backprop at depth (where hard-clamp settling failed)?
+        # Corrected-damping rerun: does the soft-NUDGE iterative regime approach
+        # backprop at depth (where the separate hard-clamped solver failed)?
         width, n_tr, ep = 64, 3000, 3
         Xtr2, Ytr2 = Xtr[:n_tr], Ytr[:n_tr]
         depths = [int(a) for a in sys.argv[2:]] or [16, 32, 48, 64]
@@ -707,15 +716,18 @@ if __name__ == "__main__":
                     h = model.f(l, h)
                 return (h.argmax(-1) == Yte).float().mean().item()
 
-        print(f"== nudged iterative PC (sweeps=10) vs backprop, width {width} ==")
+        print(f"== nudged iterative PC (sweeps=10, gamma={NUDGE_GAMMA}) vs backprop, "
+              f"width {width} ==")
         print(f"{'depth':>6} {'nudge β=0.2':>11} {'nudge β=0.5':>11} {'backprop':>9} {'sec':>6}")
         for depth in depths:
             dims = [d] + [width] * (depth - 1) + [10]
             t0 = time.time()
-            torch.manual_seed(0); net = DeepDyadicPC(dims, residual=True)
+            torch.manual_seed(0); net = DeepDyadicPC(
+                dims, gamma=NUDGE_GAMMA, residual=True)
             a2 = train_nudge(net, Xtr2, Ytr2, Xte, Yte, ep, 10,
                              torch.optim.Adam(net.parameters(), lr=1e-3), beta=0.2)
-            torch.manual_seed(0); net = DeepDyadicPC(dims, residual=True)
+            torch.manual_seed(0); net = DeepDyadicPC(
+                dims, gamma=NUDGE_GAMMA, residual=True)
             a5 = train_nudge(net, Xtr2, Ytr2, Xte, Yte, ep, 10,
                              torch.optim.Adam(net.parameters(), lr=1e-3), beta=0.5)
             torch.manual_seed(0)
@@ -730,11 +742,12 @@ if __name__ == "__main__":
         Xtr2, Ytr2 = Xtr[:n_tr], Ytr[:n_tr]
         depth = int(sys.argv[2]) if len(sys.argv) > 2 else 16
         dims = [d] + [width] * (depth - 1) + [10]
-        print(f"== async/partial-update robustness (nudged PC, depth {depth}, β=0.5) ==")
+        print(f"== async/partial-update robustness (nudged PC, depth {depth}, "
+              f"gamma={NUDGE_GAMMA}, β=0.5) ==")
         print(f"{'async_frac':>11} {'sweeps':>7} {'acc':>7} {'sec':>6}")
         for frac, sw in [(1.0, 10), (0.5, 14), (0.25, 20), (0.5, 10), (0.25, 10)]:
             torch.manual_seed(0)
-            net = DeepDyadicPC(dims, residual=True)
+            net = DeepDyadicPC(dims, gamma=NUDGE_GAMMA, residual=True)
             t0 = time.time()
             acc = train_nudge(net, Xtr2, Ytr2, Xte, Yte, ep, sw,
                               torch.optim.Adam(net.parameters(), lr=1e-3),

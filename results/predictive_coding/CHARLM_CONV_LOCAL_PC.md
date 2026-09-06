@@ -6,15 +6,18 @@
 ## The question
 
 Rung 1 (`CHARLM_LOCAL_PC.md`) showed **local** tropical PC — async error-relaxation, not
-the cascade — matches backprop on a feedforward *context-MLP* char-LM, multiplier-free.
+the cascade — matches backprop on a feedforward *context-MLP* char-LM with a
+dyadic internal weight/activation operand.
 Rung 2 asks the same on a **competitive convolutional** architecture (the step toward
 "local PC trains models worth scaling"): a causal dilated **dyadic-conv** char-LM, with
 credit by frozen-routing error-relaxation routed through the conv stack.
 
 Standard dyadic conv (not morphological): the error route `A_lᵀ = conv_transpose1d(E·relu_mask,
-±2^k W)` is an **exact linear transpose**, weight grad = `conv1d_weight` on ±2^k operands;
-the async loop (participation/stale/random-order) is the fabric form. All-position
-prediction; sliding windows; warmup+cosine lr schedule.
+±2^k W)` is an **exact linear transpose**, and the internal weight-gradient kernel uses
+`conv1d_weight` with a dyadic activation and a real error operand; the async loop
+(participation/stale/random-order) is the candidate fabric form. Cross-entropy, Adam,
+the learning-rate schedule, and data handling remain ordinary boundaries. All-position
+prediction; sliding windows.
 
 ## What's solid
 
@@ -31,17 +34,19 @@ prediction; sliding windows; warmup+cosine lr schedule.
 |---|---|---|
 | bp_float | float backprop | 2.511 |
 | **bp_dyadic** | backprop, ±2^k forward, **real-multiply backward** | **2.451** |
-| **relax_async** (async/fabric local PC) | neighbour-local, partial+stale+any-order, **fully mult-free** | **2.617** |
-| relax (sync) — identical to async | local, fully mult-free | 2.617 |
+| **relax_async** (async/fabric local PC) | neighbour-local, partial+stale+any-order, single-dyadic-operand weight gradient | **2.617** |
+| relax (sync) — identical to async | local, single-dyadic-operand weight gradient | 2.617 |
 | *bigram floor* | — | 3.58 |
 
-**Verdict: a qualified win — fully-multiplier-free local async PC trains the competitive
-conv to within ~0.1 bpc of float backprop** (2.617 vs bp_float 2.511), and the async/fabric
+**Verdict: a qualified win — local async PC with a dyadic activation operand trains
+the competitive conv to within ~0.1 bpc of float backprop** (2.617 vs bp_float 2.511), and the async/fabric
 form is robust (`relax_async` == `relax` bit-identically — partial participation + stale +
 any-order converge to the same result as sync). The residual **+0.17 vs `bp_dyadic`** (2.451)
-is the price of making the **backward also multiplier-free**: `bp_dyadic` uses a ±2^k
-*forward* but a **real-multiply** backward, while `relax_async` is fully mult-free (the
-weight grad is `±2^k activation × real error = a shift`). That operand quantization is ~free
+is the measured cost of using **single-operand quantization in the internal weight-gradient
+kernel**: `bp_dyadic` uses a ±2^k *forward* but an ordinary float backward, while
+`relax_async` uses `±2^k activation × real error` in that kernel. This operator can
+map to shifts; it is not a claim that Adam or the whole training recipe is closed.
+That operand quantization is ~free
 on the MLP (Rung 1 matched) but costs ~0.17 bpc on conv.
 
 **This was driven down with two principled fixes (not lr-guessing):**
@@ -62,13 +67,15 @@ on the MLP (Rung 1 matched) but costs ~0.17 bpc on conv.
 - This is a **credit-assignment** comparison on the same conv arch (all-position metric,
   single seed). `bp_dyadic` slightly beats `bp_float` here (a ±2^k-as-regularizer effect
   on this small data).
-- The +0.23 is the price of **multiplier-free backward** (operand quantization), *not* the
+- The +0.23 is the price of a **dyadic activation operand in the weight-gradient kernel**, *not* the
   local/async form (sync `relax` == async `relax_async`; both = the same quantized
   gradient; the *form* is fine — the *quantization* is the cost).
 - **Plausibly reducible (untested here):** magnitude-aware dyadic backward (the Rung-1
   MLP achieved "no acc cost" with magnitude-kept-within-2× dyadic grads), or not
   quantizing the worst layer (the readout / top conv), or a sign-product update there.
   This is the concrete next lever if closing the +0.23 matters.
+- **Whole-recipe closure is unmeasured:** loss, Adam/schedule, data processing, and
+  evaluation are outside the network-internal dyadic credit-path claim.
 
 ## The journey (why this took several runs — honestly)
 

@@ -54,14 +54,15 @@ the avoided all-reduce only helps at extreme scale, where frameworks overlap it 
 This is the same conclusion Rung 3B reached structurally — now grounded in measured
 compute + measured all-reduce.
 
-**What is NOT refuted — and is the real claim:** the **substrate** axis. PC's genuine,
-code-verified advantages are **no weight transport** and **credit-local-in-space**, which
-let it run on **analog / in-memory / clockless settling hardware where backprop has no
-physical realisation at all** — and where the O(L/p) "rounds" are continuous-time physics
-(gate delays), not clocked digital steps with a weight-grad pass. **A digital fabric sim
-structurally cannot capture that regime**, so this Rung-4 result neither confirms nor
-refutes the substrate claim — it only kills the *digital-throughput* version, which was the
-contestable one.
+**What is NOT refuted — and remains an opportunity:** the **substrate** axis. The
+validated error-relax path uses neighbour-local credit messages, no separately learned
+feedback matrix, and dyadic internal operands. Those properties may map efficiently to
+**analog / in-memory / clockless settling hardware**, where local dynamics could change
+the cost of O(L/p) rounds. The mathematical transpose action and directional propagation
+still remain, however, and no end-to-end physical implementation or closure audit is
+reported here. **A digital fabric sim cannot settle that regime**, so this Rung-4 result
+neither confirms nor refutes the substrate opportunity; it kills only the
+*digital-throughput* version.
 
 ## Honest scope
 
@@ -71,6 +72,6 @@ contestable one.
 - The all-reduce was measured on **localhost** (lower bound); a real interconnect at scale
   is larger (helps PC) but is also overlapped by real frameworks (helps backprop). The net
   is genuinely uncertain and not settled here.
-- The **substrate** regime (analog/in-memory) — the only place the thesis still claims a
-  win — is **not measured** by any digital experiment. Substantiating it needs real
+- The **substrate** regime (analog/in-memory) — the remaining proposed route to a win —
+  is **not measured** by any digital experiment. Substantiating it needs real
   neuromorphic / in-memory-compute hardware. That is the genuine open frontier.

@@ -102,7 +102,7 @@ Exact bakeoff protocol (1500 steps, B24, T96, char-65, fixed val windows,
 τ-anneal, mps, hard==soft at final eval in every arm). All runs local (mps);
 jsonl per arm in this directory; checkpoints in `ckpts/` (untracked).
 
-**Arm 0 — parity:** original `nanogpt_shakespeare.py` (canonical-repo
+**Arm 0 — parity:** original `scripts/nanogpt_shakespeare.py` (canonical-repo
 PYTHONPATH; the bare run imports the stale kanervasforge submodule copy — trap
 recorded) seed 0 @ lr 1e-2 → **1.9445**, inside the published 1.934±0.05. PASS.
 
@@ -280,14 +280,17 @@ form of the bear-case attack. Honest scope: an actual transformer-FIM
 baseline (the cross-family form) remains external and would likely win;
 that comparison is about the substrate, not the inference mode.
 
-## G5 strict rung (2026-07-11): the zero-multiply-training flag-plant, MACHINE-AUDITED [measured]
+## G5 strict rung (2026-07-11): legacy waiver audit plus internal-credit result [measured]
 
-- **Audit (`g5_audit.jsonl`): training_closed = TRUE.** One τ=0 cascade sweep +
-  full PureTropicalSGD step + LUT loss traces to **zero unwaived hardware
-  multiplies** (waived: LUT exp2 ROM ×1 transcendental, batch-mean/normalize
-  divides ×2 — the repo's sanctioned artifacts). The one offender found and
-  fixed en route: the conv adjoint's slot gate is now a `torch.where` mux, not
-  a mask multiply. The L2 claim-ladder rung is closed.
+- **Historical artifact (`g5_audit.jsonl`): `training_closed = TRUE` under the
+  former waiver policy.** That row waived one LUT-exp2 transcendental and two
+  batch-mean/normalization divides. It is preserved as raw provenance, but it is
+  **not** a pass under the public `strict-eager-v2` semantics: `--strict-audit`
+  now preserves caller state, grants no such eager-operation waivers, and fails
+  on the observed division/transcendental operations. The narrower result remains:
+  the τ=0 internal cascade credit path has no observed hardware multiply after the
+  conv adjoint's slot gate was changed from a mask multiply to `torch.where`.
+  Whole-step `training_closed` is not established.
 - **Quality:** strict-annealed 1500 steps: **2.218 / 2.196** (≈ beats the
   published strict 2.231). Hard-from-scratch receipt: **2.475** ≈ bigram
   2.482 — the pre-registered L3 price, confirmed. Strict at 6k budget: 2.462 —

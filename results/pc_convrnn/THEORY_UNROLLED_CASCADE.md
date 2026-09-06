@@ -57,10 +57,11 @@ ships with them for free. At inference the SAME checkpoint runs in two modes:
 
 Honest boundaries of the claim (pre-registered): (i) generative mode needs
 *state* relaxation (routing re-evaluated each step) — a different loop from the
-frozen-routing *error* relaxation used for training credit; (ii) state settling
-has measured stability failure modes in this repo (settle_nudge energy
-divergence as weights grow; fixed-step descent divergence at width 768 — the
-U-gate) — C3 is trivial for the cascade but returns as a real problem here;
+frozen-routing *error* relaxation used for training credit; (ii) the archived
+`settle_nudge` energy-divergence run used an unintended unit step because its
+configured `gamma` was ignored, so corrected-gamma behavior is pending rerun;
+independently, fixed-step descent diverged at width 768 (the U-gate), so C3 is
+trivial for the cascade but returns as a real risk here;
 (iii) at hard τ=0 the energy is piecewise-linear (kinks at winner changes), so
 relaxation runs at soft τ>0 and is evaluated hard — a disclosed inference-time
 closure boundary for this mode only; the feedforward deploy mode stays fully
@@ -75,15 +76,17 @@ closed. Gate G6 (PREREG) measures all of this.
    cost. For sequence models this is the difference between PC being unusable and
    PC being free.
 
-2. **Zero-multiply credit assignment at τ=0.** Every op in the MorphSSM stack has a
+2. **Zero-multiply internal credit assignment at τ=0.** Every op in the MorphSSM stack has a
    discrete, cacheable routing: morph-conv argmax slot, max-plus out_proj argmax,
    top-k head selection, dropout gate, residual copy, and (for the conv-RNN arm)
    the recurrence carry gate. The frozen-routing adjoint of each is a gather/
    scatter/add — **no multiplies of any kind**, stronger than the dyadic-conv PC
-   backward (which still needed ±2^k shifts for `delta @ W`). The only boundary op
-   is the CE softmax at the top (the same sanctioned boundary as every closed run
-   in the repo). The stop-grad pow-2 LayerNorm scale is the one by-design deviation
-   from autograd, exactly as in the DyadicPCNet gradchecks.
+   backward (which still needed ±2^k shifts for `delta @ W`). This is an
+   **internal reverse-path** claim, not whole-step closure. CE/LUT transcendental
+   work and batch-mean/normalization division execute at the boundary; the public
+   `strict-eager-v2` audit does not waive them and therefore fails the full step.
+   The stop-grad pow-2 LayerNorm scale is the one by-design deviation from
+   autograd, exactly as in the DyadicPCNet gradchecks.
 
 3. **Unit-gain error highways through time.** For the leaky-max recurrence
    h_t[c] = max(u_t[c], h_{t−1}[c] − λ[c]), the frozen temporal Jacobian is the

@@ -8,9 +8,11 @@ Committed before any gate runs. Theory: `THEORY_UNROLLED_CASCADE.md`. Style foll
 generative/relaxation behavior of predictive coding, performantly, via tropical
 deep learning — *pay one forward-pass-equivalent for training credit (the
 cascade), and pay iteration only where you want the generative behavior; the
-equivalence theorem guarantees it is the same model in both modes*
-(THEORY_UNROLLED_CASCADE.md §1b). G0–G5 establish the training half (cascade =
-settled PC, at BP wall-clock, zero-multiply backward at τ=0); G6 establishes
+the same checkpoint supports both modes* (THEORY_UNROLLED_CASCADE.md §1b).
+G0–G5 establish the training half (cascade = the selected frozen-routing/BPTT
+credit, without iterative settling, with a zero-multiply internal backward at
+τ=0); this is not an equality claim about finite state-settling trajectories or
+their equilibria. G6 establishes
 the inference half (infilling / steering / denoising by state relaxation on the
 same checkpoint). Decisions locked with the user 2026-07-08:
 
@@ -80,7 +82,7 @@ twin} while 2a passes ⇒ recurrence dead as an architecture claim; Track 1
 (MorphSSM+PC) proceeds unaffected. Output `g2_stability.jsonl`, `g2_synthetic.jsonl`.
 
 ### G3 — TinyShakespeare bakeoff entry
-Arms: (0) parity rerun `nanogpt_shakespeare.py --runs tropical-float --variant
+Arms: (0) parity rerun `scripts/nanogpt_shakespeare.py --runs tropical-float --variant
 morphssm` seed 0 → must land 1.934±0.05 (environment insurance); (1) `bp_float`
 MorphSSM ×3 seeds via the new harness (must match arm 0 — harness-parity);
 (2) `pc_cascade` MorphSSM ×3; (3) `pc_relax_async` ×1 (add seeds only if within
@@ -108,10 +110,13 @@ figure claims "BP quality at O(depth) settling-free cost", NOT "depth helps".
 (a) strict-annealed: PureTropicalSGD + tropical_ce_lut, anneal→hard, vs MorphSSM
 strict (2.231 char / 3.071 bpb BPE); (b) hard-from-scratch cascade receipt —
 expected ≈ bigram (2.44–2.48; the anneal is load-bearing +0.21–0.25) — published
-honestly as the L3 ladder line; (c) flag-plant: `find_training_multiplies` trace of
-forward + τ=0 cascade + closed optimizer with only sanctioned waivers (CE
-softmax/LUT boundary, batch-mean divide) — the zero-multiply-backward training-
-closed LM.
+honestly as the L3 ladder line; (c) flag-plant: trace forward + τ=0 cascade +
+optimizer and report the exact boundary. **Audit amendment (2026-09-06):** the
+public `--strict-audit` semantics do not waive CE/LUT transcendental or
+batch-mean/normalization division. They preserve caller state, record
+`strict-eager-v2`, and fail if those operations are observed. G5 can therefore
+establish a zero-multiply **internal cascade credit path**, but not a
+`training_closed` full step while those boundaries execute.
 
 ### G6 (follow-up, pre-registered) — generative inference on the cascade-trained checkpoint
 The inference half of the program goal. Implement `MorphPCEngine.infer(clamp)`:
@@ -132,17 +137,20 @@ pow-2 settling step γ). Consumes the G3 checkpoints — no retraining.
   the trusted rest, relax; measure token-recovery accuracy vs a no-settling
   forward baseline. The deep-tropical analog of the SparseCodingPC win.
 - **Stability pre-registration (the C3-at-inference risk):** if fixed-step
-  settling diverges at d=256 (the U-gate/settle_nudge failure modes), the
-  pre-listed fallbacks are, in order: smaller pow-2 γ, RMS-conditioned state
-  steps, settling at larger τ, narrower/shallower checkpoint. If none converge,
-  report the negative honestly — the training-half claims (G0–G5) stand alone.
+  settling diverges at d=256, the pre-listed fallbacks are, in order: smaller
+  pow-2 γ, RMS-conditioned state steps, settling at larger τ, narrower/shallower
+  checkpoint. The width-768 U-gate remains independent evidence for this risk;
+  the archived `settle_nudge` divergence used an unintended unit step because
+  its configured `gamma` was ignored, so corrected-gamma behavior is pending
+  rerun. If none converge, report the negative honestly — the training-half
+  claims (G0–G5) stand alone.
 - **Closure disclosure:** relaxation-mode inference at τ>0 is a declared
   boundary (same rung as the training anneal); the feedforward deploy mode
   remains fully closed at τ=0. jsonl: `g6_generative.jsonl`.
 
 ## EC2 execution plan (locked with user 2026-07-08 after G0–G3 all-PASS; no further local runs)
 
-One c5.9xlarge via the `run_connect4_prior_sweep_ec2.sh` machinery (S3 state,
+One c5.9xlarge via the `scripts/run_connect4_prior_sweep_ec2.sh` machinery (S3 state,
 no-SSH, hard backstop), driver `scripts/_pc_morphssm_onbox.sh`, batches in
 parallel with pinned threads:
 - **B1 = G6 battery (north star, first):** on-box cascade-trained checkpoints
@@ -232,9 +240,9 @@ within 0.05 bpb of morphssm:bp at both scales.
 
 | rung | training config | claimable |
 |---|---|---|
-| L0 | float-sim cascade + Adam, τ-annealed | cascade PC (≡ settled iterative PC ≡ BPTT grads) trains fully tropical seq models at BP-twin quality, settling-free; deploy fully tropical (τ=0 closure) |
+| L0 | float-sim cascade + Adam, τ-annealed | cascade PC (≡ selected BPTT gradients under frozen routing) trains the sequence model at BP-twin quality without iterative training-time settling; Adam/soft-phase/full-step closure are not claimed |
 | L1 | post-anneal hard-routing sweep | zero-multiply credit assignment through depth and time (soft-phase multiplies disclosed) |
-| L2 | + PureTropicalSGD + LUT loss | fully multiplier-free training step (sanctioned artifacts only) |
+| L2 | + PureTropicalSGD + LUT loss | target rung; the historical waiver-based audit is **not closed** under `strict-eager-v2` because observed division/transcendental operations are no longer exempt |
 | L3 | hard-from-scratch | ≈ bigram today; the price is stated, not hidden |
 
 ## Pre-registered risk register

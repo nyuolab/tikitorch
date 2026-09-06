@@ -994,31 +994,37 @@ def run_one(arch, credit, data, args, log_path):
     if not args.anneal and args.tau == 0.0:
         model.set_tau(0.0)                       # hard-from-scratch (G5 receipt)
     if args.strict_audit and engine is not None:
-        from tikitorch.audit import _make_catcher
-        model.set_tau(0.0)
+        from tikitorch.audit import _make_catcher, _preserve_audit_state
         gen0 = torch.Generator().manual_seed(0)
         xa, ya = data.batch("train", 2, args.seq_len, gen0)
         hits = []
-        with _make_catcher(hits):
-            engine.cascade_grads(xa.to(device), ya.to(device))
-            opt.step()
-        opt.zero_grad(set_to_none=True)
-        waived = {"elementwise-divide", "transcendental"}
+        xa, ya = xa.to(device), ya.to(device)
+        with _preserve_audit_state(model, opt, (xa, ya)):
+            model.set_tau(0.0)
+            opt.zero_grad(set_to_none=True)
+            with _make_catcher(hits):
+                engine.cascade_grads(xa, ya)
+                opt.step()
         from collections import Counter
         cats = Counter(c for c, _ in hits)
-        bad = {c: n for c, n in cats.items() if c not in waived}
+        bad = dict(cats)
         row = dict(gate="G5_audit", arch=arch, opt=args.opt, loss=args.loss,
                    tau=0.0, violations=bad,
-                   waived={c: n for c, n in cats.items() if c in waived},
+                   waived={}, audit_semantics="strict-eager-v2",
                    training_closed=not bad)
         with (args.out / "g5_audit.jsonl").open("a") as f:
             f.write(json.dumps(row) + "\n")
         print(f"[G5-audit] training_closed={not bad} violations={bad} "
               f"waived={dict(row['waived'])}")
         model.set_tau(max(args.tau, 0.0))
+        if bad:
+            raise RuntimeError(
+                "strict closure audit failed; see g5_audit.jsonl for observed operations"
+            )
     gen = torch.Generator().manual_seed(args.seed)
     async_gen = torch.Generator().manual_seed(args.seed + 7)
     tag = f"{arch}:{credit}"
+    recorded_lr = lr if args.opt == "adamw" else 2.0 ** (-args.lr_shift)
     L = args.n_layers
     t0 = time.time()
     tokens_seen = 0
@@ -1051,8 +1057,10 @@ def run_one(arch, credit, data, args, log_path):
             ce_h, acc_h = evaluate(model, data, args.batch_size, args.seq_len,
                                    args.eval_batches, args.seed + 1, device)
             model.set_tau(cur_tau)
-            row = dict(run=tag, arch=arch, credit=credit, opt="adamw", lr=lr,
-                       tokenizer="char", step=step, seed=args.seed,
+            row = dict(run=tag, arch=arch, credit=credit, opt=args.opt,
+                       lr=recorded_lr,
+                       lr_shift=(args.lr_shift if args.opt != "adamw" else None),
+                       tokenizer=args.tokenizer, step=step, seed=args.seed,
                        train_loss=float(loss.item()),
                        wall_s=round(time.time() - t0, 1),
                        tok_per_s=round(tokens_seen / max(time.time() - t0, 1e-9)),
@@ -1135,7 +1143,8 @@ def main():
     p.add_argument("--loss", type=str, default="ce", choices=["ce", "lut"])
     p.add_argument("--lr-shift", type=int, default=10)
     p.add_argument("--strict-audit", action="store_true",
-                   help="G5: trace one tau=0 cascade+step for hardware multiplies")
+                   help="G5: fail if a tau=0 cascade+optimizer step executes any "
+                        "classified multiply, divide, fused, or transcendental op")
     p.add_argument("--ckpt-name", type=str, default=None,
                    help="checkpoint filename override (default arch_credit_seed.pt)")
     p.add_argument("--eval-interval", type=int, default=100)

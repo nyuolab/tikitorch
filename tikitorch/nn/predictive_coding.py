@@ -1,11 +1,11 @@
 """tikitorch.nn.predictive_coding — tropical predictive-coding (PC) layers.
 
-A multiplier-free, backprop-free, *local* learning rule for the tropical
-semiring.  Predictive coding (Rao-Ballard / Whittington-Bogacz) replaces the
-backward pass with an iterative *settling* of per-layer latent states that
-minimise a hierarchy of local prediction errors; weights then follow a purely
-local Hebbian-style update.  On the tropical substrate this is unusually well
-behaved:
+Predictive coding (Rao-Ballard / Whittington-Bogacz) replaces the backward pass
+with iterative *settling* of per-layer latent states, followed by local weight
+updates. :class:`TropicalPCNet` provides a closure-audited max/min-plus recipe;
+:class:`DyadicPCNet` explores shift-add-oriented ReLU variants whose exact
+closure depends on the selected settling, loss, gradient, and optimizer
+boundaries. On the tropical substrate, the core routing is unusually simple:
 
   * **Prediction** of layer ``l`` from the state below is the max-plus (or
     min-plus) primitive ``mu_l[j] = max_i(W_l[j,i] + x_{l-1}[i])`` — the same op
@@ -37,12 +37,16 @@ Two depth levers are built in:
 Depth is made representationally real by *alternating* dilation (max-plus) and
 erosion (min-plus) layers: a pure max-plus stack collapses to a single
 max-plus-linear map, whereas min-plus∘max-plus is a genuine tropical-rational
-map.  All state/weight updates are adds, comparisons, scatters, and power-of-two
-shifts — wrap a step in :func:`tikitorch.assert_no_multiply` to verify.
+map. In :class:`TropicalPCNet`, state and weight updates are adds, comparisons,
+scatters, and power-of-two shifts — wrap that concrete recipe in
+:func:`tikitorch.assert_no_multiply` to verify its executed path. Dyadic recipe
+boundaries are documented on :class:`DyadicPCNet`.
 """
 
 from __future__ import annotations
 
+import math
+from numbers import Integral, Real
 from typing import List, Optional
 
 import torch
@@ -389,7 +393,7 @@ class DyadicPCNet(nn.Module):
     the loss and depth never helps. Replacing the lossy max mixing with a
     **dyadic shift-add** mixing (:class:`DyadicLinear`, weights snapped to ±2^k
     so ``W·x`` is a shift+add tree) plus a ReLU non-linearity gives oblique
-    normals and a non-lossy map — i.e. a multiplier-free ReLU MLP trained by PC.
+    normals and a non-lossy map — i.e. a shift-add-oriented ReLU MLP trained by PC.
     Unlike :class:`TropicalPCNet`, settling is autograd-driven, but the energy's
     grads w.r.t. states/weights are still mathematically local (each ``dE/dW_l``
     uses only the adjacent error and activity).
@@ -400,25 +404,25 @@ class DyadicPCNet(nn.Module):
         fast digital learner — trains deep and tracks the dyadic backprop
         ceiling. NOT a multiplier-free step.
       * **Dyadic magnitude-aware** (``multiplier_free=True``,
-        ``mf_mode="dyadic"``): the recommended fully multiplier-free path. Both
-        the error and the activity are quantized to ±2^k, so the weight-grad
-        contraction is a shift-add tree — matches Adam accuracy with no multiply
-        on fabric.
+        ``mf_mode="dyadic"``): the recommended multiplier-free *gradient* path.
+        Both the error and the activity are quantized to ±2^k, so the weight-grad
+        contraction is a shift-add tree and matches Adam accuracy in the reported
+        experiments. Other full-step boundaries remain separate.
       * **Pure sign-product** (``mf_mode="sign"``): exact per-sample sign
         ``sign(dE/dW[j,i]) = -sign(eps_j) ⊕ sign(x_{l,i})`` gated by ``relu'``
         (``eps = x - mu``). Lags the other two — the batched ±1 majority vote
         disagrees with the true batch-gradient sign on a sizeable fraction of
         weights — but kept for the exact per-sample identity.
 
-    Closure status (deploys multiplier-free as a weight-VALUE property): forward
-    / ``Wᵀ·error`` feedback with ±2^k weights are shift+add and ``relu'`` is a
-    0/1 mask. Residual op-trace multiplies are sim artifacts that deploy clean —
-    the L2-energy ``**2`` routes on fabric as the raw error ``(states[l+1]-mu)``
-    (a subtractor), and the dyadic matmul as a ±2^k shift-add (see
-    :class:`DyadicLinear`). The settling step ``states -= gamma·g`` uses a
-    power-of-two ``gamma`` (a right shift). The default Adam weight update is the
-    only genuine multiply; :meth:`set_mf_grads` supplies the multiplier-free
-    replacements above.
+    Closure is recipe- and boundary-scoped. Forward / ``Wᵀ·error`` feedback
+    with ±2^k weights maps to shift-add and ``relu'`` is a 0/1 mask;
+    :meth:`set_mf_grads` supplies a dyadic or ternary weight-gradient surrogate.
+    In :meth:`infer`, ``states -= gamma·g`` maps to a shift only when ``gamma`` is
+    dyadic (the default is 2^-3). :meth:`settle_nudge` additionally divides by
+    the exact diagonal preconditioner ``D``, which is a general digital division
+    in the current implementation. Adam is another explicit open boundary. A
+    closed optimizer can close the optimizer boundary, but it does not by itself
+    make the nudge recipe a fully closed step.
 
     Settling needs a small power-of-two ``gamma`` (~2^-3..2^-4, a shift;
     ``0.5=2^-1`` diverges on the deeper energy's curvature) and sweeps scaling
@@ -433,14 +437,17 @@ class DyadicPCNet(nn.Module):
         from tikitorch.nn import DyadicLinear        # lazy: avoid import cycle
         if len(dims) < 2:
             raise ValueError("dims needs at least [in, out]")
+        if (isinstance(gamma, bool) or not isinstance(gamma, Real)
+                or not math.isfinite(float(gamma)) or not 0.0 < float(gamma) <= 1.0):
+            raise ValueError("gamma must be a finite real in (0, 1]")
         self.dims = list(dims)
         self.depth = len(dims) - 1
-        self.gamma = gamma
+        self.gamma = float(gamma)
         self.relu_readout = relu_readout
         # ``residual`` adds a TROPICAL skip on square interior layers:
         # ``f(x) = max(relu(W x), x)`` — tropical addition of the identity path, a
         # single ``max`` (multiplier-free, bounded, idempotent). It keeps dyadic
-        # PC flat to depth 32 (MNIST: 0.909 Adam / 0.856 fully multiplier-free at
+        # PC flat to depth 32 (MNIST: 0.909 Adam / 0.856 dyadic-gradient at
         # n_steps≈6·depth) where plain dyadic PC collapses to chance by ~depth 24
         # (the earlier apparent drop at depth 32 was undersettling, not a wall).
         # Because ``max`` cannot accumulate the way additive residual energy does,
@@ -523,7 +530,9 @@ class DyadicPCNet(nn.Module):
             local error and the activity to ±2^k, so each product is a single
             shift; ``sign(Σ dyadic·dyadic)`` recovers the magnitude the pure sign
             rule discards and **matches Adam / the backprop ceiling** (~0.88–0.92
-            on MNIST), fully multiplier-free.
+            on MNIST). This closes the local gradient contraction; a full-step
+            mapping additionally requires a dyadic ``gamma`` and a closed
+            optimizer, and must be audited for the concrete recipe.
           * ``mf_mode="sign"`` — the pure ±1 sign-product. The per-sample sign
             identity is exact but the batch majority vote is lossy, so it lags
             (~0.65–0.68). Kept for the exact per-sample identity.
@@ -552,7 +561,8 @@ class DyadicPCNet(nn.Module):
           * ``mode="dyadic"`` — ``q(v) = sign(v)·2^round(log2|v|)`` (nearest power
             of two; a leading-bit extraction in HW). ``q(a)^T @ q(b)`` keeps
             magnitudes within 2×, so its sign tracks the true-gradient sign
-            closely — matches the Adam update in accuracy.
+            closely — matches the Adam update in accuracy. This closes the local
+            gradient contraction, not every settling/loss/optimizer boundary.
           * ``mode="sign"`` — ``q(v) = sign(v)`` (ternary {-1,0,+1}). The
             per-sample sign-product equals ``sign(dE/dW)`` exactly, but the batch
             sum-of-signs is a lossy majority vote that disagrees with the true
@@ -700,11 +710,12 @@ class DyadicPCNet(nn.Module):
         Relaxes the PC equilibrium-error condition ``E_l = A_l^T E_{l+1}`` (routing
         FROZEN at the feed-forward pass) by repeated LOCAL updates in any order,
         then applies the same multiplier-free weight update as the cascade. This is
-        the iterative regime that actually trains at full scale: unlike the
-        state-settling :meth:`settle_nudge` (whose energy *diverges* as the weights
-        grow during training, collapsing to chance), the error-relaxation is a
-        triangular (nilpotent) system — unconditionally stable regardless of weight
-        magnitude.
+        the iterative regime that has been validated at full scale. Archived
+        unit-step state-settling runs diverged as weights grew, but those runs
+        predated the fix that made :meth:`settle_nudge` apply ``gamma``; its
+        corrected full-scale behavior still needs remeasurement. In contrast,
+        error-relaxation is a triangular (nilpotent) system — unconditionally
+        stable regardless of weight magnitude.
 
         - **Sync** (``participation=1``, top-down, in-place): converges in ONE pass
           to *exactly* :meth:`cascade_grads` (= backprop credit assignment).
@@ -789,7 +800,9 @@ class DyadicPCNet(nn.Module):
     @torch.no_grad()
     def _diag_precond(self, l, x):
         """Exact per-neuron diagonal Hessian (binary gates kill cross-terms):
-        D = 1 + Σ_j(active_j) W[j,i]^2 (+ skip). Dyadic W -> add-tree of 2^(2k)."""
+        D = 1 + Σ_j(active_j) W[j,i]^2 (+ skip). Dyadic W makes construction
+        of D an add-tree of 2^(2k), but the current solver divides by exact D;
+        that division is an explicit open arithmetic boundary."""
         from tikitorch.nn import dyadic_quantize
         relu_mask, gate, has_skip = self._route_l(l, x)
         active = relu_mask * gate if has_skip else relu_mask
@@ -805,16 +818,21 @@ class DyadicPCNet(nn.Module):
                      gen: Optional[torch.Generator] = None,
                      stale: bool = False,
                      rand_order: bool = False) -> List[torch.Tensor]:
-        """ITERATIVE settling in the convergent SOFT-NUDGE regime (the fully-local,
-        async, physically-realizable mode the cascade is *not*).
+        """ITERATIVE settling in the damped SOFT-NUDGE regime (the fully-local,
+        async execution mode the cascade is *not*).
 
         The output state is FREE (init = feed-forward), softly pulled toward the
         target by ``beta`` — the small-nudge / EqProp limit that stays in the
         feed-forward basin. Diagonal-preconditioned Gauss-Seidel. There is NO
         global backward phase: every state updates from local prediction errors,
-        in any order. It converges to a usable equilibrium (~85% of backprop at
-        depth) but is robust to the distributed conditions a strict backward
-        sweep can't take:
+        in any order. Deterministic tests cover the gamma-damped recurrence and
+        objective descent for representative settings; convergence remains
+        configuration-dependent. Archived accuracy and async-robustness numbers
+        used an unintended unit step and need to be rerun before they are
+        attributed to this corrected implementation. The eager solver divides by
+        the exact diagonal preconditioner, so this state-relaxation path has an
+        explicit open digital-arithmetic boundary. It supports the distributed
+        conditions a strict backward sweep can't take:
 
           async_frac<1 : each node updates with prob async_frac per pass (partial participation)
           stale=True   : neighbour reads from a round-start snapshot (stale-by-1 / lag)
@@ -823,6 +841,18 @@ class DyadicPCNet(nn.Module):
         See ``results/predictive_coding/ITERATIVE_PC_DISTRIBUTED.md`` for the
         multi-seed async-robustness table. Drive it via ``train_step_nudge``.
         """
+        if (isinstance(n_sweeps, bool) or not isinstance(n_sweeps, Integral)
+                or n_sweeps < 0):
+            raise ValueError("n_sweeps must be a nonnegative integer")
+        if (isinstance(beta, bool) or not isinstance(beta, Real)
+                or not math.isfinite(float(beta)) or float(beta) < 0.0):
+            raise ValueError("beta must be a finite nonnegative real")
+        if (isinstance(async_frac, bool) or not isinstance(async_frac, Real)
+                or not math.isfinite(float(async_frac))
+                or not 0.0 <= float(async_frac) <= 1.0):
+            raise ValueError("async_frac must be a finite real in [0, 1]")
+        beta = float(beta)
+        async_frac = float(async_frac)
         states = [s.clone() for s in self.feedforward(x0)]
         L = self.depth
         free = list(range(1, L + 1))                        # interior + OUTPUT (free, nudged)
@@ -842,15 +872,19 @@ class DyadicPCNet(nn.Module):
                 else:                                       # output: pred error + soft target nudge
                     grad = eps_l + beta * (states[l] - target)
                     D = 1.0 + beta
-                states[l] = states[l] - grad / D
+                states[l] = states[l] - self.gamma * grad / D
         return states
 
     def train_step_nudge(self, x0: torch.Tensor, y: torch.Tensor, opt,
                          n_sweeps: int = 20, beta: float = 0.5,
                          mf_mode: str = "dyadic", **async_kw) -> None:
-        """One fully-local iterative-PC step: nudged settle to equilibrium, then the
-        local multiplier-free weight update. ``async_kw`` -> async_frac / stale /
-        rand_order (the distributed conditions). No global backward pass."""
+        """One fully-local iterative-PC step: settle, then form a local dyadic or
+        ternary gradient surrogate and pass it to ``opt``. A closed optimizer such
+        as :class:`tikitorch.optim.PureTropicalSGD` closes the optimizer boundary;
+        Adam and other ordinary optimizers leave it open. Independently, the eager
+        state solver divides by its exact diagonal preconditioner, so the complete
+        nudge step is not currently a zero-DSP recipe. ``async_kw`` selects
+        ``async_frac`` / ``stale`` / ``rand_order``. No global backward pass."""
         target = self._make_target(y, ref=x0)
         states = self.settle_nudge(x0, target, n_sweeps=n_sweeps, beta=beta, **async_kw)
         opt.zero_grad(set_to_none=True)

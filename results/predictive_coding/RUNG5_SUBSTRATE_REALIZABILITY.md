@@ -1,10 +1,18 @@
-# Rung 5: is multiplier-free PC training silicon-realizable? — the measured substrate evidence
+# Rung 5: a multiplier-free PC layer-step on silicon — measured substrate evidence
 
 **Date:** 2026-06-21. The standing claim after Rungs 1–4: the digital-throughput win is
-refuted (`RUNG4_FABRIC_SIM.md`); what's left is the **substrate** axis — a credit-assignment
-that is multiplier-free, weight-transport-free, and local, hence expressible on hardware
-backprop can't use. Rung 5 asks the first, most concrete version of that: **does the tropical
-PC training backward actually synthesize to zero-multiplier hardware?**
+refuted (`RUNG4_FABRIC_SIM.md`); what's left is the proposed **substrate** axis — a
+neighbour-local credit path with dyadic internal operands and no separately learned
+feedback matrix. Rung 5 asks the first, most concrete version of that: **does one tropical
+PC backward layer-step synthesize to zero-multiplier hardware?**
+
+> **Later evidence / scope correction:** `PC_BACKWARD_SILICON.md` supersedes the
+> engineering-status statements below: a fixed-geometry interior cascade layer-step is
+> now P&R'd and bit-exact on F2, and `MULTI_F2_SCALE_OUT.md` demonstrates a two-device
+> sharded backward. These are kernel/backward results, not closure of the loss,
+> optimizer, full PC training loop, or an analog/in-memory deployment. “No weight
+> transport” below means no separately learned feedback matrix; the transpose action and
+> physical reverse datapath still exist.
 
 The honest answer is **yes, and it's already measured** — because the two operations the PC
 backward needs are *already* the FPGA kernels the FPGA workstream has csynth-validated at
@@ -13,8 +21,9 @@ here is the **structural mapping** (which had not been drawn) plus an honest sco
 
 ## The structural mapping: the PC backward IS the already-DSP=0 kernels
 
-`cascade_grads` / `error_relax_grads` (`predictive_coding.py:628–744`) do exactly three
-arithmetic things per layer-step, and each maps to a kernel already proven multiplier-free:
+`_route_T`, `cascade_grads`, and `error_relax_grads`
+(`tikitorch/nn/predictive_coding.py`) implement the internal operations summarized below,
+which map to kernels already proven multiplier-free:
 
 | PC backward op (CPU) | what it is | FPGA kernel | measured |
 |---|---|---|---|
@@ -28,7 +37,7 @@ There is no real multiplier anywhere. This is the tropical/dyadic enabler made c
 hard discrete routing (relu/argmax → {0,1} selectors) + dyadic weights (±2^k → shifts) means
 the *backward* is shift-add + select, the same as the forward — so it synthesizes to the
 same zero-DSP fabric. (Closure invariant audited as **DSP_MULT = 0**, not DSP=0 — DSP48s as
-adders/accumulators are allowed and wanted; `multiplier-free-not-dsp0.md`.)
+adders/accumulators are allowed and wanted; see `PC_BACKWARD_SILICON.md`.)
 
 ## The measured evidence (already on silicon / in csynth)
 
@@ -51,15 +60,14 @@ the op level (csynth) and, for an equivalent mult-free training loop, on deploye
   already refuted the digital-fabric throughput advantage (PC ≈ 0.9× async-backprop). This
   rung says the mult-free PC backward *can be built in zero-DSP hardware*, which is the
   substrate *precondition*, not a performance result.
-- **csynth ≠ a deployed PC kernel.** No fused PC-adjoint kernel has been P&R'd / AFI-built /
-  run on F2. The MuZero-train precedent shows csynth-close can fail P&R at scale. The one
-  remaining engineering confirmation is a **fused `forge_pc_wgrad` csynth** (masked-transpose
-  error-route + skip-highway fused with the dyadic-MAC PE) → expected DSP_MULT=0 by
-  composition, but not yet run. (Scoped, collision-free, ~$0.17/20min, for the FPGA
-  workstream to run.)
+- **Kernel closure ≠ training closure.** The later fused `forge_pc_wgrad` result closes
+  timing at DSP=0 and matches its fixed-point reference on F2 for one interior-layer
+  geometry. It does not include the loss, optimizer, complete model, state-settling
+  division, or a full training schedule.
 - **No kernel-isolated energy number exists.** The measured F2 Vccint (morph-LM/MuZero, ~4–9W)
   is **shell-dominated** — the DSP=0 core's dynamic draw is *below the board sensor floor*
-  ("statistically identical to idle"; `MUZERO_CHESS_FWD_AFI.md`). So the FPGA energy is a
+  ("statistically identical to idle";
+  `results/fpga_silicon/MUZERO_CHESS_FWD_AFI.md`). So the FPGA energy is a
   whole-rail *bound* (~0.074 J/inference for MuZero), **not comparable** to a GPU
   whole-board number. An energy *comparison* is therefore **not made** here — it would be
   dishonest given the measurement boundaries differ. The GPU dense-backprop baseline
@@ -70,15 +78,8 @@ the op level (csynth) and, for an equivalent mult-free training loop, on deploye
 
 ## Bottom line of Rung 5
 
-The substrate **precondition is real and measured**: the tropical-PC training backward —
-the local, weight-transport-free, multiplier-free credit assignment validated to match
-backprop in Rungs 1–2 — synthesizes to **zero-multiplier hardware**, because its two ops are
-the already-DSP=0 FPGA kernels and its routing is muxes; and an equivalent mult-free training
-loop already runs on F2 silicon. What remains to convert "realizable" into "demonstrated
-advantage" is the genuine frontier and is **not** a digital-fabric result: (1) a fused
-PC-kernel deployed + P&R'd, (2) a **kernel-isolated** energy measurement (the field's open
-problem — current board sensors can't see the DSP=0 core), and (3) the analog/in-memory
-endgame where the O(L/p) relaxation rounds become continuous-time settling. Rungs 1–5 have
-established the *carrier* end-to-end (matches backprop, async-robust, bounded round-tax,
-silicon-expressible at zero DSP); the *win* still lives one substrate beyond what any digital
-measurement — FPGA included — can show.
+The measured precondition is narrower: the internal cascade layer-step can synthesize to
+a zero-multiplier FPGA kernel, and later work verified one such kernel on F2. What remains
+is a full PC training loop with recipe-level closure, a **kernel-isolated** energy
+measurement, and the analog/in-memory investigation. The existing digital results do not
+establish an end-to-end substrate advantage.

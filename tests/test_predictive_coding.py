@@ -3,13 +3,14 @@
 Predictive coding here is a local, backprop-free learning rule. The two
 properties that matter:
 
-  1. **Closure** — a full settle + local-update step runs NO hardware multiply
-     (it is adds, compares, scatters, and power-of-two shifts). This is what
-     lets the same op map onto the multiplier-free forward kernel.
+  1. **Scoped closure** — selected tropical and dyadic recipes expose explicit
+     add/compare/scatter/shift boundaries. Tests name the exact path they cover;
+     the nudge solver's exact-D division and ordinary optimizers remain open.
   2. **It learns** — the local rule actually reduces prediction error and lifts
      classification accuracy well above chance, including at depth, where the
      unit-gain 0/1 Jacobian is supposed to keep error from vanishing.
 """
+import pytest
 import torch
 
 import tikitorch as tt
@@ -208,10 +209,12 @@ def test_dyadic_sign_product_identity_and_ternary():
             "per-sample sign(dE/dW) must equal sign(mu-x)⊕sign(x)"
 
 
-def test_dyadic_pc_multiplier_free_dyadic_matches_well():
-    """The recommended fully multiplier-free path (multiplier_free=True,
-    mf_mode='dyadic' — both operands quantized to ±2^k → shift-add weight grad)
-    trains to high accuracy, recovering the magnitude the pure sign rule loses."""
+def test_dyadic_pc_dyadic_gradient_path_matches_well():
+    """The dyadic local-gradient path trains well despite quantized operands.
+
+    The non-dyadic gamma in this fixture intentionally leaves the complete step
+    open; this test covers learning behavior, not full-recipe closure.
+    """
     from tikitorch.optim import PureTropicalSGD
     torch.manual_seed(0)
     X, Y = _blobs(300, 4, 16, seed=4)
@@ -272,7 +275,11 @@ def test_dyadic_pc_residual_gate_matches_autograd():
 
 
 def test_dyadic_pc_tropical_residual_learns():
-    """End-to-end: residual + fully multiplier-free update trains on blobs."""
+    """Residual PC with dyadic local gradients and a closed optimizer learns.
+
+    This is a learning smoke for the mapped recipe, not a physical-resource
+    certificate or an executed-op closure assertion.
+    """
     from tikitorch.optim import PureTropicalSGD
     torch.manual_seed(0)
     X, Y = _blobs(300, 4, 16, seed=5)
@@ -334,15 +341,20 @@ def test_dyadic_pc_cascade_ce_matches_autograd_sign():
 
 
 def test_dyadic_pc_cascade_trains_deep():
-    """The cascade trains a deep residual net via the fully multiplier-free path
-    (no settling). (Depth where it beats settling is MNIST-scale — see the report;
-    here a fast 12-edge blobs smoke covers the code path + learning.)"""
+    """The cascade trains a deep residual net without settling.
+
+    Internal credit/gradient routing and the optimizer are shift-add oriented;
+    the default CE loss remains an explicit open boundary. This is a fast
+    12-edge learning smoke, not a full-recipe closure assertion.
+    """
     from tikitorch.optim import PureTropicalSGD
     torch.manual_seed(0)
     X, Y = _blobs(300, 4, 16, seed=6)
     Xtr, Ytr, Xte, Yte = X[:900], Y[:900], X[900:], Y[900:]
     net = DyadicPCNet([16] + [16] * 11 + [4], residual=True)        # 12 edges
-    opt = PureTropicalSGD(net.parameters(), lr_shift=9, momentum_bits=0)
+    # The conservative 2^-10 step is stable across the supported PyTorch/BLAS
+    # matrix; 2^-9 crosses hard routing boundaries differently on older stacks.
+    opt = PureTropicalSGD(net.parameters(), lr_shift=10, momentum_bits=0)
     for _ in range(20):
         for i in range(0, 900 - 32, 32):
             net.train_step_cascade(Xtr[i:i + 32], Ytr[i:i + 32], opt)
@@ -387,24 +399,73 @@ def test_dyadic_pc_multiplier_free_sign_learns():
 # ---------------------------------------------------------------------------
 # Nudged ITERATIVE settling — the fully-local / async / distributed regime
 # ---------------------------------------------------------------------------
-def test_dyadic_pc_nudge_settling_reduces_energy():
-    """Nudged settling actually descends the energy (the output's soft pull +
-    local relaxation reach a lower-energy equilibrium than feed-forward)."""
+def test_dyadic_pc_nudge_settling_reduces_augmented_objective():
+    """Nudged settling lowers its augmented objective from feed-forward init."""
     torch.manual_seed(0)
     net = DyadicPCNet([12] + [12] * 4 + [4], residual=True)
     x = torch.randn(8, 12)
     target = net._make_target(torch.randint(0, 4, (8,)), ref=x)
+    beta = 0.5
     ff = [s.detach() for s in net.feedforward(x)]
-    ff[-1] = target                                   # energy of feed-forward + clamped readout
-    e0 = net.energy(ff).item()
-    settled = net.settle_nudge(x, target, n_sweeps=20, beta=0.5)
-    e1 = net.energy(settled).item()
-    assert e1 < e0, f"nudged settling did not reduce energy: {e0:.2f} -> {e1:.2f}"
+
+    def nudged_objective(states):
+        target_penalty = 0.5 * beta * ((states[-1] - target) ** 2).sum()
+        return net.energy(states) + target_penalty
+
+    e0 = nudged_objective(ff).item()
+    settled = net.settle_nudge(x, target, n_sweeps=20, beta=beta)
+    e1 = nudged_objective(settled).item()
+    assert e1 < e0, f"nudged settling did not reduce its objective: {e0:.2f} -> {e1:.2f}"
+
+
+def test_dyadic_pc_nudge_applies_gamma_to_each_relaxation_update():
+    """A one-edge sweep follows the documented damped fixed-point recurrence."""
+    gamma, beta = 0.125, 0.5
+    net = DyadicPCNet([2, 2], gamma=gamma)
+    x = torch.tensor([[0.5, -1.0]])
+    target = net._make_target(torch.tensor([1]), ref=x)
+    initial = net.feedforward(x)[-1]
+
+    # A depth-one sweep visits the sole free state twice (forward, then reverse).
+    equilibrium = (initial + beta * target) / (1.0 + beta)
+    expected = equilibrium + (1.0 - gamma) ** 2 * (initial - equilibrium)
+    settled = net.settle_nudge(x, target, n_sweeps=1, beta=beta)[-1]
+
+    torch.testing.assert_close(settled, expected)
+
+
+@pytest.mark.parametrize("gamma", [True, "0.125", 0.0, -0.1, 1.1, float("nan"), float("inf")])
+def test_dyadic_pc_rejects_invalid_gamma(gamma):
+    with pytest.raises(ValueError, match="gamma"):
+        DyadicPCNet([2, 2], gamma=gamma)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"n_sweeps": True}, "n_sweeps"),
+        ({"n_sweeps": -1}, "n_sweeps"),
+        ({"n_sweeps": 1.5}, "n_sweeps"),
+        ({"beta": True}, "beta"),
+        ({"beta": -0.1}, "beta"),
+        ({"beta": float("nan")}, "beta"),
+        ({"async_frac": True}, "async_frac"),
+        ({"async_frac": -0.1}, "async_frac"),
+        ({"async_frac": 1.1}, "async_frac"),
+        ({"async_frac": float("inf")}, "async_frac"),
+    ],
+)
+def test_dyadic_pc_nudge_rejects_invalid_controls(kwargs, match):
+    net = DyadicPCNet([2, 2])
+    x = torch.tensor([[0.5, -1.0]])
+    target = net._make_target(torch.tensor([1]), ref=x)
+    with pytest.raises(ValueError, match=match):
+        net.settle_nudge(x, target, **kwargs)
 
 
 def test_dyadic_pc_nudge_trains():
     """Nudged iterative settling (no global backward pass) trains via the local
-    multiplier-free weight update."""
+    multiplier-free gradient surrogate; Adam remains an explicit open boundary."""
     torch.manual_seed(0)
     X, Y = _blobs(300, 4, 16, seed=7)
     Xtr, Ytr, Xte, Yte = X[:900], Y[:900], X[900:], Y[900:]
@@ -436,8 +497,8 @@ def test_dyadic_pc_async_robust():
 
 # ---------------------------------------------------------------------------
 # Error-relaxation — the async/distributed regime that works AT SCALE
-# (state-settling settle_nudge diverges as weights grow on full datasets; the
-# error-relaxation is a triangular/nilpotent system, unconditionally stable)
+# (the archived unit-step state-settling run diverged as weights grew; corrected
+# gamma-damped scale results are pending. Error-relaxation is triangular/nilpotent.)
 # ---------------------------------------------------------------------------
 def test_dyadic_pc_error_relax_sync_matches_cascade():
     """Synchronous error-relaxation converges in one in-place pass to EXACTLY the
@@ -455,7 +516,7 @@ def test_dyadic_pc_error_relax_sync_matches_cascade():
 
 
 def test_dyadic_pc_error_relax_trains():
-    """train_step_relax (iterative error-relaxation, no global backward) learns."""
+    """Schedule-tolerant iterative error-relaxation learns."""
     torch.manual_seed(0)
     X, Y = _blobs(300, 4, 16, seed=7)
     Xtr, Ytr, Xte, Yte = X[:900], Y[:900], X[900:], Y[900:]
@@ -470,8 +531,8 @@ def test_dyadic_pc_error_relax_trains():
 
 def test_dyadic_pc_error_relax_async_robust():
     """Error-relaxation trains under the distributed conditions: partial node
-    participation + stale (lagged) reads + random order — and unlike state-settling
-    it stays stable as the weights grow."""
+    participation + stale reads + random order, unlike the archived unit-step
+    state-settling run; corrected-gamma scale behavior is not yet measured."""
     torch.manual_seed(0)
     X, Y = _blobs(300, 4, 16, seed=7)
     Xtr, Ytr, Xte, Yte = X[:900], Y[:900], X[900:], Y[900:]

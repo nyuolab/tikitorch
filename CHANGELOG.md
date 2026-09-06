@@ -63,7 +63,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   negative-data generators, goodness classifier); the models train via
   `forward_forward_fit`, not `loss.backward()`. Experiments + honest report under
   `results/forward_forward/` (`scripts/tropical_forward_forward.py`,
-  `tropical_ff_mnist_benchmark.py`, `tropical_ff_diagnostics.py`).
+  `scripts/tropical_ff_mnist_benchmark.py`, `scripts/tropical_ff_diagnostics.py`).
 - `scripts/build_fpga_local.sh` and an upgraded `examples/fpga_quickstart.py`:
   one command builds the LOCAL host-reference endpoint, while the example
   distinguishes catalog lookup, structural matching, endpoint availability,
@@ -108,16 +108,27 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   multiplier-free. Closure claims now point to concrete audit and physical-evidence
   boundaries.
 - The package export version now agrees with project metadata at `0.2.0`.
-- AWS scripts (`run_tikitorch_f2_silicon.sh`, `run_tikitorch_gpu_benchmarks.sh`)
+- AWS scripts (`scripts/run_tikitorch_f2_silicon.sh`,
+  `scripts/run_tikitorch_gpu_benchmarks.sh`)
   no longer default to any account: `AWS_PROFILE` / `KEY_NAME` / `SG` / `AGFI`
   are required env vars; the library ships no AFI (build your own).
-- `BUILD_NATIVE.md`: corrected the LOCAL build command (it was missing the
+- `tikitorch/fpga/BUILD_NATIVE.md`: corrected the LOCAL build command (it was missing the
   `-DCSIM_ONLY -DTT_KERNEL_*` defines, without which the bridge returns rc -99).
 - Distribution metadata now uses an SPDX license expression with explicit
   license files, and README links are absolute so the PyPI long description
   does not produce repository-relative broken links.
 
 ### Fixed
+- `DyadicPCNet.settle_nudge` and its research runner now apply the configured
+  relaxation factor `gamma`. Archived nudge measurements that used the former
+  effective unit step are labeled as legacy evidence and require a corrected-gamma
+  rerun before being cited as current benchmarks.
+- `pc_convrnn --strict-audit` now preserves caller/model/optimizer/RNG state,
+  applies the public no-waiver eager semantics, records `strict-eager-v2`, and
+  fails on observed division or transcendental operations instead of labeling
+  those runs `training_closed`; the G5 on-box wrapper propagates that failure
+  before launching its longer quality sweep and fails closed if its final result
+  upload cannot be confirmed.
 - Executed-path closure audits now catch fused losses, normalization, activations,
   reductions, attention, non-dyadic means, and dynamic integer arithmetic without
   inferring shift safety from coincidental tensor values. Audits restore model,
@@ -138,7 +149,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fabric workers now propagate failures and cancel bounded transports instead of
   deadlocking; MCTS handles terminal roots; logical device indices, FPGA handle
   cleanup, fallback optimizer requirements, and public export contracts are validated.
-- `prune.py` citation: the "Max-plus Operators … Pruning" paper is Zhang,
+- `tikitorch/prune.py` citation: the "Max-plus Operators … Pruning" paper is Zhang,
   Blusseau et al. (ISMM 2019), not Dimitriadis & Maragos.
 - TCP neighbour-link frames are rank-, axis-, and payload-bounded before memory
   allocation, and split-chain listeners default to loopback unless a reachable
