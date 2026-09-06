@@ -24,6 +24,10 @@ or DSP-utilization claim:
     exactly the SignSGD / ``PureTropicalSGD`` path. The per-activation gradient is
     built by *scattering* ``{-1,0,+1}`` into the top-k positions (no tensor×tensor
     multiply), mirroring :class:`tikitorch.functional.TropicalPerceptronLossFn`.
+    The reference loss returns a batch mean. A whole-step shift-only certificate
+    therefore also requires a power-of-two reduction extent (the closure examples
+    use a power-of-two batch); the auditor correctly reports a non-dyadic mean as
+    a divide.
   * **Inter-layer normalization is TROPICAL**: subtract the max,
     ``h ← h − max(h)`` (:func:`tropical_max_normalize`) — the tropical analogue of
     FF's length-normalization (it removes the magnitude the previous layer's

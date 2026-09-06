@@ -31,7 +31,12 @@ manuscripts are working research artifacts, not release guarantees.
 ## Reproducing results
 
 Begin with the relevant paper README and follow its exact commit, environment, script,
-and artifact references. Large FPGA build products may remain outside Git; the
+and artifact references. The
+[results map](https://github.com/nyuolab/tikitorch/blob/main/results/README.md)
+distinguishes the major evidence areas, and the
+[runner map](https://github.com/nyuolab/tikitorch/blob/main/scripts/README.md) explains which
+scripts are public examples versus revision-bound research tools. Large FPGA build
+products may remain outside Git; the
 [artifact manifest](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/s1_afibuild/ARTIFACTS.md)
 records retrieval locations and checksums.
 

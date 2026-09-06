@@ -20,14 +20,17 @@ or test the library — the board-dependent tests self-skip without hardware.
 
 ## Before you open a PR
 
-Run what CI runs — both must be green:
+Run the two primary local checks before opening a PR:
 
 ```bash
-python -m ruff check .  # lint
-pytest -q             # fast building-block suite: closure, exactness, gradchecks
+python -m ruff check .  # pinned in the dev extra; explicit E4/E7/E9/F rules
+pytest -q               # fast building-block suite: closure, exactness, gradchecks
 ```
 
-CI (`.github/workflows/ci.yml`) runs this on Python 3.9 through 3.12.
+CI (`.github/workflows/ci.yml`) runs lint once, the fast suite on Python 3.9 through
+3.12, and a separate Python 3.9/PyTorch 2.0/NumPy 1.24 dependency-floor lane. It also
+runs focused closure checks, C-simulation, a strict docs build, and package
+build/install checks.
 
 The end-to-end **training** tests (a tropical model learns an algorithmic task
 and generalizes) are marked `slow` and **deselected by default** — they validate
@@ -89,8 +92,9 @@ If you add a new op, layer, model, or optimizer:
 
 ## Code style
 
-- Library code under `tikitorch/` is held to the full ruff ruleset (see
-  `[tool.ruff]` in `pyproject.toml`). Keep it clean.
+- The repository uses the explicit correctness-oriented Ruff rules in
+  `[tool.ruff.lint]` in `pyproject.toml`. The dev extra pins the same Ruff release as
+  CI so lint behavior cannot drift between installations.
 - Tests, examples, notebooks, and scripts relax the pure-style rules
   (compact one-liners are fine there) but keep the bug-catching `F` rules on.
 - Match the surrounding code's idiom, naming, and comment density.
@@ -101,9 +105,9 @@ If you add a new op, layer, model, or optimizer:
 - Green CI is required. A component advertised as closed must include the
   appropriate structural, executed-path, and (when relevant) full-step tests.
 
-Please follow [GOVERNANCE.md](GOVERNANCE.md) and
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Report suspected vulnerabilities through
-the private process in [SECURITY.md](SECURITY.md), not a public issue.
+Keep discussions constructive. Report suspected vulnerabilities through a
+[private GitHub security advisory](https://github.com/nyuolab/tikitorch/security/advisories/new)
+rather than in a public issue.
 
 ## License
 

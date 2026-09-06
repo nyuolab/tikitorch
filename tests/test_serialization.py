@@ -10,12 +10,27 @@ Covers, per the API contract:
 Skip-guarded behind ``requires_model`` so the suite stays green until the
 ``tikitorch.models`` module is available, then activates automatically.
 """
+from pathlib import Path
+
 import pytest
 import torch
+import torch.nn as nn
 
 import tikitorch.models as models
 from tikitorch.serialization import save, load, ClosureManifestMismatch
 from conftest import requires_model
+
+
+class _CustomTinyModel(nn.Module):
+    """Module-level custom class used to exercise the trusted reconstruction gate."""
+
+    def __init__(self, width=3):
+        super().__init__()
+        self.width = width
+        self.weight = nn.Parameter(torch.zeros(width))
+
+    def forward(self, x):
+        return x + self.weight
 
 
 def _params_identical(a, b):
@@ -148,7 +163,7 @@ def test_manifest_mismatch_warns(tmp_path):
         # into a hand-built instance instead to isolate the manifest check.
         boundary = models.TropicalCNN(in_channels=1, num_classes=10, head_type="linear")
         # hand the saved (closed) manifest a model with a different (open) graph:
-        ckpt = torch.load(path, weights_only=False)
+        ckpt = torch.load(path, weights_only=True)
         ckpt["state_dict"] = boundary.state_dict()  # make load_state_dict succeed
         torch.save(ckpt, path)
         load(path, model=boundary)
@@ -186,3 +201,52 @@ def test_load_into_instance_ignores_missing_class(tmp_path):
                                         input_dim=1, num_classes=3)
     load(path, model=target)
     _params_identical(model, target)
+
+
+def test_checkpoint_uses_restricted_weights_only_loader(tmp_path, monkeypatch):
+    """Metadata/state bundles do not need unrestricted pickle deserialization."""
+    model = models.TropicalCNN(in_channels=1, num_classes=3)
+    path = tmp_path / "safe.pt"
+    save(model, path, config=dict(in_channels=1, num_classes=3))
+
+    real_load = torch.load
+    calls = []
+
+    def checked_load(*args, **kwargs):
+        calls.append(kwargs.get("weights_only"))
+        return real_load(*args, **kwargs)
+
+    monkeypatch.setattr(torch, "load", checked_load)
+    load(path)
+    assert calls == [True]
+
+
+def test_custom_class_requires_instance_or_explicit_trust(tmp_path):
+    model = _CustomTinyModel(width=4)
+    path = tmp_path / "custom.pt"
+    save(model, path, config={"width": 4})
+
+    with pytest.raises(ValueError, match="custom model class"):
+        load(path)
+
+    target = _CustomTinyModel(width=4)
+    assert load(path, model=target) is target
+    rebuilt = load(path, trusted=True)
+    assert isinstance(rebuilt, _CustomTinyModel)
+
+
+def test_rejects_unknown_format_version(tmp_path):
+    path = tmp_path / "future.pt"
+    torch.save({"format_version": 999, "state_dict": {}}, path)
+    with pytest.raises(ValueError, match="format_version"):
+        load(path, model=_CustomTinyModel())
+
+
+@pytest.mark.parametrize("unsafe_value", [Path("weights"), nn.ReLU])
+def test_save_rejects_config_its_restricted_loader_cannot_decode(
+    tmp_path, unsafe_value
+):
+    path = tmp_path / "unsafe-config.pt"
+    with pytest.raises(TypeError, match="configuration must use only"):
+        save(_CustomTinyModel(), path, config={"unsafe": unsafe_value})
+    assert not path.exists()

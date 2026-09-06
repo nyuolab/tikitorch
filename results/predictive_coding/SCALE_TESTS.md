@@ -246,7 +246,7 @@ Tiny-ImageNet) and measured deploy energy.
 ## Reproduce
 
 ```
-export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+export AWS_PROFILE=my-profile
 PC_TASK=mnist bash scripts/run_pc_scale_gpu.sh launch          # Phase 0 baseline
 PC_TASK=mnist PC_ARGS="--residual --depths 8 16 32 --modes cascade bp_dyadic bp_float --epochs 8" \
   bash scripts/run_pc_scale_gpu.sh launch                      # Phase 0b depth-fix

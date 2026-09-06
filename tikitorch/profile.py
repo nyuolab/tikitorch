@@ -9,9 +9,9 @@ you paste in: *how many hardware multiplies does this thing actually do?*
     scans the module tree for standard ``torch.nn`` layers that carry a
     data-dependent multiply/divide (``nn.Linear``, ``nn.Conv2d``, ...).
   * **Runtime closure** — :func:`~tikitorch.audit.find_runtime_multiplies`
-    (only when ``example_inputs`` is given) traces a real forward pass and flags
-    every multiply/transcendental ATen op a custom ``forward`` actually runs
-    (power-of-two multiplies/divides are bit-shifts, not multipliers).
+    (only when ``example_inputs`` is given) traces a real forward pass and applies
+    the auditor's conservative registry to multiply/divide, fused-arithmetic, and
+    transcendental ATen ops (nonzero power-of-two scalar factors are shifts).
   * **Param count** — trainable parameters.
   * **Hardware estimate** — if the model exposes ``hardware_cost(...)`` (the
     optional hardware-cost accounting) its DSP/LUT/BRAM numbers are folded in.
@@ -78,18 +78,19 @@ def profile_model(model: nn.Module, example_inputs=None) -> dict:
             If ``None`` only the structural scan + param/hardware report run.
 
     Returns a dict with keys:
-        ``multiplications`` — the headline integer: number of hardware multiply
-            sources detected. ``0`` iff the model is closed (no structural
-            violation and, when traced, no runtime multiply).
+        ``multiplications`` — the backwards-compatible headline integer: number
+            of classified arithmetic closure violations. This includes runtime
+            transcendental operations as well as multiply/divide sources, so
+            ``0`` iff the inspected path is closed.
         ``closed`` — bool, ``multiplications == 0``.
         ``structural_violations`` — ``[(module_path, type_name), ...]``.
         ``runtime_multiplies`` — ``[(category, op_name), ...]`` (only the genuine
             multiply categories; transcendental soft-relaxation ops are reported
             separately under ``runtime_transcendental``). Empty list if traced and
             clean; ``None`` if no ``example_inputs`` were given.
-        ``runtime_transcendental`` — ``[(category, op_name), ...]`` soft tau>0
-            exp/log ops (training-time aids, anneal to tau=0 for deploy), or
-            ``None`` if untraced.
+        ``runtime_transcendental`` — ``[(category, op_name), ...]`` exp/log-like
+            ops (soft-routing aids when produced by a relaxation, but still
+            closure violations on the inspected path), or ``None`` if untraced.
         ``param_count`` / ``trainable_params`` — parameter counts.
         ``hardware`` — the ``HardwareCostProfile.summary()`` dict, or ``None``.
     """
@@ -107,11 +108,12 @@ def profile_model(model: nn.Module, example_inputs=None) -> dict:
         transcendental = [(c, op) for c, op in hits if c == "transcendental"]
 
     # Headline: a model is "closed" iff the structural scan is clean AND, where we
-    # traced it, the runtime trace found no genuine multiply. The integer is the
-    # count of distinct multiply sources (structural modules + runtime ops);
-    # transcendental soft-relaxation ops are reported but do NOT count as a
-    # hardware multiply for the headline (they vanish at tau=0).
-    mult = len(structural) + (len(runtime) if runtime is not None else 0)
+    # traced it, the runtime trace found no classified arithmetic. Transcendentals
+    # count too: hardening removes a supported soft relaxation, but a raw exp/log
+    # in a model without such a hook must never receive a closed=True report.
+    mult = len(structural)
+    if runtime is not None:
+        mult += len(runtime) + len(transcendental)
 
     trainable, total = _param_count(model)
     cost = _hardware_cost(model)
@@ -165,9 +167,7 @@ def format_report(report: dict) -> str:
 
     trans = report["runtime_transcendental"]
     if trans:
-        lines.append(
-            f"runtime transcendental ({len(trans)}, soft tau>0 — anneal to tau=0 for deploy):"
-        )
+        lines.append(f"runtime transcendental closure violations ({len(trans)}):")
         for cat, op in trans:
             lines.append(f"    {cat}: {op}")
 

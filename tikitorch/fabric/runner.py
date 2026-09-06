@@ -85,12 +85,31 @@ class PipelineRunner:
                  schedule: str = "gpipe"):
         if len(stages) != len(links):
             raise ValueError("stages and links must be the same length")
+        if not stages:
+            raise ValueError("a pipeline needs at least one stage")
         if schedule not in ("gpipe", "1f1b"):
             raise ValueError("schedule must be 'gpipe' or '1f1b'")
+        if not np.isfinite(lr) or lr < 0:
+            raise ValueError("lr must be a finite non-negative number")
+        if isinstance(window, bool) or int(window) != window or int(window) < 1:
+            raise ValueError("window must be a positive integer")
+        required = ("params", "forward", "backward")
+        for index, stage in enumerate(stages):
+            missing = [name for name in required if not hasattr(stage, name)]
+            if missing:
+                raise TypeError(
+                    f"stage {index} is missing required attributes: {', '.join(missing)}"
+                )
+        for index, (stage, link) in enumerate(zip(stages, links)):
+            if link.is_last and not hasattr(stage, "loss_error"):
+                raise TypeError(
+                    f"final stage {index} must define "
+                    "loss_error(tag, output, target)"
+                )
         self.stages = stages
         self.links = links
         self.lr = float(lr)
-        self.window = max(1, int(window))
+        self.window = int(window)
         self.schedule = schedule
         self.S = len(stages)
         # per-stage weight version + per-(stage,tag) version snapshots for staleness
@@ -121,6 +140,10 @@ class PipelineRunner:
             e_out = link.recv_backward(k)
         self._ver_at_bwd[l][k] = self._version[l]
         grads, e_in = stage.backward(k, e_out)
+        if len(grads) != len(acc):
+            raise ValueError(
+                f"stage {l} returned {len(grads)} gradients for {len(acc)} parameters"
+            )
         link.send_backward(k, e_in)
         for i in range(len(acc)):
             acc[i] += grads[i]
@@ -142,6 +165,54 @@ class PipelineRunner:
             n += 1
             if n == self.window or k == M - 1:
                 self._apply(l, acc, n); n = 0
+
+    def _abort_links(self):
+        for link in self.links:
+            abort = getattr(link, "abort", None)
+            if callable(abort):
+                try:
+                    abort()
+                except Exception:  # noqa: BLE001 — preserve the worker's root cause
+                    pass
+
+    def _run_workers(self, worker, inputs, targets, M):
+        """Run stage threads and propagate the first failure without hanging peers."""
+        errors = []
+        error_lock = threading.Lock()
+
+        def guarded(l):
+            try:
+                worker(l, inputs, targets, M)
+            except BaseException as exc:  # noqa: BLE001 — re-raised on the caller thread
+                with error_lock:
+                    if not errors:
+                        errors.append((l, exc))
+                self._abort_links()
+
+        threads = [
+            threading.Thread(target=guarded, args=(l,), daemon=True)
+            for l in range(self.S)
+        ]
+        for thread in threads:
+            thread.start()
+
+        while any(thread.is_alive() for thread in threads):
+            for thread in threads:
+                thread.join(timeout=0.05)
+            if errors:
+                self._abort_links()
+                # Built-in links wake promptly. A custom link that ignores abort
+                # must not make the caller hang forever; daemon workers are abandoned.
+                deadline = time.monotonic() + 1.0
+                while any(thread.is_alive() for thread in threads) and time.monotonic() < deadline:
+                    for thread in threads:
+                        thread.join(timeout=0.05)
+                break
+
+        if errors:
+            l, first = errors[0]
+            stage_id = getattr(self.links[l], "stage", l)
+            raise RuntimeError(f"pipeline stage {stage_id} failed: {first!r}") from first
 
     # -- 1F1B schedule: warmup forwards, then interleave 1F+1B, then drain backwards ----
     # Stage l keeps (S-l) microbatches in flight, so its backward lands ~(S-1-l) applies
@@ -167,26 +238,35 @@ class PipelineRunner:
         """inputs[k], targets[k] are the per-microbatch input / target. Returns a
         RunResult with the measured losses, overlap, staleness, and link stats."""
         M = len(inputs)
-        # feed the input stage up-front (queues buffer the forward wavefront)
-        for k in range(M):
-            self.links[0].feed_forward(k, inputs[k])
+        if len(targets) != M:
+            raise ValueError(
+                f"inputs and targets must have the same length, got {M} and {len(targets)}"
+            )
+        if not self.links[0].is_first or not self.links[-1].is_last:
+            raise ValueError(
+                "PipelineRunner.run() requires a complete chain from the first through "
+                "the last stage; use run_chain_segment() for a split TCP segment"
+            )
+        if any(link.stage != index or link.num_stages != self.S
+               for index, link in enumerate(self.links)):
+            raise ValueError("links must be ordered stage 0..N-1 for a complete pipeline")
+
+        self._losses.clear()
+        for snapshots in (self._ver_at_fwd, self._ver_at_bwd):
+            for snapshot in snapshots:
+                snapshot.clear()
         worker = self._worker_1f1b if self.schedule == "1f1b" else self._worker_gpipe
-        threads = [
-            threading.Thread(target=worker, args=(l, inputs, targets, M))
-            for l in range(self.S)
-        ]
         for lk in self.links:                          # double-buffer transport threads (no-op if off)
             if hasattr(lk, "start_transport"):
                 lk.start_transport()
         t0 = time.perf_counter()
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-        wall = time.perf_counter() - t0
-        for lk in self.links:                          # when stages join, all messages are delivered
-            if hasattr(lk, "stop_transport"):
-                lk.stop_transport()
+        try:
+            self._run_workers(worker, inputs, targets, M)
+        finally:
+            wall = time.perf_counter() - t0
+            for lk in self.links:                      # drain async transport workers
+                if hasattr(lk, "stop_transport"):
+                    lk.stop_transport()
 
         # staleness = how many weight-applies landed between a microbatch's fwd and bwd
         per_stage = []

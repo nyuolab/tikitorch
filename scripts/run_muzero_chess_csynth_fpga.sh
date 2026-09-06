@@ -6,7 +6,7 @@
 # instance with the FPGA Developer AMI (Ubuntu, Vitis pre-installed) — NOT an F2 (F2 is only needed for
 # AFI loading on real silicon, which is gated behind a strength result).
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_muzero_chess_csynth_fpga.sh launch     # build src -> S3 -> launch FPGA-dev box
 #   bash scripts/run_muzero_chess_csynth_fpga.sh status      # poll S3 (no SSH)
 #   bash scripts/run_muzero_chess_csynth_fpga.sh fetch       # download the chess csynth reports

@@ -16,7 +16,7 @@
 #       steps (acc + wcrc + tok/s per kick, all fwd+bwd+signsgd on fabric).
 # NEVER touches tiki-f2-silicon (launches its OWN f2.6xlarge).
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_morph_lm_d512_verify_f2.sh {launch|status|fetch|terminate}
 set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"

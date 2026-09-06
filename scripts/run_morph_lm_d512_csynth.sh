@@ -27,7 +27,7 @@
 # the working tree with `git stash create` (produces a commit object WITHOUT touching the index or
 # working tree) and archive THAT — falling back to HEAD only if the tree is clean.
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_morph_lm_d512_csynth.sh launch      # ML_D=512 by default; ML_D=256 bash ... to sweep
 #   bash scripts/run_morph_lm_d512_csynth.sh status       # / fetch / terminate
 #   DRY_RUN=1 bash scripts/run_morph_lm_d512_csynth.sh launch   # render user-data, no EC2

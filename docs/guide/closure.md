@@ -48,7 +48,8 @@ It covers only the branch, shapes, dtypes, device, and mode that actually execut
 
 By default, compatible models are hardened through `set_tau(0.0)` during this check.
 That is useful for inspecting a deploy graph, but it is not evidence that the soft
-training graph is closed.
+training graph is closed. Hardening and evaluation mode are temporary: model state and
+PyTorch RNG state are restored when the audit ends.
 
 ## 3. Full training-step tracing
 
@@ -75,7 +76,9 @@ assert_training_closed(
 This check executes forward, loss, backward, and optionally `optimizer.step()`. It is
 the appropriate software test for a learning-loop claim. Ordinary cross-entropy,
 soft routing, dropout rescaling, dense heads, ordinary normalization, and adaptive
-optimizer paths can introduce operations outside the closed subset.
+optimizer paths can introduce operations outside the closed subset. Parameters,
+gradients, buffers, optimizer state, module mode, and PyTorch RNG state are restored
+after the check. External side effects in user callables cannot be rolled back.
 
 [`closure_report`](../api/audit.md) gathers the available checks into one dictionary:
 

@@ -16,6 +16,11 @@ are not yet a clean-checkout TikiTorch reproduction. Submission tables must be r
 from append-only native TikiTorch runs and must disclose both packed payload and portable
 serialized-plus-boundary accounting.
 
+Some immutable raw fields therefore retain their original local hostname, absolute path,
+or former `ontogenic_learner` command. Treat those strings as historical provenance, not
+portable commands; new TikiTorch-native records should use repository-relative paths and
+non-personal host labels.
+
 At the current loss-inclusive boundary, logits and targets are added to both
 the checkpoint and portable-certificate sides, giving 1.69x, 2.48x, and 2.79x.
 Payload-only supplied-cotangent ratios (2.04x, 2.81x, and 2.98x) are coding

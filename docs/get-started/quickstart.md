@@ -38,6 +38,34 @@ This sample demonstrates interoperability, not physical multiplier-free closure.
 `compute_loss` uses the model's task loss, and a default model can contain soft-routing
 or other recipe-dependent boundaries.
 
+## Audit and replay one hard route
+
+The smallest end-to-end demonstration of TikiTorch's unusual tooling is a hard
+min-plus operator whose executed path can be audited and whose winner choices can be
+packed for selected-VJP replay:
+
+```python
+layer = tt.nn.TropicalLinear(4, 3, use_softmin=False, tau=0.0)
+x = torch.tensor([[1.0, -2.0, 0.5, 3.0]])
+
+report = tt.closure_report(layer, x)
+assert report["inference_closed"]
+output, route = tt.autodiff.min_plus(x, layer.weight, layer.bias)
+
+tape = tt.autodiff.PackedRouteTape()
+tape.append("winner", route, cardinality=x.shape[-1])
+replayed_dx, _, _ = tt.autodiff.min_plus_vjp(
+    torch.ones_like(output), tape.read("winner"), x.shape[-1]
+)
+
+print(report["inference_closed"], tape.nbytes, replayed_dx)
+```
+
+The complete deterministic example is
+[`examples/closure_workflow.py`](https://github.com/nyuolab/tikitorch/blob/main/examples/closure_workflow.py).
+This is an operator-scoped certificate for the supplied output cotangent, not a claim
+about arbitrary PyTorch graphs or physical hardware.
+
 ## Inspect closure at the right level
 
 Closure belongs to an executed recipe, not to the package name. Begin with a report:
@@ -50,9 +78,10 @@ print(report["inference"])
 print(report["inference_closed"])
 ```
 
-The report hardens models exposing `set_tau` by default and inspects the representative
-input path supplied here. It does not inspect unexecuted branches or prove anything
-about a synthesized build.
+The report temporarily hardens models exposing `set_tau` by default and inspects the
+representative input path supplied here. Model/optimizer state and PyTorch RNG state
+are restored after auditing. It does not inspect unexecuted branches, undo external
+side effects in user code, or prove anything about a synthesized build.
 
 For a full training-step audit, pass an explicit loss function and optimizer:
 
@@ -85,7 +114,11 @@ model.load_state_dict(torch.load("morphssm.pt", weights_only=True))
 ```
 
 TikiTorch also provides [`tt.save` and `tt.load`](../api/serialization.md) for its own
-model bundle format.
+model bundle format. Bundles are decoded with `weights_only=True`; built-in
+`tikitorch.models` classes can reconstruct automatically. For a custom class, pass an
+already constructed `model=` (recommended). The opt-in `trusted=True` custom-class
+reconstruction can execute checkpoint-selected imports and constructors and must never
+be used with an untrusted artifact.
 
 ## Continue learning
 

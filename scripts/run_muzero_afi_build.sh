@@ -5,7 +5,7 @@
 # runners: source->S3, IAM instance-profile, shutdown backstop, self-terminate, NO SSH. Streams the build log
 # to S3 continuously so a synth failure (~20 min, FAIL-FAST before the ~3h P&R) is diagnosable without SSH.
 # AFI registration (create-fpga-image) is done separately from the dev box (this box only produces the tarball).
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_muzero_afi_build.sh launch      # build src -> S3 -> launch z1d build box
 #   bash scripts/run_muzero_afi_build.sh status        # poll S3 (no SSH)
 #   bash scripts/run_muzero_afi_build.sh fetch          # download to_aws tarball + reports

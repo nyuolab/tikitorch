@@ -29,7 +29,9 @@ from tikitorch.planning.muzero.games import (  # noqa: F401
 try:
     from tikitorch.planning.muzero.chess_game import Chess  # noqa: F401
     _HAS_CHESS = True
-except ImportError:                                          # pragma: no cover
+except ModuleNotFoundError as exc:                           # pragma: no cover
+    if exc.name != "chess":
+        raise
     Chess = None
     _HAS_CHESS = False
 from tikitorch.planning.muzero.replay import Game, ReplayBuffer  # noqa: F401
@@ -47,12 +49,10 @@ __all__ = [
     "DenseMuZeroNet",
     "TicTacToe",
     "Connect4",
-    "Chess",
     "TwoPlayerKnownModel",
     "BoardGameModel",
     "AlphaZeroBoardModel",
     "random_opening",
-    "BoardGameModel",
     "negamax_agent",
     "play_match",
     "play_board_game",
@@ -65,3 +65,6 @@ __all__ = [
     "BoardReplay",
     "BoardMuZero",
 ]
+
+if _HAS_CHESS:
+    __all__.append("Chess")

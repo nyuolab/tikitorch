@@ -5,8 +5,8 @@ For each model and each supported ``task_type`` we check:
   * compute_loss is a finite scalar and backward populates gradients,
   * param_count is a positive int.
 
-All tests are skip-guarded behind ``requires_model`` so the suite stays green
-until the ``tikitorch.models`` module is available, then activates automatically.
+The public ``tikitorch.models`` module is required in a release checkout. The
+``requires_model`` markers make each test's symbol dependency explicit.
 """
 import pytest
 import torch

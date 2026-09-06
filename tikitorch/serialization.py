@@ -9,7 +9,12 @@ The manifest is not a proof of graph identity or physical zero-DSP execution. It
 records the output of :func:`tikitorch.audit.find_closure_violations`, a structural
 deny-list scan, and detects changes in that classification after reconstruction.
 
-A checkpoint is a single ``torch.save`` dict with four keys:
+A checkpoint is a single ``torch.save`` dict containing tensors and simple metadata.
+It is loaded with PyTorch's restricted ``weights_only=True`` unpickler.  Built-in
+models can be reconstructed automatically; custom classes must either be supplied
+as an existing ``model=`` instance or explicitly opt into trusted class import.
+
+The principal keys are:
 
     ``"class"``     — ``{"module": ..., "qualname": ...}``, the import path of the
                       model class so :func:`load` can reconstruct it.
@@ -34,7 +39,7 @@ Idiomatic usage::
                                           task_type="classification", num_classes=10))
 
     # Reconstruct from the checkpoint alone (class + config are stored):
-    reloaded = tt.load("ckpt.pt")
+    reloaded = tt.load("ckpt.pt")  # built-in TikiTorch model
 
     # Or the common torch pattern — load weights into an existing instance:
     m = tt.models.TropicalTransformer(d_model=64, n_heads=4, n_layers=2,
@@ -43,6 +48,7 @@ Idiomatic usage::
 """
 import importlib
 import warnings
+from collections.abc import Mapping
 
 import torch
 import torch.nn as nn
@@ -53,6 +59,7 @@ __all__ = ["save", "load", "ClosureManifestMismatch"]
 
 # Bump if the on-disk layout ever changes (kept in the dict for forward-compat).
 _FORMAT_VERSION = 1
+_SAFE_CONFIG_SCALARS = (type(None), bool, int, float, str)
 
 
 class ClosureManifestMismatch(UserWarning):
@@ -63,6 +70,51 @@ class ClosureManifestMismatch(UserWarning):
     loaded. Matching manifests establish only matching structural-audit output;
     they do not establish graph identity or physical closure.
     """
+
+
+def _normalise_safe_config(value, path="config", *, top_level=True):
+    """Copy constructor metadata into the bundle's restricted safe grammar.
+
+    ``torch.load(weights_only=True)`` intentionally rejects arbitrary Python
+    objects. Validate before writing so :func:`save` cannot create a bundle its
+    paired loader cannot decode. The grammar is JSON-like but preserves tuples:
+    primitive scalars, lists/tuples, and mappings with primitive keys. Constructor
+    keyword names at the top level must be strings.
+    """
+    if top_level and not isinstance(value, Mapping):
+        raise TypeError(f"{path} must be a mapping of constructor keyword arguments")
+    if type(value) in _SAFE_CONFIG_SCALARS:
+        return value
+    if isinstance(value, Mapping):
+        normalised = {}
+        for key, item in value.items():
+            if top_level and type(key) is not str:
+                raise TypeError(
+                    f"{path} keys must be strings naming constructor arguments; "
+                    f"got {type(key).__name__}"
+                )
+            if type(key) not in _SAFE_CONFIG_SCALARS:
+                raise TypeError(
+                    f"{path} contains unsupported key type {type(key).__name__}"
+                )
+            normalised[key] = _normalise_safe_config(
+                item, f"{path}[{key!r}]", top_level=False
+            )
+        return normalised
+    if type(value) is list:
+        return [
+            _normalise_safe_config(item, f"{path}[{index}]", top_level=False)
+            for index, item in enumerate(value)
+        ]
+    if type(value) is tuple:
+        return tuple(
+            _normalise_safe_config(item, f"{path}[{index}]", top_level=False)
+            for index, item in enumerate(value)
+        )
+    raise TypeError(
+        f"{path} contains unsupported {type(value).__name__}; TikiTorch bundle "
+        "configuration must use only primitive scalars, lists, tuples, and mappings"
+    )
 
 
 def _snapshot_simple_attrs(model: nn.Module) -> dict:
@@ -105,11 +157,14 @@ def save(model: nn.Module, path, config: dict = None) -> dict:
     Returns the checkpoint dict that was written (handy for inspection/testing).
     """
     cls = type(model)
+    safe_config = _normalise_safe_config(
+        config if config is not None else _snapshot_simple_attrs(model)
+    )
     checkpoint = {
         "format_version": _FORMAT_VERSION,
         "class": {"module": cls.__module__, "qualname": cls.__qualname__},
         "state_dict": model.state_dict(),
-        "config": dict(config) if config is not None else _snapshot_simple_attrs(model),
+        "config": safe_config,
         # Provenance flag: was the config the user's explicit kwargs, or a snapshot?
         "config_is_explicit": config is not None,
         # Structural audit snapshot; an empty list is necessary, not sufficient,
@@ -121,7 +176,13 @@ def save(model: nn.Module, path, config: dict = None) -> dict:
 
 
 def _resolve_class(module_name: str, qualname: str):
-    """Import ``module_name`` and walk ``qualname`` (dotted) to the class object."""
+    """Import ``module_name`` and walk ``qualname`` (dotted) to the class object.
+
+    This is deliberately kept behind ``load(..., trusted=True)``. Importing a
+    checkpoint-selected module and invoking a checkpoint-selected constructor can
+    execute code even when the checkpoint itself was decoded by the restricted
+    tensor unpickler.
+    """
     mod = importlib.import_module(module_name)
     obj = mod
     for part in qualname.split("."):
@@ -129,16 +190,41 @@ def _resolve_class(module_name: str, qualname: str):
     return obj
 
 
-def load(path, model: nn.Module = None, config: dict = None, map_location="cpu"):
+def _resolve_builtin_model(module_name: str, qualname: str):
+    """Resolve an exact public ``tikitorch.models`` class without arbitrary import."""
+    if module_name != "tikitorch.models" or "." in qualname:
+        return None
+
+    # Import the fixed, package-owned namespace rather than the module named by the
+    # checkpoint.  Then verify both identity fields so aliases cannot broaden the
+    # automatic-reconstruction allowlist accidentally.
+    from tikitorch import models
+
+    obj = getattr(models, qualname, None)
+    if not isinstance(obj, type) or not issubclass(obj, nn.Module):
+        return None
+    if obj.__module__ != module_name or obj.__qualname__ != qualname:
+        return None
+    if qualname not in getattr(models, "__all__", ()):
+        return None
+    return obj
+
+
+def load(path, model: nn.Module = None, config: dict = None, map_location="cpu", *,
+         trusted: bool = False):
     """Load a checkpoint written by :func:`save`.
 
     Two modes, mirroring the common torch patterns:
 
       * **Into an existing instance** — pass ``model``. Its ``load_state_dict`` is
         called (you built the architecture yourself; this just restores weights).
-      * **Reconstruct from scratch** — omit ``model``. The class is re-imported from
-        the saved ``(module, qualname)`` and instantiated with the saved ``config``
-        (overridable via the ``config`` argument), then the state_dict is loaded.
+      * **Reconstruct a built-in model** — omit ``model``. Public classes from the
+        fixed :mod:`tikitorch.models` namespace are resolved from an allowlist and
+        instantiated with the saved ``config`` (overridable via ``config``).
+      * **Reconstruct a custom class** — pass ``trusted=True``. This permits the
+        checkpoint metadata to select a Python module and constructor. Use it only
+        for a checkpoint whose origin and integrity you trust. Prefer passing an
+        existing ``model=`` instance for custom classes.
 
     In both modes the structural closure manifest is recomputed on the loaded
     model and compared to the one stored at save time; a mismatch emits a
@@ -150,13 +236,16 @@ def load(path, model: nn.Module = None, config: dict = None, map_location="cpu")
         config: constructor-kwargs override used only in the reconstruct path; merged
             over the saved config (saved values are the base, ``config`` wins).
         map_location (Any): forwarded to ``torch.load`` (default ``"cpu"``).
+        trusted: permit checkpoint-selected import and construction for classes outside
+            the built-in model allowlist. This can execute Python code and must never
+            be enabled for an untrusted artifact. It is unnecessary with ``model=``.
 
     Returns the loaded model.
     """
-    # weights_only=False: the checkpoint is a plain dict of metadata + a state_dict
-    # (no arbitrary code), but it contains non-tensor python objects (the class
-    # path / config / manifest) that the new default tensor-only unpickler rejects.
-    checkpoint = torch.load(path, map_location=map_location, weights_only=False)
+    # TikiTorch's format consists only of tensors plus primitive containers/metadata,
+    # all accepted by PyTorch's restricted loader. Validation below therefore happens
+    # before any checkpoint-selected import or constructor is considered.
+    checkpoint = torch.load(path, map_location=map_location, weights_only=True)
 
     if not isinstance(checkpoint, dict) or "state_dict" not in checkpoint:
         raise ValueError(
@@ -164,8 +253,15 @@ def load(path, model: nn.Module = None, config: dict = None, map_location="cpu")
             "Was it written by tikitorch.serialization.save?"
         )
 
+    format_version = checkpoint.get("format_version")
+    if format_version != _FORMAT_VERSION:
+        raise ValueError(
+            f"unsupported TikiTorch checkpoint format_version {format_version!r}; "
+            f"this release supports {_FORMAT_VERSION}"
+        )
+
     state_dict = checkpoint["state_dict"]
-    saved_config = checkpoint.get("config", {}) or {}
+    saved_config = _normalise_safe_config(checkpoint.get("config", {}) or {})
 
     if model is None:
         # Reconstruct path: re-import the class and instantiate it from the config.
@@ -175,7 +271,26 @@ def load(path, model: nn.Module = None, config: dict = None, map_location="cpu")
                 f"{path!r} has no 'class' info; cannot reconstruct the model. "
                 "Pass an existing `model=` instance to load weights into instead."
             )
-        cls = _resolve_class(cls_info["module"], cls_info["qualname"])
+        try:
+            module_name = str(cls_info["module"])
+            qualname = str(cls_info["qualname"])
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"{path!r} has malformed 'class' metadata") from exc
+
+        cls = _resolve_builtin_model(module_name, qualname)
+        if cls is None:
+            if not trusted:
+                raise ValueError(
+                    f"{path!r} names custom model class {module_name}.{qualname}; "
+                    "pass an existing `model=` instance (recommended), or set "
+                    "`trusted=True` only if you trust the checkpoint's origin and "
+                    "integrity and intend to permit its selected import/constructor"
+                )
+            cls = _resolve_class(module_name, qualname)
+        if not isinstance(cls, type) or not issubclass(cls, nn.Module):
+            raise ValueError(
+                f"checkpoint class {module_name}.{qualname} is not a torch.nn.Module class"
+            )
         merged_config = dict(saved_config)
         if config is not None:
             merged_config.update(config)

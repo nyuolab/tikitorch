@@ -58,7 +58,8 @@ class GridWorldNav:
                     self.goal = (r, c)
                 elif ch == "S":
                     self.start = (r, c)
-        assert self.goal is not None, "grid needs a goal 'G'"
+        if self.goal is None:
+            raise ValueError("grid needs a goal 'G'")
         # Enumerate non-wall cells as states.
         self.cells = [(r, c) for r in range(self.H) for c in range(self.W)
                       if (r, c) not in self.walls]
@@ -161,15 +162,21 @@ class KnownModel:
             lambda s: torch.full((self.A,), 1.0 / self.A))
 
     def initial_inference(self, state):
+        terminal = bool(
+            hasattr(self.env, "is_terminal_state")
+            and self.env.is_terminal_state(state)
+        )
         return Inference(state=state, reward=0.0,
-                         policy=self.prior_fn(state), value=float(self.value_fn(state)))
+                         policy=self.prior_fn(state), value=float(self.value_fn(state)),
+                         legal=[] if terminal else None)
 
     def recurrent_inference(self, state, action):
         ns, reward, done = self.env.step_state(state, action)
         # A terminal successor has value 0 (no further reward).
         value = 0.0 if done else float(self.value_fn(ns))
         return Inference(state=ns, reward=float(reward),
-                         policy=self.prior_fn(ns), value=value), done
+                         policy=self.prior_fn(ns), value=value,
+                         legal=[] if done else None), done
 
 
 # A small default map used by tests / smoke runs.

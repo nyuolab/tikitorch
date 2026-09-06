@@ -5,7 +5,7 @@
 # spending a 3-4h P&R. Same robust pattern as run_muzero_chess_csynth_fpga.sh: source->S3, IAM
 # instance-profile, shutdown backstop, self-terminate, NO SSH. Cheap z1d + FPGA Dev AMI (no FPGA hardware
 # needed to read the HDK).
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_f2_hdk_probe.sh launch    # set up HDK on a box -> dump interface -> S3 -> self-terminate
 #   bash scripts/run_f2_hdk_probe.sh status     # poll S3 (no SSH)
 #   bash scripts/run_f2_hdk_probe.sh fetch       # download the dumped HDK interface files

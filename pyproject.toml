@@ -9,7 +9,7 @@ description = "PyTorch-shaped infrastructure for tropical and hard-routed deep l
 readme = "README.md"
 requires-python = ">=3.9"
 license = "GPL-3.0-or-later"
-license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 authors = [
     { name = "RespectableGlioma (EKO)" },
 ]
@@ -37,14 +37,14 @@ classifiers = [
 ]
 dependencies = [
     "torch>=2.0",
-    "numpy",
+    "numpy>=1.24",
 ]
 
 [project.optional-dependencies]
 # scipy powers tikitorch.geometry.newton_polytope (convex hull); it is optional
 # at runtime (the util degrades to a warning) but required to exercise the
 # geometry tests, so it ships in the dev extra.
-dev = ["pytest", "ruff", "scipy"]
+dev = ["pytest>=7.4", "ruff==0.13.0", "scipy>=1.10"]
 # The FPGA Python namespace uses ctypes from the standard library, so this marker
 # extra intentionally adds no pip dependencies. Building a native driver or reproducing
 # the complete HLS/HDK path requires a source checkout, compatible AWS/Xilinx tooling,
@@ -90,6 +90,13 @@ tikitorch = [
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+required-version = "==0.13.0"
+
+[tool.ruff.lint]
+# Keep CI's lint contract explicit. These are Ruff's established default
+# correctness rules; style-only rule families can be adopted deliberately in a
+# dedicated cleanup instead of appearing when Ruff changes its defaults.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.lint.per-file-ignores]
 # __init__.py files curate the public API by re-importing symbols. The package root

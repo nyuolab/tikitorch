@@ -5,7 +5,7 @@
 # run_mzgeneral_chess_gpu.sh. Ships only committed files (git archive HEAD), runs the
 # selected experiment on one A10G, streams JSONL results to S3, self-terminates.
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   PC_TASK=mnist bash scripts/run_pc_scale_gpu.sh launch | status | fetch | terminate
 #   (PC_TASK=cifar for Phase 1;  DRY_RUN=1 to render user-data without launching)
 set -euo pipefail

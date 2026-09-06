@@ -51,7 +51,7 @@ def make_task(n: int, seq_len: int, n_classes: int, seed: int = 0):
     return x.unsqueeze(-1), y
 
 
-def build_model(d_model, n_layers, tau, tropical_proj):
+def build_model(d_model, n_layers, tau, out_proj_type):
     return tt.models.MorphSSM(
         d_model=d_model,
         n_layers=n_layers,
@@ -60,7 +60,7 @@ def build_model(d_model, n_layers, tau, tropical_proj):
         num_classes=4,
         tau=tau,
         use_soft=(tau > 0),
-        tropical_proj=tropical_proj,
+        out_proj_type=out_proj_type,
     )
 
 
@@ -131,20 +131,20 @@ def main():
 
     # Ablation ladder: ordinary corner -> increasingly constrained candidates.
     configs = [
-        # name,                      optimizer,        tropical_proj, tau, anneal
-        ("open  (AdamW, dense, soft)",      "adamw",        False, 1.0, False),
-        ("+ tropical SGD",                   "puretropical", False, 1.0, False),
-        ("+ tropical projection",            "puretropical", True,  1.0, False),
-        ("+ hard ops (soft->hard anneal)",   "puretropical", True,  1.0, True),
-        ("reference rerun (AdamW, dense, soft)", "adamw",    False, 1.0, False),
+        # name,                      optimizer,        out_proj_type, tau, anneal
+        ("open  (AdamW, dense, soft)",      "adamw",        "linear",   1.0, False),
+        ("+ tropical SGD",                   "puretropical", "linear",   1.0, False),
+        ("+ tropical projection",            "puretropical", "tropical", 1.0, False),
+        ("+ hard ops (soft->hard anneal)",   "puretropical", "tropical", 1.0, True),
+        ("reference rerun (AdamW, dense, soft)", "adamw",    "linear",   1.0, False),
     ]
 
     print(f"{'configuration':36s}  {'test_loss':>10s}  {'test_acc':>9s}")
     print("-" * 60)
     results = []
-    for name, opt_kind, trop_proj, tau, anneal in configs:
+    for name, opt_kind, out_proj_type, tau, anneal in configs:
         torch.manual_seed(0)
-        model = build_model(args.d_model, args.n_layers, tau, trop_proj)
+        model = build_model(args.d_model, args.n_layers, tau, out_proj_type)
         opt = build_optimizer(model, opt_kind)
         loss, acc = train_eval(model, opt, x, y, args.steps, args.batch_size, anneal)
         results.append((name, loss, acc))

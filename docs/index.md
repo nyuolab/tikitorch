@@ -17,6 +17,11 @@ y = layer(x)
 print(y.shape)  # torch.Size([8, 3])
 ```
 
+The [quickstart](get-started/quickstart.md) continues from that familiar layer API to
+TikiTorch's distinctive workflow: audit a concrete hard path, pack its route choices,
+and replay a selected VJP from the route record rather than retained activations. The
+same copy/paste workflow is runnable as `python -m examples.closure_workflow`.
+
 The distinguishing feature is the combination rather than any single layer:
 
 | PyTorch provides | TikiTorch adds |

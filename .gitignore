@@ -1,27 +1,41 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
-build/
-dist/
-.pytest_cache/
+/.venv/
+/.ruff_cache/
+/.mypy_cache/
+/.pytest_cache/
+/.tox/
+/.nox/
+/.coverage
+/htmlcov/
+.ipynb_checkpoints/
+
+# Root packaging and documentation outputs. Paper build directories are listed
+# explicitly so a source directory named ``build`` deeper in the hardware tree is
+# never hidden from contributors.
+/build/
+/dist/
+/site/
+/manuscript/build/
+/papers/*/build/
 *.pt
-data/
-*.pyc
+/data/
 .DS_Store
 .vscode/
 
 # generated model artifacts (tt.save) — mirror of the *.pt rule above
 *.tt
+!zoo/**/*.tt
 # results/ is a generated-output tree; track only curated, cited evidence
 results/closed_benchmarks/
 results/capacity_probe/
+# Nondeterministic presentation renders; retain the editable SVG and compact PNG.
+/results/graphics/*_nb.png
 # per-run console logs created by the run_* scripts
-logs/
+/logs/
 # compiled LOCAL FPGA bridge (scripts/build_fpga_local.sh) — incl. _libtikifpga_morphlm.*
 _libtikifpga*
-# mkdocs build output
-site/
-
 # FPGA workflow/build/probe/csynth scratch dropped at the repo root by the run_* and
 # forge tooling (state dirs + *_wf.js); regenerable, never committed. Covers the old
 # .tiki_sweep_state/ too.
@@ -42,8 +56,8 @@ results/fpga_silicon/**/to_aws/*.dcp
 **/.env
 
 # organism/experiments derived state
-data/experience_stream/
-organism_life/
+/data/experience_stream/
+/organism_life/
 .tiki_organism_state/
 .tiki_g1b_state*/
-organism_report_sync/
+/organism_report_sync/

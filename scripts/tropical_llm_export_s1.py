@@ -137,7 +137,7 @@ def enc_vals(W_float, scale):
 
 
 def build_buffer(ckpt_path, SA, SW, SGAM, SH, GCOMP, faithful=False):
-    ck = torch.load(ckpt_path, map_location='cpu')
+    ck = torch.load(ckpt_path, map_location="cpu", weights_only=True)
     sd = ck['model']
     o = compute_offsets()
     buf = np.zeros(BUFLEN, dtype=np.int32)

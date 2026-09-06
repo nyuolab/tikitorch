@@ -25,7 +25,7 @@
 # No key pair, no security-group edits, no inbound SSH: nothing IP-dependent to misconfigure.
 #
 # Usage (all state is in .tiki_sweep_state/, region/account come from your AWS profile):
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637   # admin in us-east-1
+#   export AWS_PROFILE=my-profile   # needs the documented EC2/S3/IAM permissions
 #   bash scripts/run_connect4_prior_sweep_ec2.sh setup       # idempotent: bucket + IAM role/profile
 #   bash scripts/run_connect4_prior_sweep_ec2.sh launch      # build src tarball -> S3 -> launch box
 #   bash scripts/run_connect4_prior_sweep_ec2.sh status      # poll S3 (+ instance state); no SSH
@@ -35,7 +35,7 @@
 #   DRY_RUN=1 bash scripts/run_connect4_prior_sweep_ec2.sh launch   # build+validate, do NOT launch
 set -euo pipefail
 
-PROFILE="${AWS_PROFILE:?set AWS_PROFILE (e.g. NYUMCResearchAdminFullAccess-739966866637)}"
+PROFILE="${AWS_PROFILE:?set AWS_PROFILE (e.g. my-profile)}"
 REGION="${REGION:-$(aws configure get region --profile "$PROFILE" 2>/dev/null || echo us-east-1)}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-c5.9xlarge}"   # 36 vCPU, ~$1.53/hr on-demand in us-east-1
 MAX_MINUTES="${MAX_MINUTES:-120}"              # hard self-terminate deadline (cost backstop)

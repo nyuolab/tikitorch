@@ -7,9 +7,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- **Public-release governance and safety files** — contribution governance,
-  code of conduct, security reporting, third-party notices, and a release
-  checklist now make repository responsibilities and release gates explicit.
+- **Public-release contribution and provenance guidance** — contribution
+  expectations, third-party notices, deterministic CI checks, and documented
+  evidence boundaries make repository responsibilities and release checks explicit.
+- **Hard-route onboarding workflow** — `examples/closure_workflow.py` connects a
+  PyTorch-shaped min-plus layer, executed-path closure report, bit-packed winner
+  record, and exact selected-VJP replay in one deterministic script.
+- **Research navigation** — root maps under `results/` and `scripts/` distinguish
+  public examples from revision-bound runners and claim-bearing evidence.
 - **Two-paper Xiang handoff** — one review entry point now separates the
   route-certificate and multiplier-free-FPGA drafts, their durable claims, and
   the experiments still required before submission.
@@ -68,6 +73,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with Twine, and exercises the installed closure CLI.
 
 ### Changed
+- CI runs deterministic Ruff rules once, tests every supported Python version plus
+  the advertised Python 3.9/PyTorch 2.0 dependency floor, pins Node 24 actions by
+  immutable SHA, and protects jobs with timeouts and concurrency cancellation.
+- Runtime metadata now declares the NumPy 1.24 floor exercised by the minimum-stack
+  job; development metadata similarly records its tested pytest and SciPy floors.
+- Character-LM ablations use deterministic built-in text in a fresh clone, accept an
+  explicit external corpus, and expose bounded `--smoke` runs.
 - Merged the `pc-morphssm` research line into `main`, including route
   certificates, local-learning experiments, silicon evidence, and both
   manuscript workspaces.
@@ -106,6 +118,26 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   does not produce repository-relative broken links.
 
 ### Fixed
+- Executed-path closure audits now catch fused losses, normalization, activations,
+  reductions, attention, non-dyadic means, and dynamic integer arithmetic without
+  inferring shift safety from coincidental tensor values. Audits restore model,
+  gradient, optimizer, mode, buffer, and PyTorch RNG state even on failure, and the
+  legacy `training_zero_dsp` result no longer exempts division.
+- `tt.load` and the algorithmic checkpoint loader now use PyTorch's restricted
+  `weights_only=True` decoding. Automatic reconstruction is limited to public built-in
+  model classes; custom classes require an existing `model=` or explicit
+  `trusted=True` opt-in.
+- Tracked model-zoo artifacts now have tested, artifact-specific loading instructions;
+  new image-sequence bundles save only `MorphSSM` constructor arguments while run
+  metadata and measured results remain in their JSON sidecars. The image benchmark
+  runner now describes its actual hard-inference audit instead of claiming that its
+  soft-relaxation fitting path is zero-DSP training.
+- MorphSSM projection selectors now match their documented tropical/linear/identity
+  behavior, closure hardening reaches all supported model families, and hardware-cost
+  estimates follow the modules that actually execute.
+- Fabric workers now propagate failures and cancel bounded transports instead of
+  deadlocking; MCTS handles terminal roots; logical device indices, FPGA handle
+  cleanup, fallback optimizer requirements, and public export contracts are validated.
 - `prune.py` citation: the "Max-plus Operators … Pruning" paper is Zhang,
   Blusseau et al. (ISMM 2019), not Dimitriadis & Maragos.
 - TCP neighbour-link frames are rank-, axis-, and payload-bounded before memory

@@ -14,7 +14,7 @@
 # The shell-side 250 MHz logic still closes at the fixed 4.0 ns; the 125 MHz kernel constraint comes from the
 # A1 recipe applied by --clock_recipe_a A1 (NOT a hand-edited create_clock). Relief knob if P&R misses at
 # 125 MHz: CLOCK_RECIPE=A0 (clk_extra_a1=62.5 MHz, 16 ns) — one knob, no RTL change.
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_s1_afi_build.sh launch      # build src -> S3 -> launch z1d build box
 #   bash scripts/run_s1_afi_build.sh status        # poll S3 (no SSH)
 #   bash scripts/run_s1_afi_build.sh fetch          # download to_aws tarball + reports

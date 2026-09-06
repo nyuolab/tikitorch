@@ -55,7 +55,10 @@ class TropicalViterbi(nn.Module):
 
     def forward(self, emissions, return_path=False):
         B, L, S = emissions.shape
-        assert S == self.n_tags
+        if S != self.n_tags:
+            raise ValueError(
+                f"emissions has {S} tags, expected n_tags={self.n_tags}"
+            )
         h0 = emissions[:, 0]                                 # (B, S)
         if L == 1:
             score = h0.max(dim=-1).values

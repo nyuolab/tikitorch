@@ -631,17 +631,18 @@ class DyadicPCNet(nn.Module):
 
         ``loss`` sets the top-layer error (the only place a loss derivative enters):
         ``"ce"`` (default) uses the softmax-cross-entropy gradient ``softmax(logits) -
-        target`` — this is what makes the cascade MATCH backprop at depth on
-        classification; ``"mse"`` uses the L2-energy gradient ``logits - target`` (the
-        canonical PC energy, but it trails backprop by a growing margin at depth — d32
-        ~9pp on MNIST). The softmax is a per-sample boundary op over the output
-        classes; the network-internal credit assignment stays multiplier-free.
+        target`` — this is what makes the cascade match backprop at depth on
+        classification. It is deliberately an **open loss boundary**: softmax uses
+        exponentials, normalization, and dense arithmetic. ``"mse"`` supplies only
+        the subtractive L2 top error ``logits - target`` and avoids that softmax
+        boundary (but trails CE at depth in the reported experiments). In either
+        case, the network-internal cached routing remains shift/add oriented.
 
         Iterative settling (:meth:`infer`) walls at ~depth 48; this exploits the
         fact that tropical routing is *discrete and cacheable*. Forward once,
         caching the hard routing (ReLU masks, residual ``max``-gates); then route
         error top-down in ONE O(depth) pass (no settling iteration). It trains to
-        **depth 100 matching backprop**, fully multiplier-free:
+        **depth 100 matching backprop** with a multiplier-free internal routing path:
 
           * error propagation ``delta @ W`` with ±2^k weights is shift-add even
             for real ``delta`` (real × 2^k = exponent shift) — so error flows
@@ -656,6 +657,10 @@ class DyadicPCNet(nn.Module):
         (``PureTropicalSGD``) via :meth:`train_step_cascade`.
         """
         from tikitorch.nn import dyadic_quantize
+        if mode not in ("dyadic", "sign"):
+            raise ValueError(f"mode must be 'dyadic' or 'sign', got {mode!r}")
+        if loss not in ("ce", "mse"):
+            raise ValueError(f"loss must be 'ce' or 'mse', got {loss!r}")
         q = (lambda v: torch.sign(v)) if mode == "sign" else dyadic_quantize
         acts, cache = self._forward_cache(x0)
         e = (torch.softmax(acts[-1], dim=-1) - target) if loss == "ce" \
@@ -675,7 +680,8 @@ class DyadicPCNet(nn.Module):
     def train_step_cascade(self, x0: torch.Tensor, y: torch.Tensor, opt,
                            mode: str = "dyadic", loss: str = "ce"):
         """One deep training step via the single-pass cascade (no settling).
-        ``loss="ce"`` (default) matches backprop at depth; see :meth:`cascade_grads`."""
+        ``loss="ce"`` (default) matches backprop at depth but retains the explicit
+        softmax loss boundary; see :meth:`cascade_grads`."""
         target = self._make_target(y, ref=x0)
         opt.zero_grad(set_to_none=True)
         self.cascade_grads(x0, target, mode=mode, loss=loss)
@@ -714,6 +720,10 @@ class DyadicPCNet(nn.Module):
         device. See ``results/predictive_coding/SCALE_TESTS.md``.
         """
         from tikitorch.nn import dyadic_quantize
+        if mode not in ("dyadic", "sign"):
+            raise ValueError(f"mode must be 'dyadic' or 'sign', got {mode!r}")
+        if loss not in ("ce", "mse"):
+            raise ValueError(f"loss must be 'ce' or 'mse', got {loss!r}")
         acts, cache = self._forward_cache(x0)
         L = self.depth
         if n_iter is None:
@@ -871,8 +881,9 @@ class SparseCodingPC(nn.Module):
     Models each input as a SPARSE combination of dictionary atoms, ``x ≈ D·s`` with
     ``s`` k-sparse. The code ``s`` is **inferred by settling** (descend
     ``½‖mask⊙(x − D·s)‖²`` then keep the top-k atoms — winner-take-all, the
-    tropical/max-plus primitive); the dyadic dictionary ``D`` (±2^k columns, unit
-    norm) is learned by a **local** update (``ΔD ∝ err ⊗ s``) — *no backprop*. This
+    tropical/max-plus primitive); the dyadic dictionary ``D`` (signed powers of two,
+    column-scaled by powers of two) is learned by a **local** update
+    (``ΔD ∝ err ⊗ s``) — *no backprop*. This
     is the Olshausen-Field / Rao-Ballard generative PC on the tropical/dyadic
     substrate, the one PC formulation where the max/WTA structure is the point.
 
@@ -889,20 +900,38 @@ class SparseCodingPC(nn.Module):
 
     def __init__(self, n_pixels: int, n_atoms: int, n_active: int = 15):
         super().__init__()
+        if n_pixels < 1 or n_atoms < 1:
+            raise ValueError("n_pixels and n_atoms must be positive")
+        if not 1 <= n_active <= n_atoms:
+            raise ValueError("n_active must be between 1 and n_atoms")
         self.n_pixels = n_pixels
         self.n_atoms = n_atoms
         self.n_active = n_active
         self.D = nn.Parameter(torch.randn(n_pixels, n_atoms) * 0.1)
+        self._renormalize_shadow()
+
+    @torch.no_grad()
+    def _renormalize_shadow(self) -> None:
+        """Bound continuous shadow columns using only a power-of-two rescale."""
+        magnitude = torch.linalg.vector_norm(
+            self.D, dim=0, keepdim=True
+        ).clamp_min(1e-12)
+        self.D.mul_(torch.exp2(-torch.log2(magnitude).round()))
 
     def _dict(self) -> torch.Tensor:
-        """Deployed dictionary: ±2^k columns, unit-normalized (multiplier-free)."""
+        """Deployed dictionary with exactly signed-dyadic entries.
+
+        The continuous shadow is kept near unit column norm using a power-of-two
+        rescale after each update; deployment then only quantizes each entry.
+        There is no runtime division that can turn ±2^k entries into arbitrary
+        real coefficients.
+        """
         from tikitorch.nn import dyadic_quantize
-        d = dyadic_quantize(self.D)
-        return d / d.norm(dim=0, keepdim=True).clamp_min(1e-6)
+        return dyadic_quantize(self.D)
 
     @torch.no_grad()
     def infer(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None,
-              n_steps: int = 40, lr: float = 0.3):
+              n_steps: int = 40, lr: float = 0.25):
         """Settle the k-sparse code for ``x``; ``mask`` (1=observed) restricts the fit
         to observed pixels. Returns ``(s, reconstruction)``."""
         Dn = self._dict()
@@ -918,7 +947,7 @@ class SparseCodingPC(nn.Module):
 
     @torch.no_grad()
     def complete(self, x: torch.Tensor, mask: torch.Tensor,
-                 n_steps: int = 120, lr: float = 0.3) -> torch.Tensor:
+                 n_steps: int = 120, lr: float = 0.25) -> torch.Tensor:
         """In-paint / denoise: infer the code from the OBSERVED pixels and fill the
         rest. ``mask`` is 1 on observed pixels, 0 on missing. Any mask pattern."""
         _, recon = self.infer(x * mask, mask=mask, n_steps=n_steps, lr=lr)
@@ -926,12 +955,12 @@ class SparseCodingPC(nn.Module):
 
     @torch.no_grad()
     def reconstruct(self, x: torch.Tensor, n_steps: int = 60,
-                    lr: float = 0.3) -> torch.Tensor:
+                    lr: float = 0.25) -> torch.Tensor:
         return self.infer(x, n_steps=n_steps, lr=lr)[1]
 
     @torch.no_grad()
     def train_step(self, x: torch.Tensor, lr_dict: float = 0.05,
-                   n_steps: int = 25, lr_code: float = 0.3) -> float:
+                   n_steps: int = 25, lr_code: float = 0.25) -> float:
         """One local learning step: settle the code, apply the LOCAL dyadic dictionary
         update (operand-quantized ``ΔD ∝ err ⊗ s``), re-normalize atoms. No backprop,
         no optimizer. Returns the reconstruction MSE."""
@@ -939,7 +968,10 @@ class SparseCodingPC(nn.Module):
         s, recon = self.infer(x, n_steps=n_steps, lr=lr_code)
         err = x - recon
         self.D += lr_dict * (dyadic_quantize(err).t() @ dyadic_quantize(s)) / x.shape[0]
-        self.D /= self.D.norm(dim=0, keepdim=True).clamp_min(1e-6)
+        # Bound continuous shadow weights with a power-of-two column rescale.
+        # Quantizing the shadow after every mini-batch destroys the small local
+        # updates; `_dict()` applies the signed-dyadic deployment constraint.
+        self._renormalize_shadow()
         return float((err ** 2).mean())
 
     def extra_repr(self) -> str:

@@ -41,6 +41,7 @@ an optional ``hardware_cost(...)`` method returning a
 :class:`tikitorch.HardwareCostProfile` (with ``get_hardware_cost_profile`` kept
 as an alias). These are optional conveniences, never required.
 """
+from __future__ import annotations
 
 import math
 
@@ -103,6 +104,111 @@ def _make_input_proj(input_type: str, in_dim: int, out_dim: int):
     if input_type == "linear":
         return nn.Linear(in_dim, out_dim)
     raise ValueError(f"input_type must be 'tropical' or 'linear', got {input_type!r}")
+
+
+def _accumulate_projection_cost(
+    profile: HardwareCostProfile, module: nn.Module, n_items: int
+) -> None:
+    """Accumulate a projection's cost from the module that will actually run.
+
+    These estimates describe the hard/export implementation.  In particular,
+    tropical projections are compare/add networks, quantized embeddings are
+    table lookups, and only an ordinary ``nn.Linear`` contributes DSP-bearing
+    multiplications.  Keeping this dispatch in one place prevents a tropical
+    default head from being accidentally costed as a dense head.
+    """
+    n_items = int(n_items)
+    if isinstance(module, nn.Identity):
+        return
+    if isinstance(module, nn.Embedding):
+        profile.table_lookups += n_items
+        profile.backward_table_lookups += n_items
+        return
+    if isinstance(module, TropicalQuantizedEmbed):
+        lookups = n_items * module.in_features
+        additions = n_items * module.out_features * max(module.in_features - 1, 0)
+        profile.table_lookups += lookups
+        profile.backward_table_lookups += lookups
+        profile.additions += additions
+        profile.backward_additions += additions
+        return
+
+    if isinstance(module, TropicalTopKModule):
+        combinations = n_items * module.out_features * module.in_features
+        reductions = n_items * module.out_features * max(module.k - 1, 0)
+        bias_adds = n_items * module.out_features
+        comparisons = n_items * module.out_features * max(module.in_features - 1, 0)
+        profile.additions += combinations + reductions + bias_adds
+        profile.comparisons += comparisons
+        profile.backward_additions += combinations + reductions
+        return
+
+    if isinstance(module, (TropicalDilationModule, TropicalLinearModule)):
+        combinations = n_items * module.out_features * module.in_features
+        bias_adds = n_items * module.out_features
+        comparisons = n_items * module.out_features * max(module.in_features - 1, 0)
+        profile.additions += combinations + bias_adds
+        profile.comparisons += comparisons
+        profile.backward_additions += combinations
+        return
+
+    if isinstance(module, CompositionalTropicalProjection):
+        first = n_items * module.d_intermediate * module.in_features
+        second = n_items * module.out_features * module.d_intermediate
+        bias_adds = n_items * (module.d_intermediate + module.out_features)
+        comparisons = n_items * (
+            module.d_intermediate * max(module.in_features - 1, 0)
+            + module.out_features * max(module.d_intermediate - 1, 0)
+        )
+        profile.additions += first + second + bias_adds
+        profile.comparisons += comparisons
+        profile.backward_additions += first + second
+        return
+
+    if isinstance(module, nn.Linear):
+        macs = n_items * module.in_features * module.out_features
+        # DyadicLinear is an nn.Linear subclass whose exported weights are shifts.
+        if getattr(module, "_zero_dsp_layer", False):
+            profile.additions += macs
+            profile.backward_additions += macs
+            # The input adjoint is shift/add, but an ordinary autograd weight
+            # gradient is an outer product of two arbitrary tensors. Only a
+            # specialized sign/local update can remove this training boundary.
+            profile.backward_multiplications += macs
+        else:
+            profile.multiplications += macs
+            profile.additions += macs
+            profile.backward_multiplications += macs
+            profile.backward_additions += macs
+        return
+
+    raise TypeError(
+        f"no hardware-cost rule for projection module {type(module).__name__}"
+    )
+
+
+def _accumulate_morph_conv_cost(
+    profile: HardwareCostProfile, conv: nn.Module, n_items: int
+) -> None:
+    """Accumulate hard morphological convolution compare/add counts."""
+    if hasattr(conv, "convs"):
+        for scale in conv.convs:
+            _accumulate_morph_conv_cost(profile, scale, n_items)
+        profile.comparisons += n_items * conv.channels * max(len(conv.convs) - 1, 0)
+        return
+    taps = conv.kernel_size * getattr(conv, "group_size", 1)
+    outputs = n_items * conv.channels
+    profile.additions += outputs * taps
+    profile.comparisons += outputs * max(taps - 1, 0)
+
+
+def _is_power_of_two_scalar(value: float) -> bool:
+    """Return whether a finite nonzero scalar is exactly a signed power of two."""
+    try:
+        mantissa, _ = math.frexp(abs(float(value)))
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(float(value)) and mantissa == 0.5
 
 
 _VALID_TASK_TYPES = ("classification", "lm", "regression")
@@ -236,6 +342,21 @@ class TropicalMLP(FpgaAccelerable, nn.Module):
         for layer in self.layers:
             layer.set_tau(self.temperature)
 
+    def set_tau(self, tau: float) -> None:
+        """Set an exact soft/hard temperature; ``0`` selects hard operators.
+
+        ``set_temperature`` retains the training-time ``tau_min`` floor. This
+        method is the deployment/auditing hook and therefore must not clamp zero.
+        """
+        if tau < 0:
+            raise ValueError("tau must be non-negative")
+        self.temperature = float(tau)
+        self.use_softmin = tau > 0
+        for layer in self.layers:
+            layer.set_tau(float(tau))
+        if hasattr(self.head, "set_tau"):
+            self.head.set_tau(float(tau))
+
     def switch_to_hard_min(self):
         """At eval time, switch all layers to hard min (no multiplications)."""
         for layer in self.layers:
@@ -274,55 +395,30 @@ class TropicalMLP(FpgaAccelerable, nn.Module):
         }
 
     def hardware_cost(self, batch_size: int = 1, seq_len: int = 1) -> HardwareCostProfile:
-        """Hardware cost: zero multiplications in tropical layers.
+        """Estimate the hard/export cost of this model's actual module types.
 
         Forward: each tropical linear does additions + comparisons (argmin).
         Backward: sparse gradient routing (additions only, no multiplies).
-        Only the output head uses standard multiplications.
+        A dense opt-in head contributes multiplications; the default tropical
+        head does not.
         """
-        total_additions = 0
-        total_comparisons = 0
-        total_multiplications = 0
-
         n_samples = batch_size * seq_len
-
-        # Tropical layers: additions + comparisons, zero multiplications
-        in_dim = self.input_dim
+        profile = HardwareCostProfile()
         for layer in self.layers:
-            out_dim = layer.out_features
-            # Forward: out_dim * in_dim additions (W + x), out_dim * (in_dim-1) comparisons (min)
-            total_additions += n_samples * out_dim * in_dim
-            total_comparisons += n_samples * out_dim * (in_dim - 1)
-            in_dim = out_dim
+            _accumulate_projection_cost(profile, layer, n_samples)
+        _accumulate_projection_cost(profile, self.head, n_samples)
 
-        # Output head: standard linear -> multiplications
-        head_in = self.d_model
-        head_out = self.num_classes
-        total_multiplications += n_samples * head_in * head_out
-
-        # Backward pass: tropical layers produce sparse gradients (additions only)
-        bwd_additions = total_additions  # same order as forward
-        bwd_comparisons = 0  # argmin indices cached from forward
-        bwd_multiplications = n_samples * head_in * head_out  # only the head
-
-        # Memory: weights + activations
         param_bytes = sum(p.numel() * p.element_size() for p in self.parameters())
         activation_bytes = n_samples * self.d_model * len(self.layers) * 4  # float32
-
-        return HardwareCostProfile(
-            multiplications=total_multiplications,
-            additions=total_additions,
-            comparisons=total_comparisons,
-            backward_multiplications=bwd_multiplications,
-            backward_additions=bwd_additions,
-            backward_comparisons=bwd_comparisons,
-            memory_reads_bytes=param_bytes + activation_bytes,
-            memory_writes_bytes=activation_bytes,
-            # FPGA estimates: tropical layers need only comparators + adders, not DSP blocks
-            dsp_blocks_required=head_in * head_out // 16,  # only the head needs DSPs
-            lut_estimate=total_comparisons // 4,  # comparators are cheap in LUTs
-            bram_kb=param_bytes // 1024,
+        profile.memory_reads_bytes = param_bytes + activation_bytes
+        profile.memory_writes_bytes = activation_bytes
+        profile.dsp_blocks_required = (
+            math.ceil(profile.multiplications / max(n_samples * 16, 1))
+            if profile.multiplications else 0
         )
+        profile.lut_estimate = profile.comparisons // 4
+        profile.bram_kb = param_bytes // 1024
+        return profile
 
     get_hardware_cost_profile = hardware_cost
 
@@ -444,6 +540,18 @@ class TropicalSequenceModel(FpgaAccelerable, nn.Module):
             wh.set_tau(self.temperature)
             wx.set_tau(self.temperature)
 
+    def set_tau(self, tau: float) -> None:
+        """Set an exact soft/hard temperature; ``0`` selects hard operators."""
+        if tau < 0:
+            raise ValueError("tau must be non-negative")
+        self.temperature = float(tau)
+        self.use_softmin = tau > 0
+        for wh, wx in zip(self.W_h, self.W_x):
+            wh.set_tau(float(tau))
+            wx.set_tau(float(tau))
+        if hasattr(self.head, "set_tau"):
+            self.head.set_tau(float(tau))
+
     def get_gradient_sparsity(self) -> dict:
         """Report per-layer gradient sparsity."""
         sparsity = {}
@@ -467,14 +575,14 @@ class TropicalSequenceModel(FpgaAccelerable, nn.Module):
         }
 
     def hardware_cost(self, batch_size: int = 1, seq_len=None) -> HardwareCostProfile:
-        """Hardware cost: zero multiplies in tropical recurrence layers."""
+        """Estimate hard/export cost, including the configured input and head."""
         if seq_len is None:
             seq_len = self.seq_len
 
         n_samples = batch_size
-
-        # Input projection: standard linear multiplications
-        proj_muls = n_samples * seq_len * self.input_dim * self.d_model
+        n_tokens = n_samples * seq_len
+        profile = HardwareCostProfile()
+        _accumulate_projection_cost(profile, self.input_proj, n_tokens)
 
         # Tropical recurrence: additions + comparisons per timestep per layer
         trop_additions = 0
@@ -486,26 +594,21 @@ class TropicalSequenceModel(FpgaAccelerable, nn.Module):
             trop_additions += n_samples * seq_len * per_step
             trop_comparisons += n_samples * seq_len * per_step_cmp
 
-        # Output head
-        head_muls = n_samples * self.d_model * self.num_classes
-
-        total_muls = proj_muls + head_muls  # only non-tropical parts
+        profile.additions += trop_additions
+        profile.comparisons += trop_comparisons
+        profile.backward_additions += trop_additions
+        _accumulate_projection_cost(profile, self.head, n_samples)
 
         param_bytes = sum(p.numel() * p.element_size() for p in self.parameters())
-
-        return HardwareCostProfile(
-            multiplications=total_muls,
-            additions=trop_additions + proj_muls + head_muls,
-            comparisons=trop_comparisons,
-            backward_multiplications=total_muls,
-            backward_additions=trop_additions,
-            backward_comparisons=0,
-            memory_reads_bytes=param_bytes,
-            memory_writes_bytes=n_samples * seq_len * self.d_model * 4 * self.n_layers,
-            dsp_blocks_required=(proj_muls + head_muls) // (16 * seq_len),
-            lut_estimate=trop_comparisons // 4,
-            bram_kb=param_bytes // 1024,
+        profile.memory_reads_bytes = param_bytes
+        profile.memory_writes_bytes = n_tokens * self.d_model * 4 * self.n_layers
+        profile.dsp_blocks_required = (
+            math.ceil(profile.multiplications / max(n_tokens * 16, 1))
+            if profile.multiplications else 0
         )
+        profile.lut_estimate = profile.comparisons // 4
+        profile.bram_kb = param_bytes // 1024
+        return profile
 
     get_hardware_cost_profile = hardware_cost
 
@@ -529,14 +632,19 @@ class MorphSSM(FpgaAccelerable, nn.Module):
         dropout: dropout rate (default 0.1)
         use_soft: soft relaxation for training (default True)
         tau: temperature for soft max/min (default 1.0)
-        tropical_proj: use tropical (vs nn.Linear) channel-mixing projection
+        tropical_proj: legacy bool projection selector (True=tropical,
+            False=linear). Omit for the closure-first tropical default.
+        out_proj_type: explicit channel projection selector: "tropical"
+            (default), "linear", or "identity". It must agree with
+            ``tropical_proj`` when both are supplied.
         norm_type: "tropical" (default), "layernorm", or another documented norm
         group_size: morph-conv channel grouping (default 1)
         max_dilation: cap on the exponential per-layer dilation (default 2048)
         multi_scale: use MultiScaleMorphConv1d per layer (default False)
         kernel_sizes (tuple[int, ...]): kernel sizes when multi_scale
             (default (3, 7, 15))
-        residual_scaling: scale residual by 1/sqrt(n_layers) (default False).
+        residual_scaling: scale each transformed residual branch by
+            1/sqrt(n_layers) (default False).
             NOTE: 1/sqrt(n_layers) is a non-power-of-2 data-path multiply, so
             residual_scaling=True is NOT closure-preserving; leave False (or use a
             power-of-2 scale) for the multiplier-free configuration.
@@ -550,7 +658,9 @@ class MorphSSM(FpgaAccelerable, nn.Module):
     def __init__(self, *, d_model: int = 256, n_layers: int = 8,
                  kernel_size: int = 7, dropout: float = 0.1,
                  use_soft: bool = True, tau: float = 1.0,
-                 tropical_proj: bool = False, norm_type: str = "tropical",
+                 tropical_proj: bool | None = None,
+                 out_proj_type: str | None = None,
+                 norm_type: str = "tropical",
                  group_size: int = 1, max_dilation: int = 2048,
                  multi_scale: bool = False, kernel_sizes=(3, 7, 15),
                  residual_scaling: bool = False,
@@ -588,7 +698,8 @@ class MorphSSM(FpgaAccelerable, nn.Module):
                 MorphSSMLayer(
                     d_model, kernel_size, dilation=layer_dilation,
                     mode=mode, dropout=dropout, use_soft=use_soft, tau=tau,
-                    tropical_proj=tropical_proj, norm_type=norm_type,
+                    tropical_proj=tropical_proj, out_proj_type=out_proj_type,
+                    norm_type=norm_type,
                     group_size=group_size, residual_scale=residual_scale,
                     multi_scale=multi_scale, kernel_sizes=kernel_sizes,
                 )
@@ -603,7 +714,10 @@ class MorphSSM(FpgaAccelerable, nn.Module):
         # the "ignition delay" where the model spends 500-1000 steps at
         # random chance before learning begins.
         for layer in self.layers:
-            nn.init.normal_(layer.out_proj.weight, std=0.02 / math.sqrt(2 * n_layers))
+            if hasattr(layer.out_proj, "weight"):
+                nn.init.normal_(
+                    layer.out_proj.weight, std=0.02 / math.sqrt(2 * n_layers)
+                )
 
     def set_tau(self, tau: float) -> None:
         """Anneal the soft-to-hard tropical temperature across the whole model.
@@ -702,51 +816,31 @@ class MorphSSM(FpgaAccelerable, nn.Module):
         """
         profile = HardwareCostProfile()
 
-        # Detect fully-closed config: no float multiplications in sequence core
-        fully_closed = (not self.layers[0].morph_conv.use_soft
-                        if self.layers else False)
-        # Check if out_proj is a TropicalDilationModule (tropical_proj=True)
-        proj_is_tropical = (isinstance(self.layers[0].out_proj, TropicalDilationModule)
-                            if self.layers else False)
-        sequence_core_closed = fully_closed and proj_is_tropical
-
+        n_tokens = batch_size * seq_len
         for layer in self.layers:
-            conv = layer.morph_conv
-            K = conv.kernel_size
-            C = conv.channels
-            n_out = batch_size * seq_len * C
+            _accumulate_morph_conv_cost(profile, layer.morph_conv, n_tokens)
+            _accumulate_projection_cost(profile, layer.out_proj, n_tokens)
+            residual_items = n_tokens * self.d_model
+            profile.additions += residual_items
+            profile.backward_additions += residual_items
+            if (
+                layer.residual_scale != 1.0
+                and not _is_power_of_two_scalar(layer.residual_scale)
+            ):
+                # A non-dyadic residual coefficient is a real data-path multiply.
+                # Exact powers of two are implemented as shifts and stay out of
+                # the multiplication/DSP count, matching the executed-path audit.
+                profile.multiplications += residual_items
+                profile.backward_multiplications += residual_items
 
-            # Per output element: K additions (weight[k] + input[t-k*d]) + K-1 comparisons
-            profile.additions += n_out * K
-            profile.comparisons += n_out * (K - 1)
+        _accumulate_projection_cost(profile, self.embed, n_tokens)
+        head_items = n_tokens if self.task_type in ("lm", "regression") else batch_size
+        _accumulate_projection_cost(profile, self.output_head, head_items)
 
-            # Channel mixing: nn.Linear uses multiplications; TropicalDilationModule does not
-            proj = layer.out_proj
-            if proj_is_tropical:
-                # Tropical out_proj: max-plus over (weight + input) — comparisons + additions
-                if hasattr(proj, 'weight'):
-                    in_f = proj.weight.shape[1]
-                    profile.additions += batch_size * seq_len * in_f
-                    profile.comparisons += batch_size * seq_len * (in_f - 1)
-            else:
-                profile.multiplications += batch_size * seq_len * proj.in_features * proj.out_features
-                profile.additions += batch_size * seq_len * proj.in_features * proj.out_features
-
-        # Input embedding (nn.Linear — float MACs, small overhead)
-        if hasattr(self.embed, 'in_features'):
-            profile.multiplications += batch_size * seq_len * self.embed.in_features * self.embed.out_features
-        # Output head (single mean-pooled vector — negligible)
-        profile.multiplications += batch_size * self.output_head.in_features * self.output_head.out_features
-
-        # FPGA resource estimates (Xilinx UltraScale+); 1 FP32 multiply = 3 DSP blocks
-        if sequence_core_closed:
-            # Only embedding + output head use DSPs (tiny fraction)
-            embed_muls = (batch_size * seq_len * self.embed.in_features * self.embed.out_features
-                          if hasattr(self.embed, 'in_features') else 0)
-            head_muls = batch_size * self.output_head.in_features * self.output_head.out_features
-            profile.dsp_blocks_required = (embed_muls + head_muls) * 3
-        else:
-            profile.dsp_blocks_required = profile.multiplications * 3
+        profile.dsp_blocks_required = (
+            math.ceil(profile.multiplications / max(n_tokens * 16, 1))
+            if profile.multiplications else 0
+        )
 
         # LUT estimate: 6 LUTs per 32-bit comparison, additions use carry chain (~free)
         profile.lut_estimate = profile.comparisons * 6 + profile.additions // 8
@@ -756,7 +850,12 @@ class MorphSSM(FpgaAccelerable, nn.Module):
         profile.bram_kb = total_params * 4 // 1024
 
         # Throughput at 250 MHz: pipeline depth = kernel_size clock cycles per output
-        pipeline_depth = self.layers[0].morph_conv.kernel_size if self.layers else 7
+        first_conv = self.layers[0].morph_conv if self.layers else None
+        pipeline_depth = (
+            max(first_conv.kernel_sizes)
+            if first_conv is not None and hasattr(first_conv, "kernel_sizes")
+            else first_conv.kernel_size if first_conv is not None else 7
+        )
         profile.estimated_clock_mhz = 250
         profile.estimated_throughput_samples_sec = 250e6 / pipeline_depth
 
@@ -855,6 +954,15 @@ class MorphMLP(FpgaAccelerable, nn.Module):
     def param_count(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
+    def set_tau(self, tau: float) -> None:
+        """Anneal every morphological layer; ``0`` selects hard operators."""
+        if tau < 0:
+            raise ValueError("tau must be non-negative")
+        for layer in self.layers:
+            layer.set_tau(float(tau))
+        if hasattr(self.head, "set_tau"):
+            self.head.set_tau(float(tau))
+
     def hardware_cost(self, batch_size: int = 1, seq_len: int = 1) -> HardwareCostProfile:
         """Morphological MLP: zero multiplications in tropical layers."""
         n_samples = batch_size * seq_len
@@ -869,19 +977,18 @@ class MorphMLP(FpgaAccelerable, nn.Module):
             total_comparisons += n_samples * out_dim * (in_dim - 1)
             in_dim = out_dim
 
-        # Linear head uses multiplications
-        head_muls = n_samples * self.d_model * self.num_classes
-
-        return HardwareCostProfile(
-            multiplications=head_muls,
-            additions=total_additions + head_muls,
+        profile = HardwareCostProfile(
+            additions=total_additions,
             comparisons=total_comparisons,
             backward_additions=total_additions,
-            backward_comparisons=total_comparisons,
-            backward_multiplications=head_muls,
-            dsp_blocks_required=self.d_model * self.num_classes // 16,
-            lut_estimate=total_comparisons // 4,
         )
+        _accumulate_projection_cost(profile, self.head, n_samples)
+        profile.dsp_blocks_required = (
+            math.ceil(profile.multiplications / max(n_samples * 16, 1))
+            if profile.multiplications else 0
+        )
+        profile.lut_estimate = profile.comparisons // 4
+        return profile
 
     get_hardware_cost_profile = hardware_cost
 
@@ -907,7 +1014,8 @@ class TropicalTransformer(FpgaAccelerable, nn.Module):
         n_layers: number of transformer blocks (default 6)
         d_ff (int | None): FFN inner dim; if None -> d_model * 4 (default None)
         dropout: dropout rate (default 0.1)
-        tau: temperature for soft attention; 0.0 is hard tropical (default 0.0)
+        tau: temperature for soft attention, projections, and FFNs; 0.0 is hard
+            tropical (default 0.0)
         use_shift_attn: use TropicalShiftAttention (no Q/K/V projections)
         max_seq_len: max sequence length for shift-attention tables (default 1024)
         score_variant: "dot_product" (default), "l_inf", "l1", "hilbert", or
@@ -959,7 +1067,7 @@ class TropicalTransformer(FpgaAccelerable, nn.Module):
         self.ln_final = _make_norm(norm_type, d_model)
 
     def set_tau(self, tau: float) -> None:
-        """Anneal soft <-> hard for all attention modules."""
+        """Anneal soft <-> hard for attention, projections, and FFNs."""
         for block in self.blocks:
             block.set_tau(tau)
 
@@ -1027,7 +1135,7 @@ class MoTEModel(FpgaAccelerable, nn.Module):
         capacity_factor: per-expert token capacity factor (default 1.5)
         use_shift_attn: use TropicalShiftAttention in transformer experts
         score_variant: "dot_product" (default) or "l_inf"
-        out_proj_type: shared-layer projection: "linear" (default), "tropical", "identity"
+        out_proj_type: shared-layer projection: "tropical" (default), "linear", "identity"
         max_seq_len: max sequence length for shift-attention tables (default 1024)
         aux_loss_weight: weight on the load-balancing aux loss (default 0.01)
         task_type: "classification" | "lm" | "regression" (default "classification")
@@ -1199,6 +1307,21 @@ class MoTEModel(FpgaAccelerable, nn.Module):
     def param_count(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
+    def set_tau(self, tau: float) -> None:
+        """Anneal every soft tropical submodule; ``0`` selects hard operators."""
+        if tau < 0:
+            raise ValueError("tau must be non-negative")
+        for module in self.modules():
+            if module is self:
+                continue
+            setter = getattr(module, "set_tau", None)
+            if callable(setter):
+                setter(float(tau))
+            elif hasattr(module, "tau"):
+                module.tau = float(tau)
+            if hasattr(module, "use_soft"):
+                module.use_soft = tau > 0
+
     def get_expert_utilization(self) -> dict:
         """Expert-utilization stats for logging — UNIMPLEMENTED, returns ``{}``.
 
@@ -1224,31 +1347,47 @@ class MoTEModel(FpgaAccelerable, nn.Module):
         # Shared pre/post layers (same as MorphSSM)
         for layer_list in [self.pre_layers, self.post_layers]:
             for layer in layer_list:
-                conv = layer.morph_conv
-                K = conv.kernel_size
-                C = conv.channels
-                n_out = n_tokens * C
-                profile.additions += n_out * K
-                profile.comparisons += n_out * (K - 1)
-                if isinstance(layer.out_proj, nn.Linear):
-                    profile.multiplications += n_tokens * layer.out_proj.in_features * layer.out_proj.out_features
+                _accumulate_morph_conv_cost(profile, layer.morph_conv, n_tokens)
+                _accumulate_projection_cost(profile, layer.out_proj, n_tokens)
 
         # Expert cost: only 1/n_experts tokens per expert (sparse)
-        tokens_per_expert = max(n_tokens // n_experts, 1)
-        # Each expert processes tokens_per_expert tokens
+        tokens_per_expert = max(
+            1, int(self.mote_block.capacity_factor * n_tokens / n_experts)
+        )
+        # Each expert processes its routed tokens. Count projection modules by
+        # their real type rather than assuming every head/projection is dense.
         for expert_layers in self.mote_block.experts:
             for layer in expert_layers:
                 if isinstance(layer, TropicalTransformerBlock):
-                    # Attention + FFN cost for tokens_per_expert tokens
-                    d = self.d_model
-                    profile.additions += tokens_per_expert * d * 4  # Q,K,V,O projections (tropical)
-                    profile.comparisons += tokens_per_expert * d * 4
-                break  # All experts have same architecture
+                    for projection_name in ("q_proj", "k_proj", "v_proj", "out_proj"):
+                        projection = getattr(layer.attn, projection_name, None)
+                        if projection is not None:
+                            _accumulate_projection_cost(
+                                profile, projection, tokens_per_expert
+                            )
+                    _accumulate_projection_cost(
+                        profile, layer.ffn_up, tokens_per_expert
+                    )
+                    _accumulate_projection_cost(
+                        profile, layer.ffn_down, tokens_per_expert
+                    )
+                elif isinstance(layer, MorphSSMLayer):
+                    _accumulate_morph_conv_cost(
+                        profile, layer.morph_conv, tokens_per_expert
+                    )
+                    _accumulate_projection_cost(
+                        profile, layer.out_proj, tokens_per_expert
+                    )
 
         # Embedding + output head
-        if hasattr(self.embed, 'in_features'):
-            profile.multiplications += n_tokens * self.embed.in_features * self.embed.out_features
-        profile.multiplications += batch_size * self.output_head.in_features * self.output_head.out_features
+        _accumulate_projection_cost(profile, self.embed, n_tokens)
+        head_items = n_tokens if self.task_type in ("lm", "regression") else batch_size
+        _accumulate_projection_cost(profile, self.output_head, head_items)
+        profile.dsp_blocks_required = (
+            math.ceil(profile.multiplications / max(n_tokens * 16, 1))
+            if profile.multiplications else 0
+        )
+        profile.lut_estimate = profile.comparisons // 4
 
         return profile
 
@@ -1299,8 +1438,12 @@ class TropicalCNN(FpgaAccelerable, nn.Module):
                  head_type: str = "tropical", task_type: str = "classification",
                  use_soft: bool = False, tau: float = 0.0):
         super().__init__()
-        assert task_type == "classification", "TropicalCNN is a classifier"
-        assert head_type in ("tropical", "linear"), head_type
+        if task_type != "classification":
+            raise ValueError("TropicalCNN supports task_type='classification' only")
+        if head_type not in ("tropical", "linear"):
+            raise ValueError(
+                f"head_type must be 'tropical' or 'linear', got {head_type!r}"
+            )
         self.task_type = _validate_task_type(task_type)
         self.num_classes = num_classes
         self.head_type = head_type

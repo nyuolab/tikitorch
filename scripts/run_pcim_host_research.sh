@@ -5,7 +5,7 @@
 # the fpga_dma / fpga_pci API headers, any DMA helper, AND regenerates forge_train_step_muzero's HLS control
 # RTL so we can confirm the s_axilite register offsets (vs bridge.cpp's hardcoded morph-LM offsets). No F2
 # needed — this is reading SDK source + an HLS csynth. Same robust pattern (S3+IAM+self-terminate, no SSH).
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_pcim_host_research.sh launch ; ... status ; ... fetch ; ... terminate
 set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"

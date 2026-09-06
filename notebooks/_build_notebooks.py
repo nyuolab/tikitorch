@@ -64,6 +64,22 @@ import torch
 print("TikiTorch", getattr(tikitorch, "__version__", "?"), "| torch", torch.__version__)
 """)
 
+# Notebook 03 uses torchvision for MNIST. Keep the base setup light for the
+# other five notebooks, but make the vision notebook self-contained as claimed.
+VISION_SETUP = code(r"""
+# --- Vision dependency (notebook 03 only) ---
+try:
+    import torchvision
+except ImportError:
+    import subprocess, sys
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-q", "torchvision"],
+        check=True,
+    )
+    import torchvision
+print("torchvision", torchvision.__version__)
+""")
+
 
 # ===========================================================================
 # 01 — Intro
@@ -272,6 +288,7 @@ trains it on MNIST with a sign-oriented optimizer. Structural inspection alone
 does not certify the complete loss/backward/update path or a physical build.
 """),
     SETUP,
+    VISION_SETUP,
     md("## See the morphology: TropicalConv2d as dilation / erosion"),
     code(r"""
 import torch, tikitorch.nn as nn

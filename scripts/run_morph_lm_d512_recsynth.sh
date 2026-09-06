@@ -14,7 +14,7 @@
 # d512_csynth.rpt (11.425 ns). This run's report lands beside it as
 # results/a2_power/d512_recsynth.rpt so the improvement is a direct diff.
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_morph_lm_d512_recsynth.sh launch          # TT_CLK_NS=6.0 default
 #   TT_CLK_NS=8.0 bash scripts/run_morph_lm_d512_recsynth.sh launch   # sweep the target
 #   bash scripts/run_morph_lm_d512_recsynth.sh {status|fetch|terminate}

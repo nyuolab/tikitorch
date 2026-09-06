@@ -117,7 +117,7 @@ class TwoPlayerKnownModel:
             val = 0.0
         return Inference(state=state, reward=reward,
                          policy=torch.full((self.A,), 1.0 / self.A),
-                         value=val, legal=legal or None)
+                         value=val, legal=legal)
 
     def initial_inference(self, state):
         return self._inf(state, 0.0, self.game.is_terminal(state[0]))
@@ -264,7 +264,7 @@ class AlphaZeroBoardModel:
         if done:                                     # exact terminal value from tp's perspective
             return Inference(state=state, reward=0.0,
                              policy=torch.full((self.A,), 1.0 / self.A),
-                             value=terminal_value(self.game, board, tp), legal=None)
+                             value=terminal_value(self.game, board, tp), legal=[])
         inf = self.net.initial_inference(self.game.obs(state))   # net prior+value at the REAL state
         inf.state = state                            # node carries the true state (not a latent)
         inf.legal = self.game.legal_actions(board)   # true legality at EVERY node

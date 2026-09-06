@@ -122,7 +122,7 @@ def main():
     log = args.out / "m4_fim.jsonl"
 
     if args.eval_only:
-        ck = torch.load(args.ckpt, map_location="cpu")
+        ck = torch.load(args.ckpt, map_location="cpu", weights_only=True)
         ns = argparse.Namespace(**{**vars(args), **ck["config"],
                                    "kernel": ck["config"]["kernel"]})
         model = build_model("morphssm", FIM_VOCAB, ns).to(device)

@@ -6,7 +6,7 @@
 # GPU energy (nvidia-smi). NOT run to strength — DeepMind chess is the literature ceiling, this is a
 # measured systems datapoint only.
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_mzgeneral_chess_gpu.sh launch | status | fetch | terminate   (DRY_RUN=1 for launch)
 set -euo pipefail
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"

@@ -28,7 +28,7 @@ import warnings
 from dataclasses import dataclass
 from typing import Callable, ClassVar, Dict, List, Optional, Tuple, Union
 
-from .device import Device
+from .device import Device, device
 
 __all__ = [
     "Backend",
@@ -128,7 +128,7 @@ _WARNED: set = set()
 
 
 def _coerce_device_type(name: Union[str, Device]) -> str:
-    return name.type if isinstance(name, Device) else str(name)
+    return name.type if isinstance(name, Device) else device(name).type
 
 
 def _backend_up(backend: Optional[Backend]) -> bool:
@@ -145,14 +145,17 @@ def _backend_up(backend: Optional[Backend]) -> bool:
 def register_backend(backend: Backend, *, default: bool = False) -> Backend:
     """Insert ``backend`` keyed by ``backend.name`` (idempotent). Returns it."""
     global _DEFAULT_BACKEND
-    _BACKENDS[backend.name] = backend
+    if not isinstance(backend, Backend):
+        raise TypeError("backend must be an instance of Backend")
+    name = _coerce_device_type(backend.name)
+    _BACKENDS[name] = backend
     if default or _DEFAULT_BACKEND is None:
-        _DEFAULT_BACKEND = backend.name
+        _DEFAULT_BACKEND = name
     return backend
 
 
 def get_backend(name: Union[str, Device]) -> Optional[Backend]:
-    """Look up a backend by name or :class:`Device`; ``None`` if absent (never raises)."""
+    """Look up a backend by name or :class:`Device`; ``None`` if well-formed but absent."""
     return _BACKENDS.get(_coerce_device_type(name))
 
 
@@ -168,6 +171,10 @@ def list_backends() -> List[str]:
 
 def register_op(op_name: str, device_type: Union[str, Device], impl: Callable) -> None:
     """Register ``impl`` as the implementation of ``op_name`` on ``device_type``."""
+    if not isinstance(op_name, str) or not op_name.strip():
+        raise ValueError("op_name must be a non-empty string")
+    if not callable(impl):
+        raise TypeError("impl must be callable")
     _OPS[(op_name, _coerce_device_type(device_type))] = impl
 
 

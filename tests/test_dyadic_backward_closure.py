@@ -71,21 +71,24 @@ def test_signonly_dyadic_rule_is_zero_dsp():
     tgt = torch.tensor([[5, -3, 2]])
 
     with tt.assert_no_multiply():                # raises ClosureViolation on any hardware multiply
+        # Establish sign provenance inside the trace; coincidental runtime values
+        # in an arbitrary integer tensor are intentionally not trusted.
+        signed_schedule = torch.sign(sgn)
         # forward: y[o] = sum_i sgn[o,i] * (x[i] << exp[o,i])
         xe = x[:, None, :].expand(1, 3, 4)
-        y = (_shift(xe, exp) * sgn).sum(dim=2)            # int-sign mul + add-tree
+        y = (_shift(xe, exp) * signed_schedule).sum(dim=2)  # int-sign mux + add-tree
         gy = torch.sign(y - tgt)                          # L1 grad in {-1,0,+1}
 
         # grad wrt input: dL/dx = q(W)^T · gy  — multiplies by the *pow2* weights -> shift+add
         gye = gy[:, :, None].expand(1, 3, 4)
-        gx = (_shift(gye, exp) * sgn).sum(dim=1)          # noqa: F841 (the closed grad-input)
+        gx = (_shift(gye, exp) * signed_schedule).sum(dim=1)  # noqa: F841
 
         # weight-grad SIGN = sign(gy) (x) sign(x): a {-1,0,+1} outer product (int = logic, no DSP).
         gwsign = torch.sign(gy)[0][:, None] * torch.sign(x)[0][None, :]
 
         # SignSGD in the (sign, exponent) domain: nudge |w| up/down by 1 (int add) toward -grad.
         d = -gwsign
-        agree = (d == sgn)
+        agree = (d == signed_schedule)
         exp = exp + torch.where(d == 0, torch.zeros_like(exp), torch.where(agree, 1, -1))
     # reached here without ClosureViolation => the rule is multiplier-free per TikiTorch's tracer.
     assert exp.dtype == torch.int64

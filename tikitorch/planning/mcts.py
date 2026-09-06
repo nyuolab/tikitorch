@@ -35,6 +35,7 @@ this interface for validating the search against exact value iteration.)
 
 import heapq
 import math
+import numbers
 from dataclasses import dataclass
 
 import numpy as np
@@ -54,6 +55,71 @@ class MCTSConfig:
     dirichlet_alpha: float = 0.3
     root_exploration_frac: float = 0.0  # 0 -> deterministic (no root noise)
     seed: int = 0
+
+    def __post_init__(self):
+        if (
+            isinstance(self.num_simulations, bool)
+            or not isinstance(self.num_simulations, numbers.Integral)
+            or self.num_simulations < 1
+        ):
+            raise ValueError("num_simulations must be a positive integer")
+        if (
+            isinstance(self.c_puct, bool)
+            or not isinstance(self.c_puct, numbers.Real)
+            or not math.isfinite(self.c_puct)
+            or self.c_puct < 0
+        ):
+            raise ValueError("c_puct must be finite and non-negative")
+        if (
+            isinstance(self.gamma, bool)
+            or not isinstance(self.gamma, numbers.Real)
+            or not math.isfinite(self.gamma)
+            or not 0 <= self.gamma <= 1
+        ):
+            raise ValueError("gamma must be finite and in [0, 1]")
+        if self.backup not in ("max", "mean", "topk"):
+            raise ValueError(
+                f"backup must be 'max', 'mean', or 'topk', got {self.backup!r}"
+            )
+        if (
+            isinstance(self.topk_k, bool)
+            or not isinstance(self.topk_k, numbers.Integral)
+            or self.topk_k < 1
+        ):
+            raise ValueError("topk_k must be a positive integer")
+        if (
+            isinstance(self.players, bool)
+            or not isinstance(self.players, numbers.Integral)
+            or self.players not in (1, 2)
+        ):
+            raise ValueError("players must be 1 or 2")
+        if (
+            isinstance(self.dirichlet_alpha, bool)
+            or not isinstance(self.dirichlet_alpha, numbers.Real)
+            or not math.isfinite(self.dirichlet_alpha)
+            or self.dirichlet_alpha <= 0
+        ):
+            raise ValueError("dirichlet_alpha must be finite and positive")
+        if (
+            isinstance(self.root_exploration_frac, bool)
+            or not isinstance(self.root_exploration_frac, numbers.Real)
+            or not math.isfinite(self.root_exploration_frac)
+            or not 0 <= self.root_exploration_frac <= 1
+        ):
+            raise ValueError("root_exploration_frac must be in [0, 1]")
+        if isinstance(self.seed, bool) or not isinstance(self.seed, numbers.Integral):
+            raise ValueError("seed must be an integer")
+
+        # Canonical built-in scalars avoid surprises in ``range`` and NumPy RNGs
+        # when callers supply numpy integer/float scalar types.
+        self.num_simulations = int(self.num_simulations)
+        self.c_puct = float(self.c_puct)
+        self.gamma = float(self.gamma)
+        self.topk_k = int(self.topk_k)
+        self.players = int(self.players)
+        self.dirichlet_alpha = float(self.dirichlet_alpha)
+        self.root_exploration_frac = float(self.root_exploration_frac)
+        self.seed = int(self.seed)
 
 
 class _MinMaxStats:
@@ -131,7 +197,13 @@ class TropicalMCTS:
         inf = self.model.initial_inference(root_state)
         root.state = inf.state
         self._n_actions = len(inf.policy)
+        if self._n_actions < 1:
+            raise ValueError("model policy must contain at least one action")
         self._expand(root, inf.policy, inf.legal)
+        if not root.expanded():
+            # An explicitly empty legal-action set is the model interface's
+            # terminal-root signal. There is nothing to simulate or select.
+            return torch.zeros(self._n_actions, dtype=torch.float), float(inf.value)
         if cfg.root_exploration_frac > 0:
             self._add_root_noise(root)
 
@@ -162,6 +234,14 @@ class TropicalMCTS:
     # ---------------------------------------------------------------- internal
     def _expand(self, node, policy, legal=None):
         actions = range(len(policy)) if legal is None else list(legal)
+        if any(
+            not isinstance(a, numbers.Integral)
+            or isinstance(a, (bool, np.bool_))
+            or not 0 <= a < len(policy)
+            for a in actions
+        ):
+            raise ValueError("legal actions must be integer indices into the policy")
+        actions = [int(a) for a in actions]
         z = sum(float(policy[a]) for a in actions) or 1.0   # renormalise prior over legal
         for a in actions:
             node.children[a] = _Node(prior=float(policy[a]) / z)

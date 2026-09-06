@@ -2,8 +2,8 @@
 
 These guard the public surface: ``import
 tikitorch`` always succeeds, the submodules resolve, and the documented
-``model -> compute_loss -> backward -> step`` loop runs end-to-end once the
-``optim``/``models`` modules are available (skip-guarded until then).
+``model -> compute_loss -> backward -> step`` loop runs end-to-end with the
+required public ``optim`` and ``models`` modules.
 """
 import importlib
 

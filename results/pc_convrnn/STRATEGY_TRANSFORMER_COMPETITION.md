@@ -101,9 +101,10 @@ memory class, and no synchronization with anything else."* Two separate but
 related goals: **Goal A** — the live loop (one process, serve + intermittent
 in-place learning at ~2×; a mechanism claim) and **Goal B** — lifelong
 retention (what is learned persists usefully in the weights; a
-continual-learning claim). Validation = the V-gate ladder in
-`ontogenic_learner/NORTHSTAR_VALIDATION.md` (V0 fusion/cost-audit → V5
-full-card PMBus), fusing this branch's substrate with the ontogenic harness.
+continual-learning claim). Validation = the V-gate ladder in the separate
+[`ontogenic-agent` repository](https://github.com/nyuolab/ontogenic-agent/blob/main/ontogenic_learner/NORTHSTAR_VALIDATION.md)
+(V0 fusion/cost-audit → V5 full-card PMBus), fusing this branch's substrate with
+the ontogenic harness.
 
 ## 5. Program implications (adopted)
 

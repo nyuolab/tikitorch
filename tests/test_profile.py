@@ -88,6 +88,20 @@ def test_runtime_multiply_counts_toward_headline_even_if_structural_clean():
     assert report["closed"] is False
 
 
+def test_runtime_transcendental_is_not_reported_as_closed():
+    class RawExp(tnn.Module):
+        def forward(self, x):
+            return torch.exp(x)
+
+    report = profile_model(RawExp(), torch.randn(4))
+    assert report["structural_violations"] == []
+    assert report["runtime_multiplies"] == []
+    assert report["runtime_transcendental"]
+    assert report["multiplications"] >= 1
+    assert report["closed"] is False
+    assert "runtime transcendental closure violations" in format_report(report)
+
+
 def test_cli_main_runs_for_builtin(capsys):
     from tikitorch.__main__ import main
     rc = main(["TropicalCNN"])
@@ -95,6 +109,15 @@ def test_cli_main_runs_for_builtin(capsys):
     out = capsys.readouterr().out
     assert "multiplications: 0" in out
     assert "TropicalCNN" in out
+
+
+def test_cli_main_runs_for_mote_builtin(capsys):
+    from tikitorch.__main__ import main
+
+    rc = main(["MoTEModel"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "MoTEModel" in out
 
 
 def test_cli_main_unknown_model_errors(capsys):

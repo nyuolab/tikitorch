@@ -35,7 +35,7 @@
 # (agfi-0433370d93cb58a78) is NOT touched by this build (separate CL package +
 # separate AFI).
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   CLOCK_RECIPE_A=A1 bash scripts/run_morph_lm_d512_afi.sh launch     # pick recipe per recsynth
 #   bash scripts/run_morph_lm_d512_afi.sh {status|fetch|terminate}
 #   DRY_RUN=1 bash scripts/run_morph_lm_d512_afi.sh launch             # render user-data only

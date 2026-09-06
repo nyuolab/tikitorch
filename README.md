@@ -9,10 +9,10 @@ ecosystem.**
 
 TikiTorch keeps the tensors, autograd, modules, devices, and training-loop conventions
 that make PyTorch useful, then adds an unusual combination: hard and relaxed tropical
-models, three-level full-recipe closure auditing, replayable forward-route certificates,
-experimental local-learning APIs, and build-specific HLS/AWS F2 paths. “PyTorch-shaped”
-describes that interoperability and familiarity; TikiTorch is not affiliated with or
-endorsed by the PyTorch project.
+models, three-level closure auditing through full training steps, replayable forward-route
+certificates, experimental local-learning APIs, and build-specific HLS/AWS F2 paths.
+“PyTorch-shaped” describes that interoperability and familiarity; TikiTorch is not
+affiliated with or endorsed by the PyTorch project.
 
 | PyTorch provides | TikiTorch adds |
 |---|---|
@@ -24,18 +24,33 @@ endorsed by the PyTorch project.
 The result is a place to study a representation, its learning rule, and its deployment
 boundary together without presenting TikiTorch as a replacement for PyTorch.
 
+Here is that distinctive workflow in miniature: execute a hard min-plus layer, audit
+the concrete path, pack its winner route, and replay its selected input VJP without
+retaining the forward activations.
+
 ```python
+import torch
 import tikitorch as tt
 
-model = tt.models.MorphSSM(
-    d_model=64,
-    n_layers=4,
-    task_type="classification",
-    input_dim=1,
-    num_classes=10,
+layer = tt.nn.TropicalLinear(4, 3, use_softmin=False, tau=0.0)
+x = torch.tensor([[1.0, -2.0, 0.5, 3.0]])
+
+report = tt.closure_report(layer, x)
+assert report["inference_closed"]
+output, route = tt.autodiff.min_plus(x, layer.weight, layer.bias)
+
+tape = tt.autodiff.PackedRouteTape()
+tape.append("winner", route, cardinality=x.shape[-1])
+dx, _, _ = tt.autodiff.min_plus_vjp(
+    torch.ones_like(output), tape.read("winner"), x.shape[-1]
 )
-optimizer = tt.optim.PureTropicalSGD(model.parameters())
+
+print(report["inference_closed"], tape.nbytes, dx)
 ```
+
+Run the deterministic, checked version with
+`python -m examples.closure_workflow`. Its certificate covers that registered
+operator and supplied output cotangent—not arbitrary code or physical hardware.
 
 The project is organized as a reusable library first. It includes differentiable
 tropical operators, `nn.Module` layers, model families, optimizers, closure audits,
@@ -61,9 +76,9 @@ cd tikitorch
 python -m pip install -e ".[dev]"
 ```
 
-TikiTorch requires Python 3.9 or newer, PyTorch 2.0 or newer, and NumPy. The project is
-licensed under GPL-3.0-or-later. Version `0.2.0` is the current source version, not yet a
-published PyPI release.
+TikiTorch requires Python 3.9 or newer, PyTorch 2.0 or newer, and NumPy 1.24 or newer.
+The project is licensed under GPL-3.0-or-later. Version `0.2.0` is the current source
+version, not yet a published PyPI release.
 
 ## Library map
 
@@ -105,15 +120,19 @@ import tikitorch as tt
 
 model = tt.models.MorphSSM(
     d_model=64,
-    n_layers=4,
+    n_layers=1,
+    dropout=0.0,
+    tau=0.0,
+    use_soft=False,
+    tropical_proj=True,
     task_type="classification",
     input_dim=1,
-    num_classes=10,
+    num_classes=8,
 )
 optimizer = tt.optim.PureTropicalSGD(model.parameters())
 
-x = torch.randn(8, 784, 1)
-y = torch.randint(0, 10, (8,))
+x = torch.randn(8, 512, 1)
+y = torch.randint(0, 8, (8,))
 
 loss = model.compute_loss(x, y)
 loss.backward()
@@ -123,10 +142,13 @@ optimizer.zero_grad()
 
 This example uses the model's default classification loss. Treat it as a library
 quickstart, not as a closure certificate. To make a multiplier-free training claim,
-choose a closure-faithful loss and hardened model, then audit the entire step:
+choose a closure-faithful loss and audit the entire step. The hard, dropout-free,
+power-of-two-sized configuration above is selected so this second check passes:
 
 ```python
+loss_fn = tt.nn.TropicalPerceptronLoss()
 report = tt.closure_report(model, x, y, loss_fn, optimizer)
+assert report["training_closed"]
 tt.assert_training_closed(model, x, y, loss_fn, optimizer)
 ```
 
@@ -223,6 +245,9 @@ and
 - [Closure auditing](https://github.com/nyuolab/tikitorch/blob/main/docs/guide/closure.md)
 - [API reference](https://github.com/nyuolab/tikitorch/blob/main/docs/api/index.md)
 - [Research scope and evidence](https://github.com/nyuolab/tikitorch/blob/main/docs/research/index.md)
+- [Research-results map](https://github.com/nyuolab/tikitorch/blob/main/results/README.md)
+- [Research-runner map](https://github.com/nyuolab/tikitorch/blob/main/scripts/README.md)
+- [Tracked model zoo and loading guide](https://github.com/nyuolab/tikitorch/blob/main/zoo/README.md)
 - [Runnable examples](https://github.com/nyuolab/tikitorch/blob/main/examples/README.md)
 - [Notebooks](https://github.com/nyuolab/tikitorch/blob/main/notebooks/README.md)
 
@@ -261,13 +286,10 @@ workflows have additional toolchain requirements documented with their kernels.
 Before opening a change, keep public imports PyTorch-shaped, add an exactness test for
 new hard-routing semantics, and state any ordinary-arithmetic boundary in the API docs.
 
-Project expectations and release gates are documented in
-[CONTRIBUTING.md](https://github.com/nyuolab/tikitorch/blob/main/CONTRIBUTING.md),
-[GOVERNANCE.md](https://github.com/nyuolab/tikitorch/blob/main/GOVERNANCE.md),
-[CODE_OF_CONDUCT.md](https://github.com/nyuolab/tikitorch/blob/main/CODE_OF_CONDUCT.md),
-[SECURITY.md](https://github.com/nyuolab/tikitorch/blob/main/SECURITY.md), and
-[RELEASING.md](https://github.com/nyuolab/tikitorch/blob/main/RELEASING.md). The current tree is release-candidate preparation;
-creating a public tag or publishing a package remains a separate maintainer decision.
+Project expectations are documented in
+[CONTRIBUTING.md](https://github.com/nyuolab/tikitorch/blob/main/CONTRIBUTING.md).
+The current tree is release-candidate preparation; creating a public tag or
+publishing a package remains a separate maintainer decision.
 
 ## Citation and versioning
 

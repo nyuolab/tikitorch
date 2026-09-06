@@ -283,7 +283,7 @@ def l2r_fill(model, ids, free, n_samples=1, temperature=0.8, gen=None):
 # ---------------------------------------------------------------------------
 
 def load_ckpt(path, data, args):
-    ck = torch.load(path, map_location="cpu")
+    ck = torch.load(path, map_location="cpu", weights_only=True)
     ns = argparse.Namespace(d_model=ck["config"]["d_model"],
                             n_layers=ck["config"]["n_layers"],
                             kernel=ck["config"]["kernel"], dropout=0.0,

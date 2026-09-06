@@ -41,14 +41,26 @@ from .kernels import KernelSpec
 BOARD_RUNNERS: Dict[str, Callable] = {}
 
 
-def register_board_runner(entry: str, fn: Callable) -> None:
+def register_board_runner(entry: str, fn: Callable, *, replace: bool = False) -> None:
     """Register an application-supplied native runner for ``entry``.
 
     Registration is an explicit trust boundary: the caller is responsible for
     the runtime, named-layout, ABI, and build-manifest checks in ``BUILD_NATIVE.md``.
     The legacy function name is retained for compatibility; LOCAL host runners
-    use the same registry.
+    use the same registry. Replacing a different runner requires
+    ``replace=True`` so an import cannot silently change the trusted boundary.
     """
+    if not isinstance(entry, str) or not entry.strip() or "\x00" in entry:
+        raise ValueError("entry must be a non-empty kernel symbol without NUL bytes")
+    if entry != entry.strip():
+        raise ValueError("entry must not contain leading or trailing whitespace")
+    if not callable(fn):
+        raise TypeError("fn must be callable")
+    if entry in BOARD_RUNNERS and BOARD_RUNNERS[entry] is not fn and not replace:
+        raise ValueError(
+            f"a board runner is already registered for {entry!r}; "
+            "pass replace=True to replace it explicitly"
+        )
     BOARD_RUNNERS[entry] = fn
 
 

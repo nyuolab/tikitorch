@@ -45,7 +45,8 @@ def tropical_prune(model, sparsity: float = 0.5):
     taps least able to win are set to the absorbing element (-inf for dilation,
     +inf for erosion). Returns ``(pruned, total)`` tap counts. In-place.
     """
-    assert 0.0 <= sparsity < 1.0, "sparsity in [0, 1)"
+    if not 0.0 <= sparsity < 1.0:
+        raise ValueError(f"sparsity must be in [0, 1), got {sparsity!r}")
     pruned = total = 0
     for m in model.modules():
         w = getattr(m, "weight", None)

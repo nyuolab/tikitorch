@@ -16,6 +16,7 @@ Naming convention. Modules carry their original research names *and* a clean,
 PyTorch-idiomatic alias (e.g. ``TropicalLinearModule`` is also ``TropicalLinear``).
 Both names refer to the same class; prefer the clean alias in new code.
 """
+from __future__ import annotations
 
 import torch
 import torch.nn as nn
@@ -227,6 +228,7 @@ __all__ = [
     "TropicalPCLayer",
     "TropicalPCNet",
     "DyadicPCNet",
+    "SparseCodingPC",
     # soft relaxations
     "TropicalSoftMin",
     "TropicalSoftMax",
@@ -984,12 +986,19 @@ class DepthwiseMorphConv1d(nn.Module):
         self.tau = tau
         self.group_size = group_size
 
+        if group_size < 1:
+            raise ValueError(f"group_size must be positive, got {group_size}")
+
         if group_size == 1:
             # Pure depthwise: one kernel per channel
             self.weight = nn.Parameter(torch.empty(channels, kernel_size))
         else:
             # Grouped: one kernel per group, applied to group_size channels
-            assert channels % group_size == 0, f"channels ({channels}) must be divisible by group_size ({group_size})"
+            if channels % group_size != 0:
+                raise ValueError(
+                    f"channels ({channels}) must be divisible by group_size "
+                    f"({group_size})"
+                )
             n_groups = channels // group_size
             # Weight shape: (n_groups, group_size * kernel_size)
             # The max/min operates over group_size * kernel_size positions
@@ -1073,7 +1082,10 @@ class DepthwiseMorphConv1d(nn.Module):
         K per output, unlike the d×d projection). Depthwise (``group_size==1``)
         only. Matches ``forward`` bit-exactly.
         """
-        assert self.group_size == 1, "forward_with_routing: depthwise only (v1)"
+        if self.group_size != 1:
+            raise NotImplementedError(
+                "forward_with_routing currently supports depthwise group_size=1 only"
+            )
         B, C, L = x.shape
         K, d = self.kernel_size, self.dilation
         x_pad = F.pad(x, ((K - 1) * d, 0))
@@ -1238,8 +1250,8 @@ class MorphSSMLayer(nn.Module):
     """Single morphological SSM layer.
 
     Sequence mixing via depthwise morphological convolution (dilation or
-    erosion, alternating by layer index).  Channel mixing via standard
-    linear projection.
+    erosion, alternating by layer index). Channel mixing uses the configured
+    tropical, dense-linear, or identity projection.
 
     The morphological operation itself provides nonlinearity (max/min are
     nonlinear), so no explicit activation is needed.
@@ -1258,7 +1270,7 @@ class MorphSSMLayer(nn.Module):
     def __init__(self, d_model: int, kernel_size: int = 7, dilation: int = 1,
                  mode: str = "dilation", dropout: float = 0.1,
                  use_soft: bool = True, tau: float = 1.0,
-                 tropical_proj: bool = False, norm_type: str = "tropical",
+                 tropical_proj: bool | None = None, norm_type: str = "tropical",
                  group_size: int = 1, residual_scale: float = 1.0,
                  multi_scale: bool = False, kernel_sizes=(3, 7, 15),
                  out_proj_type=None):
@@ -1283,15 +1295,37 @@ class MorphSSMLayer(nn.Module):
         #                blocks' FFN/expert layers to do channel mixing)
         # Default is now the multiplier-free path (was "linear" — every MorphSSM/
         # MoTE block silently multiplied D^2 MACs/token, the H5 closure hole).
+        if tropical_proj is not None and not isinstance(tropical_proj, bool):
+            raise ValueError(
+                f"tropical_proj must be a bool or None, got {tropical_proj!r}"
+            )
         if out_proj_type is None:
-            out_proj_type = "tropical"
+            # ``None`` preserves the closure-first default.  An explicitly supplied
+            # legacy bool retains its documented meaning: False=dense, True=tropical.
+            out_proj_type = (
+                "tropical" if tropical_proj is None or tropical_proj else "linear"
+            )
+        elif out_proj_type not in ("tropical", "linear", "identity"):
+            raise ValueError(
+                "out_proj_type must be 'tropical', 'linear', or 'identity', "
+                f"got {out_proj_type!r}"
+            )
+        elif tropical_proj is not None:
+            legacy_type = "tropical" if tropical_proj else "linear"
+            if out_proj_type != legacy_type:
+                raise ValueError(
+                    "tropical_proj and out_proj_type select conflicting projections: "
+                    f"{legacy_type!r} versus {out_proj_type!r}"
+                )
         if out_proj_type == "tropical":
             # Intra-package reference.
             self.out_proj = TropicalDilationModule(d_model, d_model, use_softmax=False, tau=tau)
         elif out_proj_type == "identity":
             self.out_proj = nn.Identity()
-        else:  # "linear"
+        elif out_proj_type == "linear":
             self.out_proj = nn.Linear(d_model, d_model)
+        else:  # guarded above; retain a fail-closed check if construction changes
+            raise ValueError(f"unsupported out_proj_type {out_proj_type!r}")
         self.out_proj_type = out_proj_type
         self.post_norm = _make_norm(norm_type, d_model)
 
@@ -1388,10 +1422,25 @@ class TropicalAttention(nn.Module):
                  sink_eps: float = 1.0,
                  sink_iters: int = 5):
         super().__init__()
-        assert d_model % n_heads == 0
-        assert score_variant in _SCORE_VARIANTS, score_variant
-        assert proj_variant in ("dilation", "compositional", "topk"), proj_variant
-        assert agg_variant in _AGG_VARIANTS, agg_variant
+        if n_heads < 1:
+            raise ValueError(f"n_heads must be positive, got {n_heads}")
+        if d_model % n_heads != 0:
+            raise ValueError(
+                f"d_model ({d_model}) must be divisible by n_heads ({n_heads})"
+            )
+        if score_variant not in _SCORE_VARIANTS:
+            raise ValueError(
+                f"score_variant must be one of {_SCORE_VARIANTS}, got {score_variant!r}"
+            )
+        if proj_variant not in ("dilation", "compositional", "topk"):
+            raise ValueError(
+                "proj_variant must be 'dilation', 'compositional', or 'topk', "
+                f"got {proj_variant!r}"
+            )
+        if agg_variant not in _AGG_VARIANTS:
+            raise ValueError(
+                f"agg_variant must be one of {_AGG_VARIANTS}, got {agg_variant!r}"
+            )
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_head = d_model // n_heads
@@ -1453,8 +1502,13 @@ class TropicalAttention(nn.Module):
     def _make_proj(self, in_dim: int, out_dim: int) -> nn.Module:
         """Construct a tropical projection per self.proj_variant."""
         if self.proj_variant == "dilation":
-            return TropicalDilationModule(in_dim, out_dim, use_softmax=False,
-                                          init_identity=self.proj_init_identity)
+            return TropicalDilationModule(
+                in_dim,
+                out_dim,
+                use_softmax=self.tau > 0,
+                tau=self.tau,
+                init_identity=self.proj_init_identity,
+            )
         if self.proj_variant == "compositional":
             return CompositionalTropicalProjection(
                 in_dim, out_dim,
@@ -1567,10 +1621,24 @@ class TropicalShiftAttention(nn.Module):
                  shift_mode: str = "free",
                  agg_variant: str = "argmax", agg_topk_k: int = 2):
         super().__init__()
-        assert d_model % n_heads == 0
-        assert score_variant in _SCORE_VARIANTS, score_variant
-        assert shift_mode in ("free", "rope_relative"), shift_mode
-        assert agg_variant in _AGG_VARIANTS, agg_variant
+        if n_heads < 1:
+            raise ValueError(f"n_heads must be positive, got {n_heads}")
+        if d_model % n_heads != 0:
+            raise ValueError(
+                f"d_model ({d_model}) must be divisible by n_heads ({n_heads})"
+            )
+        if score_variant not in _SCORE_VARIANTS:
+            raise ValueError(
+                f"score_variant must be one of {_SCORE_VARIANTS}, got {score_variant!r}"
+            )
+        if shift_mode not in ("free", "rope_relative"):
+            raise ValueError(
+                f"shift_mode must be 'free' or 'rope_relative', got {shift_mode!r}"
+            )
+        if agg_variant not in _AGG_VARIANTS:
+            raise ValueError(
+                f"agg_variant must be one of {_AGG_VARIANTS}, got {agg_variant!r}"
+            )
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_head = d_model // n_heads
@@ -1649,7 +1717,8 @@ class TropicalTransformerBlock(nn.Module):
         super().__init__()
         self.norm1 = _make_norm(norm_type, d_model)
         if use_shift_attn:
-            assert max_seq_len is not None, "use_shift_attn=True requires max_seq_len"
+            if max_seq_len is None:
+                raise ValueError("use_shift_attn=True requires max_seq_len")
             self.attn = TropicalShiftAttention(
                 d_model, n_heads, max_seq_len=max_seq_len,
                 tau=tau, score_variant=score_variant,
@@ -1664,8 +1733,12 @@ class TropicalTransformerBlock(nn.Module):
         self.norm2 = _make_norm(norm_type, d_model)
 
         # Tropical FFN: Dilation (max-plus) -> Erosion (min-plus) = tropical rational
-        self.ffn_up = TropicalDilationModule(d_model, d_ff, use_softmax=False)
-        self.ffn_down = TropicalLinearModule(d_ff, d_model, use_softmin=False)
+        self.ffn_up = TropicalDilationModule(
+            d_model, d_ff, use_softmax=tau > 0, tau=tau
+        )
+        self.ffn_down = TropicalLinearModule(
+            d_ff, d_model, use_softmin=tau > 0, tau=tau
+        )
         self.dropout = TropicalDropout(dropout) if dropout > 0 else nn.Identity()
 
     def set_tau(self, tau: float) -> None:
@@ -1799,6 +1872,7 @@ class MoTEBlock(nn.Module):
                 layers = nn.ModuleList([
                     TropicalTransformerBlock(
                         d_model, n_heads, d_ff, dropout,
+                        tau=tau if use_soft else 0.0,
                         use_shift_attn=use_shift_attn,
                         max_seq_len=max_seq_len,
                         score_variant=score_variant,
@@ -1905,7 +1979,10 @@ class TropicalConv2d(nn.Module):
         super().__init__()
         if isinstance(kernel_size, int):
             kernel_size = (kernel_size, kernel_size)
-        assert mode in ("dilation", "erosion"), mode
+        if mode not in ("dilation", "erosion"):
+            raise ValueError(
+                f"mode must be 'dilation' or 'erosion', got {mode!r}"
+            )
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -2263,23 +2340,27 @@ class MaxPlusMin(nn.Module):
 
 
 class DilationErosionPerceptron(nn.Module):
-    """Dilation-Erosion Perceptron (DEP): a power-of-2 convex combo of dil + ero.
+    """Dilation-Erosion Perceptron (DEP): a shift-add convex combo of dil + ero.
 
     ``y_o = lam * max_j(x_j + Wd[o,j]) + (1-lam) * min_j(x_j + We[o,j]) + b_o``,
-    separate weights for dilation/erosion. ``lam`` must be a power of two (default
-    0.5 = a 1-bit shift) to stay multiplier-free. N-D capable; ``use_soft``/``tau``
-    give the logsumexp warmup. (Charisopoulos & Maragos; the morphological DEP.)
+    separate weights for dilation/erosion. ``lam`` is restricted to the quarter-grid
+    values 0.25, 0.5, and 0.75; quarter and half scales are shifts and 0.75 is composed
+    as ``0.5*x + 0.25*x``. N-D capable; ``use_soft``/``tau`` give the logsumexp warmup.
+    (Charisopoulos & Maragos; the morphological DEP.)
     """
 
     def __init__(self, in_features: int, out_features: int, lam: float = 0.5,
                  use_soft: bool = False, tau: float = 0.0):
         super().__init__()
-        # lam must be a power of two for closure (lam*x and (1-lam)*x are shifts).
-        assert lam in (0.25, 0.5, 0.75) or (lam > 0 and (1.0 / lam).is_integer()), \
-            "lam must be a power-of-two fraction (e.g. 0.5, 0.25) to stay closed"
+        if lam not in (0.25, 0.5, 0.75):
+            raise ValueError(
+                "lam must be 0.25, 0.5, or 0.75 so both mixture weights "
+                "have an explicit shift-add implementation"
+            )
         self.in_features = in_features
         self.out_features = out_features
         self.lam = lam
+        self._dilation_quarters = int(round(float(lam) * 4))
         self.use_soft = use_soft
         self.tau = tau
         self.Wd = nn.Parameter(torch.empty(out_features, in_features))
@@ -2292,6 +2373,17 @@ class DilationErosionPerceptron(nn.Module):
         self.tau = tau
         self.use_soft = tau > 0
 
+    @staticmethod
+    def _scale_quarters(value: torch.Tensor, quarters: int) -> torch.Tensor:
+        """Scale by 1/4, 1/2, or 3/4 using shifts and addition only."""
+        if quarters == 1:
+            return value * 0.25
+        if quarters == 2:
+            return value * 0.5
+        if quarters == 3:
+            return value * 0.5 + value * 0.25
+        raise ValueError(f"quarters must be 1, 2, or 3, got {quarters}")
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         ed = x.unsqueeze(-2) + self.Wd
         ee = x.unsqueeze(-2) + self.We
@@ -2301,7 +2393,11 @@ class DilationErosionPerceptron(nn.Module):
         else:
             dil = ed.max(dim=-1).values
             ero = ee.min(dim=-1).values
-        return self.lam * dil + (1.0 - self.lam) * ero + self.bias
+        return (
+            self._scale_quarters(dil, self._dilation_quarters)
+            + self._scale_quarters(ero, 4 - self._dilation_quarters)
+            + self.bias
+        )
 
 
 class MorphOpenClose2d(nn.Module):
@@ -2317,7 +2413,8 @@ class MorphOpenClose2d(nn.Module):
     def __init__(self, channels: int, kernel_size: int = 3, op: str = "opening",
                  use_soft: bool = False, tau: float = 0.0):
         super().__init__()
-        assert op in ("opening", "closing"), op
+        if op not in ("opening", "closing"):
+            raise ValueError(f"op must be 'opening' or 'closing', got {op!r}")
         self.op = op
         pad = kernel_size // 2
         first, second = (("erosion", "dilation") if op == "opening"
@@ -2373,7 +2470,8 @@ class TropicalRNNCell(nn.Module):
     def __init__(self, input_size: int, hidden_size: int, mode: str = "min",
                  tau: float = 0.0):
         super().__init__()
-        assert mode in ("min", "max"), mode
+        if mode not in ("min", "max"):
+            raise ValueError(f"mode must be 'min' or 'max', got {mode!r}")
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.mode = mode
@@ -2440,5 +2538,5 @@ MorphConv1d = DepthwiseMorphConv1d
 # ---------------------------------------------------------------------------
 
 from tikitorch.nn.predictive_coding import (  # noqa: E402,F401
-    TropicalPCLayer, TropicalPCNet, DyadicPCNet,
+    TropicalPCLayer, TropicalPCNet, DyadicPCNet, SparseCodingPC,
 )

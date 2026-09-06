@@ -16,7 +16,7 @@
 # run_timed() are reused VERBATIM). Measures the Vccint CORE rail via
 # fpga-describe-local-image -M — NOT true full-card PMBus (disclosed in the docs).
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_morph_lm_a2_f2.sh launch
 #   bash scripts/run_morph_lm_a2_f2.sh status
 #   bash scripts/run_morph_lm_a2_f2.sh fetch

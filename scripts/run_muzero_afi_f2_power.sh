@@ -7,7 +7,7 @@
 # What it measures: fpga-describe-local-image -M reports the loaded image's power (Vccint/Vccaux/Vccbram rails
 # + total CL power in W). Loaded-fabric power of the routed DSP=0 design is a real on-silicon datapoint; a
 # DYNAMIC (kernel-executing) measurement needs the PCIM host driver (follow-on; see README/AFI record).
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   AGFI=agfi-0b2c228a17e516e0a bash scripts/run_muzero_afi_f2_power.sh launch
 #   bash scripts/run_muzero_afi_f2_power.sh status
 #   bash scripts/run_muzero_afi_f2_power.sh fetch

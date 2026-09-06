@@ -814,7 +814,10 @@ class TropicalConv2dFn(torch.autograd.Function):
     def forward(ctx, x, weight, stride, padding, dilation, mode):
         B, Cin, H, W = x.shape
         Cout, Cin_w, Kh, Kw = weight.shape
-        assert Cin == Cin_w, f"in_channels mismatch: x has {Cin}, weight has {Cin_w}"
+        if Cin != Cin_w:
+            raise ValueError(
+                f"in_channels mismatch: x has {Cin}, weight has {Cin_w}"
+            )
         s, p, d = stride, padding, dilation
         Hout = (H + 2 * p - d * (Kh - 1) - 1) // s + 1
         Wout = (W + 2 * p - d * (Kw - 1) - 1) // s + 1

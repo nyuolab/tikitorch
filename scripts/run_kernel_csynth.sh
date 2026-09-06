@@ -3,7 +3,7 @@
 # kernel. Same robust pattern as run_wgrad_probe_csynth.sh but parameterized so multiple kernels can be
 # synthesized concurrently (per-kernel state dir). csynth needs NO FPGA hardware (cheap z1d build box).
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   KTOP=forge_fwd_gemm KTCL=synth_fwd_gemm.tcl bash scripts/run_kernel_csynth.sh launch
 #   KTOP=forge_fwd_gemm bash scripts/run_kernel_csynth.sh status   # / fetch / terminate
 # Requires (committed): tikitorch/hardware/hls/forge_kernels/{$KTCL, <$KTOP>.cpp}; the tcl must set

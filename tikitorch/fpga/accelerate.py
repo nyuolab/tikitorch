@@ -141,13 +141,18 @@ class AcceleratedModel(nn.Module):
                 "PyTorch-fallback path (or run the ordinary loop: "
                 "loss = model.compute_loss(x, y); loss.backward(); opt.step())."
             )
-        self._warn_fallback_once()
         opt = optimizer if optimizer is not None else self._optimizer
+        if opt is None:
+            raise ValueError(
+                "AcceleratedModel.train_step() on the PyTorch fallback requires an "
+                "optimizer (pass optimizer=... to accelerate() or train_step()). "
+                "No backward pass or parameter update was performed."
+            )
+        self._warn_fallback_once()
         loss = self.module.compute_loss(x, targets)
         loss.backward()
-        if opt is not None:
-            opt.step()
-            opt.zero_grad()
+        opt.step()
+        opt.zero_grad()
         return float(loss.item())
 
     def fpga(self, *, optimizer=None, strict: bool = False):  # type: ignore[override]

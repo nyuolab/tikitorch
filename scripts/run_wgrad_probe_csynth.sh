@@ -5,7 +5,7 @@
 # box with the FPGA Developer AMI (Vitis pre-installed; csynth needs NO FPGA hardware), run csynth via
 # user-data, upload the report to S3, self-terminate. No F2 (F2 is only for AFI loading on silicon).
 #
-#   export AWS_PROFILE=NYUMCResearchAdminFullAccess-739966866637
+#   export AWS_PROFILE=my-profile
 #   bash scripts/run_wgrad_probe_csynth.sh launch     # (DRY_RUN=1 to preview, no launch)
 #   bash scripts/run_wgrad_probe_csynth.sh status     # poll S3 (no SSH)
 #   bash scripts/run_wgrad_probe_csynth.sh fetch       # download the csynth report

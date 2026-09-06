@@ -121,8 +121,10 @@ def test_train_step_is_multiplier_free():
     torch.manual_seed(0)
     net = TropicalFFNet([784, 64, 64, 64], num_classes=10, goodness="topk", k=8)
     trainer = TropicalFFTrainer(net, lr_shift=4, momentum_bits=4, margin=1.0)
-    x = torch.rand(13, 784)                                  # NON-power-of-2 batch on purpose
-    y = torch.randint(0, 10, (13,))
+    # The local loss takes a mean, so a power-of-two batch makes that fixed
+    # reduction a shift. A non-dyadic extent is correctly rejected by the audit.
+    x = torch.rand(16, 784)
+    y = torch.randint(0, 10, (16,))
     x_pos = overlay_label(x, y, 10)
     x_neg = overlay_label(x, make_negative_labels(y, 10), 10)
 
@@ -138,8 +140,8 @@ def test_train_step_closed_for_max_goodness():
     torch.manual_seed(0)
     net = TropicalFFNet([64, 32, 32], num_classes=8, goodness="max")
     trainer = TropicalFFTrainer(net, lr_shift=5, momentum_bits=0, theta="adaptive")
-    x = torch.rand(10, 64)
-    y = torch.randint(0, 8, (10,))
+    x = torch.rand(16, 64)
+    y = torch.randint(0, 8, (16,))
     xp = overlay_label(x, y, 8)
     xn = overlay_label(x, make_negative_labels(y, 8), 8)
     with tt.assert_no_multiply():
@@ -233,7 +235,7 @@ def test_model_forward_forward_training_is_multiplier_free():
     torch.manual_seed(0)
     m = tt.models.TropicalForwardForward(d_model=64, n_layers=3, num_classes=10)
     trainer = m.make_trainer(lr_shift=4, margin=2.0)
-    x, y = torch.rand(13, 784), torch.randint(0, 10, (13,))   # non-pow-2 batch
+    x, y = torch.rand(16, 784), torch.randint(0, 10, (16,))
     with tt.assert_no_multiply():
         m.forward_forward_step(x, y, trainer)
 

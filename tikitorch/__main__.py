@@ -53,8 +53,17 @@ def _build(spec: str):
                                            task_type="lm", vocab_size=128)
         x = torch.randint(0, 128, (1, 16))
     elif name in ("mote", "motemodel"):
-        model = models.MoTEModel(d_model=64, n_experts=4, n_layers=2,
-                                 task_type="lm", vocab_size=128)
+        model = models.MoTEModel(
+            d_model=64,
+            n_experts=4,
+            expert_layers=1,
+            n_shared_pre=1,
+            n_shared_post=1,
+            use_soft=False,
+            tau=0.0,
+            task_type="lm",
+            vocab_size=128,
+        )
         x = torch.randint(0, 128, (1, 16))
     else:
         return None, None

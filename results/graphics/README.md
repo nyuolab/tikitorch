@@ -16,14 +16,16 @@ Schematics for the predictive-coding-on-FPGA-fabric program: scaling LLM trainin
 AWS F2 FPGAs using **predictive coding** as the local learning rule and **tropical/dyadic
 (multiply-free) arithmetic** as the compute substrate.
 
-Each figure exists in three forms:
+Each figure has two tracked forms and one optional generated form:
 
 - `NN_name.svg` — the hand-drawn, editable **source of truth**. Every number is real and
   traceable; edit here first.
 - `NN_name.png` — a flat render of the SVG (the Nano Banana input / quick preview).
-- `NN_name_nb.png` — the **Nano Banana Pro** (gemini-3-pro-image-preview) polished version,
-  generated from the PNG + the prompts baked into `nb_generate.py`. These are the
-  presentation-grade images.
+- `NN_name_nb.png` — an optional **Nano Banana Pro**
+  (gemini-3-pro-image-preview) polished render generated from the PNG and the
+  prompts in `nb_generate.py`. These nondeterministic, presentation-grade outputs
+  are ignored by Git; publish selected renders with an external presentation or
+  release artifact rather than in the source tree.
 
 Numbers were frozen on **2026-07-03** from the then-current predictive-coding
 research records. Historical branch and worktree names are not reproduction

@@ -2,8 +2,8 @@
 
 Each optimizer must (a) take a single .step() without error on a parameter that
 has a gradient, and (b) reduce a simple convex toy loss over a handful of steps.
-All tests are skip-guarded behind ``requires_optim`` so the suite stays green
-until the ``tikitorch.optim`` module is available, then activates automatically.
+The public ``tikitorch.optim`` module is required in a release checkout. The
+``requires_optim`` markers make each test's symbol dependency explicit.
 """
 import pytest
 import torch
@@ -235,16 +235,16 @@ def test_tropical_adam_training_step_is_multiplier_free():
     import tikitorch.algorithmic as A
     import tikitorch.functional as F
     from tikitorch.audit import find_training_multiplies
-    x, y = A.gen_running_max(6, 12, n_symbols=12, seed=0)
+    x, y = A.gen_running_max(8, 16, n_symbols=12, seed=0)
     C = A.get_task("running_max").n_symbols
     m = A.build_reasoner("running_max", d_model=32, n_layers=1, attention="tropical",
                          agg_variant="argmax", pos_mode="none")
     loss = lambda p, yy: F.tropical_perceptron_loss(p.reshape(-1, C), yy.reshape(-1))
     opt = optim.TropicalAdam(m.parameters())
-    find_training_multiplies(m, (x,), y, loss, optimizer=opt)         # build state
+    # Audit calls roll state back; intentionally build adaptive state outside it.
+    opt.zero_grad(); loss(m(x), y).backward(); opt.step()
     hits = find_training_multiplies(m, (x,), y, loss, optimizer=opt)  # streak/flip active
-    bad = [h for h in hits if h[0] != "elementwise-divide"]           # loss /n exempt
-    assert not bad, f"TropicalAdam update has DSP-critical ops: {bad}"
+    assert hits == []
 
 
 @requires_optim("TropicalAdam")
@@ -294,23 +294,22 @@ def test_new_closed_optimizer_reduces_loss(name):
 
 @pytest.mark.parametrize("name", _NEW_CLOSED)
 def test_new_closed_optimizer_training_step_is_multiplier_free(name):
-    # The full fwd+loss+backward+optimizer step must be zero-DSP. Run twice: the
-    # adaptive state (EMAs/counters/streaks) only activates on the second step.
+    # The full fwd+loss+backward+optimizer step must be zero-DSP. Adaptive state
+    # only activates after an intentional ordinary step; audits themselves roll back.
     if not hasattr(optim, name):
         pytest.skip(f"{name} not available")
     import tikitorch.algorithmic as A
     import tikitorch.functional as F
     from tikitorch.audit import find_training_multiplies
-    x, y = A.gen_running_max(6, 12, n_symbols=12, seed=0)
+    x, y = A.gen_running_max(8, 16, n_symbols=12, seed=0)
     C = A.get_task("running_max").n_symbols
     m = A.build_reasoner("running_max", d_model=32, n_layers=1, attention="tropical",
                          agg_variant="argmax", pos_mode="none")
     loss = lambda p, yy: F.tropical_perceptron_loss(p.reshape(-1, C), yy.reshape(-1))
     opt = _build_closed_opt(name, m.parameters(), base_shift=6)
-    find_training_multiplies(m, (x,), y, loss, optimizer=opt)         # build state
+    opt.zero_grad(); loss(m(x), y).backward(); opt.step()
     hits = find_training_multiplies(m, (x,), y, loss, optimizer=opt)  # adaptive active
-    bad = [h for h in hits if h[0] != "elementwise-divide"]           # loss /n exempt
-    assert not bad, f"{name} update has DSP-critical ops: {bad}"
+    assert hits == []
 
 
 @pytest.mark.parametrize("name", _NEW_CLOSED)

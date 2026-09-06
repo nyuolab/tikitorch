@@ -30,7 +30,7 @@ Wire protocol — one message = one framed numpy array, all fields LITTLE-ENDIAN
 
 Any magic, direction, length, or checksum mismatch raises ``WireError`` (a desynced TCP
 stream fails loudly instead of training on garbage). TCP preserves order per socket, so
-the same tag-order assertion as ``ThreadLink`` guards the schedule.
+the same explicit tag-order check as ``ThreadLink`` guards the schedule.
 
 Decoding also enforces ``MAX_WIRE_NDIM``, ``MAX_WIRE_AXIS_LENGTH``, and
 ``MAX_WIRE_PAYLOAD_BYTES`` before reading the payload.  These are per-frame resource
@@ -208,14 +208,26 @@ def recv_exact(sock: socket.socket, n: int) -> bytearray:
 class _QueueEndpoint:
     """A LOCAL hop (or the host-feed open end): a plain queue shared with the neighbour."""
 
-    def __init__(self, q):
+    def __init__(self, q, cancel_event):
         self.q = q
+        self._cancel_event = cancel_event
 
     def send(self, tag, arr):
-        self.q.put((tag, arr))
+        while not self._cancel_event.is_set():
+            try:
+                self.q.put((tag, arr), timeout=0.05)
+                return
+            except queue.Full:
+                continue
+        raise WireError("pipeline transport cancelled")
 
     def recv(self):
-        return self.q.get()                        # (tag, arr)
+        while not self._cancel_event.is_set():
+            try:
+                return self.q.get(timeout=0.05)    # (tag, arr)
+            except queue.Empty:
+                continue
+        raise WireError("pipeline transport cancelled")
 
     def close(self):
         pass
@@ -230,8 +242,10 @@ class _TcpEndpoint:
     — so both processes can be started in either order.
     """
 
-    def __init__(self, spec, direction, connect_timeout_s=10.0, io_timeout_s=None):
+    def __init__(self, spec, direction, cancel_event,
+                 connect_timeout_s=10.0, io_timeout_s=None):
         self.direction = direction
+        self._cancel_event = cancel_event
         self._timeout = float(connect_timeout_s)
         self._io_timeout = io_timeout_s
         self._sock = None
@@ -251,6 +265,8 @@ class _TcpEndpoint:
 
     def _ensure(self) -> socket.socket:
         with self._lock:
+            if self._cancel_event.is_set():
+                raise WireError("pipeline transport cancelled")
             if self._sock is not None:
                 return self._sock
             if self._listener is not None:                     # accept side
@@ -264,6 +280,8 @@ class _TcpEndpoint:
             else:                                              # connect side, w/ retry
                 deadline = time.monotonic() + self._timeout
                 while True:
+                    if self._cancel_event.is_set():
+                        raise WireError("pipeline transport cancelled")
                     try:
                         sock = socket.create_connection(self._addr, timeout=1.0)
                         break
@@ -302,16 +320,18 @@ class _TcpEndpoint:
         self._sock = self._listener = None
 
 
-def _make_endpoint(spec, direction, connect_timeout_s, io_timeout_s):
+def _make_endpoint(spec, direction, cancel_event, connect_timeout_s, io_timeout_s):
     """None -> open end; {'listen'|'connect': (host,port)} -> TCP; queue-like -> local."""
     if spec is None:
         return None
     if isinstance(spec, (_QueueEndpoint, _TcpEndpoint)):
         return spec
     if isinstance(spec, dict):
-        return _TcpEndpoint(spec, direction, connect_timeout_s, io_timeout_s)
+        return _TcpEndpoint(
+            spec, direction, cancel_event, connect_timeout_s, io_timeout_s
+        )
     if hasattr(spec, "put") and hasattr(spec, "get"):
-        return _QueueEndpoint(spec)
+        return _QueueEndpoint(spec, cancel_event)
     raise TypeError(f"endpoint must be None, a queue, or a TCP spec dict: {spec!r}")
 
 
@@ -326,12 +346,22 @@ class TcpLink(NeighborLink):
     """
 
     def __init__(self, stage, num_stages, fwd_in=None, fwd_out=None, bwd_in=None,
-                 bwd_out=None, quantize=None, connect_timeout_s=10.0, io_timeout_s=None):
+                 bwd_out=None, quantize=None, connect_timeout_s=10.0,
+                 io_timeout_s=None, cancel_event=None):
         super().__init__(stage, num_stages)
-        self._fwd_in = _make_endpoint(fwd_in, DIR_FWD, connect_timeout_s, io_timeout_s)
-        self._fwd_out = _make_endpoint(fwd_out, DIR_FWD, connect_timeout_s, io_timeout_s)
-        self._bwd_in = _make_endpoint(bwd_in, DIR_BWD, connect_timeout_s, io_timeout_s)
-        self._bwd_out = _make_endpoint(bwd_out, DIR_BWD, connect_timeout_s, io_timeout_s)
+        self._cancel_event = cancel_event or threading.Event()
+        self._fwd_in = _make_endpoint(
+            fwd_in, DIR_FWD, self._cancel_event, connect_timeout_s, io_timeout_s
+        )
+        self._fwd_out = _make_endpoint(
+            fwd_out, DIR_FWD, self._cancel_event, connect_timeout_s, io_timeout_s
+        )
+        self._bwd_in = _make_endpoint(
+            bwd_in, DIR_BWD, self._cancel_event, connect_timeout_s, io_timeout_s
+        )
+        self._bwd_out = _make_endpoint(
+            bwd_out, DIR_BWD, self._cancel_event, connect_timeout_s, io_timeout_s
+        )
         # quantize: callable applied to each neighbour message before send — models/implements
         # the silicon's lossy inter-chip encoding (e.g. the int16 error rescale). None = exact.
         self._quantize = quantize
@@ -349,6 +379,11 @@ class TcpLink(NeighborLink):
             if ep is not None:
                 ep.close()
 
+    def abort(self):
+        """Cancel local waiters and close sockets so peer operations fail promptly."""
+        self._cancel_event.set()
+        self.close()
+
     # forward dataflow ----------------------------------------------------------
     def send_forward(self, tag, act):
         if self._fwd_out is None:                  # last stage: nothing downstream
@@ -363,7 +398,10 @@ class TcpLink(NeighborLink):
         t0 = time.perf_counter()
         got_tag, act = self._fwd_in.recv()
         self.stats.wait_s_fwd += time.perf_counter() - t0
-        assert got_tag == tag, f"stage {self.stage} fwd order: want {tag} got {got_tag}"
+        if got_tag != tag:
+            raise WireError(
+                f"stage {self.stage} fwd order: want {tag} got {got_tag}"
+            )
         return act
 
     # backward dataflow ---------------------------------------------------------
@@ -380,7 +418,10 @@ class TcpLink(NeighborLink):
         t0 = time.perf_counter()
         got_tag, err = self._bwd_in.recv()
         self.stats.wait_s_bwd += time.perf_counter() - t0
-        assert got_tag == tag, f"stage {self.stage} bwd order: want {tag} got {got_tag}"
+        if got_tag != tag:
+            raise WireError(
+                f"stage {self.stage} bwd order: want {tag} got {got_tag}"
+            )
         return err
 
     # host injection at the open ends ------------------------------------------
@@ -409,14 +450,21 @@ def make_tcp_chain(num_stages: int, boundary: int, role: str, base_port: int = 4
     (backward); the LEFT process CONNECTS to ``host`` (the right box's address) — so
     only one box needs a reachable address, and either side may start first. The safe
     listener default is loopback; a cross-machine deployment must opt in to a specific
-    reachable interface (or ``0.0.0.0``) and apply the trust boundary documented in
-    ``SECURITY.md``. Connects retry for ``connect_timeout_s``.
+    reachable interface (or ``0.0.0.0``). The protocol is not authenticated or
+    encrypted: expose it only on a mutually trusted, firewalled network (or through
+    an authenticated tunnel). Connects retry for ``connect_timeout_s``.
     """
     if not 0 < boundary < num_stages:
         raise ValueError(f"boundary must split the chain: 0 < {boundary} < {num_stages}")
     if role not in ("left", "right"):
         raise ValueError(f"role must be 'left' or 'right', got {role!r}")
-    kw = dict(quantize=quantize, connect_timeout_s=connect_timeout_s, io_timeout_s=io_timeout_s)
+    cancel_event = threading.Event()
+    kw = dict(
+        quantize=quantize,
+        connect_timeout_s=connect_timeout_s,
+        io_timeout_s=io_timeout_s,
+        cancel_event=cancel_event,
+    )
     links = []
     if role == "left":
         # fq[l]/bq[l] feed INTO local stage l (host feeds fq[0]); boundary-1 talks TCP.
@@ -459,7 +507,15 @@ def make_tcp_links_local(num_stages: int, base_port: int = 41000, host: str = "1
     building the whole chain up-front never deadlocks. The open ends (host feed into
     stage 0 / error feed into stage S-1) stay local queues, as in ``ThreadLink``.
     """
-    kw = dict(quantize=quantize, connect_timeout_s=connect_timeout_s, io_timeout_s=io_timeout_s)
+    if num_stages < 1:
+        raise ValueError("num_stages must be at least 1")
+    cancel_event = threading.Event()
+    kw = dict(
+        quantize=quantize,
+        connect_timeout_s=connect_timeout_s,
+        io_timeout_s=io_timeout_s,
+        cancel_event=cancel_event,
+    )
     S = num_stages
     links = []
     for l in range(S):
@@ -489,21 +545,10 @@ def run_chain_segment(stages, links, inputs, targets, lr: float = 0.1, window: i
     """
     runner = PipelineRunner(stages, links, lr=lr, window=window, schedule=schedule)
     M = len(inputs)
+    if len(targets) != M:
+        raise ValueError(
+            f"inputs and targets must have the same length, got {M} and {len(targets)}"
+        )
     worker = runner._worker_1f1b if schedule == "1f1b" else runner._worker_gpipe
-    errors: list[tuple[int, BaseException]] = []
-
-    def _run(l):
-        try:
-            worker(l, inputs, targets, M)
-        except BaseException as e:                 # noqa: BLE001 — surfaced below
-            errors.append((l, e))
-
-    threads = [threading.Thread(target=_run, args=(l,)) for l in range(len(stages))]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    if errors:
-        l, first = errors[0]
-        raise RuntimeError(f"segment stage {links[l].stage} failed: {first!r}") from first
+    runner._run_workers(worker, inputs, targets, M)
     return dict(runner._losses)

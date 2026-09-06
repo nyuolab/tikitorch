@@ -7,7 +7,7 @@ cross-entropy.
 This script measures how loss conditioning changes a small host run. Everything
 is held fixed -- the same 1-layer tropical transformer
 at the silicon dims (D=128, V=128, D_FF=512), the same sign-based optimizer, the
-same seed, the same Shakespeare windows -- and only the loss conditioning varies:
+same seed, the same character windows -- and only the loss conditioning varies:
 
     perceptron        2-hot sign-valued gradient boundary
     tropical_ce       softmax - onehot, host-conditioned exact softmax
@@ -19,24 +19,19 @@ accuracy estimates.
 
 Usage::
 
-    python examples/closure_ce.py
+    python examples/closure_ce.py --smoke
     python examples/closure_ce.py --steps 1200 --seq-len 96 --tau 0.5
+    python examples/closure_ce.py --text path/to/corpus.txt
 """
 import argparse
-from pathlib import Path
 
 import torch
 
 import tikitorch as tt
 import tikitorch.optim as optim
+from _char_data import load_ascii_ids
 
 V = 128  # ASCII vocab, matching the silicon kernel
-
-
-def load_chars(path: str):
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
-    ids = torch.tensor([min(ord(c), V - 1) for c in text], dtype=torch.long)
-    return ids
 
 
 def sample_batch(ids, batch, seq_len, gen):
@@ -94,8 +89,10 @@ def train_one(loss_type, ids, args, eval_gen_state):
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--text", type=str,
-                   default=str(Path(__file__).resolve().parents[2] / "data" / "shakespeare_input.txt"))
+    p.add_argument("--text", type=str, default=None,
+                   help="UTF-8 corpus path (default: built-in deterministic text)")
+    p.add_argument("--smoke", action="store_true",
+                   help="Use a tiny configuration that checks the complete script quickly")
     p.add_argument("--steps", type=int, default=800)
     p.add_argument("--batch-size", type=int, default=24)
     p.add_argument("--seq-len", type=int, default=64)
@@ -111,12 +108,24 @@ def main():
     p.add_argument("--eval-batches", type=int, default=8)
     args = p.parse_args()
 
-    ids = load_chars(args.text)
+    if args.smoke:
+        args.steps = 1
+        args.batch_size = 2
+        args.seq_len = 8
+        args.d_model = 16
+        args.d_ff = 32
+        args.n_layers = 1
+        args.n_heads = 2
+        args.eval_batches = 1
+
+    ids, source = load_ascii_ids(args.text, vocab_size=V, min_length=args.seq_len + 1)
     chance = 1.0 / V
     # Majority-char baseline for context (predict the single most frequent char).
     maj = torch.bincount(ids, minlength=V).max().item() / ids.numel()
 
-    print(f"Shakespeare char-LM  |  D={args.d_model} V={V} D_FF={args.d_ff} "
+    if args.smoke:
+        print("SMOKE MODE: checks execution only; the one-step scores are not results.\n")
+    print(f"Character LM ({source})  |  D={args.d_model} V={V} D_FF={args.d_ff} "
           f"L={args.seq_len} heads={args.n_heads} layers={args.n_layers} tau={args.tau}")
     print(f"optimizer=SignSGD(lr={args.lr}, momentum={args.momentum})  "
           f"steps={args.steps}  batch={args.batch_size}")

@@ -68,15 +68,20 @@ class NativeHandle:
 
     def board_present(self) -> bool:
         """Probe whether the native endpoint is usable; LOCAL may return ``True``."""
+        handle = None
         try:
             handle = self._lib.tt_fpga_open(None)
             if not handle:
                 return False
-            present = bool(self._lib.tt_fpga_board_present(handle))
-            self._lib.tt_fpga_close(handle)
-            return present
+            return bool(self._lib.tt_fpga_board_present(handle))
         except Exception:  # noqa: BLE001 — a probe must never crash availability checks
             return False
+        finally:
+            if handle:
+                try:
+                    self._lib.tt_fpga_close(handle)
+                except Exception:  # noqa: BLE001 — availability probes never escape
+                    pass
 
 
 def _candidate_paths() -> list:

@@ -1,12 +1,8 @@
 """Shared pytest fixtures / skip helpers for the TikiTorch suite.
 
-Some modules (``functional`` + the core ``nn`` layers) are always present, so
-those tests run unconditionally. Others (``optim``, ``models``, the higher-level
-``nn`` blocks) may not be available in a given working tree. Tests that depend on
-those optional symbols are guarded with the ``requires_*`` skip markers below:
-they turn green the moment
-the corresponding module is populated, and skip cleanly until then instead of
-hard-failing the whole run.
+The public modules are present in a release checkout. The ``requires_*`` helpers
+make an individual test's symbol or native-board dependency explicit; CI's import
+and export-contract tests separately require the complete public package surface.
 """
 import pytest
 import torch
@@ -47,26 +43,26 @@ def _attr_present(module_name: str, attr: str) -> bool:
 
 
 def requires_optim(name: str):
-    """Skip unless ``tikitorch.optim.<name>`` exists."""
+    """Mark a test that requires ``tikitorch.optim.<name>``."""
     return pytest.mark.skipif(
         not _attr_present("tikitorch.optim", name),
-        reason=f"tikitorch.optim.{name} not implemented yet",
+        reason=f"required tikitorch.optim.{name} symbol is unavailable",
     )
 
 
 def requires_model(name: str):
-    """Skip unless ``tikitorch.models.<name>`` exists."""
+    """Mark a test that requires ``tikitorch.models.<name>``."""
     return pytest.mark.skipif(
         not _attr_present("tikitorch.models", name),
-        reason=f"tikitorch.models.{name} not implemented yet",
+        reason=f"required tikitorch.models.{name} symbol is unavailable",
     )
 
 
 def requires_nn(name: str):
-    """Skip unless ``tikitorch.nn.<name>`` exists."""
+    """Mark a test that requires ``tikitorch.nn.<name>``."""
     return pytest.mark.skipif(
         not _attr_present("tikitorch.nn", name),
-        reason=f"tikitorch.nn.{name} not implemented yet",
+        reason=f"required tikitorch.nn.{name} symbol is unavailable",
     )
 
 

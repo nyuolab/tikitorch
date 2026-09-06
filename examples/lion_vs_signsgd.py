@@ -16,7 +16,7 @@ float-EMA number. We print ``momentum_density`` so you can see the momentum is
 actually alive.
 
 Three optimizers, everything else fixed (same tropical transformer at the silicon
-dims, same seed, same Shakespeare windows, same loss conditioning):
+dims, same seed, same character windows, same loss conditioning):
 
     signsgd     W -= lr * sign(grad)                 multiplier-free baseline
     lion_int    sign of integer-fixed-point momentum multiplier-free candidate
@@ -24,23 +24,19 @@ dims, same seed, same Shakespeare windows, same loss conditioning):
 
 Usage::
 
-    python examples/lion_vs_signsgd.py
+    python examples/lion_vs_signsgd.py --smoke
     python examples/lion_vs_signsgd.py --loss perceptron --steps 1200
+    python examples/lion_vs_signsgd.py --text path/to/corpus.txt
 """
 import argparse
-from pathlib import Path
 
 import torch
 
 import tikitorch as tt
 import tikitorch.optim as optim
+from _char_data import load_ascii_ids
 
 V = 128
-
-
-def load_chars(path):
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
-    return torch.tensor([min(ord(c), V - 1) for c in text], dtype=torch.long)
 
 
 def sample_batch(ids, batch, seq_len, gen):
@@ -110,8 +106,10 @@ def train_one(kind, ids, args):
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--text", type=str,
-                   default=str(Path(__file__).resolve().parents[2] / "data" / "shakespeare_input.txt"))
+    p.add_argument("--text", type=str, default=None,
+                   help="UTF-8 corpus path (default: built-in deterministic text)")
+    p.add_argument("--smoke", action="store_true",
+                   help="Use a tiny configuration that checks the complete script quickly")
     p.add_argument("--loss", type=str, default="tropical_ce",
                    choices=["tropical_ce", "tropical_ce_lut", "perceptron", "cross_entropy"],
                    help="loss conditioning held fixed across optimizers")
@@ -130,8 +128,20 @@ def main():
     p.add_argument("--eval-batches", type=int, default=8)
     args = p.parse_args()
 
-    ids = load_chars(args.text)
-    print(f"Shakespeare char-LM  |  D={args.d_model} V={V} heads={args.n_heads} "
+    if args.smoke:
+        args.steps = 1
+        args.batch_size = 2
+        args.seq_len = 8
+        args.d_model = 16
+        args.d_ff = 32
+        args.n_layers = 1
+        args.n_heads = 2
+        args.eval_batches = 1
+
+    ids, source = load_ascii_ids(args.text, vocab_size=V, min_length=args.seq_len + 1)
+    if args.smoke:
+        print("SMOKE MODE: checks execution only; the one-step scores are not results.\n")
+    print(f"Character LM ({source})  |  D={args.d_model} V={V} heads={args.n_heads} "
           f"layers={args.n_layers} tau={args.tau}  loss={args.loss}")
     print(f"steps={args.steps}  batch={args.batch_size}  seq_len={args.seq_len}\n")
 

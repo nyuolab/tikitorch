@@ -1,7 +1,8 @@
 # Tutorials (notebooks)
 
-Six self-contained Jupyter notebooks, runnable in Google Colab (the first cell installs
-TikiTorch). They are generated from
+Six self-contained Jupyter notebooks are runnable in Google Colab. The first setup
+cell installs TikiTorch; notebook 03 also installs its optional vision dependency.
+They are generated from
 [`notebooks/_build_notebooks.py`](https://github.com/nyuolab/tikitorch/blob/main/notebooks/_build_notebooks.py)
 — edit the generator, not the `.ipynb`, then regenerate with
 `python notebooks/_build_notebooks.py`.

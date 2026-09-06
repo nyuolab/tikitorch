@@ -1,13 +1,14 @@
-"""Reference: closed (zero-DSP) image/sequence benchmarks.
+"""Reference: hard-deployment image/sequence benchmarks.
 
-Trains a multiplier-free `MorphSSM` on the sequence tasks the README reports
-(sequential-MNIST len-784, sequential-CIFAR len-1024) under the verified CLOSED
-recipe (dropout=0, soft→hard `tau` anneal, `PureTropicalSGD` — the full-budget
-closed default) with a LARGE EFFECTIVE BATCH via gradient accumulation
+Trains a `MorphSSM` on the sequence tasks the README reports (sequential-MNIST
+len-784, sequential-CIFAR len-1024) with dropout=0, soft→hard `tau` annealing,
+`PureTropicalSGD`, and a LARGE EFFECTIVE BATCH via gradient accumulation
 (the morphological-net large-batch requirement, arXiv:2505.09710: `sign(Σ grad)` is
 the large-batch majority-vote sign). Accuracy is reported at HARD `tau=0` — the form
-that maps to the zero-DSP FPGA kernel — and each model is `tt.save`d + certified with
-`tt.closure_report` (inference_closed + training_zero_dsp).
+that maps to the zero-DSP FPGA kernel — and each saved model's executed inference path
+is checked with `tt.closure_report`. The soft relaxation and ordinary classification
+loss used during fitting are not a zero-DSP training recipe; this runner does not make
+or record a training-closure claim.
 
 Usage:
     python scripts/run_closed_benchmarks.py --task smnist --epochs 15 --batch-size 64 --accum-steps 8 --device cuda
@@ -31,6 +32,30 @@ TASKS = {
     "scifar": dict(seq_len=1024, input_dim=3, dataset="CIFAR10", num_classes=10),
     "mnist":  dict(seq_len=784, input_dim=1, dataset="MNIST", num_classes=10),
 }
+
+
+def _checkpoint_config(args, spec):
+    """Constructor-only config for the hard model written to the ``.tt`` bundle.
+
+    Training starts from a soft relaxation, but ``_evaluate`` switches every routed
+    module to the hard path before the checkpoint is written.  Keep experiment names,
+    optimizer details, and measured results in the JSON sidecar rather than passing
+    them to ``MorphSSM(**config)`` through :func:`tt.load`.
+    """
+    return dict(
+        d_model=args.d_model,
+        n_layers=args.n_layers,
+        dropout=0.0,
+        tau=0.0,
+        use_soft=False,
+        out_proj_type="tropical",
+        norm_type="tropical",
+        head_type="tropical",
+        input_type="tropical",
+        task_type="classification",
+        input_dim=spec["input_dim"],
+        num_classes=spec["num_classes"],
+    )
 
 
 def _loaders(task, batch_size, data_root):
@@ -77,22 +102,26 @@ def main():
     p.add_argument("--data-root", default="./data")
     p.add_argument("--out", default="results/closed_benchmarks")
     args = p.parse_args()
+    if args.epochs < 1:
+        p.error("--epochs must be at least 1")
     spec = TASKS[args.task]
     os.makedirs(args.out, exist_ok=True)
     print(f"task={args.task} device={args.device} eff_batch={args.batch_size*args.accum_steps}")
 
-    # CLOSED recipe: dropout=0 (inverted dropout is a train-time multiply), soft tau
-    # for dense gradients (annealed to hard), PureTropicalSGD (bit-shift lr + int momentum).
-    model = tt.models.MorphSSM(d_model=args.d_model, n_layers=args.n_layers,
-                               task_type="classification", input_dim=spec["input_dim"],
-                               num_classes=spec["num_classes"], dropout=0.0,
-                               tau=1.0, use_soft=True).to(args.device)
+    # Hard-deployment recipe: dropout=0, a soft tau for dense gradients annealed to
+    # the hard inference path, and PureTropicalSGD (bit-shift lr + int momentum).
+    # The soft fitting path itself is ordinary arithmetic, not a zero-DSP claim.
+    checkpoint_config = _checkpoint_config(args, spec)
+    training_config = {**checkpoint_config, "tau": 1.0, "use_soft": True}
+    model = tt.models.MorphSSM(**training_config).to(args.device)
     print(f"MorphSSM params: {model.param_count:,}")
     opt = optim.PureTropicalSGD(model.parameters(), lr_shift=args.lr_shift, momentum_bits=4)
     train_loader, test_loader = _loaders(args.task, args.batch_size, args.data_root)
 
     t0 = time.time()
     best = 0.0
+    best_epoch = None
+    best_state = None
     for epoch in range(args.epochs):
         model.train()
         if hasattr(model, "set_tau"):       # soft -> hard anneal across training
@@ -107,23 +136,33 @@ def main():
             if (step + 1) % args.accum_steps == 0:
                 opt.step(); opt.zero_grad()                        # sign(Σ grad) majority vote
         acc = _evaluate(model, test_loader, args.device)
-        best = max(best, acc)
+        if best_state is None or acc > best:
+            best = acc
+            best_epoch = epoch
+            best_state = {
+                name: tensor.detach().cpu().clone()
+                for name, tensor in model.state_dict().items()
+            }
         print(f"epoch {epoch:2d}  mean_loss {running/(step+1):.4f}  hard_tau_test_acc {acc:.4f}  "
               f"({round(time.time()-t0)}s)")
 
-    # --- save + certify closure on a held-out batch ---
+    # --- restore the measured best model, then save + certify a held-out batch ---
+    model.load_state_dict(best_state)
     path = os.path.join(args.out, f"{args.task}_morphssm.tt")
-    cfg = dict(task=args.task, model="MorphSSM", d_model=args.d_model, n_layers=args.n_layers,
-               input_dim=spec["input_dim"], num_classes=spec["num_classes"],
-               optimizer="PureTropicalSGD", recipe="closed",
-               eff_batch=args.batch_size * args.accum_steps, best_acc=round(best, 4))
-    tt.save(model, path, config=cfg)
+    metrics = dict(task=args.task, model="MorphSSM", d_model=args.d_model,
+                   n_layers=args.n_layers, input_dim=spec["input_dim"],
+                   num_classes=spec["num_classes"], optimizer="PureTropicalSGD",
+                   recipe="soft_to_hard", eff_batch=args.batch_size * args.accum_steps,
+                   best_acc=round(best, 4), best_epoch=best_epoch,
+                   training_zero_dsp=False)
+    model.set_tau(0.0)
+    tt.save(model, path, config=checkpoint_config)
     xb, yb = next(iter(test_loader)); xb = xb[:16].to(args.device)
     model.set_tau(0.0)
     rep = tt.closure_report(model, example_inputs=(xb,))
-    cfg["inference_closed"] = rep["inference_closed"]
+    metrics["inference_closed"] = rep["inference_closed"]
     with open(os.path.join(args.out, f"{args.task}_metrics.json"), "w") as fh:
-        json.dump(cfg, fh, indent=2)
+        json.dump(metrics, fh, indent=2)
     print(f"BEST hard-tau acc={best:.4f}  inference_closed={rep['inference_closed']}  -> {path}")
 
 

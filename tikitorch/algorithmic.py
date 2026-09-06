@@ -69,7 +69,7 @@ __all__ = [
     "micro_f1",
     # task registry + model + harness
     "Task", "TASKS", "get_task", "TropicalReasoner", "build_reasoner",
-    "evaluate_task",
+    "evaluate_task", "load_reasoner",
 ]
 
 
@@ -615,8 +615,15 @@ class TropicalReasoner(FpgaAccelerable, tnn.Module):
                  pos_mode: str = "rope_shift", agg_variant: str = "argmax",
                  agg_topk_k: int = 2, head: str = "auto"):
         super().__init__()
-        assert pos_mode in ("none", "abs", "rope_shift"), pos_mode
-        assert head in ("auto", "tropical", "linear"), head
+        if pos_mode not in ("none", "abs", "rope_shift"):
+            raise ValueError(
+                "pos_mode must be 'none', 'abs', or 'rope_shift', "
+                f"got {pos_mode!r}"
+            )
+        if head not in ("auto", "tropical", "linear"):
+            raise ValueError(
+                f"head must be 'auto', 'tropical', or 'linear', got {head!r}"
+            )
         self.task = task
         self.attention = attention
         # rope_shift only applies where position matters; order-free tasks need none.
@@ -709,7 +716,10 @@ def load_reasoner(path: str, map_location: str = "cpu") -> TropicalReasoner:
     """
     import torch as _torch
     import tikitorch as _tt
-    cfg = _torch.load(path, map_location=map_location, weights_only=False)["config"]
+    checkpoint = _torch.load(path, map_location=map_location, weights_only=True)
+    if not isinstance(checkpoint, dict) or "config" not in checkpoint:
+        raise ValueError(f"{path!r} is not a TikiTorch algorithmic checkpoint")
+    cfg = checkpoint["config"]
     task = get_task(cfg["task"])
     if cfg.get("n_symbols") is not None and task.input_kind == "tokens":
         task = Task(**{**task.__dict__, "n_symbols": cfg["n_symbols"]})

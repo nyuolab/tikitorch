@@ -27,6 +27,21 @@ class Device:
     type: str = "cpu"
     index: Optional[int] = None
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.type, str) or not self.type.strip():
+            raise ValueError("device type must be a non-empty string")
+        if ":" in self.type:
+            raise ValueError(
+                "Device.type must not contain an index; use device('type:index')"
+            )
+        if (
+            self.index is not None
+            and (isinstance(self.index, bool) or not isinstance(self.index, int)
+                 or self.index < 0)
+        ):
+            raise ValueError("device index must be a non-negative integer or None")
+        object.__setattr__(self, "type", self.type.strip().lower())
+
     @property
     def is_cpu(self) -> bool:
         """``True`` for the canonical CPU device (the always-present default)."""
@@ -99,7 +114,7 @@ def device(spec: Union[str, "Device", None] = "cpu") -> Device:
 
     if ":" in text:
         type_part, _, index_part = text.partition(":")
-        type_part = type_part.strip()
+        type_part = type_part.strip().lower()
         index_part = index_part.strip()
         if not type_part or not index_part:
             raise ValueError(f"malformed device spec {spec!r} (expected 'type' or 'type:index')")
@@ -111,4 +126,4 @@ def device(spec: Union[str, "Device", None] = "cpu") -> Device:
             raise ValueError(f"device index in {spec!r} must be non-negative")
         return Device(type_part, index)
 
-    return Device(text)
+    return Device(text.lower())

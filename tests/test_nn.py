@@ -108,7 +108,7 @@ def test_soft_to_hard_equivalence_in_module():
 
 
 # ---------------------------------------------------------------------------
-# Optional building blocks (skip-guarded until they land)
+# Higher-level public building blocks
 # ---------------------------------------------------------------------------
 
 
