@@ -669,7 +669,11 @@ class MorphPCEngine:
             conv = layer.morph_conv
             cr = cache["conv_route"]
             if cr.dtype.is_floating_point:
-                cs = (cr != 0).any(dim=(0, 2))
+                # ``Tensor.any`` did not accept a tuple of dimensions until
+                # after our PyTorch 2.0 compatibility floor.  Reduce the same
+                # original dimensions sequentially (after dim 0 is removed,
+                # original dim 2 becomes dim 1).
+                cs = (cr != 0).any(dim=0).any(dim=1)
                 all_routes_hard = False
             else:
                 cc = torch.zeros_like(conv.weight, dtype=torch.int64)
