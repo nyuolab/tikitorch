@@ -10,6 +10,8 @@ properties that matter:
      classification accuracy well above chance, including at depth, where the
      unit-gain 0/1 Jacobian is supposed to keep error from vanishing.
 """
+from copy import deepcopy
+
 import pytest
 import torch
 
@@ -59,7 +61,7 @@ def test_pc_step_is_closure_clean():
     y = torch.randint(0, 4, (16,))
     target = net._make_target(y, 4, ref=x)
     with tt.assert_no_multiply():
-        out = net.infer(x, target=target, n_steps=6, init="forward")
+        out = net.infer(x, target=target, n_steps=6, init="forward", host_metrics=False)
         net._apply_local_updates(out["states"])
 
 
@@ -68,8 +70,29 @@ def test_sign_mode_also_closure_clean():
     x = torch.randn(8, 20)
     target = net._make_target(torch.randint(0, 4, (8,)), 4, ref=x)
     with tt.assert_no_multiply():
-        out = net.infer(x, target=target, n_steps=4, init="forward")
+        out = net.infer(x, target=target, n_steps=4, init="forward", host_metrics=False)
         net._apply_local_updates(out["states"])
+
+
+def test_tensor_diagnostics_preserve_updates_and_expose_raw_winner_counts():
+    # The total winner count is non-dyadic, so its normalized fraction belongs
+    # outside the audited recipe even though its raw count is add/compare only.
+    tensor_net = TropicalPCNet([8, 8, 3], gamma_shift=2, lr_shift=5)
+    host_net = deepcopy(tensor_net)
+    x, y = torch.randn(8, 8), torch.randint(0, 3, (8,))
+    with tt.assert_no_multiply():
+        tensor_metrics = tensor_net.train_step(x, y, n_steps=3, host_metrics=False)
+    host_metrics = host_net.train_step(x, y, n_steps=3)
+    assert all(isinstance(value, torch.Tensor) for value in tensor_metrics["energy"])
+    assert [float(value) for value in tensor_metrics["energy"]] == host_metrics["energy"]
+    assert float(tensor_metrics["train_acc"]) == host_metrics["train_acc"]
+    assert tensor_metrics["winner_flip_frac"] is None
+    assert int(tensor_metrics["winner_flip_count"]) / tensor_metrics["winner_total_count"] == host_metrics["winner_flip_frac"]
+    for tensor_parameter, host_parameter in zip(tensor_net.parameters(), host_net.parameters()):
+        torch.testing.assert_close(tensor_parameter, host_parameter, rtol=0, atol=0)
+    with pytest.raises(tt.ClosureViolation, match="_local_scalar_dense"):
+        with tt.assert_no_multiply():
+            host_net.train_step(x, y, n_steps=1)
 
 
 def test_forward_init_zeros_interior_error():

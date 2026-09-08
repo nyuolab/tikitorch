@@ -7,7 +7,9 @@ name = "tikitorch"
 version = "0.2.0"
 description = "PyTorch-shaped infrastructure for tropical and hard-routed deep learning."
 readme = "README.md"
-requires-python = ">=3.9"
+# This is the validated support window in .github/workflows/ci.yml. Widen it
+# together with the test matrix, rather than advertising untested interpreters.
+requires-python = ">=3.9,<3.13"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 authors = [

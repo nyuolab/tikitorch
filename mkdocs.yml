@@ -54,6 +54,7 @@ nav:
       - Choosing a model and recipe: guide/choosing-a-model.md
       - Architectures: guide/architecture.md
       - Auditing closure: guide/closure.md
+      - Training with route tapes: guide/route-training.md
       - Why tropical for ML/DL: guide/why-tropical-ml.md
       - Tropical geometry of neural nets: guide/tropical-geometry.md
       - Beyond deep learning: guide/beyond-deep-learning.md
@@ -84,3 +85,6 @@ nav:
   - Research:
       - Scope and evidence: research/index.md
       - Claim ledger: research/CLAIM_LEDGER.md
+  - Release validation: release_validation.md
+  - Codebase audit: codebase_audit_2026-09-08.md
+  - Release and impact roadmap: release_impact_roadmap.md

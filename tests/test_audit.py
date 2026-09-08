@@ -104,6 +104,219 @@ def test_runtime_checker_pow2_multiply_is_a_shift():
     assert find_runtime_multiplies(Pow2(), torch.randn(3)) == []
 
 
+def test_runtime_unknown_special_op_is_inconclusive_and_fails_closed():
+    """A newly encountered tensor op must never inherit an implicit safe verdict."""
+    import tikitorch as tt
+
+    class UnknownSpecial(torch.nn.Module):
+        def forward(self, x):
+            return torch.special.entr(x)
+
+    x = torch.full((3,), 0.5)
+    report = tt.closure_report(UnknownSpecial(), x, harden_tau=False)
+    assert report["inference_closed"] is False
+    assert report["inference_status"] == "inconclusive"
+    assert report["inference_inconclusive"] is True
+    assert report["inference_violations"] == []
+    assert any(
+        category == "unknown-operation" and "special_entr" in op
+        for category, op in report["inference_unknown"]
+    )
+    coverage = report["coverage"]["inference"]
+    assert coverage["audit_semantics"] == "strict-eager-v3"
+    assert coverage["mode"] == "eval"
+    assert coverage["harden_tau"] is False
+    assert coverage["harden_tau_applied"] is False
+    assert coverage["dtypes"] == ["torch.float32"]
+    assert coverage["devices"] == ["cpu"]
+    assert coverage["unknown_operator_calls"] >= 1
+    with pytest.raises(AssertionError, match="unknown operation"):
+        tt.assert_closed_runtime(UnknownSpecial(), x, harden_tau=False)
+
+
+def test_runtime_lgamma_is_a_known_transcendental_violation():
+    import tikitorch as tt
+
+    class Lgamma(torch.nn.Module):
+        def forward(self, x):
+            return torch.lgamma(x)
+
+    report = tt.closure_report(Lgamma(), torch.full((2,), 1.5))
+    assert report["inference_status"] == "violated"
+    assert report["inference_unknown"] == []
+    assert any(
+        category == "transcendental" and "lgamma" in op
+        for category, op in report["inference_violations"]
+    )
+
+
+def test_previously_unlisted_linalg_and_fused_ops_cannot_certify():
+    import tikitorch as tt
+
+    class Linalg(torch.nn.Module):
+        def forward(self, x):
+            return torch.linalg.svdvals(x)
+
+    linalg_report = tt.closure_report(Linalg(), torch.eye(2))
+    assert linalg_report["inference_closed"] is False
+    assert linalg_report["inference_status"] == "violated"
+    assert any(
+        category == "linalg-arithmetic" and "linalg_svd" in op
+        for category, op in linalg_report["inference_violations"]
+    )
+
+    if not hasattr(torch.ops.aten, "_addmm_activation"):
+        pytest.skip("this PyTorch build does not expose aten._addmm_activation")
+
+    class UnknownFused(torch.nn.Module):
+        def forward(self, x):
+            return torch.ops.aten._addmm_activation.default(
+                torch.zeros_like(x), x, x
+            )
+
+    fused_report = tt.closure_report(UnknownFused(), torch.eye(2))
+    assert fused_report["inference_closed"] is False
+    assert fused_report["inference_status"] == "inconclusive"
+    assert any(
+        category == "unknown-operation" and "_addmm_activation" in op
+        for category, op in fused_report["inference_unknown"]
+    )
+
+
+def test_runtime_safe_registry_produces_versioned_closed_coverage():
+    import tikitorch as tt
+
+    class SafePath(torch.nn.Module):
+        def forward(self, x):
+            shifted = x / 8.0
+            return torch.maximum(shifted, x).sum()
+
+    report = tt.closure_report(SafePath(), torch.arange(8.0), harden_tau=False)
+    assert report["schema_version"] == "tikitorch.closure-report.v2"
+    assert report["audit_semantics"] == "strict-eager-v3"
+    assert report["inference"] == []
+    assert report["inference_status"] == "closed"
+    assert report["inference_closed"] is True
+    coverage = report["coverage"]["inference"]
+    assert coverage["certified"] is True
+    assert coverage["unknown_operators"] == []
+    assert coverage["safe_operator_calls"] == coverage["observed_operator_calls"]
+
+
+def test_coverage_metadata_includes_intermediate_tensor_dtypes():
+    import tikitorch as tt
+
+    class Cast(torch.nn.Module):
+        def forward(self, value):
+            return value.to(torch.float64)
+
+    report = tt.closure_report(Cast(), torch.ones(2, dtype=torch.float32))
+    assert report["coverage"]["inference"]["dtypes"] == [
+        "torch.float32",
+        "torch.float64",
+    ]
+
+
+def test_safe_aten_basename_does_not_allow_an_opaque_custom_operator():
+    import tikitorch as tt
+
+    library = torch.library.Library("tikitorch_audit_test", "DEF")
+    library.define("sum(Tensor value) -> Tensor")
+    library.impl("sum", lambda value: value, "CompositeExplicitAutograd")
+
+    with pytest.raises(tt.ClosureViolation, match="unknown-operation"):
+        with tt.assert_no_multiply():
+            torch.ops.tikitorch_audit_test.sum.default(torch.ones(2))
+
+
+def test_overloaded_index_and_scatter_arithmetic_is_schema_checked():
+    import tikitorch as tt
+
+    value = torch.zeros(3)
+    source = torch.ones(2)
+    index = torch.tensor([0, 2])
+    with tt.assert_no_multiply():
+        torch.index_add(value, 0, index, source, alpha=0.5)
+        torch.ops.aten.index_add_.default(
+            value.clone(), 0, index, source, alpha=0.5
+        )
+        torch.ops.aten.scatter.reduce(value, 0, index, source, reduce="add")
+        torch.ops.aten.scatter_.reduce(
+            value.clone(), 0, index, source, reduce="add"
+        )
+        torch.scatter_reduce(value, 0, index, source, reduce="amax")
+
+    with pytest.raises(tt.ClosureViolation, match="scalar-multiply"):
+        with tt.assert_no_multiply():
+            torch.index_add(value, 0, index, source, alpha=3)
+    with pytest.raises(tt.ClosureViolation, match="scalar-multiply"):
+        with tt.assert_no_multiply():
+            torch.ops.aten.index_add_.default(
+                value.clone(), 0, index, source, alpha=3
+            )
+    with pytest.raises(tt.ClosureViolation, match="elementwise-multiply"):
+        with tt.assert_no_multiply():
+            torch.ops.aten.scatter.reduce(
+                value, 0, index, source, reduce="multiply"
+            )
+    with pytest.raises(tt.ClosureViolation, match="elementwise-multiply"):
+        with tt.assert_no_multiply():
+            torch.ops.aten.scatter_.reduce(
+                value.clone(), 0, index, source, reduce="multiply"
+            )
+    with pytest.raises(tt.ClosureViolation, match="elementwise-multiply"):
+        with tt.assert_no_multiply():
+            torch.scatter_reduce(value, 0, index, source, reduce="prod")
+
+
+def test_embedding_backward_frequency_scaling_is_not_plain_index_add():
+    import tikitorch as tt
+
+    gradient = torch.ones(3, 2)
+    index = torch.tensor([0, 1, 0])
+    with tt.assert_no_multiply():
+        torch.ops.aten.embedding_dense_backward.default(
+            gradient, index, 3, -1, False
+        )
+    with pytest.raises(tt.ClosureViolation, match="elementwise-divide"):
+        with tt.assert_no_multiply():
+            torch.ops.aten.embedding_dense_backward.default(
+                gradient, index, 3, -1, True
+            )
+
+
+def test_rng_registry_separates_uniform_bits_from_gaussian_arithmetic():
+    import tikitorch as tt
+
+    with tt.assert_no_multiply():
+        torch.rand(4)
+        torch.empty(4).uniform_(-0.5, 0.5)
+
+    for operation in (
+        lambda: torch.randn(4),
+        lambda: torch.normal(0.0, 1.0, size=(4,)),
+        lambda: torch.empty(4).uniform_(-1.0, 2.0),
+    ):
+        with pytest.raises(tt.ClosureViolation, match="random-generation-arithmetic"):
+            with tt.assert_no_multiply():
+                operation()
+
+
+def test_frexp_certifies_exponent_extraction_not_mantissa_arithmetic():
+    import tikitorch as tt
+
+    value = torch.arange(1.0, 5.0)
+    decomposition_source = torch.full((4,), 3.0)
+    with tt.assert_no_multiply():
+        _mantissa, exponent = torch.frexp(decomposition_source)
+        value * torch.exp2(exponent)
+
+    with pytest.raises(tt.ClosureViolation, match="elementwise-multiply"):
+        with tt.assert_no_multiply():
+            mantissa, _exponent = torch.frexp(decomposition_source)
+            value * mantissa
+
+
 @pytest.mark.parametrize(
     "operation",
     [
@@ -154,9 +367,10 @@ def test_tensor_values_do_not_establish_shift_provenance():
 
     # In contrast, a literal scalar and an explicitly rounded exponent have
     # operation-derived shift provenance and are closure-clean.
+    exponent_source = torch.randn(8)
     with tt.assert_no_multiply():
         left * 0.5
-        exponent = torch.round(torch.randn(8))
+        exponent = torch.round(exponent_source)
         left * torch.exp2(exponent)
 
 
@@ -307,9 +521,11 @@ def test_linalg_arithmetic_is_flagged(operation):
 def test_power_of_two_mean_and_add_alpha_are_static_shifts():
     import tikitorch as tt
 
+    left = torch.randn(8)
+    right = torch.randn(8)
     with tt.assert_no_multiply():
-        torch.randn(8).mean()
-        torch.add(torch.randn(8), torch.randn(8), alpha=-0.25)
+        left.mean()
+        torch.add(left, right, alpha=-0.25)
 
 
 # --- Level-B training-closure check (forward + loss + backward + optimizer) ---
@@ -628,6 +844,16 @@ def test_closure_report_one_call_inference_and_training():
     rep = tt.closure_report(m, x, y, perc, optimizer=optim.PureTropicalSGD(m.parameters(), lr_shift=4))
     assert rep["inference_closed"] is True
     assert rep["training_zero_dsp"] is True          # closed recipe -> zero-DSP training
+    assert rep["training_status"] == "closed"
+    assert rep["training_unknown"] == []
+    training_coverage = rep["coverage"]["training"]
+    assert training_coverage["audit_semantics"] == "strict-eager-v3"
+    assert training_coverage["mode"] == "train"
+    assert training_coverage["harden_tau"] is True
+    assert training_coverage["harden_tau_applied"] is True
+    assert "cpu" in training_coverage["devices"]
+    assert "torch.float32" in training_coverage["dtypes"]
+    assert "torch.int64" in training_coverage["dtypes"]
 
 
 def test_inference_closed_by_construction_for_tropical_models():
@@ -662,8 +888,9 @@ def test_tropical_dropout_keeps_training_zero_dsp():
 
     # contrast: the raw nn.Dropout it replaced rescales by 1/(1-p); at non-pow2 p that is a
     # real multiply the closure guard flags (1/(1-0.3)=1.43); TropicalDropout(0.3) does not.
+    dropout_input = torch.randn(256)
     with tt.assert_no_multiply():
-        ttnn.TropicalDropout(0.3).train()(torch.randn(256))
+        ttnn.TropicalDropout(0.3).train()(dropout_input)
     with pytest.raises(tt.ClosureViolation):
         with tt.assert_no_multiply():
-            nn.Dropout(0.3).train()(torch.randn(256))
+            nn.Dropout(0.3).train()(dropout_input)

@@ -5,22 +5,24 @@ which makes them useful targets for non-GPU accelerator experiments. This packag
 is the seam those accelerators plug into: a small, PyTorch-flavored dispatch layer.
 
 * :class:`Device` / :func:`device` — a logical device handle (``tt.device('fpga')``),
-  spelled like ``torch.device`` but living one level up (tropical tensors stay
-  ordinary CPU ``torch.Tensor`` s; see :mod:`tikitorch.backend.device`).
+  spelled like ``torch.device`` but living one level up (tensor storage remains
+  on its existing PyTorch device; see :mod:`tikitorch.backend.device`).
 * :class:`Backend` / :class:`BackendCapabilities` — the single extension point. A
   new backend subclasses :class:`Backend`, declares its capabilities, and calls
   ``.register()``.
 * :func:`register_op` / :func:`dispatch` — a per-device op registry with
-  **transparent CPU fallback**: an op with no available device implementation
-  silently runs the CPU reference (one-time :class:`BackendFallbackWarning`).
-  The registered CPU reference is returned with a warning. Equivalence remains the
-  responsibility of the registered implementation and its tests.
+  **transparent PyTorch fallback**: an op with no available logical-device
+  implementation runs the reference on its input tensors' existing device
+  (one-time :class:`BackendFallbackWarning`). Equivalence remains the responsibility
+  of the registered implementation and its tests.
 * :func:`to` — a logical mover, the ``.to(device)`` analogue.
 
 The CPU backend is registered at import and **auto-binds every op in
 :mod:`tikitorch.functional` as the default implementation** — the *same* callable
 objects. Dispatch lookup itself still has ordinary Python call overhead.
-The seam is consulted only when a non-CPU device is explicitly requested.
+The public tropical linear modules consult this seam. Omitting their logical
+device uses :func:`get_default_device`; :func:`to` can tag a module tree for an
+op-dispatch backend without moving its tensor storage.
 
 Idiomatic usage::
 
@@ -34,8 +36,7 @@ the same way — FPGA is simply the first consumer.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
-from typing import Iterator, Union
+from typing import Union
 
 from .device import Device, FpgaAccelerable, device
 from .registry import (
@@ -47,13 +48,17 @@ from .registry import (
     _reset_fallback_warnings as _reset_fallback_warnings,  # re-exported for tests
     _warn_fallback,
     available_backends,
+    default_device,
     dispatch,
+    get_default_device,
     get_backend,
+    is_reference_dispatch,
     is_op_supported,
     list_backends,
     list_ops,
     register_backend,
     register_op,
+    set_default_device,
 )
 
 __all__ = [
@@ -70,6 +75,7 @@ __all__ = [
     "list_backends",
     "register_op",
     "dispatch",
+    "is_reference_dispatch",
     "is_op_supported",
     "list_ops",
     "to",
@@ -86,65 +92,46 @@ _as_device = device
 CpuBackend().register(default=True)
 _autoregister_cpu_ops()
 
-# Process-wide default logical device (consulted when a device is omitted).
-_DEFAULT_DEVICE: Device = Device("cpu")
-
-
-def get_default_device() -> Device:
-    """Return the current process-wide default logical device."""
-    return _DEFAULT_DEVICE
-
-
-def set_default_device(dev: Union[str, Device]) -> None:
-    """Set the process-wide default logical device (mirrors ``torch.set_default_device``)."""
-    global _DEFAULT_DEVICE
-    _DEFAULT_DEVICE = _as_device(dev)
-
-
-@contextmanager
-def default_device(dev: Union[str, Device]) -> Iterator[Device]:
-    """Scope the default logical device for the duration of a ``with`` block."""
-    global _DEFAULT_DEVICE
-    previous = _DEFAULT_DEVICE
-    _DEFAULT_DEVICE = _as_device(dev)
-    try:
-        yield _DEFAULT_DEVICE
-    finally:
-        _DEFAULT_DEVICE = previous
-
-
 def to(obj, device: Union[str, Device, None] = None):
     """Move a model (logically) to a TikiTorch device — the ``.to(device)`` analogue.
 
-    * ``nn.Module`` + CPU device  -> the same module object, unchanged.
+    * ``nn.Module`` + CPU device -> the same module, tagged for reference dispatch.
     * ``nn.Module`` + a backend that *can* bind models (``capabilities().model_binding``,
       e.g. ``'fpga'``) -> ``backend.accelerate(obj)``. This holds regardless of board
       availability: the returned wrapper itself runs on device when bound and does the
       transparent CPU fallback (with a one-time warning at ``train_step`` time) when not.
-    * ``nn.Module`` + a non-binding or unknown device -> the module unchanged, plus a
-      one-time :class:`BackendFallbackWarning`.
-    * ``torch.Tensor`` + a non-CPU device -> the tensor unchanged (tropical tensors
-      stay on torch CPU; the logical device only selects a backend), plus a
-      one-time warning.
+    * ``nn.Module`` + an op-dispatch backend -> the same module tree, tagged so its
+      public tropical layers resolve operations from that backend.
+    * ``nn.Module`` + an unknown device -> the tagged module unchanged, plus a
+      one-time :class:`BackendFallbackWarning`; operations use their PyTorch reference.
+    * ``torch.Tensor`` + a non-CPU logical device -> the tensor unchanged, including
+      its physical PyTorch device, plus a one-time warning.
 
-    Unsupported logical devices fall back to CPU with a warning. Errors raised by the
-    selected implementation itself are not swallowed.
+    Unsupported logical devices use the PyTorch reference on the tensor's existing
+    physical device, with a warning. Errors raised by the selected implementation
+    itself are not swallowed.
     """
-    dev = _as_device(device) if device is not None else _DEFAULT_DEVICE
-
-    if dev.is_cpu:
-        return obj
+    dev = _as_device(device) if device is not None else get_default_device()
 
     backend = get_backend(dev)
 
-    # torch.Tensor: logical devices never move storage.
     import torch
 
+    def tag_module_tree(module) -> None:
+        for child in module.modules():
+            child._tt_device = dev
+
+    if dev.is_cpu:
+        if isinstance(obj, torch.nn.Module):
+            tag_module_tree(obj)
+        return obj
+
+    # torch.Tensor: logical devices never move storage.
     if isinstance(obj, torch.Tensor):
         _warn_fallback(
             ("to-tensor", dev.type),
             f"tikitorch.to(): tensors are not moved to logical device {dev!s} "
-            f"(tropical tensors stay on torch CPU; the device selects a backend). "
+            f"(storage remains on {obj.device}; the logical device selects a backend). "
             f"Returning the tensor unchanged.",
         )
         return obj
@@ -153,12 +140,19 @@ def to(obj, device: Union[str, Device, None] = None):
     if backend is not None and backend.capabilities().model_binding:
         return backend.accelerate(obj, device=dev)
 
+    if isinstance(obj, torch.nn.Module) and backend is not None \
+            and backend.capabilities().op_dispatch:
+        tag_module_tree(obj)
+        return obj
+
     _warn_fallback(
         ("to-module", dev.type),
         f"tikitorch.to(): no model-binding backend available for device {dev!s}; "
-        f"returning the model unchanged (it will run on CPU).",
+        f"returning the model unchanged with PyTorch reference fallback.",
     )
-    if hasattr(obj, "__dict__"):
+    if isinstance(obj, torch.nn.Module):
+        tag_module_tree(obj)
+    elif hasattr(obj, "__dict__"):
         try:
             obj._tt_device = dev  # advisory tag; harmless if unused
         except Exception:  # noqa: BLE001

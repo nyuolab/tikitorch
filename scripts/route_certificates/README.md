@@ -1,6 +1,6 @@
 # Route-certificate experiments
 
-These scripts own the software experiments for the route-certificate paper. Run them
+These scripts own the software experiments for the unified TikiTorch manuscript. Run them
 as modules from the TikiTorch repository root so provenance resolves against this
 checkout.
 
@@ -14,6 +14,7 @@ checkout.
 | `actual_model_benchmark.py` | Actual MorphSSM benchmark with isolated workers and incident records |
 | `saved_state_audit.py` | Actual MorphSSM retained-state accounting |
 | `compiled_resource_benchmark.py` | Consolidated five-arm grid, peak/proxy accounting, and frozen systems gates |
+| `training_benchmark.py` | Current device-native five-arm full-step protocol, repeated-update parity, checkpoint policies and learning checks |
 | `provenance.py` | Shared manifests, digests, environment records, and append-only helpers |
 
 Smoke-check the actual-model configurations without starting a measured run:
@@ -36,5 +37,9 @@ scientific row after creation. Preserve failed runs and fallbacks as incidents, 
 every retained row to a clean commit, command, environment, configuration, input/model
 digests, and schema version.
 
-The current Python implementations establish exactness and accounting. They are not the
-paper's pending compiled five-arm systems benchmark.
+The historical Python/serialized protocols and current device-native protocol
+must not share claim-bearing rows. `training_benchmark.py` now executes native
+compiled numerical paths, but the small CPU validation is not a completed
+multi-scale GPU or matched-quality study. See the unified
+[experiment protocol](../../manuscript/EXPERIMENT_PROTOCOL.md) and
+[evidence ledger](../../manuscript/EVIDENCE_LEDGER.md).

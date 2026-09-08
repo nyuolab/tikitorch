@@ -270,7 +270,7 @@ class TropicalPCNet(nn.Module):
     @torch.no_grad()
     def infer(self, x0: torch.Tensor, target: Optional[torch.Tensor] = None,
               n_steps: int = 8, init: str = "forward",
-              learn_every: int = 0):
+              learn_every: int = 0, *, host_metrics: bool = True):
         """Settle the latent states (and optionally do iPC weight updates).
 
         ``target`` (if given) clamps the top state x_L; x_0 is always clamped to
@@ -279,6 +279,12 @@ class TropicalPCNet(nn.Module):
         (L1 energy per sweep, plus winner-flip fraction vs the feed-forward
         pass).  ``learn_every > 0`` enables incremental PC: a local weight step
         every ``learn_every`` sweeps.
+
+        ``host_metrics=False`` leaves energy diagnostics as scalar tensors and
+        returns ``winner_flip_count`` / ``winner_total_count`` instead of
+        calculating a normalized fraction (``winner_flip_frac`` is None).
+        Divide these counts outside a strict closure audit: the denominator
+        need not be dyadic. The default preserves Python-float diagnostics.
         """
         states = self._init_states(x0, init)        # states[0] == x0 in both modes
         ff_idx = None
@@ -306,7 +312,8 @@ class TropicalPCNet(nn.Module):
             # settling below descends the L2 energy (1/2)||eps||^2, so this L1
             # trace is NOT the minimized objective and can rise while L2 falls;
             # use it as a rough convergence signal, not a strict monotone check.
-            energy_trace.append(float(sum(e.abs().sum().item() for e in errs)))
+            energy = sum(e.abs().sum() for e in errs)
+            energy_trace.append(float(energy) if host_metrics else energy)
 
             # update each free interior state: grad = eps_l - S_{l+1}^T eps_{l+1}
             new_states = list(states)
@@ -325,16 +332,22 @@ class TropicalPCNet(nn.Module):
 
         # final winners/errors for the flip diagnostic and post-settle learning
         flip_frac = None
+        chg, tot = None, 0
         if ff_idx is not None and last_idx is not None:
             tot = sum(i.numel() for i in last_idx)
-            chg = sum((a != b).sum().item() for a, b in zip(ff_idx, last_idx))
-            flip_frac = chg / max(tot, 1)
+            chg = sum((a != b).sum() for a, b in zip(ff_idx, last_idx))
+            if host_metrics:
+                flip_frac = int(chg) / max(tot, 1)
+
+        trace = {"energy": energy_trace, "winner_flip_frac": flip_frac}
+        if not host_metrics:
+            trace.update(winner_flip_count=chg, winner_total_count=tot)
 
         return {
             "states": states,
             "errors": last_errors,
             "indices": last_idx,
-            "trace": {"energy": energy_trace, "winner_flip_frac": flip_frac},
+            "trace": trace,
         }
 
     @torch.no_grad()
@@ -347,22 +360,32 @@ class TropicalPCNet(nn.Module):
     # -- training / prediction ----------------------------------------------
     @torch.no_grad()
     def train_step(self, x0: torch.Tensor, y: torch.Tensor, n_steps: int = 8,
-                   init: str = "forward", learn_every: int = 0):
-        """One supervised PC update on a batch. Returns a small metrics dict."""
+                   init: str = "forward", learn_every: int = 0, *,
+                   host_metrics: bool = True):
+        """One supervised PC update; see :meth:`infer` for tensor diagnostics.
+
+        Set ``host_metrics=False`` while auditing the numerical recipe. Accuracy
+        remains a tensor mean (a shift only for a power-of-two batch); winner
+        counts remain unnormalized, without a hidden Python-scalar boundary.
+        """
         n_classes = self.dims[-1]
         target = self._make_target(y, n_classes, ref=x0)
         out = self.infer(x0, target=target, n_steps=n_steps, init=init,
-                         learn_every=learn_every)
+                         learn_every=learn_every, host_metrics=host_metrics)
         if not learn_every:                            # post-settle (standard) update
             self._apply_local_updates(out["states"])
         # train-time accuracy from the feed-forward readout (what test uses)
         logits = self.predict_logits(x0)
-        acc = (logits.argmax(dim=-1) == y).float().mean().item()
-        return {
+        acc = (logits.argmax(dim=-1) == y).float().mean()
+        result = {
             "energy": out["trace"]["energy"],
             "winner_flip_frac": out["trace"]["winner_flip_frac"],
-            "train_acc": acc,
+            "train_acc": float(acc) if host_metrics else acc,
         }
+        if not host_metrics:
+            result.update(winner_flip_count=out["trace"]["winner_flip_count"],
+                          winner_total_count=out["trace"]["winner_total_count"])
+        return result
 
     @torch.no_grad()
     def predict_logits(self, x0: torch.Tensor) -> torch.Tensor:

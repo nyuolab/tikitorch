@@ -9,13 +9,13 @@
 #      PC_ARGS (optional extra args).
 set -u
 REPO="${REPO:-$PWD}"
-S3_RESULTS="${S3_RESULTS:?set S3_RESULTS}"
 PYBIN="${PYBIN:-python3}"
 PC_TASK="${PC_TASK:-mnist}"
 PC_ARGS="${PC_ARGS:-}"
-cd "$REPO"
-export PYTHONPATH="$REPO" PYTHONUNBUFFERED=1 DATA_ROOT="$REPO/_data"
-mkdir -p results/predictive_coding
+case "${1:-}" in
+  ""|--print-commands) ;;
+  *) echo "usage: $0 [--print-commands]" >&2; exit 2 ;;
+esac
 
 MATRIX_ARGS=(--matrix)
 case "$PC_TASK" in
@@ -24,6 +24,41 @@ case "$PC_TASK" in
   convlm) SCRIPT=scripts/pc_charlm_conv.py; OUT=results/predictive_coding/charlm_conv_localpc.jsonl; MATRIX_ARGS=() ;;
   *) echo "[pcscale] unknown PC_TASK=$PC_TASK"; exit 2 ;;
 esac
+
+# Parse once without eval. Invalid quoting fails before uploads, result cleanup,
+# or background jobs. The offline renderer follows this same argument path.
+EXTRA_ARGS=()
+ARGS_FILE=""
+if [ -n "$PC_ARGS" ]; then
+  ARGS_FILE="$(mktemp /tmp/pc_scale_args.XXXXXX)" || exit 2
+  if ! "$PYBIN" -c 'import os,shlex,sys; args=shlex.split(sys.argv[1]); sys.stdout.buffer.write(b"".join(os.fsencode(arg) + b"\0" for arg in args))' "$PC_ARGS" > "$ARGS_FILE"; then
+    rm -f "$ARGS_FILE"
+    echo "[pcscale] invalid shell-style quoting or encoding in PC_ARGS" >&2
+    exit 2
+  fi
+  while IFS= read -r -d '' arg; do
+    EXTRA_ARGS+=("$arg")
+  done < "$ARGS_FILE"
+  rm -f "$ARGS_FILE"
+  ARGS_FILE=""
+fi
+COMMAND=("$PYBIN" "$SCRIPT")
+if [ "${#MATRIX_ARGS[@]}" -gt 0 ]; then
+  COMMAND+=("${MATRIX_ARGS[@]}")
+fi
+if [ "${#EXTRA_ARGS[@]}" -gt 0 ]; then
+  COMMAND+=("${EXTRA_ARGS[@]}")
+fi
+COMMAND+=(--out "$OUT")
+if [ "${1:-}" = "--print-commands" ]; then
+  printf '%q ' "${COMMAND[@]}"
+  printf '\n'
+  exit 0
+fi
+S3_RESULTS="${S3_RESULTS:?set S3_RESULTS}"
+cd "$REPO" || exit 2
+export PYTHONPATH="$REPO" PYTHONUNBUFFERED=1 DATA_ROOT="$REPO/_data"
+mkdir -p results/predictive_coding || exit 2
 LOG=/tmp/pc_scale.log
 
 push_best_effort(){
@@ -92,29 +127,6 @@ finish_on_exit(){
   exit "$final_rc"
 }
 trap finish_on_exit EXIT
-
-EXTRA_ARGS=()
-if [ -n "$PC_ARGS" ]; then
-  ARGS_FILE="$(mktemp /tmp/pc_scale_args.XXXXXX)" || exit 2
-  if ! "$PYBIN" -c 'import os,shlex,sys; args=shlex.split(sys.argv[1]); sys.stdout.buffer.write(b"".join(os.fsencode(arg) + b"\0" for arg in args))' "$PC_ARGS" > "$ARGS_FILE"; then
-    rm -f "$ARGS_FILE"
-    echo "[pcscale] invalid shell-style quoting or encoding in PC_ARGS" >&2
-    exit 2
-  fi
-  while IFS= read -r -d '' arg; do
-    EXTRA_ARGS+=("$arg")
-  done < "$ARGS_FILE"
-  rm -f "$ARGS_FILE"
-  ARGS_FILE=""
-fi
-COMMAND=("$PYBIN" "$SCRIPT")
-if [ "${#MATRIX_ARGS[@]}" -gt 0 ]; then
-  COMMAND+=("${MATRIX_ARGS[@]}")
-fi
-if [ "${#EXTRA_ARGS[@]}" -gt 0 ]; then
-  COMMAND+=("${EXTRA_ARGS[@]}")
-fi
-COMMAND+=(--out "$OUT")
 
 rm -f "$OUT"      # start fresh; corrected runs never append to a legacy artifact
 {

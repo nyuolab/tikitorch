@@ -86,7 +86,8 @@ def run_record(experiment: str, command: str,
                config: Mapping[str, Any],
                inputs: list[str | Path] | None = None,
                device: str | None = None,
-               modules: list[Any] | None = None) -> dict[str, Any]:
+               modules: list[Any] | None = None,
+               output_root: str | Path | None = None) -> dict[str, Any]:
     """Create the run directory + manifest skeleton; returns the record
     (caller appends metrics and calls finish()).
 
@@ -94,7 +95,7 @@ def run_record(experiment: str, command: str,
     modules: imported modules to record (resolved path + repo SHA); None uses
     the imported ``tikitorch`` package when present."""
     run_id = str(uuid.uuid4())
-    out_dir = RESULTS / experiment / run_id
+    out_dir = (RESULTS if output_root is None else Path(output_root)) / experiment / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
         import torch

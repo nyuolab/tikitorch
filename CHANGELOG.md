@@ -7,6 +7,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Device-resident packed/unpacked route tapes, streaming hard-MorphSSM recording,
+  loss-independent VJPs, and `route_logits` integration with ordinary first-order
+  PyTorch autograd and saved-tensor hooks.
+- A separate five-arm full-step benchmark with strict compiler capture, checkpoint
+  policies, isolated resource cells, source hashes, capacity sweeps and bounded
+  held-out learning/trajectory checks; historical evidence remains unchanged.
+- Offline AWS runner inspection tests, explicit manual GPU/compiler validation,
+  and a fail-closed provenance release gate.
 - **Public-release contribution and provenance guidance** — contribution
   expectations, third-party notices, deterministic CI checks, and documented
   evidence boundaries make repository responsibilities and release checks explicit.
@@ -73,6 +81,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with Twine, and exercises the installed closure CLI.
 
 ### Changed
+- Supported Python metadata now matches the tested 3.9–3.12 interpreter window.
+- Hard tropical layers handle arbitrary leading dimensions and use bounded
+  reduction tiles/direct gradient accumulation. Hard depthwise and top-k software
+  routes use deterministic first-index ties; historical silicon is not re-certified.
+- Public tropical layers participate in device-aware backend dispatch; backend
+  replacement is atomic and removes stale implementations.
+- Closure reports distinguish unknown operations from verified-safe arithmetic,
+  with coverage and execution metadata; unknown numeric operations cannot certify
+  closure. Temperature validation rejects invalid hard/soft configurations.
+- Local-learning helpers expose tensor-only diagnostic modes for executed-step
+  auditing; default host metrics remain compatible. Adaptive FF thresholds and
+  per-layer optimizer lookups no longer escape through Python scalars.
 - CI runs deterministic Ruff rules once, tests every supported Python version plus
   the advertised Python 3.9/PyTorch 2.0 dependency floor, pins Node 24 actions by
   immutable SHA, and protects jobs with timeouts and concurrency cancellation.

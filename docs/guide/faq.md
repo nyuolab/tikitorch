@@ -70,11 +70,13 @@ energy, or even that the intended board kernel was selected.
 ## Performance / memory
 
 **A wide tropical linear OOMs.**
-Max-plus linears have no GEMM equivalent and materialize a `(batch, out, in)`
-intermediate; a big FFN at long sequence can be many GB. `nn.TropicalLinear` already
-**tiles over the output dim** above a threshold (`_chunked_linear`) to reduce peak
-intermediate size. If you still OOM, lower the batch/sequence or layer width. A
-streaming compiled kernel has a different memory path and must be measured separately.
+Max-plus linears have no GEMM equivalent, and a naive broadcast creates a
+`(rows, out, in)` candidate tensor that can be many GB. The hard PyTorch reference tiles
+rows, outputs, and input features, retaining only output values and winner indices; its
+backward accumulates directly into the `(out, in)` weight gradient. Soft logsumexp
+linears still require dense candidates for each bounded output tile. If you still OOM,
+lower the batch/sequence or layer width. A streaming compiled kernel has a different
+memory path and must be measured separately.
 
 **It's slower than `torch.nn` on my GPU.**
 This can happen because eager PyTorch lacks the same optimized kernel ecosystem for

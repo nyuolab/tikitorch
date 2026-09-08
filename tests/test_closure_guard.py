@@ -41,20 +41,21 @@ def test_guard_catches_nonpow2_divide():
 
 def test_guard_passes_closed_ops():
     # max / add / clamp + power-of-two scale (a bit-shift) are all closure-clean
+    x = torch.randn(8, 8)
     with tt.assert_no_multiply():
-        x = torch.randn(8, 8)
         y = torch.clamp_min(x, 0.0) + (x * 0.25) - (x / 8.0)   # relu, *2^-2, /2^3
         torch.maximum(y, x).sum()
 
 
 def test_guard_transcendental_flag():
+    x = torch.randn(8)
     # exp is flagged by default...
     with pytest.raises(tt.ClosureViolation):
         with tt.assert_no_multiply():
-            torch.randn(8).exp().sum()
+            x.exp().sum()
     # ...but allowed with allow_transcendental=True (the soft tau>0 relaxations)
     with tt.assert_no_multiply(allow_transcendental=True):
-        torch.randn(8).exp().sum()
+        x.exp().sum()
 
 
 def test_guard_propagates_user_exception():
@@ -102,8 +103,9 @@ def test_activation_modules_values():
 
 def test_activations_closure_clean():
     seq = nn.Sequential(ttnn.TropicalReLU(), ttnn.TropicalLeakyReLU(3), ttnn.TropicalHardtanh())
+    x = torch.randn(16, 32)
     with tt.assert_no_multiply():
-        seq(torch.randn(16, 32))
+        seq(x)
 
 
 def test_tropical_dropout_eval_is_identity():
@@ -127,20 +129,21 @@ def test_tropical_dropout_is_closure_clean_in_training():
     # THE fix: standard nn.Dropout's 1/(1-p) survivor rescale breaks training closure
     # for any p where 1/(1-p) is NOT a power of two; TropicalDropout (a {0,1} gate with
     # no rescale) is closure-clean for ALL p.
+    x = torch.randn(256)
     for p in (0.3, 0.5, 0.7):
         d = ttnn.TropicalDropout(p).train()
         with tt.assert_no_multiply():
-            d(torch.randn(256))
+            d(x)
 
     # contrast: nn.Dropout(0.3) rescales by 1/0.7 (non-pow2) -> a real divide/multiply
     nd = nn.Dropout(0.3).train()
     with pytest.raises(tt.ClosureViolation):
         with tt.assert_no_multiply():
-            nd(torch.randn(256))
+            nd(x)
 
     # nuance: nn.Dropout(0.5) happens to be clean — 1/(1-0.5) = 2 is a power of two (a shift)
     with tt.assert_no_multiply():
-        nn.Dropout(0.5).train()(torch.randn(256))
+        nn.Dropout(0.5).train()(x)
 
 
 def test_tropical_dropout_rejects_bad_p():

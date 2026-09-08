@@ -35,6 +35,15 @@ They must not be included in a public release until the adapted portion is
 independently replaced or the required upstream notice and licensing plan receive
 legal approval. Resolving that provenance is a prerequisite for public release.
 
+The tracked [provenance inventory](docs/release_provenance.json) fingerprints these
+four sources and records the separate retained-history review. Run
+`python scripts/check_release_provenance.py` before publication or a visibility
+change: it fails while any record is unresolved. Ordinary CI uses
+`--inventory-only`, which checks record integrity and explicitly does **not** grant
+release clearance. See [release validation](docs/release_validation.md) for the
+evidence and maintainer authority still required; no legal clearance or independent
+replacement has been inferred from the local comments alone.
+
 The historical snapshots identified in
 `results/fpga_silicon/ddr_arch/VENDOR_SNAPSHOT_MANIFEST.tsv` carry Amazon Software
 License notices, whose redistribution conditions include retaining that license and

@@ -1,12 +1,18 @@
 # TikiTorch research claim ledger
 
-Status: canonical working ledger, 2026-09-01.
+Status: canonical working ledger, 2026-09-08.
 
 This file controls research wording for TikiTorch. A result may be described
 more narrowly than this ledger, but not more broadly without adding evidence
 and updating the ledger. Raw artifacts and executable tests outrank summaries;
 this ledger outranks manuscript prose and the top-level README when wording
 conflicts.
+
+The single active paper is now the [unified TikiTorch manuscript](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md).
+The two `papers/` scientific drafts and their raw results are preserved as
+historical sources, not competing current claim authorities. The manuscript's
+[evidence ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md) records the selected
+current and historical evidence separately.
 
 ## Repository identity
 
@@ -27,7 +33,8 @@ used to expand TikiTorch's claims.
 
 ## Status vocabulary
 
-- **Established:** checked by committed implementation and tests.
+- **Established:** checked by implementation and tests; this status alone does
+  not assert a clean committed release or remote CI validation.
 - **Measured:** supported by an archived run, within the stated configuration.
 - **Draft evidence:** numerically supported, but not yet reproduced from a clean
   archived TikiTorch commit.
@@ -63,8 +70,12 @@ build-specific.
 
 **Allowed wording:** TikiTorch can audit a declared recipe at three software
 levels: registered-module structure, an executed forward trace, and an executed
-forward--loss--backward--optimizer step. Power-of-two scaling is classified as
-a shift. HLS reports and silicon checks separately validate a compiled kernel.
+forward--loss--backward--optimizer step. The current executed classifier is
+fail-closed (`safe`, `unsafe`, `unknown`), with `strict-eager-v3` semantics and
+report schema version 2. Only supported static scaling with the declared
+operation/dtype semantics is classified as a shift; a runtime tensor is not
+accepted merely because its observed values are powers of two. HLS reports and
+silicon checks separately validate a compiled kernel.
 
 **Evidence:** [`tikitorch.audit`](https://github.com/nyuolab/tikitorch/blob/main/tikitorch/audit.py), [audit
 tests](https://github.com/nyuolab/tikitorch/blob/main/tests/test_audit.py), [training-closure
@@ -84,8 +95,10 @@ listed below.
   subset.
 - Historical research artifacts that set `training_closed=true` after waiving
   division or transcendental operations are not passes under the public
-  no-waiver `strict-eager-v2` semantics; preserve the rows as provenance and
+  no-waiver `strict-eager-v3` semantics; preserve the rows as provenance and
   label the narrower internal-path result instead.
+- Earlier `strict-eager-v2` reports are historical results, not automatically
+  re-certified under the newer fail-closed classifier.
 - A software pass is not proof of zero multipliers after synthesis.
 
 **Do not claim:** “every TikiTorch operation contains no multiplication” or
@@ -101,25 +114,29 @@ reports, and an on-silicon known-answer test.
 **Status:** Draft evidence. The implementation and working artifacts are now in
 TikiTorch; clean release-candidate reproduction remains pending.
 
-**Allowed wording:** For a declared finite graph of trace-sufficient hard
+**Allowed wording:** For a declared finite executed graph of trace-sufficient hard
 operators, the forward route plus required auxiliary fields and a supplied
 output cotangent determines the selected state and additive-parameter VJPs.
 Certificates compose through the registered fan-out, residual, shared-parameter,
-and finite-unrolling rules under deterministic ties.
+and finite-unrolling rules under declared deterministic ties. At differentiable
+points this is the classical VJP. At ties it is the specified local reverse
+program, not necessarily a Clarke subgradient of the composed function.
 
-**Evidence:** [route-certificate paper workspace](https://github.com/nyuolab/tikitorch/tree/main/papers/route_certificates/),
-[claim boundary and preserved evidence](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/README.md),
+**Evidence:** [unified manuscript and proofs](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md),
+[claim boundary and preserved evidence](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md),
 [working implementation](https://github.com/nyuolab/tikitorch/tree/main/tikitorch/autodiff/), [working result
 archive](https://github.com/nyuolab/tikitorch/tree/main/results/route_certificates/), and route tests currently under
 [`tests/`](https://github.com/nyuolab/tikitorch/tree/main/tests/).
 
-**Exactness evidence currently used by the draft:** 38 core registered-reference
-tests form the historical claim-bearing record; 37 additional integration,
-serialization, and benchmark-hardening tests pass in the current worktree and
-await clean release-candidate reproduction. A small residual-DAG comparison has
-maximum FP32 parameter-gradient difference `4.77e-7` from eager autograd and
-maximum parameter difference `2.98e-8` after five SGD steps. Packed replay and
-the direct route reverse use the same selected reverse-mode computation.
+**Exactness evidence currently used by the draft:** current source-bound
+device-tape measurements are TT-ROUTE-003. The executable tests additionally
+exercise primitive/composed VJPs, ties, sharing, serialization and supported
+training trajectories; numerical tolerance agreement is not bit identity.
+Historical reference tests and small residual-DAG results remain in the old
+archive, not as a current test-count or current device-performance claim.
+The integrated `route_logits` MorphSSM adapter is narrower than the graph
+theorem: it rejects parameter aliases, hooks/overrides, custom route-less
+backends, recurrent scans and other unsupported configurations.
 
 **Do not claim:** a new gradient; a biologically distinct learning rule; generic
 activation-free training; route-index-only sufficiency; or coverage of dense
@@ -137,18 +154,19 @@ TikiTorch results.
 
 **Status:** Draft evidence, configuration-specific.
 
-**Allowed wording:** On three measured hard-routed MorphSSM configurations, the
+**Allowed wording:** In the historical three-cell hard-routed MorphSSM archive, the
 portable certificate is 1.97x, 2.74x, and 2.96x smaller than the registered
-checkpoint-retained-state comparator without recomputation when both sides are
+shape-derived layer/embedding checkpoint boundary set when both sides are
 given the output cotangent. At `d=128, L=4, T=96`, the payload is 87,588 bytes,
 or 912.4 bytes/token; the portable certificate is 89,799 bytes and the
 boundary-matched ratio is 2.74x.
 
-**Accounting boundary:** the primary supplied-cotangent ratios include the
-portable certificate directory. When the current replay interface retains
+**Accounting boundary:** these historical supplied-cotangent ratios include the
+portable certificate directory. When the historical replay interface retains
 loss logits and int64 targets, include those tensors on both sides; the resulting
-ratios are 1.69x, 2.48x, and 2.79x. Payload-only ratios (2.04x, 2.81x, and
-2.98x) are coding diagnostics, not the headline retained-state comparison.
+ratios are 1.69x, 2.48x, and 2.79x. Historical payload-only ratios (2.04x, 2.81x,
+and 2.98x) are coding diagnostics. The independently measured current device
+payload comparison has its own record and boundary in TT-ROUTE-003.
 
 **Evidence:** [paper README](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/README.md),
 [manuscript table](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/main.tex), [accounting
@@ -157,13 +175,51 @@ results](https://github.com/nyuolab/tikitorch/tree/main/results/route_certificat
 
 **Do not claim:** lower process RSS, allocator peak, accelerator peak, DRAM
 traffic, latency, energy, or generic whole-model activation memory. The small
-Python prototype was 3.3--3.8x slower than eager autograd; the compiled five-arm
-comparison is not complete.
+historical Python prototype was 3.3--3.8x slower than eager autograd; that is not
+a measurement of current device replay. The five-arm full-step benchmark is
+now implemented, but deployment-scale CUDA comparisons remain unrun. A
+shape-derived boundary is not an optimal executed checkpoint policy.
 
 **Upgrade gate:** matched eager, compiled-autograd, checkpoint, compiled-unpacked
 VJP, and compiled-packed-replay arms with exact trajectory equivalence, full
 cycle latency, retained bytes, process/device peak, recomputation, and measured
 bytes moved.
+
+### TT-ROUTE-003 — Current device-route retained-state audit
+
+**Status:** Draft evidence: freshly measured from source-fingerprinted current
+code; clean release-candidate reproduction remains pending.
+
+**Allowed wording:** For three declared FP32 hard-MorphSSM cells, actual device
+tape payloads are 36,084, 87,588 and 329,928 bytes, respectively 2.04x, 2.81x
+and 2.98x smaller than a specified analytical layer/embedding boundary set.
+All cells pass exact logits, canonical integer route consistency and
+parameter-VJP comparison at predeclared `atol=rtol=1e-5`; maximum absolute
+gradient errors are `7.30e-7`, `2.92e-6` and `1.49e-6`.
+
+**Configuration/accounting:** `(D,L,T)` is `(64,2,96)`, `(128,4,96)` or
+`(256,4,192)`; batch 1, vocabulary 38, top-k sum with k=8, kernel 7, no dropout.
+Parameter, input and cotangent seeds are 0, 1 and 2; these are three distinct
+seed roles, not a multi-seed task study. The common supplied cotangent has
+unit L2 norm. The comparator is `(L+1)*B*T*D*4`, not measured checkpoint peak.
+Parameters, optimizer, loss, common cotangent, metadata and transient
+workspace are excluded. Portable framing is reported separately: 38,298,
+91,342 and 333,715 bytes. Its values differ from the historical format.
+
+**Evidence:** [current source-bound record](https://github.com/nyuolab/tikitorch/blob/main/manuscript/evidence/current_retained_state.json),
+[measurement/check command](https://github.com/nyuolab/tikitorch/blob/main/manuscript/measure_retained_state.py),
+[table and boundary ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md).
+The route-consistency oracle shares canonical primitives; it is not an
+independent algorithm. The record binds all library Python sources and the
+measurement script and explicitly reports a dirty worktree.
+
+**Do not claim:** measured peak savings, an optimal checkpoint comparison,
+speed, energy, quality, independent route-oracle validation, or general
+activation-free training. A byte comparison is not a full-step benchmark.
+
+**Upgrade gate:** clean independent reproduction, then five-arm same-model
+measurements and multi-seed useful-task quality/cost evidence under the
+[declared experiment protocol](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EXPERIMENT_PROTOCOL.md).
 
 ### TT-FPGA-INF-001 — Coherent multiplier-free LM inference on F2
 
@@ -290,10 +346,20 @@ over backprop. The surviving claim is scheduling tolerance on a suitable
 substrate, not measured GPU acceleration. Evidence: [parallelism
 audit](https://github.com/nyuolab/tikitorch/blob/main/results/predictive_coding/PARALLELISM.md).
 
-### TT-NEG-003 — Strict closure currently carries a language-quality cost
+### TT-NEG-003 — Historical language endpoints favor the dense baseline
 
-In the matched Tiny Shakespeare host study, strict MorphSSM reached 2.793 bpb
-versus 2.273 for parameter-matched nanoGPT at the reported budgets. The 2.423
+In the historical Tiny Shakespeare host study, the selected annealed MorphSSM
+endpoint reached 2.793 bpb versus 2.273 for nanoGPT, but with unequal token
+budgets (13.8M versus 3.46M) and unequal parameter counts (1,004,032 versus
+770,816 in the raw rows). The archived summary's parameter-matched wording
+does not hold for these selected endpoints. The MorphSSM run starts at
+`tau=0.5` and ends at zero; its legacy ROM/LZC audit waivers are not a
+`strict-eager-v3` full-training closure certificate. This is a negative
+historical quality result, not a matched-compute causal cost of strict closure
+or a measurement of the current device-tape implementation. The raw selected
+endpoints are [MorphSSM](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/strictH_bpe_anneal_s9decay_6k.jsonl)
+and [dense GPT](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/bpeA_dense.jsonl).
+The 2.423
 bpc F2 inference model is a different character setup trained by kernel-faithful
 QAT and must not be substituted into that comparison. Evidence: [hallmark
 ledger](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/fig_hallmark_lm.md) and the [fixed-point
@@ -305,7 +371,17 @@ Core-rail measurements, WNS-derived estimates, and projected replicas do not
 support a board-to-board energy claim. Full-card FPGA power under a matched
 quality/workload protocol remains open. Evidence: [hallmark
 qualifications](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/fig_hallmark_lm.md) and the [FPGA
-paper draft](https://github.com/nyuolab/tikitorch/blob/main/papers/multiplier_free_fpga/main.tex).
+evidence qualifications](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md).
+
+### TT-NEG-005 — Native compiled AdamW does not pass strict update parity
+
+On the audited local FP32 stack, ordinary native compiled autograd and packed
+replay both fail the repeated-update parity check against eager AdamW, with
+approximately 0.002 maximum parameter difference after two updates. Separate
+momentum-SGD integration passes are not AdamW equivalence. Keep this failed
+configuration visible; do not loosen tolerances to obtain a speed ranking.
+Evidence: [local codebase audit](../codebase_audit_2026-09-08.md) and the
+[full-step benchmark](https://github.com/nyuolab/tikitorch/blob/main/scripts/route_certificates/training_benchmark.py).
 
 ## Next claim gates, in order
 
@@ -314,10 +390,13 @@ paper draft](https://github.com/nyuolab/tikitorch/blob/main/papers/multiplier_fr
    manuscripts, and this ledger; bind every result to that clean commit and an
    environment manifest. Complete the separate all-ref provenance/history gate
    before exposing the repository.
-2. **Library:** restore ordinary green CI, reconcile package/version/docs claims,
-   and tag a reproducible release.
-3. **Route certificates:** complete the exact five-arm compiled comparison and
-   measure full-cycle latency, retained bytes, peak, recomputation, and traffic.
+2. **Library:** local tests/docs/package checks passed in the implementation
+   audit; obtain green remote candidate CI across the supported matrix and
+   independent installed-artifact reproduction before authorizing a release.
+3. **Practical route utility:** resolve or scope native AdamW support, complete
+   the five-arm CUDA comparison, and measure full-cycle latency, retained bytes,
+   peak and recomputation. Add multi-seed real-task quality/cost comparisons;
+   traffic or energy requires separate measurement, not inference from bytes.
 4. **FPGA learning:** run D512 on disjoint windows with held-out evaluation and a
    matched reference trajectory.
 5. **FPGA systems comparison:** close timing with margin; add iso-model CUDA and
@@ -326,3 +405,7 @@ paper draft](https://github.com/nyuolab/tikitorch/blob/main/papers/multiplier_fr
    before generalizing the learning claim.
 
 No ontogenic-agent result is a gate for these TikiTorch publications.
+
+The detailed acceptance criteria and implementation priorities are in the
+[release/impact roadmap](../release_impact_roadmap.md). A narrower software
+paper need not complete every hardware project unless its claims depend on it.

@@ -42,6 +42,7 @@ import torch.nn.functional as F
 REPO = Path(__file__).resolve().parents[1]
 
 import tikitorch as tt                                    # noqa: E402
+from tikitorch.functional import stable_topk               # noqa: E402
 from tikitorch.nn import (                                # noqa: E402
     DepthwiseMorphConv1d,
     MorphSSMLayer,
@@ -360,7 +361,7 @@ class MorphPCEngine:
         idxs, outs = [], []
         for s in range(0, rows.shape[0], 512):             # bound the (rows,V,D) transient
             expanded = m.output_head.weight + rows[s:s + 512].unsqueeze(-2)
-            vals, idx = expanded.topk(k, dim=-1)
+            vals, idx = stable_topk(expanded, k, dim=-1)
             outs.append(vals.sum(dim=-1) + m.output_head.bias)
             idxs.append(idx)
         logits = torch.cat(outs, 0).reshape(B, T, V)
@@ -372,7 +373,7 @@ class MorphPCEngine:
             aidxs, aouts = [], []
             for s in range(0, rows.shape[0], 512):
                 expanded = ah.weight + rows[s:s + 512].unsqueeze(-2)
-                vals, idx = expanded.topk(ka, dim=-1)
+                vals, idx = stable_topk(expanded, ka, dim=-1)
                 aouts.append(vals.sum(dim=-1) + ah.bias)
                 aidxs.append(idx)
             top["act_logits"] = torch.cat(aouts, 0).reshape(B, T, Ka)
@@ -1010,7 +1011,7 @@ def run_one(arch, credit, data, args, log_path):
         bad = dict(cats)
         row = dict(gate="G5_audit", arch=arch, opt=args.opt, loss=args.loss,
                    tau=0.0, violations=bad,
-                   waived={}, audit_semantics="strict-eager-v2",
+                   waived={}, audit_semantics=tt.audit.AUDIT_SEMANTICS_VERSION,
                    training_closed=not bad)
         with (args.out / "g5_audit.jsonl").open("a") as f:
             f.write(json.dumps(row) + "\n")

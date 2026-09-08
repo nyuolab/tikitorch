@@ -28,9 +28,10 @@ registry to each eager ATen op — catching common raw ``*`` / ``@`` / ``torch.e
 arithmetic in a custom ``forward`` that the structural scan cannot see. It treats
 literal power-of-two scalars and explicitly traced dyadic tensor operands as
 bit-shifts; arbitrary runtime tensors do not become trusted constants merely
-because their observed values happen to be powers of two. Like any evolving
-operator registry, this is not proof that every possible arithmetic kernel has
-been classified.
+because their observed values happen to be powers of two. Operations absent from
+the versioned registry are reported as ``unknown-operation`` and make the audit
+inconclusive; they are never silently certified. The trace still covers only the
+executed eager path, not every possible branch or compiled kernel.
 
 Usage::
 
@@ -83,7 +84,21 @@ import torch.nn as nn
 __all__ = ["assert_closed", "find_closure_violations", "MULTIPLY_MODULES",
            "find_runtime_multiplies", "assert_closed_runtime",
            "find_training_multiplies", "assert_training_closed", "closure_report",
-           "assert_no_multiply", "closed", "ClosureViolation"]
+           "assert_no_multiply", "closed", "ClosureViolation",
+           "AUDIT_SEMANTICS_VERSION", "AUDIT_REPORT_SCHEMA_VERSION"]
+
+
+# These identifiers are part of the evidence surface.  Increment the semantics
+# version whenever an operation can move between certified, rejected, and
+# inconclusive; increment the report schema when the serialized shape changes.
+AUDIT_SEMANTICS_VERSION = "strict-eager-v3"
+AUDIT_REPORT_SCHEMA_VERSION = "tikitorch.closure-report.v2"
+_AUDIT_COVERAGE_SCHEMA_VERSION = "tikitorch.audit-coverage.v1"
+
+_SAFE = "safe"
+_UNSAFE = "unsafe"
+_UNKNOWN = "unknown"
+_PENDING = "pending"
 
 # Standard torch modules that contain a data-dependent hardware multiply/divide.
 MULTIPLY_MODULES = tuple(
@@ -150,7 +165,8 @@ _TRANSCENDENTAL = {
     "exp", "expm1", "log", "log10", "log1p", "pow", "float_power",
     "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sinh", "cosh",
     "tanh", "sigmoid", "erf", "erfc", "erfinv", "sqrt", "rsqrt",
-    "reciprocal", "logaddexp", "logaddexp2", "logsumexp",
+    "reciprocal", "logaddexp", "logaddexp2", "logsumexp", "lgamma", "digamma",
+    "polygamma", "mvlgamma", "igamma", "igammac",
 }
 _SOFTMAX_OPS = {
     "softmax", "_softmax", "_safe_softmax", "special_softmax",
@@ -226,6 +242,66 @@ _PROVENANCE_PASSTHROUGH = {
     "to", "_to_copy", "type_as", "neg", "negative",
 }
 
+# Operations admitted by the eager software certificate.  This is deliberately
+# an allow-list rather than the complement of the arithmetic deny-lists above:
+# a newly introduced ATen, special, linalg, or fused operator must remain
+# inconclusive until its semantics have been reviewed.  The entries below are
+# limited to data movement/construction, selection, addition/reduction,
+# comparison, integer/bit logic, or route-based reverse operations.
+_SAFE_ATEN_OPS = _PROVENANCE_PASSTHROUGH | _CLAMP_OPS | {
+    # Tensor construction and state/data movement.
+    "empty", "empty_like", "empty_strided", "new_empty", "new_empty_strided",
+    "zeros", "zeros_like", "new_zeros", "ones", "ones_like", "new_ones",
+    "full", "full_like", "new_full", "scalar_tensor", "lift", "lift_fresh",
+    "eye", "arange", "rand", "rand_like", "randint", "randint_like", "randperm",
+    "bernoulli", "bernoulli_", "copy", "copy_", "fill", "fill_", "zero", "zero_",
+    "resize", "resize_", "resize_as_", "set_", "as_strided", "as_strided_",
+    "_unsafe_view", "cat", "concat", "concatenate", "stack", "hstack", "vstack",
+    "dstack", "split", "split_with_sizes", "tensor_split", "chunk", "unbind",
+    "unfold", "roll", "flip", "fliplr", "flipud", "rot90", "diagonal", "diag",
+    "diag_embed", "triu", "tril", "constant_pad_nd", "reflection_pad1d",
+    "reflection_pad2d", "reflection_pad3d", "replication_pad1d", "replication_pad2d",
+    "replication_pad3d", "circular_pad_nd", "im2col", "col2im", "pixel_shuffle",
+    "pixel_unshuffle", "channel_shuffle",
+    # Addressed reads/writes and route replay.
+    "index", "_unsafe_index", "index_select", "index_put", "index_put_",
+    "_index_put_impl_", "index_copy", "index_copy_", "index_fill", "index_fill_",
+    "gather", "take", "take_along_dim", "put_",
+    "masked_fill", "masked_fill_", "masked_scatter", "masked_scatter_",
+    "masked_select", "scatter_add", "scatter_add_",
+    "slice_scatter", "select_scatter", "diagonal_scatter", "as_strided_scatter",
+    "slice_backward", "select_backward", "diagonal_backward", "as_strided_backward",
+    "nonzero", "nonzero_static", "argwhere", "embedding",
+    # Comparison, selection, hard activations, and discrete route construction.
+    "eq", "ne", "lt", "le", "gt", "ge", "equal", "where", "maximum",
+    "minimum", "fmax", "fmin", "relu", "relu_", "threshold", "threshold_backward",
+    "hardtanh", "hardtanh_", "hardtanh_backward", "abs", "absolute", "sign",
+    "sgn", "signbit", "frexp", "round", "round_", "floor", "floor_", "ceil", "ceil_",
+    "trunc", "trunc_", "fix", "logical_and", "logical_or", "logical_xor",
+    "logical_not", "bitwise_and", "bitwise_and_", "bitwise_or", "bitwise_or_",
+    "bitwise_xor", "bitwise_xor_", "bitwise_not", "bitwise_not_",
+    "bitwise_left_shift", "bitwise_left_shift_", "bitwise_right_shift",
+    "bitwise_right_shift_", "isfinite", "isinf", "isnan", "isneginf", "isposinf",
+    # Additive and extremum reductions.  Product/statistical/norm reductions are
+    # intentionally absent and are rejected above.
+    "sum", "nansum", "cumsum", "max", "min", "amax", "amin", "aminmax",
+    "argmax", "argmin", "topk", "sort", "argsort", "msort", "kthvalue",
+    "median", "nanmedian", "mode", "cummax", "cummin", "any", "all",
+    "count_nonzero", "add", "add_", "sub", "sub_", "rsub",
+    # Max pooling is compare/route; average pooling remains rejected above.
+    "max_pool1d", "max_pool2d", "max_pool3d", "max_pool1d_with_indices",
+    "max_pool2d_with_indices", "max_pool3d_with_indices",
+    "max_pool1d_with_indices_backward", "max_pool2d_with_indices_backward",
+    "max_pool3d_with_indices_backward", "adaptive_max_pool1d",
+    "adaptive_max_pool2d", "adaptive_max_pool3d", "adaptive_max_pool2d_backward",
+    "adaptive_max_pool3d_backward",
+}
+
+
+def _decision(status, category, name):
+    """Return the internal tri-state classification tuple."""
+    return status, category, name
+
 
 def _is_pow2(x) -> bool:
     try:
@@ -292,8 +368,35 @@ def _scaled_dyadic_provenance(meta):
 
 
 def _aten_base(func) -> str:
+    schema = getattr(func, "_schema", None)
+    schema_name = getattr(schema, "name", "")
+    if "::" in schema_name:
+        return schema_name.split("::", 1)[1]
     name = str(func)
     return name[len("aten."):].split(".")[0] if name.startswith("aten.") else name
+
+
+def _operator_namespace(func) -> str:
+    """Return an operator's dispatcher namespace without trusting its basename."""
+    namespace = getattr(func, "namespace", None)
+    if isinstance(namespace, str):
+        return namespace
+    schema_name = getattr(getattr(func, "_schema", None), "name", "")
+    if "::" in schema_name:
+        return schema_name.split("::", 1)[0]
+    name = str(func)
+    return "aten" if name.startswith("aten.") else ""
+
+
+def _aten_overload(func) -> str:
+    return str(getattr(getattr(func, "_schema", None), "overload_name", ""))
+
+
+def _argument(args, kwargs, position, name, default=None):
+    """Read a dispatcher argument in either positional or keyword form."""
+    if len(args) > position:
+        return args[position]
+    return (kwargs or {}).get(name, default)
 
 
 def _walk_values(value):
@@ -305,6 +408,19 @@ def _walk_values(value):
             yield from _walk_values(item)
     else:
         yield value
+
+
+def _value_tensor_metadata(*values):
+    """Collect dtype/device strings from arbitrarily nested tensor values."""
+    tensors = [
+        value
+        for value in _walk_values(values)
+        if isinstance(value, torch.Tensor)
+    ]
+    return {
+        "dtypes": sorted({str(tensor.dtype) for tensor in tensors}),
+        "devices": sorted({str(tensor.device) for tensor in tensors}),
+    }
 
 
 def _numeric_tensor_operands(args, kwargs) -> bool:
@@ -376,65 +492,125 @@ def _clamp_bounds(base, args, kwargs):
 
 
 def _classify_aten(func, args=(), kwargs=None, provenance=None):
-    """Classify one ATen call using the audit's single conservative policy.
+    """Classify one dispatched call as safe, unsafe, pending, or unknown.
 
     ``provenance`` is supplied by :func:`_make_catcher`.  Tensor-by-tensor
     multiply/divide is a violation unless one operand was *traced* to a trusted
     sign/gate/power-of-two constructor.  In particular, inspecting an arbitrary
     tensor and noticing that today's values happen to be powers of two is never
-    sufficient.
+    sufficient.  Unregistered operations are ``unknown`` rather than implicitly
+    safe, so a closure certificate fails closed as the PyTorch operator surface
+    evolves.
     """
     kwargs = kwargs or {}
     provenance = provenance or (lambda _tensor: None)
     name = str(func)
+    if name.startswith("profiler."):
+        return _decision(_SAFE, "instrumentation", name)
+    # A safe ATen basename does not confer safety on a custom operator with the
+    # same name: its implementation is opaque at this interception boundary.
+    if _operator_namespace(func) != "aten":
+        return _decision(_UNKNOWN, "unknown-operation", name)
     base = _aten_base(func)
+    overload = _aten_overload(func)
     numeric_ops = _numeric_tensor_operands(args, kwargs)
 
     if base in _DENSE_MUL or base.startswith(("convolution", "cudnn_convolution")):
-        return "dense-multiply", name
+        return _decision(_UNSAFE, "dense-multiply", name)
     if (base in _FUSED_ATTENTION_OPS or "scaled_dot_product" in base or
             "flash_attention" in base or "efficient_attention" in base):
-        return "dense-multiply", name
+        return _decision(_UNSAFE, "dense-multiply", name)
     if base in _FUSED_EMBEDDING_OPS or "embedding_bag" in base:
         # Even mode='sum' can take per-sample weights. Treat this opaque fused
         # boundary conservatively instead of inferring safety from one call.
-        return "fused-embedding-arithmetic", name
+        return _decision(_UNSAFE, "fused-embedding-arithmetic", name)
     if base in _INTERPOLATION_ARITHMETIC:
-        return "interpolation-arithmetic", name
+        return _decision(_UNSAFE, "interpolation-arithmetic", name)
     if base in _LINALG_ARITHMETIC or base.startswith(("linalg_", "_linalg_")):
-        return "linalg-arithmetic", name
+        return _decision(_UNSAFE, "linalg-arithmetic", name)
     if base in {"native_dropout", "_fused_dropout", "feature_dropout"}:
-        return "fused-multiply", name
+        return _decision(_UNSAFE, "fused-multiply", name)
+    if base in {"randn", "randn_like", "normal", "normal_"}:
+        # Gaussian generation is an opaque arithmetic boundary (commonly using
+        # transcendental transforms), even when its requested std is dyadic.
+        return _decision(_UNSAFE, "random-generation-arithmetic", name)
+    if base in {"uniform", "uniform_"}:
+        lower = _argument(args, kwargs, 1, "from", 0.0)
+        upper = _argument(args, kwargs, 2, "to", 1.0)
+        try:
+            width = float(upper) - float(lower)
+        except (TypeError, ValueError):
+            return _decision(_UNKNOWN, "unknown-operation", name)
+        if math.isfinite(width) and _is_pow2(width):
+            return _decision(_SAFE, "uniform-rng-dyadic-map", name)
+        return _decision(_UNSAFE, "random-generation-arithmetic", name)
     if base in _SOFTMAX_OPS or base in _TRANSCENDENTAL:
-        return "transcendental", name
+        return _decision(_UNSAFE, "transcendental", name)
     if base in {"softplus", "softplus_backward"}:
-        return "transcendental", name
+        return _decision(_UNSAFE, "transcendental", name)
     if base == "log2":
         # Deferred by the catcher: round(log2(x)) is an exponent/leading-bit
         # extraction, while a standalone log2 remains a transcendental.
-        return "pending-log2", name
+        return _decision(_PENDING, "pending-log2", name)
     if base == "exp2":
         exponent = args[0] if args else None
         if isinstance(exponent, torch.Tensor):
             exponent_meta = provenance(exponent)
             if exponent_meta == "integer" or (
                     isinstance(exponent_meta, tuple) and exponent_meta[0] == "rounded"):
-                return None
-        return "transcendental", name
+                return _decision(_SAFE, "dyadic-shift", name)
+        return _decision(_UNSAFE, "transcendental", name)
     if base in _FUSED_LOSS_OPS:
-        return "fused-loss-arithmetic", name
+        return _decision(_UNSAFE, "fused-loss-arithmetic", name)
     if base in _FUSED_NORMALIZATION_OPS:
-        return "fused-normalization-arithmetic", name
+        return _decision(_UNSAFE, "fused-normalization-arithmetic", name)
     if base in _FUSED_ACTIVATION_OPS:
-        return "fused-activation-arithmetic", name
+        return _decision(_UNSAFE, "fused-activation-arithmetic", name)
     if base in _ARITHMETIC_REDUCTIONS or base in _AVERAGING_OPS:
-        return "reduction-arithmetic", name
+        return _decision(_UNSAFE, "reduction-arithmetic", name)
     if base in {"mean", "nanmean"}:
         if _mean_is_static_shift(args, kwargs):
-            return None
-        return "elementwise-divide", name
+            return _decision(_SAFE, "static-shift-reduction", name)
+        return _decision(_UNSAFE, "elementwise-divide", name)
     if base in {"lerp", "addcmul", "addcdiv", "addmv", "addr"}:
-        return "fused-multiply", name
+        return _decision(_UNSAFE, "fused-multiply", name)
+
+    # These otherwise additive route operations contain optional arithmetic
+    # modes/scales, so their schemas must be inspected before admitting them.
+    if base in {"index_add", "index_add_"}:
+        alpha = kwargs.get("alpha", 1)
+        if _scalar_shift(alpha):
+            return _decision(_SAFE, "indexed-add-dyadic-scale", name)
+        return _decision(_UNSAFE, "scalar-multiply", name)
+
+    if base in {"scatter", "scatter_", "scatter_reduce", "scatter_reduce_"}:
+        reducer = kwargs.get("reduce")
+        has_reducer = (
+            "reduce" in overload
+            or reducer is not None
+            or base.startswith("scatter_reduce")
+        )
+        if base.startswith("scatter_reduce") and reducer is None:
+            reducer = _argument(args, kwargs, 4, "reduce")
+        if not has_reducer:
+            return _decision(_SAFE, "indexed-write", name)
+        if reducer in {"add", "sum", "amax", "amin", "max", "min"}:
+            return _decision(_SAFE, "indexed-add-or-extremum", name)
+        if reducer in {"multiply", "prod"}:
+            return _decision(_UNSAFE, "elementwise-multiply", name)
+        if reducer == "mean":
+            return _decision(_UNSAFE, "elementwise-divide", name)
+        return _decision(_UNKNOWN, "unknown-operation", name)
+
+    if base in {"embedding_dense_backward", "embedding_sparse_backward"}:
+        scale_by_frequency = _argument(
+            args, kwargs, 4, "scale_grad_by_freq", default=None
+        )
+        if scale_by_frequency is False:
+            return _decision(_SAFE, "indexed-add", name)
+        if scale_by_frequency is True:
+            return _decision(_UNSAFE, "elementwise-divide", name)
+        return _decision(_UNKNOWN, "unknown-operation", name)
 
     # add/sub's ``alpha`` is an implicit multiply.  A literal dyadic alpha is a
     # compile-time shift; arbitrary alpha (including tensor alpha) is not.
@@ -442,31 +618,35 @@ def _classify_aten(func, args=(), kwargs=None, provenance=None):
         alpha = kwargs.get("alpha", 1)
         non_unit_alpha = isinstance(alpha, torch.Tensor) or alpha != 1
         if non_unit_alpha and numeric_ops and not _scalar_shift(alpha):
-            return "scalar-multiply", name
+            return _decision(_UNSAFE, "scalar-multiply", name)
 
-    if "mul" in base and numeric_ops:
+    if "mul" in base:
+        if not numeric_ops:
+            return _decision(_SAFE, "boolean-logic", name)
         operands = [a for a in _walk_values(args) if isinstance(a, torch.Tensor) or
                     (isinstance(a, (int, float)) and not isinstance(a, bool))]
         if any(_scalar_shift(a) for a in operands):
-            return None
+            return _decision(_SAFE, "dyadic-shift", name)
         tensor_operands = [a for a in operands if isinstance(a, torch.Tensor)]
         trusted = {"shift", "dyadic-with-zero", "zero", "sign", "gate", "unit"}
         if any(provenance(t) in trusted for t in tensor_operands):
-            return None
+            return _decision(_SAFE, "trusted-gate-or-shift", name)
         category = "scalar-multiply" if len(tensor_operands) < 2 else "elementwise-multiply"
-        return category, name
+        return _decision(_UNSAFE, category, name)
 
     if "div" in base and numeric_ops:
         divisor = args[1] if len(args) > 1 else kwargs.get("other")
         # Zero is a legal multiplier gate but never a legal divisor. Tensor
         # provenance must prove that every divisor is nonzero.
         if _scalar_nonzero_shift(divisor):
-            return None
+            return _decision(_SAFE, "dyadic-shift", name)
         if isinstance(divisor, torch.Tensor) and provenance(divisor) in {"shift", "unit"}:
-            return None
-        return "elementwise-divide", name
+            return _decision(_SAFE, "trusted-shift-divisor", name)
+        return _decision(_UNSAFE, "elementwise-divide", name)
 
-    return None
+    if base in _SAFE_ATEN_OPS:
+        return _decision(_SAFE, "registered-safe", name)
+    return _decision(_UNKNOWN, "unknown-operation", name)
 
 
 def _dedupe_hits(hits):
@@ -478,11 +658,14 @@ def _dedupe_hits(hits):
     return out
 
 
-def _make_catcher(hits):
+def _make_catcher(hits, records=None):
     """Return a dispatch mode applying :func:`_classify_aten` to every operation.
 
     The mode carries only operation-derived provenance.  Arbitrary input values
-    are never examined to decide that a tensor multiply is a shift.
+    are never examined to decide that a tensor multiply is a shift. ``hits``
+    receives every unsafe or unknown blocker in the legacy ``(category, op)``
+    shape.  When supplied, ``records`` receives one tri-state record per executed
+    operation for coverage reporting.
     """
     from torch.utils._python_dispatch import TorchDispatchMode
 
@@ -566,6 +749,13 @@ def _make_catcher(hits):
                 # Record the source identity too, so the standard straight-through
                 # expression x + (round(x) - x).detach() is recognised exactly.
                 self._set_meta(result, ("rounded", id(first)))
+                return
+            if base == "frexp" and isinstance(result, (tuple, list)) and len(result) == 2:
+                # IEEE mantissa/exponent decomposition maps to field extraction.
+                # Only the exponent is granted integer provenance; the mantissa
+                # remains an ordinary runtime tensor and cannot bless a later
+                # tensor multiply as a shift.
+                self._set_meta(result[1], "integer")
                 return
             if base in _CLAMP_OPS:
                 lower, upper = _clamp_bounds(base, args, kwargs)
@@ -656,11 +846,21 @@ def _make_catcher(hits):
             kwargs = kwargs or {}
             base = _aten_base(func)
             self._note_pending_uses(base, args, kwargs)
-            classification = _classify_aten(func, args, kwargs, self._get_meta)
+            status, category, op_name = _classify_aten(
+                func, args, kwargs, self._get_meta
+            )
+            record = {"status": status, "category": category, "op": op_name}
             result = func(*args, **kwargs)
+            record.update(_value_tensor_metadata(args, kwargs, result))
             self._record_provenance(base, args, kwargs, result)
-            if classification and classification[0] != "pending-log2":
-                hits.append(classification)
+            if status == _PENDING:
+                meta = self._get_meta(result)
+                if isinstance(meta, tuple) and meta and meta[0] == "pending-log2":
+                    self._pending_log2[meta[1]]["coverage_record"] = record
+            elif status in {_UNSAFE, _UNKNOWN}:
+                hits.append((category, op_name))
+            if records is not None:
+                records.append(record)
             return result
 
         def __exit__(self, exc_type, exc_value, traceback):
@@ -668,6 +868,17 @@ def _make_catcher(hits):
                 for record in self._pending_log2.values():
                     if record["unsafe"] or not record["resolved"]:
                         hits.append(record["op"])
+                        coverage_record = record.get("coverage_record")
+                        if coverage_record is not None:
+                            coverage_record.update(
+                                status=_UNSAFE, category="transcendental"
+                            )
+                    else:
+                        coverage_record = record.get("coverage_record")
+                        if coverage_record is not None:
+                            coverage_record.update(
+                                status=_SAFE, category="integer-exponent-extraction"
+                            )
             finally:
                 return super().__exit__(exc_type, exc_value, traceback)
 
@@ -907,6 +1118,92 @@ def _preserve_audit_state(model, optimizer=None, extra_tensors=()):
             torch.cuda.set_rng_state_all(cuda_rng)
 
 
+def _execution_tensor_metadata(model, *values):
+    """Return stable dtype/device coverage for an executed audit boundary."""
+    tensors = []
+    seen = set()
+
+    def add(value):
+        if isinstance(value, torch.Tensor) and id(value) not in seen:
+            seen.add(id(value))
+            tensors.append(value)
+
+    for value in _walk_values(values):
+        add(value)
+    try:
+        for value in model.parameters():
+            add(value)
+        for value in model.buffers():
+            add(value)
+    except (AttributeError, RuntimeError, ValueError):
+        # The execution path will still raise for unsafe lazy/unmaterialized
+        # models. Metadata collection must not mask that more useful error.
+        pass
+    return {
+        "dtypes": sorted({str(t.dtype) for t in tensors}),
+        "devices": sorted({str(t.device) for t in tensors}),
+    }
+
+
+def _coverage_summary(records, model, values, *, mode, harden_tau):
+    unsafe = sorted({r["op"] for r in records if r["status"] == _UNSAFE})
+    unknown = sorted({r["op"] for r in records if r["status"] == _UNKNOWN})
+    safe = sorted({r["op"] for r in records if r["status"] == _SAFE})
+    if unsafe:
+        status = "violated"
+    elif unknown:
+        status = "inconclusive"
+    else:
+        status = "closed"
+    counts = {
+        key: sum(r["status"] == key for r in records)
+        for key in (_SAFE, _UNSAFE, _UNKNOWN)
+    }
+    tensor_metadata = _execution_tensor_metadata(model, values)
+    observed_dtypes = {
+        dtype for record in records for dtype in record.get("dtypes", ())
+    }
+    observed_devices = {
+        device for record in records for device in record.get("devices", ())
+    }
+    return {
+        "schema_version": _AUDIT_COVERAGE_SCHEMA_VERSION,
+        "audit_semantics": AUDIT_SEMANTICS_VERSION,
+        "scope": "executed-eager-path",
+        "mode": mode,
+        "harden_tau": bool(harden_tau),
+        "harden_tau_applied": bool(harden_tau and hasattr(model, "set_tau")),
+        "dtypes": sorted(set(tensor_metadata["dtypes"]) | observed_dtypes),
+        "devices": sorted(set(tensor_metadata["devices"]) | observed_devices),
+        "status": status,
+        "certified": status == "closed",
+        "observed_operator_calls": len(records),
+        "unique_operators": len({r["op"] for r in records}),
+        "safe_operator_calls": counts[_SAFE],
+        "unsafe_operator_calls": counts[_UNSAFE],
+        "unknown_operator_calls": counts[_UNKNOWN],
+        "safe_operators": safe,
+        "unsafe_operators": unsafe,
+        "unknown_operators": unknown,
+    }
+
+
+def _runtime_audit(model, example_inputs, *, run_eval=True, harden_tau=True):
+    hits, records = [], []
+    with _preserve_audit_state(model, extra_tensors=example_inputs):
+        if run_eval and hasattr(model, "eval"):
+            model.eval()
+        if harden_tau and hasattr(model, "set_tau"):
+            model.set_tau(0.0)
+        with torch.no_grad(), _make_catcher(hits, records):
+            model(*example_inputs)
+    coverage = _coverage_summary(
+        records, model, example_inputs,
+        mode="eval" if run_eval else "current", harden_tau=harden_tau,
+    )
+    return _dedupe_hits(hits), coverage
+
+
 def find_runtime_multiplies(model, *example_inputs, run_eval=True, harden_tau=True):
     """Trace a forward pass and return the multiply/transcendental aten ops it runs.
 
@@ -921,18 +1218,16 @@ def find_runtime_multiplies(model, *example_inputs, run_eval=True, harden_tau=Tr
     relaxations; absent once annealed to tau=0).
 
     By default the model is put in ``eval()`` and annealed to a hard ``tau=0``
-    candidate path first (``harden_tau``). Returns ``[(category, op_name), ...]``;
-    an empty result means no classified operation was observed for these inputs.
+    candidate path first (``harden_tau``). Returns ``[(category, op_name), ...]``.
+    For compatibility the function retains its historical name and tuple shape,
+    but the result now includes ``("unknown-operation", op_name)`` for any
+    unregistered dispatched operation. An empty result means every observed
+    operation was explicitly classified safe for these inputs.
     """
-    hits = []
-    with _preserve_audit_state(model, extra_tensors=example_inputs):
-        if run_eval and hasattr(model, "eval"):
-            model.eval()
-        if harden_tau and hasattr(model, "set_tau"):
-            model.set_tau(0.0)
-        with torch.no_grad(), _make_catcher(hits):
-            model(*example_inputs)
-    return _dedupe_hits(hits)
+    hits, _coverage = _runtime_audit(
+        model, example_inputs, run_eval=run_eval, harden_tau=harden_tau
+    )
+    return hits
 
 
 def assert_closed_runtime(model, *example_inputs, allow_transcendental=False,
@@ -953,12 +1248,40 @@ def assert_closed_runtime(model, *example_inputs, allow_transcendental=False,
     if hits:
         lines = "\n".join(f"    {cat}: {op}" for cat, op in hits)
         raise AssertionError(
-            "Model executes hardware multiplies at runtime (closure violated in a "
-            "custom forward, which the structural assert_closed cannot see):\n" +
-            lines + "\n\nRewrite these as add/compare/shift (or anneal tau->0 for "
-            "the transcendental soft-relaxation ops)."
+            "Model is not certified closed on this executed path. Known arithmetic "
+            "violates closure and unknown operations make the result inconclusive:\n" +
+            lines + "\n\nRewrite known violations as add/compare/shift (or anneal "
+            "tau->0 for supported soft relaxations), and classify or remove every "
+            "unknown operation before making a closure claim."
         )
     return model
+
+
+def _training_audit(model, example_inputs, targets, loss_fn, optimizer=None,
+                    harden_tau=True):
+    if not isinstance(example_inputs, (tuple, list)):
+        example_inputs = (example_inputs,)
+    else:
+        example_inputs = tuple(example_inputs)
+    hits, records = [], []
+    with _preserve_audit_state(model, optimizer, (example_inputs, targets)):
+        if hasattr(model, "train"):
+            model.train()
+        if harden_tau and hasattr(model, "set_tau"):
+            model.set_tau(0.0)
+        if optimizer is not None:
+            optimizer.zero_grad()
+        with _make_catcher(hits, records):
+            pred = model(*example_inputs)
+            loss = loss_fn(pred, targets)
+            loss.backward()
+            if optimizer is not None:
+                optimizer.step()
+    coverage = _coverage_summary(
+        records, model, (example_inputs, targets), mode="train",
+        harden_tau=harden_tau,
+    )
+    return _dedupe_hits(hits), coverage
 
 
 def find_training_multiplies(model, example_inputs, targets, loss_fn, optimizer=None,
@@ -977,26 +1300,17 @@ def find_training_multiplies(model, example_inputs, targets, loss_fn, optimizer=
 
     ``example_inputs`` is a tuple/list of model args; ``targets`` is passed to
     ``loss_fn(predictions, targets)``. If ``optimizer`` is given, ``.step()`` is
-    traced too. An empty result means no classified operation was observed on this
-    run; it does not predict compiler or synthesis resource use.
+    traced too. The historical tuple shape is retained, but unknown dispatched
+    operations are returned as ``("unknown-operation", op_name)`` and prevent
+    certification. An empty result means every observed operation was explicitly
+    classified safe on this run; it does not predict compiler or synthesis
+    resource use.
     """
-    if not isinstance(example_inputs, (tuple, list)):
-        example_inputs = (example_inputs,)
-    hits = []
-    with _preserve_audit_state(model, optimizer, (example_inputs, targets)):
-        if hasattr(model, "train"):
-            model.train()
-        if harden_tau and hasattr(model, "set_tau"):
-            model.set_tau(0.0)
-        if optimizer is not None:
-            optimizer.zero_grad()
-        with _make_catcher(hits):
-            pred = model(*example_inputs)
-            loss = loss_fn(pred, targets)
-            loss.backward()
-            if optimizer is not None:
-                optimizer.step()
-    return _dedupe_hits(hits)
+    hits, _coverage = _training_audit(
+        model, example_inputs, targets, loss_fn, optimizer=optimizer,
+        harden_tau=harden_tau,
+    )
+    return hits
 
 
 def assert_training_closed(model, example_inputs, targets, loss_fn, optimizer=None,
@@ -1013,10 +1327,12 @@ def assert_training_closed(model, example_inputs, targets, loss_fn, optimizer=No
     if hits:
         lines = "\n".join(f"    {cat}: {op}" for cat, op in hits)
         raise AssertionError(
-            "TRAINING step is NOT multiplier-free (Level-B closure violated):\n" + lines +
+            "TRAINING step is not certified multiplier-free (Level-B closure is "
+            "violated or inconclusive):\n" + lines +
             "\n\nUse a hard tropical forward (no logsumexp/tau>0), a closure-faithful "
             "loss (tropical_perceptron_loss or L1 -- not cross-entropy), and a sign-only "
-            "optimizer (SignSGD/PureTropicalSGD with a power-of-two lr)."
+            "optimizer (SignSGD/PureTropicalSGD with a power-of-two lr); classify or "
+            "remove every unknown operation before making a closure claim."
         )
     return model
 
@@ -1025,13 +1341,15 @@ def closure_report(model, example_inputs=None, targets=None, loss_fn=None,
                    optimizer=None, harden_tau=True):
     """Collect structural and executed-path software audit results.
 
-    Returns a dict with ``structural`` (module-level :func:`find_closure_violations`),
-    ``inference`` (:func:`find_runtime_multiplies`, when ``example_inputs`` given),
-    ``training`` (:func:`find_training_multiplies`, when ``targets`` + ``loss_fn``
-    given), and booleans ``inference_closed`` / ``training_closed`` /
-    ``training_zero_dsp`` (a legacy-named convenience boolean meaning that the
-        eager trace had no classified multiply, divide, fused arithmetic, or
-        transcendental). It does not report synthesized DSP utilization.
+    Returns a versioned dict with ``structural`` (module-level
+    :func:`find_closure_violations`), ``inference`` (executed-forward blockers),
+    and ``training`` (full-step blockers). The legacy booleans
+    ``inference_closed`` / ``training_closed`` / ``training_zero_dsp`` remain,
+    but are true only when every observed operation is explicitly classified
+    safe. The corresponding ``*_status`` is tri-state: ``"closed"``,
+    ``"violated"``, or ``"inconclusive"``. Unknown operations are exposed under
+    ``*_unknown`` and in the versioned ``coverage`` metadata. It does not report
+    synthesized DSP utilization.
     This is the "double-check TikiTorch" one-liner::
 
         tt.closure_report(model, x)                       # structural + inference
@@ -1046,31 +1364,76 @@ def closure_report(model, example_inputs=None, targets=None, loss_fn=None,
     batch/token counts for mean-reduced losses). Results remain scoped to the
     executed configuration and inputs.
     """
-    rep = {"structural": find_closure_violations(model)}
+    structural = find_closure_violations(model)
+    structural_tensors = _execution_tensor_metadata(model)
+    rep = {
+        "schema_version": AUDIT_REPORT_SCHEMA_VERSION,
+        "audit_semantics": AUDIT_SEMANTICS_VERSION,
+        "structural": structural,
+        "coverage": {
+            "structural": {
+                "schema_version": _AUDIT_COVERAGE_SCHEMA_VERSION,
+                "audit_semantics": AUDIT_SEMANTICS_VERSION,
+                "scope": "registered-module-tree",
+                "mode": "structural",
+                "harden_tau": False,
+                "harden_tau_applied": False,
+                "dtypes": structural_tensors["dtypes"],
+                "devices": structural_tensors["devices"],
+                "status": "violated" if structural else "scan-clean",
+                "certified": False,
+            }
+        },
+    }
     if example_inputs is not None:
         if not isinstance(example_inputs, (tuple, list)):
             example_inputs = (example_inputs,)
-        rep["inference"] = find_runtime_multiplies(model, *example_inputs, harden_tau=harden_tau)
-        rep["inference_closed"] = not rep["inference"]
+        else:
+            example_inputs = tuple(example_inputs)
+        inference, inference_coverage = _runtime_audit(
+            model, example_inputs, harden_tau=harden_tau
+        )
+        rep["inference"] = inference
+        rep["inference_violations"] = [
+            hit for hit in inference if hit[0] != "unknown-operation"
+        ]
+        rep["inference_unknown"] = [
+            hit for hit in inference if hit[0] == "unknown-operation"
+        ]
+        rep["inference_status"] = inference_coverage["status"]
+        rep["inference_inconclusive"] = bool(rep["inference_unknown"])
+        rep["inference_closed"] = inference_coverage["certified"]
+        rep["coverage"]["inference"] = inference_coverage
     if targets is not None and loss_fn is not None and example_inputs is not None:
-        tr = find_training_multiplies(model, example_inputs, targets, loss_fn,
-                                      optimizer=optimizer, harden_tau=harden_tau)
+        tr, training_coverage = _training_audit(
+            model, example_inputs, targets, loss_fn,
+            optimizer=optimizer, harden_tau=harden_tau,
+        )
         rep["training"] = tr
-        rep["training_closed"] = not tr
+        rep["training_violations"] = [
+            hit for hit in tr if hit[0] != "unknown-operation"
+        ]
+        rep["training_unknown"] = [
+            hit for hit in tr if hit[0] == "unknown-operation"
+        ]
+        rep["training_status"] = training_coverage["status"]
+        rep["training_inconclusive"] = bool(rep["training_unknown"])
+        rep["training_closed"] = training_coverage["certified"]
         # A divide is arithmetic too.  Earlier versions silently exempted every
         # elementwise divide here, allowing genuinely non-closed recipes to earn a
         # zero-DSP badge.  Hardware-specific host exclusions belong in an explicit
         # certificate boundary, not this eager whole-step boolean.
-        rep["training_zero_dsp"] = not tr
+        rep["training_zero_dsp"] = training_coverage["certified"]
+        rep["coverage"]["training"] = training_coverage
     return rep
 
 
 class ClosureViolation(AssertionError):
-    """Raised when a registered multiply-like operation executes in a guard."""
+    """Raised when an unsafe or unclassified operation executes in a guard."""
 
 
 class assert_no_multiply:
-    """Guard that rejects classified multiply-like ops in a block of YOUR code.
+    """Guard that rejects unsafe or unclassified ops in a block of YOUR code.
 
     The fail-fast, wrap-your-own-loop closure check — ``torch.no_grad()``-shaped::
 
@@ -1079,16 +1442,17 @@ class assert_no_multiply:
             loss = model.compute_loss(x, y)
             loss.backward()
             opt.step()
-        # raises ClosureViolation listing classified multiply-like ATen ops.
+        # raises ClosureViolation listing unsafe or unknown ATen ops.
 
     Unlike :func:`assert_closed` (which only inspects *registered modules*), this traces
     eager ATen stream via the same :func:`_make_catcher` ``TorchDispatchMode`` the audit
     helpers use, so it catches common raw ``*`` / ``@`` / ``torch.exp`` arithmetic
-    written in custom ``forward`` or training code. Passing remains scoped to the
-    executed path and the auditor's operator registry. Literal power-of-two scalars and tensor operands
-    with traced dyadic/sign/gate provenance pass. Arbitrary runtime tensor values
-    are never trusted merely because they currently look dyadic; dynamic integer
-    multiply/divide is arithmetic too. Boolean logic passes.
+    written in custom ``forward`` or training code. An unregistered operation also
+    blocks the guard rather than passing by omission. Passing remains scoped to the
+    executed path and the versioned auditor registry. Literal power-of-two scalars
+    and tensor operands with traced dyadic/sign/gate provenance pass. Arbitrary
+    runtime tensor values are never trusted merely because they currently look
+    dyadic; dynamic integer multiply/divide is arithmetic too. Boolean logic passes.
     ``allow_transcendental=True`` permits the soft
     ``tau>0`` ``exp``/``log`` relaxations. Tracing has per-op overhead — use it as an
     opt-in guard / test / CI gate, not in the hot training loop.
@@ -1124,9 +1488,11 @@ class assert_no_multiply:
             where = f" in {self.label}" if self.label else ""
             lines = "\n".join(f"    {c}: {op}" for c, op in uniq)
             raise ClosureViolation(
-                f"Hardware multiply/divide executed{where} — closure violated:\n" + lines +
-                "\n\nRewrite as add/compare/shift (powers of two are bit-shifts and pass); "
-                "anneal tau->0 for the soft exp/log relaxations, or pass allow_transcendental=True.")
+                f"Closure is violated or inconclusive{where}:\n" + lines +
+                "\n\nRewrite known arithmetic as add/compare/shift (powers of two are "
+                "bit-shifts and pass); anneal tau->0 for supported soft exp/log "
+                "relaxations, or classify/remove unknown operations. "
+                "allow_transcendental=True waives only registered transcendental ops.")
         return False
 
     def __call__(self, fn):                    # @assert_no_multiply() decorator form
@@ -1140,7 +1506,7 @@ class assert_no_multiply:
 
 
 def closed(fn=None, *, allow_transcendental=False):
-    """Decorator asserting the wrapped function/forward runs no hardware multiply::
+    """Decorator requiring the wrapped function's executed ops to certify closed::
 
         @tt.closed
         def train_step(x, y): ...
@@ -1149,7 +1515,7 @@ def closed(fn=None, *, allow_transcendental=False):
         def soft_forward(x): ...
 
     Thin wrapper over :class:`assert_no_multiply`; raises :class:`ClosureViolation`
-    (naming each classified offending op) if the call executes registered arithmetic.
+    (naming each blocker) if the call executes registered unsafe or unknown arithmetic.
     """
     if fn is None:
         return lambda f: closed(f, allow_transcendental=allow_transcendental)

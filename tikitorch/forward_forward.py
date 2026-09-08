@@ -181,7 +181,7 @@ class TropicalFFHingeLossFn(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, h, is_pos, theta, margin, goodness, k):
-        # h: (B, D) float; is_pos: (B,) bool; theta/margin: float; goodness: str; k: int
+        # h: (B, D) float; is_pos: (B,) bool; theta: scalar tensor/number.
         g, idx = _goodness_and_indices(h, goodness, int(k))     # g:(B,), idx:(B,kk)
 
         pos_target = theta + margin
@@ -218,20 +218,26 @@ class TropicalFFHingeLossFn(torch.autograd.Function):
 
 
 def tropical_ff_hinge_loss(h: torch.Tensor, is_pos: torch.Tensor,
-                           theta: float = 0.0, margin: float = 1.0,
+                           theta: Union[float, torch.Tensor] = 0.0, margin: float = 1.0,
                            goodness: str = "topk", k: int = 8) -> torch.Tensor:
     """Scalar FF hinge loss with a sign-gated custom gradient.
 
     ``h`` is ``(B, D)`` activations, ``is_pos`` a ``(B,)`` bool mask (True =
-    positive sample). See :class:`TropicalFFHingeLossFn`.
+    positive sample). A tensor threshold remains on-device and is treated as a
+    detached control value, not a differentiable parameter. See
+    :class:`TropicalFFHingeLossFn`.
     """
     if is_pos.dtype != torch.bool:
         is_pos = is_pos.bool()
-    return TropicalFFHingeLossFn.apply(h, is_pos, float(theta), float(margin), goodness, int(k))
+    if isinstance(theta, torch.Tensor):
+        if theta.ndim != 0:
+            raise ValueError("theta must be a scalar")
+        theta = theta.detach().to(device=h.device, dtype=h.dtype)
+    return TropicalFFHingeLossFn.apply(h, is_pos, theta, float(margin), goodness, int(k))
 
 
 def tropical_ff_logistic_loss(h: torch.Tensor, is_pos: torch.Tensor,
-                              theta: float = 0.0, goodness: str = "topk",
+                              theta: Union[float, torch.Tensor] = 0.0, goodness: str = "topk",
                               k: int = 8) -> torch.Tensor:
     """Hinton's original logistic FF loss — host-conditioned coefficient.
 
@@ -252,13 +258,17 @@ def tropical_ff_logistic_loss(h: torch.Tensor, is_pos: torch.Tensor,
       anything with a magnitude-aware update (a non-closed optimizer, or a
       frexp/agreement-tiered one). Prefer the hinge loss for the closed loop.
     """
+    if isinstance(theta, torch.Tensor):
+        if theta.ndim != 0:
+            raise ValueError("theta must be a scalar")
+        theta = theta.detach().to(device=h.device, dtype=h.dtype)
     g, idx = _goodness_and_indices(h, goodness, int(k))
     with torch.no_grad():
         # coeff = dL/dG; host sigmoid (transcendental) -> scattered, never multiplied per-weight.
         coeff_pos = -torch.sigmoid(theta - g)                   # in (-1, 0)
         coeff_neg = torch.sigmoid(g - theta)                    # in (0, 1)
         coeff = torch.where(is_pos.bool(), coeff_pos, coeff_neg)
-    return _ScatterCoeffLossFn.apply(h, idx, coeff, g, is_pos.bool(), float(theta))
+    return _ScatterCoeffLossFn.apply(h, idx, coeff, g, is_pos.bool(), theta)
 
 
 class _ScatterCoeffLossFn(torch.autograd.Function):
@@ -494,12 +504,16 @@ class TropicalFFTrainer:
         margin: hinge margin ``m`` (goodness units).
         lr_shift: forwarded to the default ``PureTropicalSGD``.
         momentum_bits: forwarded to the default ``PureTropicalSGD``.
+        host_metrics: return Python floats by default. Set False for detached
+            scalar-tensor diagnostics during an executed closure audit; convert
+            them to host values only after leaving the audit scope.
     """
 
     def __init__(self, net: TropicalFFNet, *,
                  optimizer_factory: Optional[Callable[[object], object]] = None,
                  theta: Union[str, float] = "adaptive", margin: float = 1.0,
-                 lr_shift: int = 4, momentum_bits: int = 0):
+                 lr_shift: int = 4, momentum_bits: int = 0,
+                 host_metrics: bool = True):
         self.net = net
         if optimizer_factory is None:
             if PureTropicalSGD is None:  # pragma: no cover - import guard
@@ -511,27 +525,35 @@ class TropicalFFTrainer:
         self.optimizers = [optimizer_factory(layer.parameters()) for layer in net.layers]
         self.theta_policy = theta
         self.margin = float(margin)
+        self.host_metrics = host_metrics
 
-    def _theta(self, gp: torch.Tensor, gn: torch.Tensor) -> float:
+    def _theta(self, gp: torch.Tensor, gn: torch.Tensor) -> Union[float, torch.Tensor]:
         if isinstance(self.theta_policy, str):
             if self.theta_policy != "adaptive":
                 raise ValueError(f"theta must be 'adaptive' or a float, got {self.theta_policy!r}")
             # batch midpoint: (mean + mean) * 0.5  -> add + power-of-2 shift (closed)
-            return float((gp.mean() + gn.mean()) * 0.5)
+            return ((gp.mean() + gn.mean()) * 0.5).detach()
         return float(self.theta_policy)
 
-    def train_step(self, x_pos: torch.Tensor, x_neg: torch.Tensor) -> Dict[str, list]:
+    def train_step(self, x_pos: torch.Tensor, x_neg: torch.Tensor, *,
+                   host_metrics: Optional[bool] = None) -> Dict[str, list]:
         """Train every layer one step on a positive/negative batch pair.
 
         Returns ``{"loss": [...per layer], "g_pos": [...], "g_neg": [...]}`` (the
         per-layer mean goodness on positive and negative data — the separation
         diagnostic). Forward-only: each layer's gradient touches only its own
         weights.
+
+        ``host_metrics=False`` retains detached scalar tensors and avoids
+        tensor-to-Python conversions. The default follows the constructor's
+        setting (Python floats for backward compatibility). Host conversion is
+        an explicit audit boundary; it never feeds back into the weight update.
         """
         net = self.net
         hp = net._prep(x_pos)
         hn = net._prep(x_neg)
         out = {"loss": [], "g_pos": [], "g_neg": []}
+        host_metrics = self.host_metrics if host_metrics is None else host_metrics
         for layer, opt in zip(net.layers, self.optimizers):
             inp_p, inp_n = hp.detach(), hn.detach()
             ap = layer(inp_p)                       # grad flows to layer.weight only
@@ -548,9 +570,9 @@ class TropicalFFTrainer:
                                           goodness=layer.goodness_name, k=layer.k)
             loss.backward()
             opt.step()
-            out["loss"].append(float(loss.detach()))
-            out["g_pos"].append(float(gp.mean()))
-            out["g_neg"].append(float(gn.mean()))
+            for name, value in (("loss", loss.detach()), ("g_pos", gp.mean()),
+                                ("g_neg", gn.mean())):
+                out[name].append(float(value) if host_metrics else value.detach())
             # tropically-normalized, DETACHED activations -> next layer's input.
             hp = layer.normalize(ap).detach()
             hn = layer.normalize(an).detach()
@@ -585,10 +607,15 @@ def overlay_label(x: torch.Tensor, labels: torch.Tensor, num_classes: int,
 def make_negative_labels(labels: torch.Tensor, num_classes: int,
                          generator: Optional[torch.Generator] = None) -> torch.Tensor:
     """A wrong label for each sample: uniform over the ``num_classes-1`` classes
-    that are not the true one (``(label + U[1, C-1]) mod C`` — never equal)."""
+    that are not the true one (``(label + U[1, C-1]) mod C`` — never equal).
+
+    Input labels must lie in ``[0, num_classes)``. The bounded sum needs only
+    one conditional subtraction to wrap, without integer division/remainder.
+    """
     offset = torch.randint(1, num_classes, labels.shape, generator=generator,
                            device=labels.device)
-    return (labels + offset) % num_classes
+    candidate = labels + offset
+    return torch.where(candidate >= num_classes, candidate - num_classes, candidate)
 
 
 def scramble_features(x: torch.Tensor, generator: Optional[torch.Generator] = None) -> torch.Tensor:

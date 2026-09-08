@@ -9,6 +9,7 @@ optional route cardinalities; the payload contains no activation values.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from copy import deepcopy
 import json
 import struct
 from typing import Any, Iterator, Mapping
@@ -95,6 +96,12 @@ class PackedRouteTape:
         self._payload = bytearray()
         self._fields: dict[str, PackedField] = {}
         self._bit_length = 0
+        self._fingerprint: dict[str, Any] | None = None
+
+    @property
+    def fingerprint(self) -> dict[str, Any] | None:
+        """A defensive copy of the optional configuration binding."""
+        return deepcopy(self._fingerprint)
 
     @property
     def bit_length(self) -> int:
@@ -276,6 +283,11 @@ class PackedRouteTape:
         byte-identical to the pre-v2 writer.
         """
 
+        if fingerprint is None:
+            fingerprint = self._fingerprint
+        elif self._fingerprint is not None and dict(fingerprint) != self._fingerprint:
+            raise ValueError("PackedRouteTape fingerprint mismatch: refusing rebinding")
+
         def field_dict(field: PackedField) -> dict[str, Any]:
             d = asdict(field)
             if not field.value_offset:
@@ -329,6 +341,10 @@ class PackedRouteTape:
                     f"(expected {dict(expected_fingerprint)!r}, got {got!r})")
 
         tape = cls()
+        if header.get("fingerprint") is not None:
+            if not isinstance(header["fingerprint"], dict):
+                raise ValueError("PackedRouteTape fingerprint must be an object")
+            tape._fingerprint = deepcopy(header["fingerprint"])
         tape._bit_length = int(header["bit_length"])
         if tape._bit_length < 0:
             raise ValueError("negative packed bit length")

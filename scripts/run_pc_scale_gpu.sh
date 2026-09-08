@@ -11,10 +11,17 @@
 #   PC_TASK=mnist bash scripts/run_pc_scale_gpu.sh fetch
 #   PC_TASK=mnist bash scripts/run_pc_scale_gpu.sh terminate
 #   (PC_TASK=cifar or convlm for other tasks; DRY_RUN=1 renders without launching)
+#   bash scripts/run_pc_scale_gpu.sh render S3_SRC S3_RESULTS COMMIT SHA256
+#   (`render` is fully offline, needs no AWS profile, and writes only stdout.)
 set -euo pipefail
-PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"
+COMMAND_NAME="${1:-}"
+case "$COMMAND_NAME" in
+  render) PROFILE="${AWS_PROFILE:-}" ;;
+  launch|status|fetch|terminate) PROFILE="${AWS_PROFILE:?set AWS_PROFILE}" ;;
+  *) echo "usage: $0 {launch|status|fetch|terminate|render S3_SRC S3_RESULTS COMMIT SHA256}" >&2; exit 2 ;;
+esac
 REGION="${REGION:-}"
-if [ -z "$REGION" ]; then
+if [ -z "$REGION" ] && [ "$COMMAND_NAME" != render ]; then
   REGION="$(aws configure get region --profile "$PROFILE" 2>/dev/null || true)"
 fi
 REGION="${REGION:-us-east-1}"
@@ -36,12 +43,13 @@ if [ "$MAX_MINUTES" -le 0 ]; then
   echo "FATAL: MAX_MINUTES must be a positive integer"
   exit 2
 fi
-STATE_DIR="$PROJECT_DIR/.tiki_pcscale_${PC_TASK}_state"; mkdir -p "$STATE_DIR"  # per-task so mnist/cifar don't collide
+STATE_DIR="$PROJECT_DIR/.tiki_pcscale_${PC_TASK}_state"  # per-task so mnist/cifar don't collide
 STATE_FILE="$STATE_DIR/run.env"
 aws_(){ aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
 cmd_launch(){
   [ -f "$STATE_FILE" ] && { echo "state exists; terminate first (fetch anytime):"; cat "$STATE_FILE"; exit 1; }
+  mkdir -p "$STATE_DIR"
   local ACCT BUCKET TAG S3_SRC S3_RESULTS UD INSTANCE_ID SOURCE_COMMIT SOURCE_ARCHIVE_SHA256
   ACCT="$(aws_ sts get-caller-identity --query Account --output text)"; BUCKET="tiki-sweep-${ACCT}"
   aws_ s3api head-bucket --bucket "$BUCKET" 2>/dev/null || { echo "no bucket $BUCKET; run the connect4 runner's setup first"; exit 1; }
@@ -95,19 +103,24 @@ cmd_launch(){
 render_user_data(){
   local s3_src="$1" s3_results="$2" source_commit="$3" expected_sha="$4"
   local pc_args_q pc_task_q ami_q instance_type_q region_q
+  local s3_src_q s3_results_q source_commit_q expected_sha_q
   printf -v pc_args_q '%q' "$PC_ARGS"
   printf -v pc_task_q '%q' "$PC_TASK"
   printf -v ami_q '%q' "$AMI"
   printf -v instance_type_q '%q' "$INSTANCE_TYPE"
   printf -v region_q '%q' "$REGION"
+  printf -v s3_src_q '%q' "$s3_src"
+  printf -v s3_results_q '%q' "$s3_results"
+  printf -v source_commit_q '%q' "$source_commit"
+  printf -v expected_sha_q '%q' "$expected_sha"
   cat <<UDEOF
 #!/bin/bash
 exec > /var/log/tiki-pcscale.log 2>&1
 set -u
 set -x
-S3_SRC="${s3_src}"; S3_RESULTS="${s3_results}"
-SOURCE_COMMIT="${source_commit}"
-EXPECTED_SOURCE_ARCHIVE_SHA256="${expected_sha}"
+S3_SRC=${s3_src_q}; S3_RESULTS=${s3_results_q}
+SOURCE_COMMIT=${source_commit_q}
+EXPECTED_SOURCE_ARCHIVE_SHA256=${expected_sha_q}
 RUN_AMI=${ami_q}; RUN_INSTANCE_TYPE=${instance_type_q}; RUN_REGION=${region_q}
 RUN_RC=""
 export DEBIAN_FRONTEND=noninteractive PATH=/opt/venv/bin:\$PATH
@@ -229,10 +242,12 @@ cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; source "$ST
   rm -f "$STATE_FILE"
   echo "(state cleared; ready to launch again)"
 }
-case "${1:-}" in
+case "$COMMAND_NAME" in
   launch) cmd_launch ;;
   status) cmd_status ;;
   fetch) cmd_fetch ;;
   terminate) cmd_terminate ;;
-  *) echo "usage: $0 {launch|status|fetch|terminate}  (PC_TASK=mnist|cifar|convlm  DRY_RUN=1)"; exit 2 ;;
+  render)
+    [ "$#" -eq 5 ] || { echo "usage: $0 render S3_SRC S3_RESULTS COMMIT SHA256" >&2; exit 2; }
+    render_user_data "$2" "$3" "$4" "$5" ;;
 esac

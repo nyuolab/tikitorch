@@ -23,6 +23,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from tikitorch.functional import (
+    _hard_tropical_linear_forward,
+    _validate_temperature,
+    _validate_tropical_linear_inputs,
     adder_linear,
     tropical_asym_score,
     tropical_conv2d,
@@ -301,54 +304,136 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
-# Max-plus / min-plus linears materialize a (batch, out, in) intermediate (there is
-# no GEMM equivalent for the (max,+) semiring). For a large layer -- e.g. an LM FFN
-# d->4d at long sequence -- that tensor is many GB and OOMs in eager PyTorch. We tile
-# over the OUTPUT dim so peak memory is bounded, reusing the SAME (tested) ops on
-# weight-row slices: identical math, just chunked, and autograd flows through the
-# slices. Small layers (under the threshold) take the original single-shot path with
-# zero overhead. This is purely an eager-mode fix -- on FPGA/ASIC the max-plus
-# reduction streams with no materialization (the whole point of being multiplier-free).
+# The hard functional references tile the input reduction and retain only an output
+# value and first-winner route. Soft reductions still need dense candidates for their
+# logsumexp Jacobian, so bound those temporaries by tiling output rows here.
 _MAXPLUS_CHUNK_ELEMS = 32_000_000   # (batch*out*in) above this -> tile over out
 
 
-def _chunked_linear(op, x, weight, bias):
-    """``op(x, weight_rows) -> (..., out_rows)``, tiled over output features when the
-    (batch, out, in) intermediate would exceed ``_MAXPLUS_CHUNK_ELEMS``. ``x`` is
-    (..., in); ``weight`` is (out, in); ``bias`` is (out,)."""
-    out_features, in_features = weight.shape
-    batch = x.numel() // in_features
-    if batch * out_features * in_features <= _MAXPLUS_CHUNK_ELEMS:
+def _tropical_dispatch_device(op_name: str, logical_device=None, *, tensor=None):
+    """Resolve binding/default/tensor precedence to one logical dispatch device."""
+
+    from tikitorch.backend import get_default_device, is_op_supported
+
+    selected = logical_device
+    inferred_tensor_device = False
+    if selected is None:
+        selected = get_default_device()
+        if selected.is_cpu and tensor is not None and tensor.device.type != "cpu":
+            selected = tensor.device.type
+            inferred_tensor_device = True
+    if inferred_tensor_device and not is_op_supported(op_name, selected):
+        # A native torch CUDA/MPS tensor is not an explicit request for a logical
+        # extension backend. Use the generic PyTorch reference silently; it keeps
+        # storage on the tensor's device and remains fullgraph compilable.
+        return "cpu"
+    return selected
+
+
+def _dispatch_tropical_op(op_name: str, logical_device=None, *, tensor=None):
+    """Resolve a public op from binding, logical default, then tensor device."""
+
+    from tikitorch.backend import dispatch
+
+    selected = _tropical_dispatch_device(
+        op_name, logical_device, tensor=tensor
+    )
+    return dispatch(op_name, selected)
+
+
+def _uses_reference_tropical_op(op_name: str, logical_device=None, *, tensor=None) -> bool:
+    from tikitorch.backend import dispatch, is_reference_dispatch
+
+    selected = _tropical_dispatch_device(
+        op_name, logical_device, tensor=tensor
+    )
+    # Resolve through the ordinary dispatch boundary first so an unavailable
+    # explicitly selected backend retains the same warning/error contract as
+    # ``forward``.  Callable identity is deliberately not inspected here: the
+    # registry's reference metadata is safe for Dynamo to guard below.
+    dispatch(op_name, selected)
+    return is_reference_dispatch(op_name, selected)
+
+
+def _chunked_linear(op_name, x, weight, bias, *, tau=None, logical_device=None):
+    """Execute a hard additive linear or a bounded soft reduction.
+
+    ``x`` is ``(..., in)`` and the result is ``(..., out)``. Hard reference ops
+    perform their own input-feature tiling; a registered backend receives the
+    complete public operation. Soft reducers receive bounded output-row slices.
+    """
+
+    rows, out_features, in_features = _validate_tropical_linear_inputs(x, weight)
+    if bias.shape != (out_features,):
+        raise ValueError(f"bias must have shape {(out_features,)}, got {tuple(bias.shape)}")
+    op = _dispatch_tropical_op(op_name, logical_device, tensor=x)
+    if tau is None:
         return op(x, weight) + bias
-    chunk = max(1, _MAXPLUS_CHUNK_ELEMS // max(1, batch * in_features))
-    return torch.cat([op(x, weight[s:s + chunk]) + bias[s:s + chunk]
-                      for s in range(0, out_features, chunk)], dim=-1)
+
+    tau = _validate_temperature(tau, allow_zero=False)
+    output_shape = (*x.shape[:-1], out_features)
+    flat_x = x.reshape(rows, in_features)
+    if out_features == 0:
+        expanded = flat_x[:, None, :] + weight[None, :, :]
+        return op(expanded, tau=tau, dim=-1).reshape(output_shape) + bias
+    chunk = min(
+        out_features,
+        max(1, _MAXPLUS_CHUNK_ELEMS // max(1, rows * in_features)),
+    )
+    outputs = []
+    for start in range(0, out_features, chunk):
+        stop = min(start + chunk, out_features)
+        expanded = flat_x[:, None, :] + weight[None, start:stop, :]
+        outputs.append(op(expanded, tau=tau, dim=-1) + bias[start:stop])
+    return torch.cat(outputs, dim=-1).reshape(output_shape)
 
 
 class TropicalSoftMin(nn.Module):
-    """Differentiable tropical linear using softmin with temperature tau."""
+    """Tropical linear relaxation that hardens at ``tau=0``."""
 
     def __init__(self, tau: float = 1.0):
         super().__init__()
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+
+    def set_tau(self, tau: float) -> None:
+        self.tau = _validate_temperature(tau, allow_zero=True)
 
     def forward(self, x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
-        """x: (batch, in), weight: (out, in) -> (batch, out)."""
-        expanded = weight.unsqueeze(0) + x.unsqueeze(1)  # (batch, out, in)
-        return tropical_softmin(expanded, tau=self.tau, dim=-1)
+        """``x: (..., in)``, ``weight: (out, in) -> (..., out)``."""
+        bias = weight.new_zeros(weight.shape[0])
+        if self.tau == 0:
+            return _chunked_linear(
+                "tropical_linear", x, weight, bias,
+                logical_device=getattr(self, "_tt_device", None),
+            )
+        return _chunked_linear(
+            "tropical_softmin", x, weight, bias, tau=self.tau,
+            logical_device=getattr(self, "_tt_device", None),
+        )
 
 
 class TropicalSoftMax(nn.Module):
-    """Differentiable tropical dilation using softmax with temperature tau."""
+    """Tropical dilation relaxation that hardens at ``tau=0``."""
 
     def __init__(self, tau: float = 1.0):
         super().__init__()
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+
+    def set_tau(self, tau: float) -> None:
+        self.tau = _validate_temperature(tau, allow_zero=True)
 
     def forward(self, x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
-        """x: (batch, in), weight: (out, in) -> (batch, out)."""
-        expanded = weight.unsqueeze(0) + x.unsqueeze(1)
-        return tropical_softmax(expanded, tau=self.tau, dim=-1)
+        """``x: (..., in)``, ``weight: (out, in) -> (..., out)``."""
+        bias = weight.new_zeros(weight.shape[0])
+        if self.tau == 0:
+            return _chunked_linear(
+                "tropical_dilation", x, weight, bias,
+                logical_device=getattr(self, "_tt_device", None),
+            )
+        return _chunked_linear(
+            "tropical_softmax", x, weight, bias, tau=self.tau,
+            logical_device=getattr(self, "_tt_device", None),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -369,8 +454,8 @@ class TropicalDilationModule(nn.Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.use_softmax = use_softmax
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_softmax = bool(use_softmax and self.tau > 0)
         # init_identity seeds the dilation as the identity map (W[j,j]=0,
         # W[j,i!=j]=-big), so y_j = max_i(W[j,i]+x[i]) ~= x_j at init. A plain
         # uniform init makes a single dilation collapse the value signal (one
@@ -382,7 +467,7 @@ class TropicalDilationModule(nn.Module):
 
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.bias = nn.Parameter(torch.zeros(out_features))
-        self._softmax = TropicalSoftMax(tau=tau)
+        self._softmax = TropicalSoftMax(tau=self.tau)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -398,13 +483,19 @@ class TropicalDilationModule(nn.Module):
         # Flip into the soft (logsumexp) path for tau>0 and the hard (argmax)
         # path at tau==0 -- otherwise a module built use_softmax=False stays hard
         # through the whole soft->hard curriculum (the soft-anneal-freeze bug).
-        self.tau = tau
-        self.use_softmax = tau > 0
-        self._softmax.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_softmax = self.tau > 0
+        self._softmax.set_tau(self.tau)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        op = self._softmax if self.use_softmax else tropical_dilation
-        return _chunked_linear(op, x, self.weight, self.bias)
+        return _chunked_linear(
+            "tropical_softmax" if self.use_softmax else "tropical_dilation",
+            x,
+            self.weight,
+            self.bias,
+            tau=self.tau if self.use_softmax else None,
+            logical_device=getattr(self, "_tt_device", None),
+        )
 
     @torch.no_grad()
     def forward_with_indices(self, x: torch.Tensor):
@@ -415,13 +506,19 @@ class TropicalDilationModule(nn.Module):
         but don't need gradients through the routing decision.
 
         Args:
-            x: (batch, in_features)
+            x: (..., in_features)
         Returns:
-            out: (batch, out_features) — max-plus output + bias
-            indices: (batch, out_features) — argmax index per output unit
+            out: (..., out_features) — max-plus output + bias
+            indices: (..., out_features) — argmax index per output unit
         """
-        expanded = self.weight.unsqueeze(0) + x.unsqueeze(1)  # (batch, out, in)
-        out, indices = expanded.max(dim=-1)  # (batch, out)
+        if not _uses_reference_tropical_op(
+            "tropical_dilation", getattr(self, "_tt_device", None), tensor=x
+        ):
+            raise RuntimeError(
+                "forward_with_indices requires the registered PyTorch reference; "
+                "the selected backend supplies values without a paired route contract"
+            )
+        out, indices = _hard_tropical_linear_forward(x, self.weight, largest=True)
         return out + self.bias, indices
 
     @torch.no_grad()
@@ -437,25 +534,17 @@ class TropicalDilationModule(nn.Module):
         Tiled over output features like ``_chunked_linear`` so the transient stays
         bounded. Matches ``forward`` bit-exactly on both paths.
         """
-        out_features, in_features = self.weight.shape
-        rows = x.numel() // in_features
-        xf = x.reshape(rows, in_features)
-        chunk = out_features if rows * out_features * in_features <= _MAXPLUS_CHUNK_ELEMS else \
-            max(1, _MAXPLUS_CHUNK_ELEMS // max(1, rows * in_features))
-        outs, idxs = [], []
-        for s in range(0, out_features, chunk):
-            w = self.weight[s:s + chunk]
-            expanded = w.unsqueeze(0) + xf.unsqueeze(1)      # (rows, chunk, in)
-            if self.use_softmax:
-                y = tropical_softmax(expanded, tau=self.tau, dim=-1)
-            else:
-                y, idx = expanded.max(dim=-1)
-                idxs.append(idx)
-            outs.append(y + self.bias[s:s + chunk])
-        y = torch.cat(outs, dim=-1).reshape(*x.shape[:-1], out_features)
         if self.use_softmax:
-            return y, None
-        return y, torch.cat(idxs, dim=-1).reshape(*x.shape[:-1], out_features)
+            return self.forward(x), None
+        if not _uses_reference_tropical_op(
+            "tropical_dilation", getattr(self, "_tt_device", None), tensor=x
+        ):
+            raise RuntimeError(
+                "forward_with_routing requires the registered PyTorch reference; "
+                "the selected backend supplies values without a paired route contract"
+            )
+        y, route = _hard_tropical_linear_forward(x, self.weight, largest=True)
+        return y + self.bias, route
 
     def extra_repr(self) -> str:
         return (
@@ -480,12 +569,12 @@ class TropicalLinearModule(nn.Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.use_softmin = use_softmin
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_softmin = bool(use_softmin and self.tau > 0)
 
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.bias = nn.Parameter(torch.zeros(out_features))
-        self._softmin = TropicalSoftMin(tau=tau)
+        self._softmin = TropicalSoftMin(tau=self.tau)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -497,13 +586,19 @@ class TropicalLinearModule(nn.Module):
         """Update temperature for softmin annealing (and flip into/out of soft)."""
         # tau>0 -> soft (logsumexp) path; tau==0 -> hard (argmin). Without this
         # flip a module built use_softmin=False never softens (soft-anneal freeze).
-        self.tau = tau
-        self.use_softmin = tau > 0
-        self._softmin.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_softmin = self.tau > 0
+        self._softmin.set_tau(self.tau)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        op = self._softmin if self.use_softmin else tropical_linear
-        return _chunked_linear(op, x, self.weight, self.bias)
+        return _chunked_linear(
+            "tropical_softmin" if self.use_softmin else "tropical_linear",
+            x,
+            self.weight,
+            self.bias,
+            tau=self.tau if self.use_softmin else None,
+            logical_device=getattr(self, "_tt_device", None),
+        )
 
     def extra_repr(self) -> str:
         return (
@@ -546,7 +641,7 @@ class CompositionalTropicalProjection(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.d_intermediate = d_intermediate
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
 
         # First layer: Dilation (max-plus): in_features -> d_intermediate
         self.W1 = nn.Parameter(torch.empty(d_intermediate, in_features))
@@ -564,33 +659,26 @@ class CompositionalTropicalProjection(nn.Module):
         nn.init.zeros_(self.b2)
 
     def set_tau(self, tau: float) -> None:
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (..., in_features). Step 1 expands to d_intermediate via dilation.
-        if self.tau > 0:
-            # Soft path: logsumexp gives dense gradients.
-            expanded1 = self.W1 + x.unsqueeze(-2)  # (..., d_intermediate, in)
-            h = tropical_softmax(expanded1, tau=self.tau, dim=-1) + self.b1
-        else:
-            # Hard path: custom autograd through 1-of-d argmax.
-            # tropical_dilation expects (batch, in) - (out, in) -> (batch, out).
-            orig_shape = x.shape
-            x_flat = x.reshape(-1, self.in_features)
-            h_flat = tropical_dilation(x_flat, self.W1)
-            h = h_flat.reshape(*orig_shape[:-1], self.d_intermediate) + self.b1
-
-        # Step 2: erosion (min-plus): d_intermediate -> out_features.
-        if self.tau > 0:
-            expanded2 = self.W2 + h.unsqueeze(-2)  # (..., out, d_intermediate)
-            y = tropical_softmin(expanded2, tau=self.tau, dim=-1) + self.b2
-        else:
-            h_shape = h.shape
-            h_flat = h.reshape(-1, self.d_intermediate)
-            y_flat = tropical_linear(h_flat, self.W2)
-            y = y_flat.reshape(*h_shape[:-1], self.out_features) + self.b2
-
-        return y
+        logical_device = getattr(self, "_tt_device", None)
+        h = _chunked_linear(
+            "tropical_softmax" if self.tau > 0 else "tropical_dilation",
+            x,
+            self.W1,
+            self.b1,
+            tau=self.tau if self.tau > 0 else None,
+            logical_device=logical_device,
+        )
+        return _chunked_linear(
+            "tropical_softmin" if self.tau > 0 else "tropical_linear",
+            h,
+            self.W2,
+            self.b2,
+            tau=self.tau if self.tau > 0 else None,
+            logical_device=logical_device,
+        )
 
     def extra_repr(self) -> str:
         return (
@@ -624,10 +712,17 @@ class TropicalTopKModule(nn.Module):
     def __init__(self, in_features: int, out_features: int,
                  k: int = 4, tau: float = 0.0):
         super().__init__()
+        if in_features < 1:
+            raise ValueError(f"in_features must be positive, got {in_features}")
+        if out_features < 0:
+            raise ValueError(f"out_features must be nonnegative, got {out_features}")
+        if isinstance(k, bool) or not isinstance(k, int) or k < 1:
+            raise ValueError(f"k must be a positive integer, got {k!r}")
         self.in_features = in_features
         self.out_features = out_features
         self.k = min(k, in_features)
-        self.tau = tau  # accepted for API compatibility; topk is hard by nature
+        # Accepted for API compatibility; selection itself remains hard.
+        self.tau = _validate_temperature(tau, allow_zero=True)
 
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.bias = nn.Parameter(torch.zeros(out_features))
@@ -640,13 +735,56 @@ class TropicalTopKModule(nn.Module):
     def set_tau(self, tau: float) -> None:
         # Accepted for symmetry with other tropical projections; the top-K
         # selection itself does not have a meaningful soft analogue here.
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+
+    def _forward_and_route(self, x: torch.Tensor):
+        rows, out_features, in_features = _validate_tropical_linear_inputs(
+            x, self.weight
+        )
+        output_shape = (*x.shape[:-1], out_features)
+        route_shape = (*output_shape, self.k)
+        flat_x = x.reshape(rows, in_features)
+        if out_features == 0:
+            expanded = flat_x[:, None, :] + self.weight[None, :, :]
+            selector = _dispatch_tropical_op(
+                "stable_topk", getattr(self, "_tt_device", None), tensor=expanded
+            )
+            selected, route = selector(expanded, self.k, dim=-1)
+            return (
+                (selected.sum(dim=-1) + self.bias).reshape(output_shape),
+                route.reshape(route_shape),
+            )
+        chunk = min(
+            out_features,
+            max(1, _MAXPLUS_CHUNK_ELEMS // max(1, rows * in_features)),
+        )
+        outputs, routes = [], []
+        for start in range(0, out_features, chunk):
+            stop = min(start + chunk, out_features)
+            expanded = flat_x[:, None, :] + self.weight[None, start:stop, :]
+            selector = _dispatch_tropical_op(
+                "stable_topk", getattr(self, "_tt_device", None), tensor=expanded
+            )
+            selected, route = selector(expanded, self.k, dim=-1)
+            outputs.append(selected.sum(dim=-1) + self.bias[start:stop])
+            routes.append(route)
+        return (
+            torch.cat(outputs, dim=-1).reshape(output_shape),
+            torch.cat(routes, dim=-2).reshape(route_shape),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (..., in_features). Add weight and select top-K along input dim.
-        expanded = self.weight + x.unsqueeze(-2)  # (..., out, in)
-        topk_vals, _ = expanded.topk(self.k, dim=-1)  # (..., out, k)
-        return topk_vals.sum(dim=-1) + self.bias
+        return self._forward_and_route(x)[0]
+
+    @torch.no_grad()
+    def forward_with_routing(self, x: torch.Tensor):
+        """Return ``(output, route)`` with stable lowest-index top-k ties.
+
+        ``route`` has shape ``(..., out_features, k)`` and exactly describes the
+        selected subgradient used by :meth:`forward`.
+        """
+
+        return self._forward_and_route(x)
 
     def extra_repr(self) -> str:
         return (
@@ -738,12 +876,13 @@ class DyadicTropicalProjection(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.d_intermediate = d_intermediate
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
         self.lin1 = DyadicLinear(in_features, d_intermediate)
         self.lin2 = DyadicLinear(d_intermediate, out_features)
 
     def set_tau(self, tau: float) -> None:
-        self.tau = tau            # inert; kept for parity with TropicalProjection.set_tau
+        # Inert in the forward path, but shares the public temperature contract.
+        self.tau = _validate_temperature(tau, allow_zero=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.lin2(torch.relu(self.lin1(x)))
@@ -982,8 +1121,8 @@ class DepthwiseMorphConv1d(nn.Module):
         self.kernel_size = kernel_size
         self.dilation = dilation
         self.mode = mode
-        self.use_soft = use_soft
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = bool(use_soft and self.tau > 0)
         self.group_size = group_size
 
         if group_size < 1:
@@ -1009,6 +1148,10 @@ class DepthwiseMorphConv1d(nn.Module):
 
     def reset_parameters(self):
         nn.init.uniform_(self.weight, -0.1, 0.1)
+
+    def set_tau(self, tau: float) -> None:
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = self.tau > 0
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, C, L = x.shape
@@ -1210,14 +1353,20 @@ class MultiScaleMorphConv1d(nn.Module):
         self.channels = channels
         self.kernel_sizes = kernel_sizes
         self.mode = mode
-        self.use_soft = use_soft
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = bool(use_soft and self.tau > 0)
         # One morph conv per scale
         self.convs = nn.ModuleList([
             DepthwiseMorphConv1d(channels, k, dilation=dilation,
-                                 mode=mode, use_soft=use_soft, tau=tau)
+                                 mode=mode, use_soft=self.use_soft, tau=self.tau)
             for k in kernel_sizes
         ])
+
+    def set_tau(self, tau: float) -> None:
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = self.tau > 0
+        for conv in self.convs:
+            conv.set_tau(self.tau)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """(B, C, L) -> (B, C, L). Combine scales via tropical max/min."""
@@ -1444,7 +1593,7 @@ class TropicalAttention(nn.Module):
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_head = d_model // n_heads
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
         # value_topk_k > 1 softens the HARD (tau==0) value pull: each output
         # (i, d) averages its k best keys instead of its single argmax, so the
         # gradient flows to k keys -- denser, still add/compare-only (no
@@ -1525,7 +1674,7 @@ class TropicalAttention(nn.Module):
 
         Propagates tau into projection sub-modules that support it (compositional).
         """
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
         # Cascade tau into sub-projections that respect it.
         for proj in (self.q_proj, self.k_proj, self.v_proj, self.out_proj):
             if hasattr(proj, "set_tau"):
@@ -1643,7 +1792,7 @@ class TropicalShiftAttention(nn.Module):
         self.n_heads = n_heads
         self.d_head = d_model // n_heads
         self.max_seq_len = max_seq_len
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
         self.score_variant = score_variant
         self.shift_mode = shift_mode
         self.agg_variant = agg_variant
@@ -1663,7 +1812,7 @@ class TropicalShiftAttention(nn.Module):
             self.g = nn.Parameter(torch.zeros(d_model))
 
     def set_tau(self, tau: float) -> None:
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
 
     def _make_shifts(self, L: int, device):
         positions = torch.arange(L, device=device)
@@ -1993,8 +2142,8 @@ class TropicalConv2d(nn.Module):
         # Soft (logsumexp) reduction over taps for a dense-gradient warmup; anneal
         # tau -> 0 (set_tau) to recover the hard, multiplier-free morphological op
         # (Maslov dequantization), exactly like the rest of the library.
-        self.use_soft = use_soft
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = bool(use_soft and self.tau > 0)
         self.weight = nn.Parameter(torch.empty(out_channels, in_channels, *kernel_size))
         self.bias = nn.Parameter(torch.zeros(out_channels)) if bias else None
         self.reset_parameters()
@@ -2005,8 +2154,8 @@ class TropicalConv2d(nn.Module):
             nn.init.zeros_(self.bias)
 
     def set_tau(self, tau: float) -> None:
-        self.tau = tau
-        self.use_soft = tau > 0
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = self.tau > 0
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.use_soft and self.tau > 0:
@@ -2315,8 +2464,8 @@ class MaxPlusMin(nn.Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.use_soft = use_soft
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = bool(use_soft and self.tau > 0)
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.w0 = nn.Parameter(torch.zeros(out_features))   # dilation bias
         self.m0 = nn.Parameter(torch.zeros(out_features))   # erosion bias
@@ -2324,8 +2473,8 @@ class MaxPlusMin(nn.Module):
         nn.init.uniform_(self.weight, -0.1, 0.1)
 
     def set_tau(self, tau: float) -> None:
-        self.tau = tau
-        self.use_soft = tau > 0
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = self.tau > 0
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         expanded = x.unsqueeze(-2) + self.weight           # (..., out, in)
@@ -2361,8 +2510,8 @@ class DilationErosionPerceptron(nn.Module):
         self.out_features = out_features
         self.lam = lam
         self._dilation_quarters = int(round(float(lam) * 4))
-        self.use_soft = use_soft
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = bool(use_soft and self.tau > 0)
         self.Wd = nn.Parameter(torch.empty(out_features, in_features))
         self.We = nn.Parameter(torch.empty(out_features, in_features))
         self.bias = nn.Parameter(torch.zeros(out_features))
@@ -2370,8 +2519,8 @@ class DilationErosionPerceptron(nn.Module):
         nn.init.uniform_(self.We, -0.1, 0.1)
 
     def set_tau(self, tau: float) -> None:
-        self.tau = tau
-        self.use_soft = tau > 0
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.use_soft = self.tau > 0
 
     @staticmethod
     def _scale_quarters(value: torch.Tensor, quarters: int) -> torch.Tensor:
@@ -2475,7 +2624,7 @@ class TropicalRNNCell(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.mode = mode
-        self.tau = tau
+        self.tau = _validate_temperature(tau, allow_zero=True)
         if mode == "min":
             self.x2h = TropicalLinearModule(input_size, hidden_size, use_softmin=(tau > 0), tau=tau)
             self.h2h = TropicalLinearModule(hidden_size, hidden_size, use_softmin=(tau > 0), tau=tau)
@@ -2485,9 +2634,9 @@ class TropicalRNNCell(nn.Module):
         self.bias = nn.Parameter(torch.zeros(hidden_size))
 
     def set_tau(self, tau: float) -> None:
-        self.tau = tau
-        self.x2h.set_tau(tau)
-        self.h2h.set_tau(tau)
+        self.tau = _validate_temperature(tau, allow_zero=True)
+        self.x2h.set_tau(self.tau)
+        self.h2h.set_tau(self.tau)
 
     def forward(self, x_t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         a, b = self.x2h(x_t), self.h2h(h)

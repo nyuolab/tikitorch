@@ -868,7 +868,9 @@ class PerLayerStepSGD(toptim.Optimizer):
                                     torch.where(accel, shift - 1.0, shift)).clamp(smin, smax)
                 streak = torch.where(accel, torch.zeros_like(streak), streak)
                 table = _pow2_table(self._K, p.device, p.dtype)
-                step = table[shift.to(torch.long)]                  # scalar pow2
+                # A 0-D tensor in Python indexing extracts a host scalar. Keep
+                # the lookup on-device and visible to the closure auditor.
+                step = torch.index_select(table, 0, shift.to(torch.long).reshape(1)).squeeze(0)
                 p.add_(torch.sign(g) * step, alpha=-1.0)
                 st["shift"], st["prev"], st["streak"] = shift, layerdir, streak
         return loss

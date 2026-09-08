@@ -65,7 +65,8 @@ def test_strict_run_audit_records_every_hit_and_fails_closed(tmp_path):
     audit_lines = (tmp_path / "g5_audit.jsonl").read_text().splitlines()
     rows = [json.loads(line) for line in audit_lines]
     assert len(rows) == 1
-    assert rows[0]["audit_semantics"] == "strict-eager-v2"
+    from tikitorch.audit import AUDIT_SEMANTICS_VERSION
+    assert rows[0]["audit_semantics"] == AUDIT_SEMANTICS_VERSION
     assert rows[0]["training_closed"] is False
     assert rows[0]["violations"]
     assert rows[0]["waived"] == {}

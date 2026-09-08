@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "scope": "Public source tree and retained Git refs; no automated legal clearance",
+  "records": [
+    {
+      "id": "aws_ddr_muzero",
+      "path": "tikitorch/hardware/hdk/cl_forge_muzero_ddr/design/cl_forge_muzero_ddr.sv",
+      "sha256": "dab074ebb9edf17f0945612a009be3add48fe0dcf9f50de4ce6462dce15c92c7",
+      "status": "unresolved",
+      "finding": "File header identifies sh_ddr instantiation adapted from HDK unused_ddr_template.",
+      "evidence": [],
+      "reviewed_by": ""
+    },
+    {
+      "id": "aws_ddr_pc",
+      "path": "tikitorch/hardware/hdk/cl_forge_pc_ddr/design/cl_forge_pc_ddr.sv",
+      "sha256": "9d8874061a96e6c1658c3589e3fef2b4d39b6d2074a5704dd633bacaf78bd084",
+      "status": "unresolved",
+      "finding": "File header identifies verbatim reuse of the MuZero DDR wiring, including sh_ddr.",
+      "evidence": [],
+      "reviewed_by": ""
+    },
+    {
+      "id": "aws_ddr_pc_train",
+      "path": "tikitorch/hardware/hdk/cl_forge_pc_train_ddr/design/cl_forge_pc_train_ddr.sv",
+      "sha256": "ddbd8969956b95f2f167808398ebf3b9c4f82f1c3124eb6d701ca3ef1168514a",
+      "status": "unresolved",
+      "finding": "Related DDR wrapper retaining the adapted sh_ddr wiring; source and distribution treatment require review.",
+      "evidence": [],
+      "reviewed_by": ""
+    },
+    {
+      "id": "aws_ddr_train_s1",
+      "path": "tikitorch/hardware/hdk/cl_forge_train_step_s1/design/cl_forge_train_step_s1.sv",
+      "sha256": "5056e97b1039719fb2e4df258b0f792612e415f2be091650e862e5633a05df0e",
+      "status": "unresolved",
+      "finding": "Related DDR wrapper retaining the adapted sh_ddr wiring; source and distribution treatment require review.",
+      "evidence": [],
+      "reviewed_by": ""
+    },
+    {
+      "id": "retained_git_history",
+      "status": "unresolved",
+      "finding": "Review every ref intended for public release for vendor snapshots, Developer_CL archives and routed checkpoints; no history rewrite is authorized by this inventory.",
+      "evidence": [],
+      "reviewed_by": ""
+    }
+  ]
+}

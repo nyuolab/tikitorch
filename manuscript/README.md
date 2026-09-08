@@ -1,92 +1,91 @@
-# Route-certificate manuscript handoff
+# TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning
 
-This is the root-level entry point for the discussion draft prepared for Xiang:
-**Forward Traces as Exact Differentiation Certificates in Hard-Routed
-Networks**.
+This directory is the **single active manuscript**, combining the former
+route-certificate and multiplier-free FPGA drafts around TikiTorch.
+The older scientific sources remain in `papers/` as historical reference;
+they are not parallel submission drafts.
 
-There is deliberately only one scientific source. The canonical LaTeX lives
-in [`papers/route_certificates/`](../papers/route_certificates/); this
-directory supplies a zero-copy build launcher and the publication handoff.
-Edit the canonical [`main.tex`](../papers/route_certificates/main.tex),
-[`methods.tex`](../papers/route_certificates/methods.tex),
-[`supplement.tex`](../papers/route_certificates/supplement.tex), and
-[`refs.bib`](../papers/route_certificates/refs.bib). Do not copy them into this
-directory.
+The main contribution is an executable connection between the derivative state
+needed by additive hard operators and the arithmetic executed by a learning
+recipe. It is not a claim to have invented morphological backpropagation,
+compact switches, or multiplication-free training.
 
-The multiplier-free FPGA result is a separate paper. It must not be folded
-into this manuscript or used to imply a software latency, memory, traffic, or
-energy result.
+## Read and build
 
-## Build
+- [Main paper](main.tex), [theory appendix](theory_appendix.tex), and
+  [methods/evidence appendix](methods_appendix.tex).
+- [Evidence ledger](EVIDENCE_LEDGER.md) and [primary-literature comparison](LITERATURE_REVIEW.md).
+- [ICML readiness](ICML_READINESS.md) and [remaining experiment protocol](EXPERIMENT_PROTOCOL.md).
+- [Post-manuscript codebase/release roadmap](../docs/release_impact_roadmap.md).
 
 From the repository root:
 
 ```bash
-cd manuscript
-latexmk -pdf main.tex
+# Requires Python, latexmk and TeX Live/MacTeX (including forloop, placeins, pgf, xurl).
+# First build only: fetch the pinned official, unmodified template.
+python manuscript/build.py --fetch-style
+# Subsequent builds are offline:
+python manuscript/build.py
 ```
 
-The PDF is written to `manuscript/build/main.pdf`; `build/` is ignored by Git.
-Use `latexmk -C main.tex` from this directory to clean generated files.
+An already-downloaded official archive can be supplied with
+`--template-zip /path/to/icml2026.zip`. Venue styles and PDF/auxiliary files
+stay in ignored `manuscript/build/`; they are not vendored into the package.
+The PDF is `manuscript/build/main.pdf`. The build checks both evidence reducers,
+style hashes, unresolved citations, overfull boxes and the main-body page marker.
 
-Before changing a claim, check the
-[`claim ledger`](../docs/research/CLAIM_LEDGER.md) and the canonical
-[`paper README`](../papers/route_certificates/README.md).
+The latest verified **2026** ICML style is a provisional drafting aid.
+The 2026 conference has passed; next-cycle instructions and dates have not been
+verified. Anonymous formatting is not confirmation of authorship or permission
+to submit. Do not use the accepted/camera-ready option or invent author details.
 
-## Xiang's publication brief
+## Evidence boundaries
 
-The paper's durable contribution is an operator-scoped theorem and executable
-contract: for declared hard-routed operators, a forward trace can be a
-sufficient certificate for state and additive-parameter VJPs under a declared
-derivative selection. It is ordinary reverse accumulation over a smaller,
-explicitly typed tape—not a new gradient rule and not generic activation-free
-learning. The graph composition proof is intentionally direct; the scientific
-value is the operator contract, concrete replay fields, counterexamples,
-portable representation, and evidence.
+The new current-source, three-cell CPU audit records device payloads of
+36,084 / 87,588 / 329,928 bytes, with exact logits and canonical route checks
+and tolerance-gated parameter VJPs. The 2.04 / 2.81 / 2.98 ratios compare a
+**shape-defined layer/embedding checkpoint retained set to device payload**,
+not peak memory, the best checkpoint schedule or speed.
 
-Do not promote the current retained-state result into a peak-memory or speed
-claim. Under a common supplied-output-cotangent boundary, the portable
-certificate is 1.97--2.96x smaller than checkpoint-retained state on the three
-measured MorphSSM configurations. Under the current replay interface, which
-retains logits and targets on both sides, the portable ratio is 1.69--2.79x.
-The current focused suite passes 38 core tests plus 37 integration,
-serialization, and benchmark-hardening tests.
+```bash
+python manuscript/measure_retained_state.py --check
+python manuscript/generate_tables.py --check
+python -m pytest -q tests/test_manuscript_tables.py tests/test_manuscript_artifact.py
+```
 
-### Gates that must close before submission
+The current record hashes every library Python source and its measurement
+script. If code changes, the check fails: produce a new append-only record,
+audit it, and deliberately update which table the manuscript cites. The
+current worktree is not a tagged release. To rerun without overwriting evidence:
 
-1. **Freeze the protocol.** Pin a clean TikiTorch commit, environment, output
-   cotangent/loss boundary, schemas, model/input digests, configurations,
-   seeds, commands, and deterministic reducer before collecting final rows.
-2. **Prove equivalence first.** For every retained comparison row, require
-   matching outputs and routes plus tolerance-gated parameter gradients and
-   optimization trajectories. Preserve graph breaks, fallbacks, OOMs, and
-   failed runs instead of filtering them away.
-3. **Complete all five target arms on the actual MorphSSM workload:** eager autograd,
-   compiled autograd, checkpoint/recompute, compiled unpacked custom VJP, and
-   compiled packed replay. Include packing and decoding in the measured cycle.
-   The checked-in Python cascade/packed runner is scaffolding, not this result.
-4. **Measure the systems question.** Report full-cycle latency, retained bytes,
-   process or accelerator peak memory, recomputation events, and bytes moved at
-   each scale under the same boundary accounting. Report warm-up, compilation,
-   and steady-state timing separately.
-5. **Regenerate every table.** Tables must come from append-only raw rows with
-   provenance, not hand-edited manuscript values. Re-run the theorem,
-   serializer, matched-DAG, trajectory, and actual-model audits from the pinned
-   clean checkout.
-6. **Finish the submission surface.** Confirm authorship, lock the
-   venue style, complete the closest-prior-art matrix, audit theorem notation
-   against implementation fields, and package a one-command artifact with an
-   immutable release identifier.
+```bash
+python manuscript/measure_retained_state.py --run \
+  --output manuscript/build/reproduction.json \
+  --table manuscript/build/reproduction.tex
+```
 
-### Venue decision
+Use new output names for subsequent runs. Historical portable-tape rows are
+kept separately in the appendix, with raw-source hashes. Hardware records
+establish scoped feasibility, not current-Python export equivalence or a
+matched GPU/energy comparison. Native compiled AdamW update parity remains
+a documented failure on the tested stack; the SGD smoke is a separate recipe.
 
-- Target **MLSys** only if the compiled packed certificate closes a meaningful
-  peak-memory or memory-traffic gate while reporting the full latency cost.
-- Target **TMLR** if the durable result remains the theorem, exact replay, and
-  retained-state representation. That is a strong paper boundary, not a
-  failed MLSys paper.
-- Do not submit to preserve a deadline. Make the venue decision only after the
-  five-arm reducer produces its frozen decision table.
+## Submission status
 
-The first deliverable should be a checked-in protocol manifest and a clean-run
-reproduction report—not revised headline prose.
+The combined scientific draft is substantially more rigorous but **not yet
+submission-ready**. The main missing result is useful real-task training with
+multi-seed, matched-quality memory/latency evidence, including the strongest
+feasible checkpoint baseline. GPU measurements, clean archived reproduction,
+artifact rights review and human authorship/content approval remain open.
+The [readiness checklist](ICML_READINESS.md) makes these gates explicit.
+
+Local validation on 2026-09-08: 899 tests passed, 8 skipped and 8 deliberately
+deselected; 21 of the passing tests check manuscript/evidence integrity.
+The strict documentation build, lint and PDF build passed. The anonymous PDF
+has six main-text pages and 16 pages total, with resolved references and no
+overfull boxes. These are local artifact checks, not remote CI, independent
+reproduction or scientific acceptance. The first sandboxed suite was unable
+to open localhost sockets; the full rerun with loopback permitted passed.
+
+Nothing in this manuscript pass submits a paper, creates a public release,
+changes repository visibility, rewrites history, or authorizes a paid run.

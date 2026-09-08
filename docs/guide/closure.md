@@ -11,6 +11,18 @@ model + loss + reverse rule + optimizer + executed inputs + compiled build
 TikiTorch provides three software checks. HLS and routed implementation reports are a
 separate fourth boundary.
 
+Keep diagnostics inside an audited region tensor-valued. Forward-Forward trainers
+accept `host_metrics=False` at construction or `train_step`; `TropicalPCNet.infer`
+and `train_step` accept the same option. Default host-float metrics remain available
+for compatibility, but scalar extraction is an explicit unknown boundary under
+the strict auditor. PC tensor diagnostics expose raw winner-change counts and
+total counts; compute a reporting fraction outside the audited update.
+
+Likewise, the coin-change planning helper uses amount-dependent Python loops.
+Its scalar extraction makes runtime certification inconclusive even though its
+algorithmic recurrence is min-plus. Do not suppress this finding to obtain a
+closure boolean.
+
 ## 1. Structural inspection
 
 ```python
@@ -46,6 +58,33 @@ Runtime tracing observes PyTorch operations on the supplied input. It can catch 
 multiply, divide, and transcendental operations that structural inspection misses.
 It covers only the branch, shapes, dtypes, device, and mode that actually execute.
 
+Certification is allow-list based. Every dispatched operation has one of three
+outcomes:
+
+- **safe** — the versioned registry explicitly recognizes a data-movement,
+  compare/select, additive-reduction, integer/bit, or provenance-checked dyadic-shift
+  operation;
+- **unsafe** — recognized multiply/divide, transcendental, normalization, loss,
+  linalg, attention, or other arithmetic; or
+- **unknown** — the operation is not yet classified, so the result is
+  `inconclusive` and fails closed.
+
+`find_runtime_multiplies` retains its historical name and `(category, op_name)`
+return shape. It now includes `("unknown-operation", op_name)` blockers. An empty
+list means that every operation observed on that eager path was explicitly classified
+safe; it is not a claim about unexecuted branches or compiler-generated code.
+
+Registration is namespace- and schema-aware. A custom operator called `sum`, for
+example, remains unknown even though `aten::sum` is registered safe. Overloads with
+arithmetic options are checked at the call site: non-dyadic `index_add` scaling,
+multiplicative scatter reduction, and frequency-scaled embedding gradients are
+blockers rather than inheriting the verdict of their additive forms.
+
+Uniform random-bit generation is an explicit software-audit primitive; mapping it
+through a dyadic range remains shift/add arithmetic. This does not certify a physical
+random-number generator. Gaussian generation (`randn` and `normal`) and non-dyadic
+uniform range maps are arithmetic boundaries and are rejected.
+
 By default, compatible models are hardened through `set_tau(0.0)` during this check.
 That is useful for inspecting a deploy graph, but it is not evidence that the soft
 training graph is closed. Hardening and evaluation mode are temporary: model state and
@@ -79,6 +118,8 @@ soft routing, dropout rescaling, dense heads, ordinary normalization, and adapti
 optimizer paths can introduce operations outside the closed subset. Parameters,
 gradients, buffers, optimizer state, module mode, and PyTorch RNG state are restored
 after the check. External side effects in user callables cannot be rolled back.
+`find_training_multiplies` likewise includes unknown-operation blockers rather than
+silently treating a new fused or special operator as safe.
 
 [`closure_report`](../api/audit.md) gathers the available checks into one dictionary:
 
@@ -91,6 +132,23 @@ report = tt.closure_report(
     optimizer=optimizer,
 )
 ```
+
+The report is versioned (`tikitorch.closure-report.v2`, audit semantics
+`strict-eager-v3`). For each executed boundary, inspect both the tri-state status and
+coverage metadata:
+
+```python
+assert report["inference_status"] in {"closed", "violated", "inconclusive"}
+print(report["inference_unknown"])
+print(report["coverage"]["inference"])
+```
+
+Coverage records the eager mode, whether `harden_tau` was requested and applied,
+observed tensor dtypes/devices, operator-call counts, and the safe, unsafe, and unknown
+operator names. The compatibility booleans `inference_closed`, `training_closed`, and
+`training_zero_dsp` are `True` only for status `closed`; both a known violation and an
+unknown operation make them `False`. `training_zero_dsp` is a legacy name for this
+software result and does not report synthesized DSP utilization.
 
 ## 4. Compiled implementation
 

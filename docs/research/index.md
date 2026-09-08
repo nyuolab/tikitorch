@@ -22,8 +22,12 @@ ledger entry.
 | Workstream | Workspace | Boundary |
 | --- | --- | --- |
 | TikiTorch library | [source and API docs](../api/index.md) | PyTorch-shaped, not complete PyTorch compatibility or production maturity |
-| Multiplier-free learning on FPGA | [`papers/multiplier_free_fpga`](https://github.com/nyuolab/tikitorch/tree/main/papers/multiplier_free_fpga) | Build- and task-specific results; D128 replication is preliminary pending timing closure, while matched CUDA and full-card power remain open |
-| Forward traces as differentiation certificates | [`papers/route_certificates`](https://github.com/nyuolab/tikitorch/tree/main/papers/route_certificates) | Exact selected-VJP replay for a declared finite operator set, not a new gradient or arbitrary PyTorch graph |
+| Unified TikiTorch manuscript | [`manuscript`](https://github.com/nyuolab/tikitorch/tree/main/manuscript) | Route-sufficient selected reverse programs and independent arithmetic auditing; current-code representation measurements and historical FPGA feasibility remain separately scoped |
+
+The older route-certificate and FPGA drafts under `papers/` are preserved
+historical sources, not independent active submission tracks. See the
+[release and scientific-impact roadmap](../release_impact_roadmap.md) for the
+post-manuscript priorities and required acceptance evidence.
 
 Paper source is kept separate from the installed package and user documentation. Draft
 manuscripts are working research artifacts, not release guarantees.

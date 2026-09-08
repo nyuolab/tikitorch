@@ -24,6 +24,9 @@ This eliminates hardware multipliers from both the forward and the backward
 pass — the basis of the algebraic-closure result the library is built around.
 """
 
+import math
+import numbers
+
 import torch
 
 __all__ = [
@@ -36,6 +39,8 @@ __all__ = [
     # soft relaxations
     "tropical_softmin",
     "tropical_softmax",
+    # deterministic selection
+    "stable_topk",
     # tropical matmul
     "tropical_matmul",
     # attention: dot-product scoring
@@ -93,6 +98,197 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
+# Bound the largest temporary used by the eager PyTorch reference.  The hard
+# linears only need to retain one value and one route per output, so allocating
+# the complete ``rows * out_features * in_features`` candidate tensor is
+# avoidable.  Backends remain free to replace these references with fused
+# kernels through ``tikitorch.backend``.
+_TROPICAL_LINEAR_CHUNK_ELEMS = 8_000_000
+_TROPICAL_LINEAR_FEATURE_TILE = 64
+
+
+def _validate_temperature(tau: float, *, allow_zero: bool, name: str = "tau") -> float:
+    """Return a finite scalar temperature with the requested zero policy."""
+
+    if isinstance(tau, bool) or not isinstance(tau, numbers.Real):
+        raise TypeError(f"{name} must be a real scalar, got {type(tau).__name__}")
+    value = float(tau)
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be finite, got {tau!r}")
+    if value < 0 or (value == 0 and not allow_zero):
+        relation = "nonnegative" if allow_zero else "strictly positive"
+        raise ValueError(f"{name} must be {relation}, got {tau!r}")
+    return value
+
+
+def _validate_tropical_linear_inputs(x: torch.Tensor, weight: torch.Tensor) -> tuple[int, int, int]:
+    if x.ndim < 1:
+        raise ValueError("x must have shape (..., in_features)")
+    if weight.ndim != 2:
+        raise ValueError("weight must have shape (out_features, in_features)")
+    out_features, in_features = weight.shape
+    if in_features == 0:
+        raise ValueError("tropical linear reduction requires at least one input feature")
+    if x.shape[-1] != in_features:
+        raise ValueError(
+            f"x has {x.shape[-1]} input features but weight expects {in_features}"
+        )
+    if x.device != weight.device:
+        raise RuntimeError(
+            f"x and weight must be on the same device, got {x.device} and {weight.device}"
+        )
+    if x.dtype != weight.dtype:
+        raise RuntimeError(
+            f"x and weight must have the same dtype, got {x.dtype} and {weight.dtype}"
+        )
+    rows = x.numel() // in_features
+    return rows, out_features, in_features
+
+
+def _hard_tropical_linear_forward(
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    *,
+    largest: bool,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Memory-bounded additive extreme and its deterministic first route.
+
+    Candidate features are processed in ascending tiles.  A later tile replaces
+    the running result only on a *strictly* better value, so exact ties always
+    retain the lowest input-feature index, including across tile boundaries.
+    """
+
+    rows, out_features, in_features = _validate_tropical_linear_inputs(x, weight)
+    output_shape = (*x.shape[:-1], out_features)
+    if rows == 0 or out_features == 0:
+        out = x.new_empty(output_shape)
+        route = torch.empty(output_shape, dtype=torch.long, device=x.device)
+        return out, route
+
+    flat_x = x.reshape(rows, in_features)
+    # Balance all three candidate axes. This keeps each dense temporary at or
+    # below the configured bound even when ``rows * out_features`` alone exceeds
+    # it (the output and route themselves are necessarily that large).
+    target_features = min(in_features, _TROPICAL_LINEAR_FEATURE_TILE)
+    row_chunk = min(
+        rows,
+        max(
+            1,
+            _TROPICAL_LINEAR_CHUNK_ELEMS
+            // max(1, min(out_features, _TROPICAL_LINEAR_CHUNK_ELEMS) * target_features),
+        ),
+    )
+    row_outputs = []
+    row_routes = []
+    for row_start in range(0, rows, row_chunk):
+        row_stop = min(row_start + row_chunk, rows)
+        tile_rows = row_stop - row_start
+        output_chunk = min(
+            out_features,
+            max(1, _TROPICAL_LINEAR_CHUNK_ELEMS // max(1, tile_rows * target_features)),
+        )
+        output_tiles = []
+        route_tiles = []
+        for out_start in range(0, out_features, output_chunk):
+            out_stop = min(out_start + output_chunk, out_features)
+            tile_outputs = out_stop - out_start
+            feature_chunk = min(
+                in_features,
+                max(
+                    1,
+                    _TROPICAL_LINEAR_CHUNK_ELEMS
+                    // max(1, tile_rows * tile_outputs),
+                ),
+            )
+            best = None
+            best_route = None
+            for feature_start in range(0, in_features, feature_chunk):
+                feature_stop = min(feature_start + feature_chunk, in_features)
+                candidates = (
+                    flat_x[row_start:row_stop, None, feature_start:feature_stop]
+                    + weight[None, out_start:out_stop, feature_start:feature_stop]
+                )
+                if largest:
+                    tile_best = candidates.amax(dim=-1)
+                else:
+                    tile_best = candidates.amin(dim=-1)
+                # Do not rely on a fused argmax/argmin index kernel here. Some
+                # Inductor CPU vector paths have rounded 16-wide indices down to
+                # SIMD-lane boundaries even while returning the correct value.
+                # Explicit equality + lowest matching position is portable and
+                # pins the selected subgradient to the documented first winner.
+                tile_positions = torch.arange(
+                    feature_stop - feature_start, device=x.device
+                )
+                tile_route = torch.where(
+                    (candidates == tile_best.unsqueeze(-1)) | torch.isnan(candidates),
+                    tile_positions,
+                    feature_stop - feature_start,
+                ).amin(dim=-1)
+                tile_route = tile_route + feature_start
+                if best is None:
+                    best, best_route = tile_best, tile_route
+                    continue
+                replace = tile_best > best if largest else tile_best < best
+                # torch min/max propagate NaNs and select the first NaN. Preserve
+                # that behavior when the first NaN appears in a later feature tile.
+                replace = replace | (torch.isnan(tile_best) & ~torch.isnan(best))
+                best = torch.where(replace, tile_best, best)
+                best_route = torch.where(replace, tile_route, best_route)
+            output_tiles.append(best)
+            route_tiles.append(best_route)
+        row_outputs.append(
+            output_tiles[0] if len(output_tiles) == 1 else torch.cat(output_tiles, dim=1)
+        )
+        row_routes.append(
+            route_tiles[0] if len(route_tiles) == 1 else torch.cat(route_tiles, dim=1)
+        )
+
+    out = row_outputs[0] if len(row_outputs) == 1 else torch.cat(row_outputs, dim=0)
+    route = row_routes[0] if len(row_routes) == 1 else torch.cat(row_routes, dim=0)
+    return out.reshape(output_shape), route.reshape(output_shape)
+
+
+def _hard_tropical_linear_backward(
+    ctx,
+    grad_output: torch.Tensor,
+) -> tuple[torch.Tensor | None, torch.Tensor | None]:
+    (route,) = ctx.saved_tensors
+    rows = ctx.rows
+    grad = grad_output.reshape(rows, ctx.out_features)
+    flat_route = route.reshape(rows, ctx.out_features)
+
+    grad_x = None
+    if ctx.needs_input_grad[0]:
+        grad_x = torch.zeros(
+            rows,
+            ctx.in_features,
+            dtype=grad.dtype,
+            device=grad.device,
+        )
+        grad_x.scatter_add_(1, flat_route, grad)
+        grad_x = grad_x.reshape(ctx.input_shape)
+
+    grad_weight = None
+    if ctx.needs_input_grad[1]:
+        output_offsets = torch.arange(
+            0,
+            ctx.out_features * ctx.in_features,
+            ctx.in_features,
+            device=grad.device,
+        ).view(1, -1)
+        parameter_route = output_offsets + flat_route
+        grad_weight = torch.zeros(
+            ctx.out_features * ctx.in_features,
+            dtype=grad.dtype,
+            device=grad.device,
+        )
+        grad_weight.index_add_(0, parameter_route.reshape(-1), grad.reshape(-1))
+        grad_weight = grad_weight.reshape(ctx.out_features, ctx.in_features)
+
+    return grad_x, grad_weight
+
+
 class TropicalLinearFn(torch.autograd.Function):
     """Tropical linear: y_j = min_i(W[j,i] + x[i]).
 
@@ -103,36 +299,16 @@ class TropicalLinearFn(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, x, weight):
-        # x: (batch, in_features), weight: (out_features, in_features)
-        expanded = weight.unsqueeze(0) + x.unsqueeze(1)  # (batch, out, in)
-        out, indices = expanded.min(dim=-1)  # (batch, out)
+        out, indices = _hard_tropical_linear_forward(x, weight, largest=False)
         ctx.save_for_backward(indices)
-        ctx.shape = x.shape
-        ctx.weight_shape = weight.shape
+        ctx.input_shape = x.shape
+        ctx.out_features, ctx.in_features = weight.shape
+        ctx.rows = x.numel() // ctx.in_features
         return out
 
     @staticmethod
     def backward(ctx, grad_output):
-        (indices,) = ctx.saved_tensors
-        batch, in_features = ctx.shape
-        out_features, _ = ctx.weight_shape
-
-        # grad_output: (batch, out_features)
-        # indices:     (batch, out_features) — argmin index per output unit
-
-        # Gradient w.r.t. x: scatter grad_output into input positions
-        grad_x = torch.zeros(batch, in_features, device=grad_output.device, dtype=grad_output.dtype)
-        grad_x.scatter_add_(1, indices, grad_output)
-
-        # Gradient w.r.t. weight: one-hot at argmin, scaled by grad_output
-        grad_weight = torch.zeros(
-            batch, out_features, in_features,
-            device=grad_output.device, dtype=grad_output.dtype,
-        )
-        grad_weight.scatter_(2, indices.unsqueeze(-1), grad_output.unsqueeze(-1))
-        grad_weight = grad_weight.sum(dim=0)  # (out_features, in_features)
-
-        return grad_x, grad_weight
+        return _hard_tropical_linear_backward(ctx, grad_output)
 
 
 tropical_linear = TropicalLinearFn.apply
@@ -148,8 +324,10 @@ def tropical_softmin(z: torch.Tensor, tau: float = 1.0, dim: int = -1) -> torch.
 
     softmin(z, tau) = -tau * logsumexp(-z / tau)
 
-    Approaches hard min as tau -> 0.
+    Approaches hard min as tau -> 0. ``tau`` must be finite and strictly
+    positive; use :func:`tropical_linear` or ``Tensor.min`` at exactly zero.
     """
+    tau = _validate_temperature(tau, allow_zero=False)
     return -tau * torch.logsumexp(-z / tau, dim=dim)
 
 
@@ -182,30 +360,16 @@ class TropicalDilationFn(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, x, weight):
-        expanded = weight.unsqueeze(0) + x.unsqueeze(1)  # (batch, out, in)
-        out, indices = expanded.max(dim=-1)  # (batch, out)
+        out, indices = _hard_tropical_linear_forward(x, weight, largest=True)
         ctx.save_for_backward(indices)
-        ctx.shape = x.shape
-        ctx.weight_shape = weight.shape
+        ctx.input_shape = x.shape
+        ctx.out_features, ctx.in_features = weight.shape
+        ctx.rows = x.numel() // ctx.in_features
         return out
 
     @staticmethod
     def backward(ctx, grad_output):
-        (indices,) = ctx.saved_tensors
-        batch, in_features = ctx.shape
-        out_features, _ = ctx.weight_shape
-
-        grad_x = torch.zeros(batch, in_features, device=grad_output.device, dtype=grad_output.dtype)
-        grad_x.scatter_add_(1, indices, grad_output)
-
-        grad_weight = torch.zeros(
-            batch, out_features, in_features,
-            device=grad_output.device, dtype=grad_output.dtype,
-        )
-        grad_weight.scatter_(2, indices.unsqueeze(-1), grad_output.unsqueeze(-1))
-        grad_weight = grad_weight.sum(dim=0)
-
-        return grad_x, grad_weight
+        return _hard_tropical_linear_backward(ctx, grad_output)
 
 
 tropical_dilation = TropicalDilationFn.apply
@@ -221,9 +385,45 @@ def tropical_softmax(z: torch.Tensor, tau: float = 1.0, dim: int = -1) -> torch.
 
     softmax(z, tau) = tau * logsumexp(z / tau)
 
-    Approaches hard max as tau -> 0.
+    Approaches hard max as tau -> 0. ``tau`` must be finite and strictly
+    positive; use :func:`tropical_dilation` or ``Tensor.max`` at exactly zero.
     """
+    tau = _validate_temperature(tau, allow_zero=False)
     return tau * torch.logsumexp(z / tau, dim=dim)
+
+
+def stable_topk(
+    values: torch.Tensor,
+    k: int,
+    *,
+    largest: bool = True,
+    dim: int = -1,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Select top-k values with lowest candidate indices winning exact ties.
+
+    Stability is defined in the tensor's represented dtype: values that round
+    to an exact tie retain ascending order along ``dim``. The returned values
+    are gathered through the returned route so their autograd subgradient and
+    the recorded route are identical.
+    """
+
+    if values.ndim == 0:
+        raise ValueError("stable_topk requires a candidate dimension")
+    if isinstance(k, bool) or not isinstance(k, int):
+        raise TypeError(f"k must be an integer, got {type(k).__name__}")
+    if isinstance(dim, bool) or not isinstance(dim, int):
+        raise TypeError(f"dim must be an integer, got {type(dim).__name__}")
+    if not -values.ndim <= dim < values.ndim:
+        raise IndexError(
+            f"dim {dim} is out of range for a tensor with {values.ndim} dimensions"
+        )
+    dim = dim % values.ndim
+    candidates = values.shape[dim]
+    if not 1 <= k <= candidates:
+        raise ValueError(f"k must lie in [1, {candidates}], got {k}")
+    order = torch.argsort(values, dim=dim, descending=largest, stable=True)
+    route = order.narrow(dim, 0, k)
+    return values.gather(dim, route), route
 
 
 # ---------------------------------------------------------------------------
@@ -575,6 +775,7 @@ def tropical_softmax_value_gather(V: torch.Tensor, scores: torch.Tensor,
     this -> :func:`tropical_value_gather`. Contains a multiply (weights @ V): a
     training-only relaxation, removed at deploy.
     """
+    tau = _validate_temperature(tau, allow_zero=False)
     w = torch.softmax(scores / tau, dim=-1)                        # (..., L_q, L_v)
     return torch.einsum("...ij,...jd->...id", w, V)
 
@@ -763,6 +964,7 @@ def tropical_softmax_value_pull_iter_topk(V: torch.Tensor, scores: torch.Tensor,
     :func:`tropical_value_pull_iter_topk`. Training-only (uses exp); the deployed
     ``tau==0`` path uses the hard, multiplier-free function.
     """
+    tau = _validate_temperature(tau, allow_zero=False)
     eps = 1e-6
     m = V.unsqueeze(-3) + scores.unsqueeze(-1)                   # (...,Lq,Lv,D)
     Lv = m.shape[-2]

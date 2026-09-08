@@ -1,6 +1,6 @@
 # Installation
 
-TikiTorch requires Python 3.9 or newer, PyTorch 2.0 or newer, and NumPy 1.24 or newer.
+TikiTorch supports Python 3.9–3.12 (`>=3.9,<3.13`), PyTorch 2.0 or newer, and NumPy 1.24 or newer.
 PyTorch and NumPy are its only runtime Python dependencies. A GPU or FPGA is not
 required for the normal CPU path.
 

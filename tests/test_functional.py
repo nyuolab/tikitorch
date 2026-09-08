@@ -80,6 +80,109 @@ def test_tropical_dilation_forward():
     torch.testing.assert_close(out, ref)
 
 
+@pytest.mark.parametrize(
+    ("op", "reduction"),
+    [(F.tropical_linear, "min"), (F.tropical_dilation, "max")],
+)
+@pytest.mark.parametrize("shape", [(4,), (2, 3, 4), (0, 4), (2, 0, 4)])
+@pytest.mark.parametrize("dtype", [torch.float16, torch.float32, torch.float64])
+def test_hard_linears_match_reference_for_arbitrary_leading_shapes(
+    op, reduction, shape, dtype
+):
+    x = torch.randn(shape, dtype=dtype, requires_grad=True)
+    weight = torch.randn(5, 4, dtype=dtype, requires_grad=True)
+    ref_x = x.detach().clone().requires_grad_()
+    ref_weight = weight.detach().clone().requires_grad_()
+
+    output = op(x, weight)
+    candidates = ref_x.unsqueeze(-2) + ref_weight
+    reference = getattr(candidates, reduction)(dim=-1).values
+    assert output.shape == (*shape[:-1], 5)
+    torch.testing.assert_close(output, reference, rtol=0, atol=0)
+
+    upstream = torch.randn_like(output)
+    output.backward(upstream)
+    reference.backward(upstream)
+    # Direct indexed accumulation need not use the same reduction tree as the
+    # dense broadcast reference; bound only its dtype-level rounding difference.
+    tolerance = 4 * torch.finfo(dtype).eps
+    torch.testing.assert_close(x.grad, ref_x.grad, rtol=tolerance, atol=tolerance)
+    torch.testing.assert_close(
+        weight.grad, ref_weight.grad, rtol=tolerance, atol=tolerance
+    )
+
+
+@pytest.mark.parametrize(
+    ("op", "largest"),
+    [(F.tropical_linear, False), (F.tropical_dilation, True)],
+)
+def test_hard_linear_tiling_preserves_first_tie_and_gradients(monkeypatch, op, largest):
+    # Force row/output/feature tiling so ties cross every tile boundary.
+    monkeypatch.setattr(F, "_TROPICAL_LINEAR_CHUNK_ELEMS", 4)
+    monkeypatch.setattr(F, "_TROPICAL_LINEAR_FEATURE_TILE", 2)
+    x = torch.zeros(2, 3, 7, requires_grad=True)
+    weight = torch.zeros(5, 7, requires_grad=True)
+    output = op(x, weight)
+    upstream = torch.arange(1, output.numel() + 1, dtype=x.dtype).reshape(output.shape)
+    output.backward(upstream)
+
+    expected_x = torch.zeros_like(x)
+    expected_x[..., 0] = upstream.sum(dim=-1)
+    expected_weight = torch.zeros_like(weight)
+    expected_weight[:, 0] = upstream.reshape(-1, 5).sum(dim=0)
+    torch.testing.assert_close(x.grad, expected_x, rtol=0, atol=0)
+    torch.testing.assert_close(weight.grad, expected_weight, rtol=0, atol=0)
+
+
+@pytest.mark.parametrize(
+    ("op", "largest"),
+    [(F.tropical_linear, False), (F.tropical_dilation, True)],
+)
+def test_hard_linear_tiling_propagates_and_routes_to_first_nan(monkeypatch, op, largest):
+    monkeypatch.setattr(F, "_TROPICAL_LINEAR_CHUNK_ELEMS", 4)
+    monkeypatch.setattr(F, "_TROPICAL_LINEAR_FEATURE_TILE", 2)
+    x = torch.tensor([[0.0, 1.0, 2.0, float("nan"), 4.0, float("nan")]],
+                     requires_grad=True)
+    weight = torch.zeros(2, 6, requires_grad=True)
+    output = op(x, weight)
+    assert torch.isnan(output).all()
+    output.backward(torch.ones_like(output))
+    expected_x = torch.zeros_like(x)
+    expected_x[0, 3] = 2.0
+    expected_weight = torch.zeros_like(weight)
+    expected_weight[:, 3] = 1.0
+    torch.testing.assert_close(x.grad, expected_x, rtol=0, atol=0)
+    torch.testing.assert_close(weight.grad, expected_weight, rtol=0, atol=0)
+
+
+def test_hard_linear_fullgraph_compile_forward_backward():
+    x = torch.randn(2, 3, 4, requires_grad=True)
+    weight = torch.randn(5, 4, requires_grad=True)
+
+    def loss(a, b):
+        return F.tropical_linear(a, b).sum() + F.tropical_dilation(a, b).sum()
+
+    compiled = torch.compile(loss, backend="eager", fullgraph=True)
+    compiled(x, weight).backward()
+    assert x.grad is not None and torch.isfinite(x.grad).all()
+    assert weight.grad is not None and torch.isfinite(weight.grad).all()
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available")
+def test_hard_linear_cuda_fullgraph_compile_stays_on_device():
+    x = torch.randn(2, 3, 8, device="cuda", requires_grad=True)
+    weight = torch.randn(6, 8, device="cuda", requires_grad=True)
+
+    def loss(a, b):
+        return F.tropical_linear(a, b).sum() + F.tropical_dilation(a, b).sum()
+
+    compiled = torch.compile(loss, backend="inductor", fullgraph=True)
+    result = compiled(x, weight)
+    result.backward()
+    assert result.is_cuda and x.grad is not None and x.grad.is_cuda
+    assert weight.grad is not None and weight.grad.is_cuda
+
+
 # ---------------------------------------------------------------------------
 # Hard backward: gradient routes only through the argmin/argmax index
 # ---------------------------------------------------------------------------
@@ -134,6 +237,69 @@ def test_softmax_approaches_hard_max():
     hard = z.max(dim=-1).values
     soft_lo = F.tropical_softmax(z, tau=1e-3, dim=-1)
     assert torch.allclose(soft_lo, hard, atol=1e-2)
+
+
+@pytest.mark.parametrize("op", [F.tropical_softmin, F.tropical_softmax])
+@pytest.mark.parametrize("tau", [0.0, -1.0, float("nan"), float("inf"), -float("inf")])
+def test_soft_reductions_reject_nonpositive_or_nonfinite_temperature(op, tau):
+    with pytest.raises(ValueError, match="tau"):
+        op(torch.randn(2, 3), tau=tau)
+
+
+@pytest.mark.parametrize("largest", [False, True])
+def test_stable_topk_uses_lowest_indices_for_ties(largest):
+    values = torch.tensor([[4.0, 4.0, 4.0, 4.0]])
+    selected, route = F.stable_topk(values, 3, largest=largest)
+    assert route.tolist() == [[0, 1, 2]]
+    torch.testing.assert_close(selected, torch.full((1, 3), 4.0))
+
+
+@pytest.mark.parametrize("dim", [2, 3, -3, -4])
+def test_stable_topk_rejects_out_of_range_dimensions(dim):
+    with pytest.raises(IndexError, match="out of range"):
+        F.stable_topk(torch.randn(2, 4), 2, dim=dim)
+
+
+@pytest.mark.parametrize("kwargs", [{"dim": True}, {"k": True}])
+def test_stable_topk_rejects_boolean_integer_arguments(kwargs):
+    options = {"k": 2, "dim": -1}
+    options.update(kwargs)
+    with pytest.raises(TypeError):
+        F.stable_topk(torch.randn(2, 4), **options)
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda tau: F.tropical_softmax_dot_product(
+            torch.randn(1, 2, 3), torch.randn(1, 2, 3), tau=tau
+        ),
+        lambda tau: F.tropical_softmax_l_inf_score(
+            torch.randn(1, 2, 3), torch.randn(1, 2, 3), tau=tau
+        ),
+        lambda tau: F.tropical_softmax_hilbert_score(
+            torch.randn(1, 2, 3), torch.randn(1, 2, 3), tau=tau
+        ),
+        lambda tau: F.tropical_softmax_asym_score(
+            torch.randn(1, 2, 3), torch.randn(1, 2, 3), tau=tau
+        ),
+        lambda tau: F.tropical_softmax_value_pull(
+            torch.randn(1, 2, 3), torch.randn(1, 2, 2), tau=tau
+        ),
+        lambda tau: F.tropical_softmax_value_pull_min(
+            torch.randn(1, 2, 3), torch.randn(1, 2, 2), tau=tau
+        ),
+        lambda tau: F.tropical_softmax_value_gather(
+            torch.randn(1, 2, 3), torch.randn(1, 2, 2), tau=tau
+        ),
+        lambda tau: F.tropical_softmax_value_pull_iter_topk(
+            torch.randn(1, 2, 3), torch.randn(1, 2, 2), tau=tau
+        ),
+    ],
+)
+def test_all_public_soft_attention_paths_reject_zero_temperature(call):
+    with pytest.raises(ValueError, match="tau"):
+        call(0.0)
 
 
 def test_soft_linear_approaches_hard_linear():

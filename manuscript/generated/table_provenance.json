@@ -1,0 +1,168 @@
+{
+  "hardware": {
+    "d512": [
+      {
+        "observable_reference_match": true,
+        "processed_positions": 3840,
+        "reported_integer_tokens_per_second": 611,
+        "updates": 30,
+        "wall_seconds": 6.2879
+      },
+      {
+        "observable_reference_match": false,
+        "processed_positions": 25600,
+        "reported_integer_tokens_per_second": 612,
+        "updates": 200,
+        "wall_seconds": 41.8356
+      },
+      {
+        "observable_reference_match": false,
+        "processed_positions": 256000,
+        "reported_integer_tokens_per_second": 612,
+        "updates": 2000,
+        "wall_seconds": 418.3963
+      }
+    ],
+    "d512_compared_record": {
+      "acc": 0.421875,
+      "fused_steps": 30,
+      "preds16": [
+        111,
+        32,
+        111,
+        32,
+        32,
+        111,
+        114,
+        32,
+        111,
+        111,
+        111,
+        111,
+        111,
+        111,
+        32,
+        111
+      ],
+      "wcrc": 10673268721020562856
+    },
+    "d512_scope": "same resident window; 30-update observable record only, not full state",
+    "mnist": [
+      {
+        "driver_test_accuracy": 0.7101,
+        "epoch": 1,
+        "inclusive_epoch_wall_seconds": 24.8,
+        "kicks": 1875
+      },
+      {
+        "driver_test_accuracy": 0.743,
+        "epoch": 2,
+        "inclusive_epoch_wall_seconds": 24.6,
+        "kicks": 1875
+      },
+      {
+        "driver_test_accuracy": 0.7399,
+        "epoch": 3,
+        "inclusive_epoch_wall_seconds": 24.6,
+        "kicks": 1875
+      },
+      {
+        "driver_test_accuracy": 0.7479,
+        "epoch": 4,
+        "inclusive_epoch_wall_seconds": 24.5,
+        "kicks": 1875
+      },
+      {
+        "driver_test_accuracy": 0.7475,
+        "epoch": 5,
+        "inclusive_epoch_wall_seconds": 24.8,
+        "kicks": 1875
+      }
+    ],
+    "mnist_independent_test_accuracy": 0.7413,
+    "mnist_scope": "different evaluator pipelines; not paired-input parity; inclusive wall time",
+    "status": "historical feasibility; no current-build certification or accelerator comparison"
+  },
+  "retained_state": {
+    "accounting": {
+      "checkpoint": "declared layer/embedding retained set, not a measured checkpoint allocator peak",
+      "exclusions": "parameters, optimizer, supplied cotangent, transient workspaces and allocator overhead",
+      "ignored_legacy_fields": "ratio_* fields are not used; they mix boundaries or omit directory bytes",
+      "loss_inclusive": "(checkpoint_core + logits + int64 targets) / (serialized_bytes + logits + int64 targets)",
+      "supplied_cotangent": "(checkpoint_retained - boundary_logits) / serialized_bytes"
+    },
+    "command": "python -m ontogenic_learner.ontogenic_v2.exp1_saved_state",
+    "manifest": "results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/manifest.json",
+    "rows": [
+      {
+        "batch": 1,
+        "boundary_logit_bytes": 14592,
+        "boundary_target_bytes": 768,
+        "checkpoint_core_bytes": 73728,
+        "layers": 2,
+        "logical_bits": 288672,
+        "loss_inclusive_ratio": 1.6875603796101608,
+        "payload_bytes": 36084,
+        "portable_bytes": 37431,
+        "sequence": 96,
+        "supplied_cotangent_ratio": 1.9697042558307285,
+        "vocabulary": 38,
+        "width": 64
+      },
+      {
+        "batch": 1,
+        "boundary_logit_bytes": 14592,
+        "boundary_target_bytes": 768,
+        "checkpoint_core_bytes": 245760,
+        "layers": 4,
+        "logical_bits": 700704,
+        "loss_inclusive_ratio": 2.4830970245057484,
+        "payload_bytes": 87588,
+        "portable_bytes": 89799,
+        "sequence": 96,
+        "supplied_cotangent_ratio": 2.736778806000067,
+        "vocabulary": 38,
+        "width": 128
+      },
+      {
+        "batch": 1,
+        "boundary_logit_bytes": 29184,
+        "boundary_target_bytes": 1536,
+        "checkpoint_core_bytes": 983040,
+        "layers": 4,
+        "logical_bits": 2639424,
+        "loss_inclusive_ratio": 2.793550716051288,
+        "payload_bytes": 329928,
+        "portable_bytes": 332173,
+        "sequence": 192,
+        "supplied_cotangent_ratio": 2.959421747101661,
+        "vocabulary": 38,
+        "width": 256
+      }
+    ],
+    "run_id": "529c45f4-7274-4999-b35c-c59d1db917e6",
+    "source_identity": {
+      "device": "cpu",
+      "ontogenic_commit": "7b29124b63c30abadb0288b095db0cc85c5400f7",
+      "ontogenic_dirty_patch_sha256": "24b605604f6bdee19f0dc4d9909fc6189c3b9d21991df767b5aa6c8284711f91",
+      "platform": "macOS-26.5.2-arm64-arm-64bit",
+      "python": "3.11.5",
+      "tikitorch_commit": "ee3c775281b6046781144b0768a050ac26dfbc19",
+      "tikitorch_dirty_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "torch": "2.10.0"
+    },
+    "status": "historical imported representation evidence; not current device training"
+  },
+  "schema": "tikitorch.manuscript_tables.v1",
+  "sources_sha256": {
+    "results/fpga_silicon/d512_verify/golden_fused.jsonl": "43bd34508d457b7d5662482aecb13012bf39136dc666fdb42a4f894d026bbeb3",
+    "results/fpga_silicon/d512_verify/silicon_fused.jsonl": "43bd34508d457b7d5662482aecb13012bf39136dc666fdb42a4f894d026bbeb3",
+    "results/fpga_silicon/d512_verify/train_200.err": "ddda8919bf946b514154bb5efc7e6ec8ad05ed6d37fbca31485b2f112dcc514d",
+    "results/fpga_silicon/d512_verify/train_2000.err": "b8a5d29e207ad3591ca5639bc4a5094b13a5892b2dd273fa77b3403fcc074e36",
+    "results/fpga_silicon/d512_verify/train_30.err": "59c863911b018499a3e49cb165e5c50e3fbd8db4b83dac351eb553a6ae407124",
+    "results/predictive_coding/onfabric_train/crosscheck.txt": "4203d9cff2234bfa9b312ec06e9a94e42165d8a4b5c190560f7fbd93254b7a0a",
+    "results/predictive_coding/onfabric_train/train.txt": "097bdc7d37dbe141feb90dc03b5d673fb3287eb7bf85e193372196368d86143b",
+    "results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/manifest.json": "7f5bf7b657b160dc51c51a563267d3ee77412c9b29ad0cd40f802c55f84bac29",
+    "results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/saved_state.jsonl": "351c15fc09455d953db3f53dc9929af1dd961db9f351c9992ba48ba08d25623b"
+  }
+}

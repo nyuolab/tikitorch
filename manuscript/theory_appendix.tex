@@ -1,0 +1,359 @@
+\section{Selected reverse programs and sufficient traces}
+\label{app:theory}
+
+This appendix states the mathematical contract independently of a particular
+framework. All vector spaces are finite-dimensional real spaces; arithmetic
+equalities below are real-arithmetic identities. A floating-point
+implementation must separately validate tie selection, exceptional values,
+reduction order, and numerical error. In particular, equality of the
+mathematical reverse actions does not imply bitwise equality after changing
+the order of floating-point accumulation.
+
+\subsection{Local contract and graph composition}
+\label{app:composition}
+
+Let an executed computation be a finite directed acyclic multigraph.
+An incoming edge denotes an argument occurrence, so the same predecessor may
+appear twice in one operation. At node $v$, a declared local differentiation
+rule specifies linear maps $A_{ve}$ from the state on incoming edge $e$ to
+the output state, and $B_v$ from the local parameter vector to that output.
+These maps are evaluated at the recorded forward execution. They need not be
+classical derivatives at nondifferentiable points; the declaration of the
+rule is part of the contract.
+
+Write $S$ for information available to reverse execution independently of the
+certificate: graph and address metadata, shapes, any required parameter
+snapshot, and explicitly retained boundary data. Local parameters may be
+coordinate views of a shared global vector $\theta$, with
+$\theta_v=E_v\theta$ for a fixed coordinate-selection map $E_v$.
+
+\begin{definition}[Joint trace sufficiency]
+\label{def:joint-trace}
+A local record $c_v$ is sufficient for a requested local reverse action when
+evaluators using only $(q,c_v,S)$ return $A_{ve}^{T}q$ for every requested
+state edge $e$ and $B_v^{T}q$ for the requested local parameters, for every
+incoming cotangent $q$. Every additional realized forward quantity used by an
+evaluator must belong to either $c_v$ or the declared boundary information
+$S$. A record that determines state actions need not determine parameter
+actions.
+\end{definition}
+
+\begin{theorem}[Composition of trace-sufficient local reverse actions]
+\label{thm:appendix-composition}
+Suppose all local state actions needed by a finite executed graph, and all
+requested local parameter actions, satisfy Definition~\ref{def:joint-trace}.
+Given output cotangents, the records $(c_v)_v$, and $S$, reverse-topological
+accumulation reproduces the declared local reverse program without access to
+any unrecorded primal activation or forward recomputation. Shared parameters,
+repeated argument occurrences, and fan-out are handled by summing their
+contributions. If all local maps are classical derivatives at the execution
+point, the result is the classical vector--Jacobian product of the graph.
+\end{theorem}
+
+\begin{proof}
+Initialize every state and global-parameter cotangent to zero, then add the
+supplied cotangents at the requested graph outputs. Process nodes in reverse
+topological order. When $v$ is visited, every consumer of its value has
+already been visited, so $\bar z_v$ contains exactly the accumulated
+contributions from all downstream occurrences and any supplied output seed.
+For every incoming argument occurrence $e$ with predecessor $u(e)$, perform
+\begin{equation}
+ \bar z_{u(e)}\mathrel{+}=A_{ve}^{T}\bar z_v,
+ \qquad
+ \bar\theta\mathrel{+}=E_v^{T}B_v^{T}\bar z_v
+ \label{eq:reverse-accumulation}
+\end{equation}
+where the parameter update is performed once per node, not once per state
+edge. The assumed evaluators provide precisely these terms from the record
+and available information. Induction over reverse order establishes equality
+with the declared reverse program. Repeated edges add repeated terms, and
+$E_v^{T}$ scatters each local contribution into the correct shared parameter
+coordinates. When the local maps are classical derivatives, the ordinary
+chain rule identifies this program with the graph VJP.
+\end{proof}
+
+This is a specialization of standard reverse accumulation, not a new chain
+rule or learning rule. The substantive operator question is whether a small
+record determines both local state and local parameter actions. The global
+selected linear map need not be a partial permutation: residual addition
+duplicates cotangents, and overlapping routes can produce integer
+multiplicities greater than one.
+
+\begin{corollary}[Finite recurrent windows]
+\label{cor:finite-window}
+The theorem applies to any stated finite recurrent unrolling whose executed
+nodes satisfy the local contract. It includes the cotangent of the initial
+state when that state is differentiated, and sums parameter contributions
+across all occurrences of a shared recurrent parameter.
+\end{corollary}
+
+\begin{proof}
+Replace each recurrent invocation in the finite window by its time-indexed
+node. The resulting graph is finite and acyclic; apply
+Theorem~\ref{thm:appendix-composition}.
+\end{proof}
+
+The corollary makes no infinite-horizon, fixed-point, or convergence claim.
+A bounded tape ring permits truncated windows, but overwriting earlier records
+does not preserve an unrestricted full-history gradient. The current
+\texttt{morphssm\_tape} adapter rejects recurrent scans and aliased parameters;
+the corollary and alias construction describe mathematical composition, not
+additional adapter coverage.
+
+\subsection{Additive Extrema, Signs, and Top-\texorpdfstring{$k$}{k} Sums}
+\label{app:operators}
+
+For an independent example index $a$, consider
+\begin{equation}
+ y_{aj}=\mathop{\mathrm{ext}}_{i=1}^{K}
+          (x_{ai}+\sigma w_{ji})+b_j,
+ \qquad \mathrm{ext}\in\{\max,\min\},\quad \sigma\in\{-1,+1\}.
+ \label{eq:signed-additive-extreme}
+\end{equation}
+An exact tie selects the lowest index in a fixed candidate ordering. Let
+$r_{aj}$ be the selected index and let $q_{aj}$ be the output cotangent.
+
+\begin{proposition}[Joint route sufficiency for additive extrema]
+\label{prop:additive-route}
+Under the selected-branch rule, the indices $r_{aj}$ and static addresses
+determine all state, weight, and bias reverse actions of
+\eqref{eq:signed-additive-extreme}:
+\begin{align}
+ \bar x_{ai}&=\sum_j q_{aj}\mathbf{1}\{r_{aj}=i\},\\
+ \bar w_{ji}&=\sigma\sum_a q_{aj}\mathbf{1}\{r_{aj}=i\},\\
+ \bar b_j&=\sum_a q_{aj}.
+ \label{eq:additive-reverse}
+\end{align}
+No candidate activation value or weight value is required for these actions.
+\end{proposition}
+
+\begin{proof}
+After selecting $r_{aj}$, the local branch is
+$x_{a,r_{aj}}+\sigma w_{j,r_{aj}}+b_j$. Its nonzero derivatives are $1$,
+$\sigma$, and $1$, respectively. Transposing and accumulating across outputs
+and parameter-sharing examples gives the displayed formulas.
+\end{proof}
+
+Changing max to min changes the comparison, not the derivative sign. A minus
+sign arises only from a minus sign in the selected affine candidate, as in
+the common erosion convention $x-w$. TikiTorch's additive min-plus reference
+uses $x+w$, so its selected weight derivative has positive sign.
+Morphological convolution replaces $i$ by a static channel/offset address.
+Overlapping windows and shared kernel coordinates scatter-add their
+contributions. A selected padding constant receives no requested input
+cotangent, although a selected additive kernel parameter still does.
+
+For the sum of the $k$ selected candidates in each output, the same formula
+replaces the single-index indicator by membership in the selected set. Its
+coefficients are $1$, not $1/k$; averaging would be a different operator.
+Stable ordered indices implement a deterministic tie contract, but ordering
+within a selected set is unnecessary to determine the real-arithmetic VJP of
+the sum. This distinction matters to storage lower bounds.
+
+For $h_t=\max(u_t,h_{t-1}-\lambda)$, a carry/input gate determines the state
+transpose action; each carry contributes the negative accumulated cotangent
+to $\lambda$. If a different parameterization uses $|\lambda|$, its declared
+sign selection must also be retained or otherwise available. A route index
+does not automatically encode such signs.
+
+\subsection{Ties: program agreement is not a global subgradient theorem}
+\label{app:ties}
+
+At a strict max/min winner, the selected branch is locally the active branch.
+At a tie, each individual affine branch gradient is a valid local generalized
+gradient of that extremum. Arbitrary composition of those selections need
+not belong to the Clarke generalized Jacobian of the composite function.
+The distinction between differentiating a program and differentiating its
+denoted function is central in nonsmooth AD \citep{bolte2020model}.
+
+\paragraph{An incompatible-tie counterexample.}
+Let
+\begin{equation}
+ f(x)=\max(x,0)-\max(-x,0)=x.
+\end{equation}
+Order the candidate lists as $(x,0)$ and $(-x,0)$. At $x=0$, the first-index
+rule selects the variable branch in both maxima. The composed local reverse
+program returns $1-(-1)=2$, whereas the composite function has derivative
+$f'(0)=1$ and Clarke generalized gradient $\{1\}$. Both selected branches
+cannot be strict winners at a common nearby nonzero input. Deterministic
+local ties therefore suffice for reproducible program replay, but do not
+prove that the replay is a generalized gradient of the composite function.
+
+A classical-VJP claim is valid when all relevant local functions are
+differentiable at the recorded execution. For a continuous piecewise-affine
+program, another sufficient condition at a boundary is that the complete
+selected branch is realized on a sequence of full-dimensional affine regions
+approaching the point: its constant Jacobian is then a limiting Jacobian of
+the composite. We do not assert this simultaneous realizability for arbitrary
+ties. Tests at ties must compare the explicitly declared local program;
+ordinary central finite differences are not an oracle for that declaration.
+
+\subsection{A local route-stability certificate}
+\label{app:margin}
+
+\begin{proposition}[Sufficient score-gap condition]
+\label{prop:score-gap}
+Let $r$ be the unique maximum of finite scores $(s_i)_i$. Suppose perturbed
+scores obey $|s'_i-s_i|\leq\epsilon_i$. If
+\begin{equation}
+ s_r-s_i>\epsilon_r+\epsilon_i \qquad\text{for every }i\ne r,
+\end{equation}
+then $r$ is still the unique maximum. In particular, a winner--runner-up gap
+$\gamma>2\epsilon$ suffices when every $\epsilon_i\leq\epsilon$. Reversing
+signs gives the analogous statement for a minimum. For top-$k$ sums, a gap
+greater than $2\epsilon$ between ranks $k$ and $k+1$ preserves the selected
+set, but need not preserve its internal rank ordering.
+\end{proposition}
+
+\begin{proof}
+For every competitor,
+$s'_r-s'_i\geq s_r-s_i-\epsilon_r-\epsilon_i>0$.
+For top-$k$, apply the same inequality to every selected--unselected pair;
+their smallest initial gap is the rank-$k$ boundary gap.
+\end{proof}
+
+For affine scores $s_i(t)=a_i^Tt+b_i$ and any norm with dual norm
+$\|\cdot\|_*$, the sharper sufficient condition
+\begin{equation}
+ s_r(t)-s_i(t)>\rho\|a_r-a_i\|_*
+ \quad (i\ne r)
+\end{equation}
+certifies the same winner for every $\|t'-t\|\leq\rho$, by the dual-norm
+inequality. At a tied winner no positive radius follows from these strict-gap
+conditions. In a graph, all relevant node bounds must concern the actual
+perturbed candidate scores, including changes propagated from earlier nodes.
+A local observed margin is not by itself a radius in input or parameter
+space. Dropout masks and normalization exponent selections are additional
+trace state; extrema margins alone do not certify their stability.
+
+Even if a tape remains sufficient for the original execution after live
+weights change, it is not automatically the derivative of a fresh execution.
+For the additive operators above the recorded reverse coefficients do not
+depend on weight values, so the original selected reverse action remains
+well defined. General local evaluators may instead require the original
+parameter snapshot in $S$.
+
+\subsection{Conditional information and representation accounting}
+\label{app:information}
+
+Fix available information $S=s$. Regard two admissible forward executions as
+equivalent when their requested selected reverse actions agree for every
+admissible cotangent. Let $J$ denote this equivalence class and let $M_s$ be
+the number of attainable classes. Counting route labels can overcount these
+classes: different labels can select identical coefficients, cancel after
+composition, or be indistinguishable for the requested subset of gradients.
+
+\begin{proposition}[Conditional action-coding bound]
+\label{prop:action-coding}
+A deterministic exact decoder that must answer every admissible cotangent
+from $(c,S)$ needs at least $\lceil\log_2 M_s\rceil$ bits for a fixed-length
+certificate at $S=s$, when $M_s$ is finite. A conditionally uniquely decodable
+variable-length encoding has expected length at least $H(J\mid S)$ under
+the stated distribution of executions.
+\end{proposition}
+
+\begin{proof}
+Two inequivalent executions admit a cotangent on which the requested actions
+differ. They cannot share a code when the decoder's other input $S=s$ is
+identical. Hence at least $M_s$ distinct codes are necessary, proving the
+fixed-length bound. Conditional unique decodability gives the Kraft
+inequality for each $s$; the standard coding inequality yields expected
+length at least $H(J\mid S=s)$. Average over $S$ for the conditional bound.
+\end{proof}
+
+For a single additive extremum with an omitted freely varying input, fixed
+weights, and all $K$ candidates attainable and derivative-distinguishable,
+the local bound is $\lceil\log_2K\rceil$. For $n$ outputs it becomes
+$\lceil n\log_2K\rceil$ only if all $K^n$ joint action classes are attainable
+and distinguishable under the same conditioning. Independent per-output
+fixed-width packing uses $n\lceil\log_2K\rceil$ bits, which need not attain
+that joint bound. A top-$k$ sum has at most $\binom{K}{k}$ selected-set actions
+per output, not $K^k$ distinct ordered actions. Thus storing $k$ indices is a
+simple implementation choice, not a proof of information optimality.
+
+Crucially, if $S$ already contains the full original input and parameters of
+a deterministic program, its route and selected reverse action are
+determined by $S$, so $H(J\mid S)=0$. Merely prohibiting forward
+recomputation does not produce a positive information-theoretic lower bound
+in that setting; a nontrivial time--space claim requires a computational
+model. Proposition~\ref{prop:action-coding} is an interface-conditional coding
+statement, not a universal lower bound on training memory.
+
+\paragraph{Current adapter payload.}
+\label{app:payload}
+For batch size $B$, length $T$, width $D$, $L$ layers with tap counts $K_l$,
+vocabulary size $V$, and a top-$k$ sum head, define
+$\ell(n)=\lceil\log_2n\rceil$, with $\ell(1)=0$. The current hard MorphSSM
+adapter's declared logical payload is
+\begin{align}
+ N_{\mathrm{bits}}=BT\Big[&D\sum_{l=1}^{L}\big(\ell(K_l)+\ell(D)\big)
+       +Vk\ell(D)\notag\\
+       &+5(2L+1)+\ell(V)+Dn_{\mathrm{drop}}\Big],
+ \label{eq:morphssm-logical-bits}
+\end{align}
+where $n_{\mathrm{drop}}$ counts the actually recorded input/layer dropout
+masks. Each layer contributes convolution and projection winners and two
+normalization exponents; the final norm contributes one exponent, the head
+contributes $BT Vk$ indices, and token IDs contribute $BT$ codes. Exponents
+are clamped to $[-8,8]$, so their 17-code alphabet uses five bits.
+
+For fields with $n_f$ entries of width $b_f$, device payload bytes are
+$\sum_f\lceil n_fb_f/8\rceil$, with at most seven padding bits per field.
+The portable contiguous payload is $\lceil N_{\mathrm{bits}}/8\rceil$;
+its directory and framing add bytes. These formulas exclude logits,
+cotangents, parameter/optimizer state, Python metadata, and transient
+packing, decoding, or reduction workspace. They are not allocator-peak
+formulas. The vocabulary-head term can dominate, so there is no
+architecture-independent memory advantage over checkpointing.
+
+\subsection{Exclusions and the separate arithmetic contract}
+\label{app:exclusions}
+
+\paragraph{Dense trainable maps.}
+For $y=Wx$, a fixed unchanged $W$ suffices for the state action $W^Tq$, but
+the weight action is $qx^T$. With $W$ fixed, two distinct omitted inputs and
+a suitable common nonzero $q$ give different weight actions. A route-free
+record cannot represent both under this interface. Dyadic forward weights
+do not eliminate this activation dependence for gradients of real-valued
+master weights under an explicitly chosen straight-through rule. A
+discrete sign-update recipe is a different contract, not an exact ordinary
+weight-gradient identity.
+
+\paragraph{Positive temperature and smooth mixtures.}
+For $f_\tau(x)=\tau\log\sum_i\exp(x_i/\tau)$ with $\tau>0$, the selected
+maximum index does not determine the derivative
+$\exp(x_i/\tau)/\sum_j\exp(x_j/\tau)$. For example, $(0,-a)$ has the same
+maximum for every $a>0$ but continuously changing derivatives. Small positive
+temperature is not the hard operator. Likewise, an expert index does not
+determine a dense expert's parameter gradient, nor does a hard gate certify
+the value-dependent derivatives of a smooth attention mixture.
+
+\paragraph{Normalization.}
+Ordinary normalization has a value-dependent Jacobian. For the simple
+$y=x/\sqrt{x^2+\varepsilon}$, the derivative
+$\varepsilon/(x^2+\varepsilon)^{3/2}$ is not determined by the sign of $x$;
+variance-normalized layers have the analogous continuous dependence.
+The implemented tropical layer norm instead declares its selected exponent
+$s$ constant in differentiation and uses
+$y=2^{-s}(x-\mathrm{mean}(x))+\beta$. Its local reverse action is
+\begin{equation}
+ \bar x=2^{-s}\left(q-\frac{\mathbf{1}^Tq}{D}\mathbf{1}\right),
+ \qquad \bar\beta=\sum_{\text{rows}}q.
+\end{equation}
+Thus the exponent is sufficient auxiliary state, but not a winner route.
+Exponent quantization can make the forward map discontinuous at thresholds;
+the stop-gradient rule is a declared program rule, not a general classical
+derivative there. The mean's factor $1/D$ is dyadic only when $D$ is a power
+of two. A trainable multiplicative gain would also require the normalized
+activation for its gain gradient.
+
+\paragraph{Whole training recipes.}
+Gather, scatter, copy, sign, and addition implement the additive selected
+reverse actions without multiplying two run-time numerical data values.
+That property is separate from trace sufficiency: an unchanged dense matrix
+may be reverse-available yet require products, and even a fully routed trunk
+may use a conventional softmax loss or AdamW outside its boundary. A software
+audit must inspect the executed forward, backward, loss, and update under
+its versioned operation semantics. A physical zero-DSP or timing claim
+additionally requires evidence for a particular synthesized design; neither
+the route theorem nor a software pass supplies that evidence.

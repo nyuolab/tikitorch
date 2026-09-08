@@ -76,7 +76,7 @@ cd tikitorch
 python -m pip install -e ".[dev]"
 ```
 
-TikiTorch requires Python 3.9 or newer, PyTorch 2.0 or newer, and NumPy 1.24 or newer.
+TikiTorch supports Python 3.9–3.12 (`>=3.9,<3.13`), PyTorch 2.0 or newer, and NumPy 1.24 or newer.
 The project is licensed under GPL-3.0-or-later. Version `0.2.0` is the current source
 version, not yet a published PyPI release.
 
@@ -97,6 +97,18 @@ version, not yet a published PyPI release.
 The package is intentionally shaped like PyTorch: use `tt.nn`, `tt.optim`,
 `tt.models`, `tt.save`, `tt.load`, `tt.device`, and `tt.to` where their documented
 semantics apply.
+
+For hard MorphSSM training, the experimental
+[`route_logits` workflow](docs/guide/route-training.md) records device-resident
+routes during forward and plugs into ordinary `loss.backward()` and PyTorch
+optimizers. Portable byte serialization is an export, not a training-step
+requirement. Compact retained routes do **not** by themselves establish lower
+peak memory or faster training; the guide includes a full-step five-arm benchmark
+with explicit compiler failures, checkpoint policies, and measurement boundaries.
+
+Before public distribution, run the [release-validation checks](docs/release_validation.md).
+Known third-party provenance questions remain fail-closed release gates; passing
+the code tests is not equivalent to resolving distribution rights.
 
 ## API maturity
 
@@ -260,18 +272,18 @@ mkdocs build
 
 ## Research artifacts
 
-Two focused manuscripts are maintained independently of the future ontogenic-agent
-programme. The
-[joint discussion handoff](https://github.com/nyuolab/tikitorch/blob/main/papers/XIANG_HANDOFF.md)
-gives Xiang a single review entry point:
+The single active manuscript is
+[TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning](manuscript/README.md).
+It combines the earlier route-certificate and FPGA drafts around an executable
+derivative-state and arithmetic-audit contract. Current-code measurements and
+historical hardware evidence retain separate configurations and claim boundaries.
+The old scientific sources remain preserved under `papers/` as historical drafts.
 
-- [Forward traces as exact differentiation certificates in hard-routed networks](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/README.md)
-  ([root build handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md))
-- [Multiplier-free learning on FPGA](https://github.com/nyuolab/tikitorch/blob/main/papers/multiplier_free_fpga/README.md)
-
-Their READMEs distinguish measured results from experiments still required for
-submission. Historical exploratory results under `results/` are evidence records, not
-blanket claims about the current library.
+Start with the [Xiang handoff](papers/XIANG_HANDOFF.md),
+[ICML readiness checklist](manuscript/ICML_READINESS.md), and
+[codebase/release roadmap](docs/release_impact_roadmap.md).
+The paper is an evidence-bounded draft, not yet submission-ready. Historical
+results under `results/` do not certify the current library or a public release.
 
 ## Development
 
@@ -296,5 +308,5 @@ publishing a package remains a separate maintainer decision.
 The current development version is `0.2.0`. See
 [CITATION.cff](https://github.com/nyuolab/tikitorch/blob/main/CITATION.cff),
 [CHANGELOG.md](https://github.com/nyuolab/tikitorch/blob/main/CHANGELOG.md), and the
-paper-specific bibliographies for citation metadata. A release tag and archival DOI are
-required before either manuscript is submitted.
+unified manuscript bibliography for citation metadata. A reviewed release tag and
+archived artifact remain project goals before submission; no DOI is claimed yet.

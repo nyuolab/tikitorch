@@ -11,6 +11,7 @@ from .packed_tape import (
     route_code_lower_bound,
     unpack_field,
 )
+from .device_tape import DeviceRouteTape
 from .primitives import (
     accumulate_fanout,
     embedding_gather_vjp,
@@ -49,9 +50,16 @@ from .morphssm_tape import (
     pack_engine_cache,
     replay as replay_morphssm_vjp,
     serialize as serialize_morphssm_tape,
+    forward_tape as morphssm_forward_tape,
+    vjp as morphssm_vjp,
+    route_logits,
 )
 
 __all__ = [
+    "DeviceRouteTape",
+    "morphssm_forward_tape",
+    "morphssm_vjp",
+    "route_logits",
     "FixedCapacityRingBuffer",
     "PackedField",
     "PackedRouteTape",

@@ -151,8 +151,9 @@ def additive_extreme_vjp(
     grad_input = torch.zeros(rows, input_features, dtype=g.dtype, device=g.device)
     grad_input.scatter_add_(1, r, g)
 
-    output_rows = torch.arange(out_features, device=g.device).view(1, out_features)
-    flat_route = output_rows * input_features + r
+    output_offsets = torch.arange(0, out_features * input_features, input_features,
+                                  device=g.device).view(1, out_features)
+    flat_route = output_offsets + r
     grad_weight = torch.zeros(
         out_features * input_features, dtype=g.dtype, device=g.device
     )
@@ -182,17 +183,10 @@ def stable_topk(
 ) -> tuple[Tensor, Tensor]:
     """Stable top-k selection whose ties retain ascending candidate order."""
 
-    if values.ndim == 0:
-        raise ValueError("stable_topk requires a candidate dimension")
-    dim = dim % values.ndim
-    n = values.shape[dim]
-    if not 1 <= k <= n:
-        raise ValueError(f"k must lie in [1, {n}], got {k}")
+    from tikitorch.functional import stable_topk as select
     if torch.isnan(values).any():
         raise ValueError("NaN candidates have no deterministic top-k route")
-    order = torch.argsort(values, dim=dim, descending=largest, stable=True)
-    route = order.narrow(dim, 0, k)
-    return values.gather(dim, route), route
+    return select(values, k, largest=largest, dim=dim)
 
 
 def topk_additive(
@@ -449,7 +443,7 @@ __all__ = [
 
 
 def pow2_norm_vjp(adjoint: torch.Tensor, shift: torch.Tensor,
-                  want_beta_grad: bool = True):
+                  want_beta_grad: bool = True, *, validate: bool = True):
     """Reverse of the tropical layer norm y = (x - mean(x)) * 2^-shift + beta.
 
     ``shift`` is the integer dyadic exponent tape record (17 codes in
@@ -460,7 +454,7 @@ def pow2_norm_vjp(adjoint: torch.Tensor, shift: torch.Tensor,
     Returns ``(e_input, beta_grad)``; ``beta_grad`` is ``None`` when not
     requested.
     """
-    if adjoint.isnan().any():
+    if validate and adjoint.isnan().any():
         raise ValueError("adjoint contains NaN")
     if shift.dtype not in (torch.int8, torch.int16, torch.int32,
                            torch.int64):
@@ -482,7 +476,7 @@ def gate_vjp(adjoint: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
 
 
 def embedding_gather_vjp(adjoint: torch.Tensor, ids: torch.Tensor,
-                         num_embeddings: int) -> torch.Tensor:
+                         num_embeddings: int, *, validate: bool = True) -> torch.Tensor:
     """Reverse of an embedding row gather: scatter-accumulate the adjoint
     into the gathered rows. ``ids`` is the token-id tape record."""
     if ids.dtype not in (torch.int32, torch.int64):
@@ -492,7 +486,7 @@ def embedding_gather_vjp(adjoint: torch.Tensor, ids: torch.Tensor,
     flat_i = ids.reshape(-1)
     if flat_e.shape[0] != flat_i.shape[0]:
         raise ValueError("adjoint/ids length mismatch")
-    if int(flat_i.min()) < 0 or int(flat_i.max()) >= num_embeddings:
+    if validate and flat_i.numel() and (int(flat_i.min()) < 0 or int(flat_i.max()) >= num_embeddings):
         raise ValueError("ids out of range")
     out = torch.zeros(num_embeddings, d, dtype=adjoint.dtype,
                       device=adjoint.device)

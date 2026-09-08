@@ -16,17 +16,20 @@ Design invariants:
   ``functional.tropical_linear`` itself. Registry lookup still has normal Python
   overhead and does not make a claim about other implementations.
   Nothing here edits or wraps ``functional``.
-* **Transparent fallback.** Requesting an op for a device that has no
-  implementation (or whose backend is unavailable) returns the CPU implementation
-  and emits a one-time :class:`BackendFallbackWarning`. The CPU reference semantics
-  are then used; backend equivalence must be established separately.
+* **Transparent fallback.** Requesting an op for a logical device that has no
+  implementation (or whose backend is unavailable) returns the registered PyTorch
+  reference and emits a one-time :class:`BackendFallbackWarning`. This does not move
+  tensor storage: CUDA inputs remain CUDA inputs. Backend equivalence must be
+  established separately.
 """
 from __future__ import annotations
 
 import abc
+from contextlib import contextmanager
+from threading import RLock
 import warnings
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Dict, List, Optional, Tuple, Union
+from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, Tuple, Union
 
 from .device import Device, device
 
@@ -41,13 +44,17 @@ __all__ = [
     "list_backends",
     "register_op",
     "dispatch",
+    "is_reference_dispatch",
     "is_op_supported",
     "list_ops",
+    "set_default_device",
+    "get_default_device",
+    "default_device",
 ]
 
 
 class BackendFallbackWarning(UserWarning):
-    """Emitted once per ``(subject, device)`` when execution silently falls back to CPU."""
+    """Emitted when a logical-device operation uses the PyTorch reference."""
 
 
 # ---------------------------------------------------------------------------
@@ -110,10 +117,8 @@ class Backend(abc.ABC):
         return model
 
     def register(self, *, default: bool = False) -> "Backend":
-        """Register this backend and all of its :meth:`ops` into the global tables."""
-        register_backend(self, default=default)
-        for op_name, impl in self.ops().items():
-            register_op(op_name, self.name, impl)
+        """Atomically register this backend and the exact result of :meth:`ops`."""
+        _install_backend(self, self.ops(), default=default, replace_ops=True)
         return self
 
 
@@ -124,7 +129,13 @@ class Backend(abc.ABC):
 _BACKENDS: Dict[str, Backend] = {}
 _DEFAULT_BACKEND: Optional[str] = None
 _OPS: Dict[Tuple[str, str], Callable] = {}
+_CANONICAL_REFERENCE_IMPLS: Dict[str, Callable] = {}
+_REFERENCE_OPS = frozenset()
+_REGISTRY_SNAPSHOT = (_BACKENDS, _OPS, _REFERENCE_OPS)
 _WARNED: set = set()
+_DEFAULT_DEVICE: Device = Device("cpu")
+_REGISTRY_LOCK = RLock()
+_REGISTRY_GENERATION = 0
 
 
 def _coerce_device_type(name: Union[str, Device]) -> str:
@@ -142,97 +153,272 @@ def _backend_up(backend: Optional[Backend]) -> bool:
         return False
 
 
-def register_backend(backend: Backend, *, default: bool = False) -> Backend:
-    """Insert ``backend`` keyed by ``backend.name`` (idempotent). Returns it."""
-    global _DEFAULT_BACKEND
+def _backend_op_dispatch_up(backend: Optional[Backend]) -> bool:
+    if not _backend_up(backend):
+        return False
+    try:
+        return bool(backend.capabilities().op_dispatch)
+    except Exception:  # noqa: BLE001 — invalid capability probes are unavailable
+        return False
+
+
+def _validated_ops(implementations: Mapping[str, Callable]) -> Dict[str, Callable]:
+    if not isinstance(implementations, Mapping):
+        raise TypeError("Backend.ops() must return a mapping of op names to callables")
+    validated: Dict[str, Callable] = {}
+    for op_name, impl in implementations.items():
+        if not isinstance(op_name, str) or not op_name.strip():
+            raise ValueError("backend op names must be non-empty strings")
+        if not callable(impl):
+            raise TypeError(f"implementation for op {op_name!r} must be callable")
+        validated[op_name] = impl
+    return validated
+
+
+def _install_backend(
+    backend: Backend,
+    implementations: Mapping[str, Callable],
+    *,
+    default: bool,
+    replace_ops: bool,
+) -> Backend:
+    """Install validated backend state without exposing a partial replacement."""
+
+    global _BACKENDS, _DEFAULT_BACKEND, _DEFAULT_DEVICE, _OPS, _REFERENCE_OPS
+    global _REGISTRY_GENERATION, _REGISTRY_SNAPSHOT
     if not isinstance(backend, Backend):
         raise TypeError("backend must be an instance of Backend")
     name = _coerce_device_type(backend.name)
-    _BACKENDS[name] = backend
-    if default or _DEFAULT_BACKEND is None:
-        _DEFAULT_BACKEND = name
+    validated = _validated_ops(implementations)
+    if validated:
+        try:
+            op_dispatch = bool(backend.capabilities().op_dispatch)
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError("backend capabilities() failed during registration") from exc
+        if not op_dispatch:
+            raise ValueError(
+                f"backend {name!r} supplies ops but capabilities().op_dispatch is False"
+            )
+    with _REGISTRY_LOCK:
+        current_backends, current_ops, current_references = _REGISTRY_SNAPSHOT
+        backends = dict(current_backends)
+        ops = dict(current_ops)
+        references = set(current_references)
+        previous = backends.get(name)
+        if replace_ops or (previous is not None and previous is not backend):
+            stale = [key for key in ops if key[1] == name]
+            for key in stale:
+                del ops[key]
+                references.discard(key)
+        backends[name] = backend
+        ops.update({(op_name, name): impl for op_name, impl in validated.items()})
+        # Publish immutable-by-convention snapshots in one assignment each. Public
+        # execution reads these without acquiring a lock, which keeps torch.compile
+        # fullgraph-compatible; Dynamo guards the global snapshot identities.
+        reference_snapshot = frozenset(references)
+        _REGISTRY_SNAPSHOT = (backends, ops, reference_snapshot)
+        _BACKENDS, _OPS = backends, ops
+        _REFERENCE_OPS = reference_snapshot
+        _REGISTRY_GENERATION += 1
+        if default or _DEFAULT_BACKEND is None:
+            _DEFAULT_BACKEND = name
+        if default:
+            _DEFAULT_DEVICE = Device(name)
     return backend
+
+
+def register_backend(backend: Backend, *, default: bool = False) -> Backend:
+    """Register a backend object, clearing stale ops when replacing another object.
+
+    Prefer :meth:`Backend.register` when the backend supplies operations; it
+    validates and installs the backend and its exact operation set together.
+    Re-registering the same object through this low-level function is idempotent.
+    """
+
+    return _install_backend(backend, {}, default=default, replace_ops=False)
 
 
 def get_backend(name: Union[str, Device]) -> Optional[Backend]:
     """Look up a backend by name or :class:`Device`; ``None`` if well-formed but absent."""
-    return _BACKENDS.get(_coerce_device_type(name))
+    backends, _, _ = _REGISTRY_SNAPSHOT
+    return backends.get(_coerce_device_type(name))
 
 
 def available_backends() -> List[str]:
     """Names of registered backends whose :meth:`is_available` is ``True``."""
-    return [name for name, backend in _BACKENDS.items() if _backend_up(backend)]
+    backends, _, _ = _REGISTRY_SNAPSHOT
+    registered = list(backends.items())
+    return [name for name, backend in registered if _backend_up(backend)]
 
 
 def list_backends() -> List[str]:
     """Names of *all* registered backends (available or not)."""
-    return list(_BACKENDS.keys())
+    backends, _, _ = _REGISTRY_SNAPSHOT
+    return list(backends.keys())
 
 
-def register_op(op_name: str, device_type: Union[str, Device], impl: Callable) -> None:
+def register_op(
+    op_name: str,
+    device_type: Union[str, Device],
+    impl: Callable,
+    *,
+    _reference: bool = False,
+) -> None:
     """Register ``impl`` as the implementation of ``op_name`` on ``device_type``."""
     if not isinstance(op_name, str) or not op_name.strip():
         raise ValueError("op_name must be a non-empty string")
     if not callable(impl):
         raise TypeError("impl must be callable")
-    _OPS[(op_name, _coerce_device_type(device_type))] = impl
+    global _OPS, _REFERENCE_OPS, _REGISTRY_GENERATION, _REGISTRY_SNAPSHOT
+    key = (op_name, _coerce_device_type(device_type))
+    with _REGISTRY_LOCK:
+        backends, current_ops, current_references = _REGISTRY_SNAPSHOT
+        backend = backends.get(key[1])
+        if backend is not None and not backend.capabilities().op_dispatch:
+            raise ValueError(
+                f"backend {key[1]!r} does not declare op_dispatch capability"
+            )
+        ops = dict(current_ops)
+        references = set(current_references)
+        ops[key] = impl
+        canonical_reference = _CANONICAL_REFERENCE_IMPLS.get(op_name)
+        if _reference or impl is canonical_reference:
+            references.add(key)
+        else:
+            references.discard(key)
+        reference_snapshot = frozenset(references)
+        _REGISTRY_SNAPSHOT = (backends, ops, reference_snapshot)
+        _OPS = ops
+        _REFERENCE_OPS = reference_snapshot
+        _REGISTRY_GENERATION += 1
 
 
 def _warn_fallback(key: Tuple, message: str) -> None:
-    if key not in _WARNED:
+    with _REGISTRY_LOCK:
+        if key in _WARNED:
+            return
         _WARNED.add(key)
-        warnings.warn(message, BackendFallbackWarning, stacklevel=3)
+    warnings.warn(message, BackendFallbackWarning, stacklevel=3)
 
 
-def dispatch(op_name: str, device_type: Union[str, Device] = "cpu") -> Callable:
+def dispatch(op_name: str, device_type: Union[str, Device, None] = None) -> Callable:
     """Return the implementation of ``op_name`` for ``device_type``.
 
+    Omitting ``device_type`` consults :func:`get_default_device`.
     If the device has a registered, *available* implementation, it is returned.
     Otherwise this emits a one-time :class:`BackendFallbackWarning` and returns
-    the CPU implementation. Raises :class:`KeyError` only if no CPU implementation
-    exists (a genuine bug — the op name is unknown).
+    the registered PyTorch reference. The fallback executes wherever its tensor
+    inputs already live; dispatch never copies a CUDA tensor to CPU. Raises
+    :class:`KeyError` only if no reference implementation exists.
     """
-    dev = _coerce_device_type(device_type)
-    impl = _OPS.get((op_name, dev))
+    dev = get_default_device().type if device_type is None else _coerce_device_type(device_type)
+    # Deliberately read the published snapshots without a lock. Apart from making
+    # dispatch cheap, this lets torch.compile guard the registry/default globals
+    # instead of graph-breaking on a lock context manager.
+    backends, ops, _ = _REGISTRY_SNAPSHOT
+    impl = ops.get((op_name, dev))
+    backend = backends.get(dev)
+    reference_impl = ops.get((op_name, "cpu"))
 
     if dev != "cpu":
-        if impl is not None and _backend_up(_BACKENDS.get(dev)):
+        if impl is not None and _backend_op_dispatch_up(backend):
             return impl
-        cpu_impl = _OPS.get((op_name, "cpu"))
-        if cpu_impl is None:
+        if reference_impl is None:
             raise KeyError(f"no implementation registered for op {op_name!r} (cpu or {dev!r})")
+        import torch
+        if torch._dynamo.is_compiling():
+            raise RuntimeError(
+                f"cannot compile an implicit fallback for explicitly selected logical "
+                f"device {dev!r}; make the backend available or select the PyTorch "
+                "reference device before calling torch.compile"
+            )
         _warn_fallback(
             ("dispatch", op_name, dev),
             f"tikitorch op {op_name!r} has no available {dev!r} implementation; "
-            f"falling back to the registered CPU reference. "
+            f"using the registered PyTorch reference on the inputs' existing device. "
             f"This warning is shown once per (op, device).",
         )
-        return cpu_impl
+        return reference_impl
 
     if impl is None:
-        raise KeyError(f"no CPU implementation registered for op {op_name!r}")
+        raise KeyError(f"no PyTorch reference implementation registered for op {op_name!r}")
     return impl
+
+
+def is_reference_dispatch(
+    op_name: str,
+    device_type: Union[str, Device, None] = None,
+) -> bool:
+    """Whether dispatch resolves to the canonical PyTorch reference callable.
+
+    This metadata query avoids comparing callable identities inside compiled
+    module code. Registry snapshot replacement gives Dynamo a normal global
+    guard, so changing a backend invalidates the compiled specialization.
+    """
+
+    dev = get_default_device().type if device_type is None else _coerce_device_type(device_type)
+    backends, ops, references = _REGISTRY_SNAPSHOT
+    key = (op_name, dev)
+    if dev == "cpu":
+        return key in references
+    if key in ops and _backend_op_dispatch_up(backends.get(dev)):
+        return key in references
+    return (op_name, "cpu") in references
 
 
 def is_op_supported(op_name: str, device_type: Union[str, Device]) -> bool:
     """Pure query: is ``op_name`` natively supported on ``device_type``? (No warning.)"""
     dev = _coerce_device_type(device_type)
-    if (op_name, dev) not in _OPS:
+    backends, ops, _ = _REGISTRY_SNAPSHOT
+    registered = (op_name, dev) in ops
+    backend = backends.get(dev)
+    if not registered:
         return False
     if dev == "cpu":
         return True
-    return _backend_up(_BACKENDS.get(dev))
+    return _backend_op_dispatch_up(backend)
 
 
 def list_ops(device_type: Union[str, Device] = "cpu") -> List[str]:
     """All op names registered for ``device_type``."""
     dev = _coerce_device_type(device_type)
-    return [op for (op, d) in _OPS if d == dev]
+    _, ops, _ = _REGISTRY_SNAPSHOT
+    return [op for (op, d) in ops if d == dev]
 
 
 def _reset_fallback_warnings() -> None:
     """Test hook: clear the one-time fallback-warning dedup set."""
-    _WARNED.clear()
+    with _REGISTRY_LOCK:
+        _WARNED.clear()
+
+
+def get_default_device() -> Device:
+    """Return the logical device used when :func:`dispatch` omits one."""
+
+    return _DEFAULT_DEVICE
+
+
+def set_default_device(dev: Union[str, Device]) -> None:
+    """Set the process-wide default logical dispatch device."""
+
+    global _DEFAULT_BACKEND, _DEFAULT_DEVICE, _REGISTRY_GENERATION
+    selected = device(dev)
+    with _REGISTRY_LOCK:
+        _DEFAULT_DEVICE = selected
+        _DEFAULT_BACKEND = selected.type
+        _REGISTRY_GENERATION += 1
+
+
+@contextmanager
+def default_device(dev: Union[str, Device]) -> Iterator[Device]:
+    """Temporarily select the logical device used by implicit dispatch."""
+
+    previous = get_default_device()
+    set_default_device(dev)
+    try:
+        yield get_default_device()
+    finally:
+        set_default_device(previous)
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +427,7 @@ def _reset_fallback_warnings() -> None:
 
 
 class CpuBackend(Backend):
-    """The default backend: ordinary PyTorch/CPU execution of the tropical ops."""
+    """The default backend: ordinary PyTorch execution of the tropical ops."""
 
     name = "cpu"
 
@@ -258,7 +444,7 @@ class CpuBackend(Backend):
         )
 
     def accelerate(self, model, **opts):
-        return model  # CPU is the native path; nothing to wrap
+        return model  # The PyTorch reference needs no logical-device wrapper.
 
 
 def _autoregister_cpu_ops() -> int:
@@ -282,6 +468,7 @@ def _autoregister_cpu_ops() -> int:
             continue
         if isinstance(obj, type) and issubclass(obj, torch.autograd.Function):
             continue  # the .apply alias is the dispatchable op, not the class
-        register_op(name, "cpu", obj)
+        _CANONICAL_REFERENCE_IMPLS[name] = obj
+        register_op(name, "cpu", obj, _reference=True)
         count += 1
     return count

@@ -1,0 +1,260 @@
+\section{Implementation and Evaluation Details}
+\label{app:methods}
+
+\subsection{Reproduction Surface and Source Identity}
+
+The canonical source, bibliography, evidence ledgers, table generators and
+readiness checklist live together in the manuscript artifact. A build checks
+the downloaded official venue style against a pinned hash, regenerates or
+checks tables against their raw inputs, resolves citations and checks the
+main-body page marker. Those checks establish neither scientific acceptance
+nor distribution clearance. The latest verified ICML 2026 submission style
+is used provisionally; the rules for the intended next submission cycle must
+be rechecked before submission. No author list, acknowledgment or identifying
+repository URL appears in the review manuscript.
+
+\subsection{New Current-Code Retained-State Protocol}
+\label{app:current-protocol}
+
+The new protocol is separate from the historical audit below. Its three
+cells have $(D,L,T)=(64,2,96),(128,4,96),(256,4,192)$, batch one, vocabulary
+38, top-$k$ head with $k=8$, kernel width seven, no dropout, FP32 and hard routing. Parameter seed
+zero, input seed one and cotangent seed two are fixed. The supplied random
+output cotangent is normalized to unit Euclidean norm. The run uses one CPU
+thread; Python 3.11.5 and PyTorch 2.10.0 are recorded in its environment.
+The source-hashed implementation, parameter/input digests, field metadata
+and per-parameter errors are part of the raw record. The Git worktree is
+explicitly marked dirty; exact file hashes bind the run, but this is not a
+clean tagged release-candidate reproduction.
+
+Each cell records an eager output and parameter VJP, a packed device tape,
+an unpacked tape and a portable export. Logits and selected integer routes
+are checked exactly, and packed, unpacked and portable field round trips
+must agree. The route reference applies the canonical routing primitives
+to actual eager-layer inputs captured by temporary hooks; it validates
+recording consistency, not an independent implementation of those
+primitives. Hooks are removed before invoking the strict streaming adapter.
+The external-cotangent VJP and public \code{route\_logits} backward are
+compared with eager using predeclared $\mathrm{atol}=\mathrm{rtol}=10^{-5}$;
+nonfinite values and failed comparisons invalidate the record.
+
+The device record counts actual owned route tensor bytes, including field
+padding. The portable record additionally counts its framing, field
+directory and configuration fingerprint. The unpacked baseline uses int64
+codes rather than bit-packed codes. The analytical comparator retains one
+embedding and one layer-boundary tensor per layer, namely
+\begin{equation}
+ M_{\mathrm{checkpoint\ core}}=(L+1)BTD\cdot4\quad\text{bytes}.
+\end{equation}
+No claim is made that this is the minimal checkpoint set, the actual
+allocator peak of \code{torch.utils.checkpoint}, or a sufficient description
+of all live memory. The common externally supplied cotangent, parameters,
+optimizer, Python metadata and transient workspaces are outside this narrow
+comparison. If the loss is constructed inside the requested computation,
+its retained state must be added symmetrically; it cannot be omitted only
+from the route denominator. The scalar ratios in the main table have no
+sampling uncertainty because they are deterministic byte counts for these
+particular shapes, not estimates across a population of tasks or models.
+
+The measurement script refuses to overwrite an existing run. Its check
+mode verifies source identity, row invariants and the exact generated table.
+A changed implementation requires a new record and an explicit selection
+of which record the manuscript cites. Raw historical rows are not relabeled
+as measurements of the current implementation.
+
+\subsection{Full-Step Comparator Definitions}
+
+The five-arm runner keeps initialization, data, dtype, loss, optimizer and
+update count common. The \emph{compiled} designation applies to the numerical
+model/gradient path with \code{fullgraph=True}; Python orchestration and the
+ordinary optimizer call are not claimed to be one compiled whole-step graph.
+The route arm obtains the derivative of the same PyTorch cross-entropy
+boundary using functional differentiation, rather than substituting a
+handwritten, algebraically equivalent but differently rounded formula.
+Loss evaluation casts logits to FP32 in this protocol. The primary optimizer
+choices are AdamW or momentum SGD, recorded as distinct recipes, not pooled
+replicates of one method.
+
+Checkpoint policies include individual layers, groups of layers, and selective
+checkpointing where the PyTorch version supports it. Unavailable policies
+are labeled unavailable, not silently replaced. One startup update, warmup
+updates and timed updates form the same total count for every execution
+case. Each case executes in a separate timeout-bounded subprocess. A start
+manifest is persisted before execution, and the final manifest includes
+source, model and data hashes. Source changes, partial outputs or failed
+workers cannot produce a completed comparison.
+
+Measurement peaks and timing are captured before separate auxiliary
+accounting and reference validation. The final measured parameters, last
+gradients and loss are copied outside the timed interval and compared with
+an eager reference after the same total update count. This catches a
+compiled function that is correct on its first call but stale thereafter.
+Comparisons require predefined dtype-specific tolerances, matching
+initial/data hashes and update counts. CPU RSS and CUDA allocated/reserved
+peaks remain distinct. An auxiliary forward can report route payload but
+does not measure autograd/checkpoint saved state. A measured packed fit
+whose eager validation runs out of memory is labeled a fit with unavailable
+parity, not a verified speedup or quality result.
+
+The native CPU smoke uses a small shape to exercise these contracts.
+The AdamW failure described in the main paper affects both ordinary
+compiled autograd and packed replay in that local configuration; its
+maximum parameter discrepancy is approximately $0.002$ after two updates.
+This is an implementation/numerical boundary, not evidence that AdamW
+cannot train tropical models. A momentum-SGD pass is a distinct result.
+The existing automatic CPU compiler job and manual existing-runner CUDA
+job do not substitute for a source-bound, multi-scale GPU experiment.
+
+\subsection{Learning Checks and Their Limits}
+
+The bounded regression draws synthetic token-successor examples from
+separate training and evaluation RNG streams. A dense token baseline and
+the hard route model each receive AdamW with learning rate $0.01$ in this
+auxiliary regression. The default synthetic gate requires each model's
+held-out loss to fall below $0.75$ of its initial value and its accuracy to
+exceed $0.8$. Merely obtaining finite metrics is insufficient. This task
+checks that gradients and updates produce learning; it is deliberately not
+a competitive sequence-modeling benchmark.
+
+An optional character-corpus path fixes a contiguous 85/15 train/evaluation
+split, builds the vocabulary on the training prefix and maps unseen suffix
+characters to an unknown token. Its dense sequence baseline is a GRU. It
+reports loss, accuracy, perplexity, update count and parameter count, but
+does not impose a universal corpus-quality threshold or establish matched
+quality. A submission-scale study additionally needs a validation split,
+controlled model selection, multiple seeds, final untouched test evaluation,
+and independently specified resource/quality comparisons. The artifact's
+experiment protocol defines those requirements rather than presenting them
+as completed experiments.
+
+\section{Historical Representation Evidence}
+\label{app:legacy-state}
+
+The historical saved-state archive selected here is run
+\code{529c45f4-7274-4999-b35c-c59d1db917e6}. Its original manifest references
+a prior implementation and a dirty external experiment checkout. It is
+therefore preserved as imported representation evidence, not a clean native
+reproduction and not a current-device training benchmark. The table generator
+pins the raw source hashes, selects exactly the declared three cells, and
+derives the ratios from byte counts rather than trusting old ratio fields.
+
+\begin{table}[h]
+\centering
+\caption{Historical portable-tape accounting only. ``Cotan.'' is declared
+checkpoint-core bytes divided by portable bytes; ``Loss'' adds logits and
+int64 targets symmetrically. The checkpoint set is shape-derived, not a
+measured optimal policy or allocator peak. These rows are not pooled with
+Table~\ref{tab:current-state}.}
+\small
+\input{generated/retained_state.tex}
+\end{table}
+
+For the three historical cells, logits contribute 14,592, 14,592 and
+29,184 bytes, and targets contribute 768, 768 and 1,536 bytes. Thus the
+loss-inclusive ratio is
+\begin{equation}
+ \frac{M_{\mathrm{checkpoint\ core}}+M_{\mathrm{logits}}+M_{\mathrm{targets}}}
+      {M_{\mathrm{portable}}+M_{\mathrm{logits}}+M_{\mathrm{targets}}}.
+\end{equation}
+Field-payload ratios and portable-framed ratios answer different questions;
+neither is substituted for allocator peak. The current fingerprint includes
+additional configuration fields, so its export bytes need not equal the
+historical framing even when logical route payloads coincide. The old
+Python serialization benchmark was slower than eager autograd; no latency
+advantage is inferred from the historical representation ratios.
+
+\section{Hardware Evidence and Non-Comparability}
+\label{app:hardware}
+
+\subsection{D512 Fused Execution}
+
+The archived AWS F2 sequence kernel uses width 512, four layers, vocabulary
+128 and a resident window of 128 positions. It is a shape-specialized
+integer HLS training kernel, not an export-equivalence result for the
+floating-point adapter. A lookup-table loss gradient and sign update are
+part of its numerical recipe. The host stages data and observes results;
+the learning transition within a fused invocation executes on fabric.
+
+\begin{table}[h]
+\centering
+\caption{Historical D512 execution. All updates reuse one resident
+128-position window. Throughput is the integer value reported in each raw
+run; it is not an accelerator speedup or held-out learning metric.}
+\small
+\input{generated/d512_execution.tex}
+\end{table}
+
+For the 30-update run, the archived silicon and C-simulation records match
+in resident accuracy, weight checksum and sampled predictions. This checks
+the observable record, not every parameter, internal signal or full training
+trajectory. Longer runs establish execution and changed observed state but
+have no corresponding full-state parity certificate in the cited archive.
+The same 128 token positions are repeated; 256,000 processed positions do
+not mean 256,000 distinct training tokens. Disjoint streamed windows,
+held-out evaluation, a no-update control and periodic reference-state
+comparisons are required before claiming scaled language learning.
+
+The D128 replica family is not a headline result: its one-, two- and
+four-replica routed worst negative slack values are $-0.020$, $-0.097$ and
+$-0.173$ ns. Successful execution does not imply timing closure with margin.
+The D512 final routed report is not included in the current public evidence
+bundle. Core-rail readings cannot support a full-card FPGA/GPU energy ratio.
+No matched-model, matched-update or matched-quality accelerator speedup is
+claimed.
+
+\subsection{Fabric-Trained MNIST}
+
+The separate MNIST artifact trains a two-layer dyadic classifier on 16-by-16
+images, using 60,000 training examples, minibatches of 32 and five epochs.
+Its final recorded test accuracy is 74.75\%; a separate evaluator of the
+exported weights reports 74.13\%. The evaluation inputs and preprocessing
+were not frozen identically, so the $0.62$ percentage-point gap has no
+established single cause. The optional one-step full-training known-answer
+check is not present as a completed check in the run log. Test accuracy was
+observed beginning at epoch one, not measured at initialization.
+
+The historical recipe includes target-scale compensation for a
+normalization-shift mismatch. Reproduction must either preserve and declare
+that exact recipe or create a new corrected-implementation experiment; it
+cannot silently combine the two. A narrative software-recipe comparison in
+the historical summary disagrees with its raw diagnostic's epoch/batch
+configuration and is excluded here. Epoch wall time includes host readback
+and evaluation and is not pure fabric-training throughput.
+
+Dyadic gradient quantization is also not automatically the exact
+additive-parameter reverse action of Section~\ref{sec:contract}. This
+artifact supports feasibility of its own hardware learning rule. It neither
+verifies the floating-point route theorem nor establishes a new credit
+assignment algorithm. The hardware reads forward weights through
+transposed access; there is no weight-transport-free claim. The documented
+MNIST resource distinction is zero DSP multipliers but one DSP used as an
+adder, so ``multiplier-free'' and ``zero DSP blocks'' must not be conflated.
+
+\subsection{Historical Host Language Quality}
+\label{app:host-quality}
+
+The historical Tiny Shakespeare/BPE-1024 endpoint records report
+2.793 bits/byte for an annealed MorphSSM with 1,004,032 parameters and
+13.8 million nominal training tokens, versus 2.273 for a dense nanoGPT
+with 770,816 parameters and 3.46 million tokens. The raw parameter counts
+contradict the older figure summary's ``parameter-matched'' label for these
+selected endpoints. The MorphSSM record starts at $\tau=0.5$ and ends at
+zero; this is not a fully hard training trajectory. Historical ROM/LZC
+audit waivers do not constitute a current no-waiver software closure pass.
+These are negative historical quality observations under unequal sizes,
+budgets and training recipes, not a causal measurement of a strict-closure
+penalty, a current device-tape benchmark, or evidence that this checkpoint
+was trained on FPGA. The evidence ledger identifies the exact endpoint
+files and the figure's token-accounting script. They are not pooled with
+the new retained-state audit.
+
+\subsection{Publication and Artifact Boundary}
+
+Current release review includes unresolved provenance for four AWS-derived
+RTL files and retained Git history. A built wheel, generated PDF or software
+audit pass does not resolve permission to redistribute a hardware source
+bundle. Required upstream notices must not be removed merely to anonymize
+an artifact. A legally reviewed, immutable anonymous artifact and confirmed
+author list are separate pre-submission requirements. None of the
+historical hardware numbers is automatically recertified by changes to
+current software, tie conventions or audit semantics.

@@ -1,5 +1,11 @@
 # Forward traces as exact differentiation certificates
 
+> Historical draft, superseded on 2026-09-08 by the unified
+> [TikiTorch manuscript](../../manuscript/README.md). The scientific sources below
+> are preserved for provenance, not maintained as a separate submission. Former
+> instructions requiring separate papers, old test counts and venue choices are
+> historical. Make new scientific edits in `manuscript/`.
+
 This directory is the canonical TikiTorch manuscript workspace for the
 route-certificate result. It is deliberately separate from the FPGA learning
 paper and from any continual, developmental, or embodied-agent programme.

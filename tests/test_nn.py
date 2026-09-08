@@ -27,6 +27,16 @@ def test_soft_modules_forward():
     assert nn.TropicalSoftMax(tau=0.5)(x, w).shape == (4, 5)
 
 
+@pytest.mark.parametrize("module", [nn.TropicalSoftMin, nn.TropicalSoftMax])
+def test_soft_modules_harden_at_exactly_zero(module):
+    x = torch.tensor([1.0, -2.0, 3.0])
+    weight = torch.zeros(2, 3)
+    output = module(tau=0.0)(x, weight)
+    reduction = "min" if module is nn.TropicalSoftMin else "max"
+    reference = getattr(x.unsqueeze(-2) + weight, reduction)(dim=-1).values
+    torch.testing.assert_close(output, reference, rtol=0, atol=0)
+
+
 @pytest.mark.parametrize("use_soft", [False, True])
 def test_tropical_linear_module(use_soft):
     layer = nn.TropicalLinearModule(6, 5, use_softmin=use_soft, tau=0.7)
@@ -56,6 +66,40 @@ def test_dilation_forward_with_indices():
     assert idx.shape == (3, 5)
     assert idx.dtype == torch.long
     assert (idx >= 0).all() and (idx < 6).all()
+
+
+@pytest.mark.parametrize("layer_type", [nn.TropicalLinearModule, nn.TropicalDilationModule])
+@pytest.mark.parametrize("use_soft", [False, True])
+@pytest.mark.parametrize("shape", [(6,), (2, 3, 6), (2, 0, 6)])
+def test_linear_modules_accept_arbitrary_leading_shapes(layer_type, use_soft, shape):
+    kwargs = {"use_softmin": use_soft} if layer_type is nn.TropicalLinearModule \
+        else {"use_softmax": use_soft}
+    layer = layer_type(6, 5, tau=0.5, **kwargs)
+    x = torch.randn(shape, requires_grad=True)
+    output = layer(x)
+    assert output.shape == (*shape[:-1], 5)
+    output.sum().backward()
+    assert x.grad is not None and x.grad.shape == x.shape
+    assert layer.weight.grad is not None
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda tau: nn.TropicalSoftMin(tau),
+        lambda tau: nn.TropicalSoftMax(tau),
+        lambda tau: nn.TropicalLinear(3, 2, tau=tau),
+        lambda tau: nn.TropicalDilation(3, 2, tau=tau),
+        lambda tau: nn.TropicalProjection(3, 2, tau=tau),
+        lambda tau: nn.TropicalTopK(3, 2, tau=tau),
+        lambda tau: nn.DepthwiseMorphConv1d(2, 3, tau=tau),
+        lambda tau: nn.TropicalConv2d(1, 2, 3, tau=tau),
+    ],
+)
+@pytest.mark.parametrize("tau", [-1.0, float("nan"), float("inf")])
+def test_temperature_modules_reject_negative_or_nonfinite_values(factory, tau):
+    with pytest.raises(ValueError, match="tau"):
+        factory(tau)
 
 
 def test_set_tau_propagates():
@@ -89,6 +133,77 @@ def test_topk_module():
     assert y.shape == (3, 4)
     y.sum().backward()
     assert torch.isfinite(x.grad).all()
+
+
+def test_topk_forward_and_route_share_stable_lowest_index_ties(monkeypatch):
+    monkeypatch.setattr(nn, "_MAXPLUS_CHUNK_ELEMS", 4)
+    layer = nn.TropicalTopKModule(6, 5, k=3)
+    with torch.no_grad():
+        layer.weight.zero_()
+        layer.bias.zero_()
+    x = torch.zeros(2, 3, 6, requires_grad=True)
+    output = layer(x)
+    routed_output, route = layer.forward_with_routing(x.detach())
+    torch.testing.assert_close(output, routed_output, rtol=0, atol=0)
+    assert route.shape == (2, 3, 5, 3)
+    assert torch.equal(route, torch.tensor([0, 1, 2]).expand_as(route))
+    output.sum().backward()
+    assert torch.equal(x.grad[..., :3], torch.full_like(x.grad[..., :3], 5.0))
+    assert torch.equal(x.grad[..., 3:], torch.zeros_like(x.grad[..., 3:]))
+
+
+@pytest.mark.parametrize("shape", [(2, 0, 6), (0, 6)])
+def test_topk_empty_batch_retains_zero_autograd_edges(shape):
+    layer = nn.TropicalTopKModule(6, 4, k=3)
+    x = torch.randn(shape, requires_grad=True)
+    output = layer(x)
+    assert output.shape == (*shape[:-1], 4)
+    output.sum().backward()
+    assert x.grad is not None and torch.equal(x.grad, torch.zeros_like(x))
+    assert layer.weight.grad is not None
+    assert torch.equal(layer.weight.grad, torch.zeros_like(layer.weight))
+    assert layer.bias.grad is not None
+    assert torch.equal(layer.bias.grad, torch.zeros_like(layer.bias))
+
+
+def test_topk_zero_outputs_retains_zero_autograd_edges():
+    layer = nn.TropicalTopKModule(6, 0, k=3)
+    x = torch.randn(2, 6, requires_grad=True)
+    output = layer(x)
+    assert output.shape == (2, 0)
+    output.sum().backward()
+    assert x.grad is not None and torch.equal(x.grad, torch.zeros_like(x))
+    assert layer.weight.grad is not None and layer.weight.grad.shape == (0, 6)
+    assert layer.bias.grad is not None and layer.bias.grad.shape == (0,)
+
+
+@pytest.mark.parametrize("mode", ["dilation", "erosion"])
+def test_depthwise_conv_hard_forward_and_route_share_first_tie(mode):
+    layer = nn.DepthwiseMorphConv1d(
+        channels=2, kernel_size=4, dilation=2, mode=mode,
+        use_soft=False, tau=0.0,
+    )
+    with torch.no_grad():
+        layer.weight.zero_()
+        layer.bias.zero_()
+    x = torch.zeros(2, 2, 7)
+    output = layer(x)
+    routed_output, route = layer.forward_with_routing(x)
+    torch.testing.assert_close(output, routed_output, rtol=0, atol=0)
+    assert torch.equal(route, torch.zeros_like(route))
+
+
+def test_hard_morphssm_layer_fullgraph_compile():
+    layer = nn.MorphSSMLayer(
+        8, kernel_size=3, dropout=0.0, use_soft=False, tau=0.0,
+        out_proj_type="tropical",
+    ).eval()
+    x = torch.randn(2, 5, 8, requires_grad=True)
+    compiled = torch.compile(layer, backend="eager", fullgraph=True)
+    output = compiled(x)
+    assert output.shape == x.shape
+    output.sum().backward()
+    assert x.grad is not None and torch.isfinite(x.grad).all()
 
 
 def test_phase1_aliases_identical():

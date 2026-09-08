@@ -169,6 +169,237 @@ def test_default_device_scoping():
     assert B.get_default_device().is_cpu  # restored
 
 
+def test_default_dispatch_and_public_modules_use_registered_backend():
+    calls = []
+
+    class ToyBackend(B.Backend):
+        name = "public-module-test-backend"
+
+        def is_available(self):
+            return True
+
+        def capabilities(self):
+            return B.BackendCapabilities(op_dispatch=True)
+
+        def ops(self):
+            def hard(x, weight):
+                calls.append("hard")
+                return F.tropical_linear(x, weight)
+
+            def soft(values, *, tau, dim):
+                calls.append("soft")
+                return F.tropical_softmin(values, tau=tau, dim=dim)
+
+            return {"tropical_linear": hard, "tropical_softmin": soft}
+
+    name = ToyBackend.name
+    try:
+        ToyBackend().register()
+        hard = tt.nn.TropicalLinear(4, 3, use_softmin=False)
+        soft = tt.nn.TropicalLinear(4, 3, use_softmin=True, tau=0.5)
+        x = torch.randn(2, 5, 4)
+        with B.default_device(name):
+            assert B.dispatch("tropical_linear") is not F.tropical_linear
+            hard(x)
+            soft(x)
+        assert calls == ["hard", "soft"]
+
+        calls.clear()
+        assert tt.to(hard, name) is hard
+        hard(x)
+        assert calls == ["hard"]
+        # Explicitly retargeting to the reference backend clears the binding.
+        tt.to(hard, "cpu")
+        hard(x)
+        assert calls == ["hard"]
+    finally:
+        B.registry._BACKENDS.pop(name, None)
+        B.registry._OPS.pop(("tropical_linear", name), None)
+        B.registry._OPS.pop(("tropical_softmin", name), None)
+
+
+def test_backend_replacement_is_atomic_and_removes_stale_ops():
+    name = "replacement-test-backend"
+    first_linear = lambda *args, **kwargs: "first-linear"
+    first_dilation = lambda *args, **kwargs: "stale-dilation"
+    second_linear = lambda *args, **kwargs: "second-linear"
+
+    class First(B.Backend):
+        name = "replacement-test-backend"
+
+        def is_available(self):
+            return True
+
+        def capabilities(self):
+            return B.BackendCapabilities(op_dispatch=True)
+
+        def ops(self):
+            return {
+                "tropical_linear": first_linear,
+                "tropical_dilation": first_dilation,
+            }
+
+    class InvalidReplacement(First):
+        def ops(self):
+            return {"tropical_linear": None}
+
+    class Second(First):
+        def ops(self):
+            return {"tropical_linear": second_linear}
+
+    try:
+        first = First().register()
+        with pytest.raises(TypeError, match="callable"):
+            InvalidReplacement().register()
+        # Validation happens before either registry table changes.
+        assert B.get_backend(name) is first
+        assert B.dispatch("tropical_dilation", name) is first_dilation
+
+        second = Second().register()
+        assert B.get_backend(name) is second
+        assert B.dispatch("tropical_linear", name) is second_linear
+        assert "tropical_dilation" not in B.list_ops(name)
+        with pytest.warns(B.BackendFallbackWarning, match="PyTorch reference"):
+            assert B.dispatch("tropical_dilation", name) is F.tropical_dilation
+    finally:
+        B.registry._BACKENDS.pop(name, None)
+        B.registry._OPS.pop(("tropical_linear", name), None)
+        B.registry._OPS.pop(("tropical_dilation", name), None)
+
+
+def test_backend_default_flag_selects_implicit_dispatch_device():
+    name = "default-test-backend"
+    sentinel = lambda *args, **kwargs: "selected-default"
+
+    class DefaultBackend(B.Backend):
+        name = "default-test-backend"
+
+        def is_available(self):
+            return True
+
+        def capabilities(self):
+            return B.BackendCapabilities(op_dispatch=True)
+
+        def ops(self):
+            return {"tropical_linear": sentinel}
+
+    previous = B.get_default_device()
+    try:
+        DefaultBackend().register(default=True)
+        assert B.get_default_device().type == name
+        assert B.dispatch("tropical_linear") is sentinel
+    finally:
+        B.set_default_device(previous)
+        B.registry._BACKENDS.pop(name, None)
+        B.registry._OPS.pop(("tropical_linear", name), None)
+
+
+def test_backend_rejects_ops_without_declared_dispatch_capability():
+    name = "contradictory-test-backend"
+
+    class Contradictory(B.Backend):
+        name = "contradictory-test-backend"
+
+        def is_available(self):
+            return True
+
+        def ops(self):
+            return {"tropical_linear": lambda *args, **kwargs: None}
+
+    with pytest.raises(ValueError, match="op_dispatch is False"):
+        Contradictory().register()
+    assert B.get_backend(name) is None
+
+
+def test_route_methods_reject_backend_values_without_paired_routes():
+    name = "routeless-test-backend"
+
+    class Routeless(B.Backend):
+        name = "routeless-test-backend"
+
+        def is_available(self):
+            return True
+
+        def capabilities(self):
+            return B.BackendCapabilities(op_dispatch=True)
+
+        def ops(self):
+            return {"tropical_dilation": lambda x, weight: F.tropical_dilation(x, weight)}
+
+    try:
+        Routeless().register()
+        layer = tt.nn.TropicalDilation(4, 3)
+        tt.to(layer, name)
+        x = torch.randn(2, 4)
+        assert layer(x).shape == (2, 3)
+        with pytest.raises(RuntimeError, match="paired route contract"):
+            layer.forward_with_indices(x)
+        with pytest.raises(RuntimeError, match="paired route contract"):
+            layer.forward_with_routing(x)
+    finally:
+        B.registry._BACKENDS.pop(name, None)
+        B.registry._OPS.pop(("tropical_dilation", name), None)
+
+
+def test_route_methods_warn_when_explicit_backend_falls_back_to_reference():
+    name = "unavailable-route-backend"
+    layer = tt.nn.TropicalDilation(4, 3)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", B.BackendFallbackWarning)
+        tt.to(layer, name)
+
+    B._reset_fallback_warnings()
+    x = torch.randn(2, 4)
+    with pytest.warns(B.BackendFallbackWarning, match="existing device"):
+        output, route = layer.forward_with_routing(x)
+
+    expected, expected_route = F._hard_tropical_linear_forward(
+        x, layer.weight, largest=True
+    )
+    assert torch.equal(output, expected + layer.bias)
+    assert torch.equal(route, expected_route)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available")
+def test_unbound_public_module_infers_cuda_backend_without_moving_inputs():
+    calls = []
+
+    class CudaSpy(B.Backend):
+        name = "cuda"
+
+        def is_available(self):
+            return True
+
+        def capabilities(self):
+            return B.BackendCapabilities(op_dispatch=True)
+
+        def ops(self):
+            def hard(x, weight):
+                calls.append((x.device, weight.device))
+                return F.tropical_linear(x, weight)
+
+            return {"tropical_linear": hard}
+
+    # Preserve a third-party CUDA registration if the test environment has one.
+    before_backends = dict(B.registry._BACKENDS)
+    before_ops = dict(B.registry._OPS)
+    before_references = frozenset(B.registry._REFERENCE_OPS)
+    try:
+        CudaSpy().register()
+        layer = tt.nn.TropicalLinear(4, 3).cuda()
+        x = torch.randn(2, 4, device="cuda")
+        output = layer(x)
+        assert output.is_cuda
+        assert calls == [(x.device, layer.weight.device)]
+    finally:
+        B.registry._BACKENDS = before_backends
+        B.registry._OPS = before_ops
+        B.registry._REFERENCE_OPS = before_references
+        B.registry._REGISTRY_SNAPSHOT = (
+            before_backends, before_ops, before_references
+        )
+
+
 # --- custom backend registration (the extension point) --------------------
 
 def test_custom_backend_registers_and_dispatches():

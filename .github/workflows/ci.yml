@@ -27,6 +27,16 @@ jobs:
         run: python -m pip install "ruff==0.13.0"
       - name: Lint
         run: python -m ruff check .
+      - name: Check every tracked Bash runner without executing it
+        run: |
+          python - <<'PY'
+          import subprocess
+          paths = subprocess.check_output(["git", "ls-files", "-z", "*.sh"]).decode().split("\0")
+          for path in filter(None, paths):
+              subprocess.run(["bash", "-n", path], check=True)
+          PY
+      - name: Validate provenance inventory (not release clearance)
+        run: python scripts/check_release_provenance.py --inventory-only
 
   test:
     name: test (py${{ matrix.python-version }})
@@ -66,6 +76,28 @@ jobs:
           # self-skip without hardware, so the suite is green on a stock runner.
           python -m pytest -q
 
+  compiled-route:
+    name: native compiled route parity (CPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TIKITORCH_REQUIRE_COMPILE: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install CPU test dependencies
+        run: |
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev]"
+      - name: Require native fullgraph compilation and matched route updates
+        run: python -m pytest -q tests/test_accelerator_contract.py tests/test_training_benchmark.py
+
   minimum-dependencies:
     name: minimum dependencies (py3.9, torch2.0)
     runs-on: ubuntu-latest
@@ -85,6 +117,30 @@ jobs:
           python -m pip install --no-deps -e .
       - name: Run fast tests at the dependency floor
         run: python -m pytest -q
+
+  bounded-learning:
+    name: bounded learning and route-training regression (CPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev]"
+      - name: Run fixed-seed bounded learning contracts
+        run: |
+          python -m pytest -q tests/test_route_training.py \
+            tests/test_fabric.py::test_runtime_actually_learns \
+            tests/test_predictive_coding.py::test_pc_learns_blobs
 
   csim:
     name: csim (HLS kernel testbenches)

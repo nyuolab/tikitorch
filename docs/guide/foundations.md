@@ -48,7 +48,11 @@ pass routes the gradient through that single winning index: a one-hot scatter ra
 than a dense Jacobian. That sparsity gives the operator an add/compare hardware mapping
 and a different inductive bias from dense nets — closer to *routing* than to *mixing*.
 A complete backward path can contain other parameter-gradient rules, so audit the full
-recipe separately. Sparse routing is also why the following technique can be useful.
+recipe separately. For exact ties, the software reference selects the lowest candidate
+index; stable top-k similarly retains ascending candidate order. This deterministic
+software convention is not evidence that a historical or third-party hardware kernel
+implements the same tie rule—validate the compiled kernel separately. Sparse routing is
+also why the following technique can be useful.
 
 ## The soft→hard curriculum
 
@@ -66,6 +70,11 @@ then evaluate the corresponding hard add/compare operator. The **same weights** 
 `tau` only changes how the forward pass routes during training. Models expose
 `model.set_tau(value)` and you schedule it per step (CNN, SSM, Transformer, MoTE all
 support it; `TropicalMLP` fixes its softness at construction).
+
+The standalone `functional.tropical_softmin`/`tropical_softmax` reducers require a
+finite, strictly positive temperature. Layer modules accept finite `tau >= 0`; setting
+exactly zero selects their hard route. Negative, NaN, and infinite temperatures are
+configuration errors rather than alternate relaxations.
 
 ```python
 import torch, tikitorch.functional as F

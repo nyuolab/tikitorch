@@ -2,12 +2,15 @@
 
 The headline assertion is :func:`test_train_step_is_multiplier_free` — the WHOLE
 forward-only TFF train step (two forward passes, the local hinge loss, its
-backward, and the ``PureTropicalSGD`` update) executes with **zero hardware
-multiplies**, verified by the closure guard (``tt.assert_no_multiply``), not by a
-comment. The rest pin the goodness functions, the tropical (subtract-max)
+backward, and the ``PureTropicalSGD`` update) has no registered arithmetic
+blockers or unknown operations in its audited software trace. This is not a
+physical-resource certificate. The rest pin the goodness functions, the tropical (subtract-max)
 normalization, the negative-data generators, and that the local rule actually
 separates positive from negative goodness on a learnable signal.
 """
+from copy import deepcopy
+
+import pytest
 import torch
 
 import tikitorch as tt
@@ -83,6 +86,16 @@ def test_make_negative_labels_never_equal_true():
     assert int(yn.min()) >= 0 and int(yn.max()) < 10
 
 
+def test_negative_labels_conditional_wrap_matches_modulo_and_audits():
+    labels = torch.arange(10).repeat(8)
+    expected_generator = torch.Generator().manual_seed(19)
+    offset = torch.randint(1, 10, labels.shape, generator=expected_generator)
+    expected = (labels + offset) % 10
+    with tt.assert_no_multiply():
+        actual = make_negative_labels(labels, 10, generator=torch.Generator().manual_seed(19))
+    assert torch.equal(actual, expected)
+
+
 def test_scramble_preserves_marginals_breaks_joint():
     x = torch.rand(64, 40)
     xs = scramble_features(x)
@@ -120,7 +133,7 @@ def test_net_accumulated_goodness_shape_and_skip_first():
 def test_train_step_is_multiplier_free():
     torch.manual_seed(0)
     net = TropicalFFNet([784, 64, 64, 64], num_classes=10, goodness="topk", k=8)
-    trainer = TropicalFFTrainer(net, lr_shift=4, momentum_bits=4, margin=1.0)
+    trainer = TropicalFFTrainer(net, lr_shift=4, momentum_bits=4, margin=1.0, host_metrics=False)
     # The local loss takes a mean, so a power-of-two batch makes that fixed
     # reduction a shift. A non-dyadic extent is correctly rejected by the audit.
     x = torch.rand(16, 784)
@@ -130,7 +143,8 @@ def test_train_step_is_multiplier_free():
 
     # The deliverable: the WHOLE forward-only update — two forwards, the local
     # hinge loss, its backward, and the sign-only optimizer step — runs with no
-    # hardware multiply/divide/transcendental. An assertion, not a comment.
+    # registered multiply/divide/transcendental or unknown executed op. Physical
+    # hardware claims require a separate configuration-matched build report.
     with tt.assert_no_multiply():
         trainer.train_step(x_pos, x_neg)
 
@@ -139,13 +153,50 @@ def test_train_step_is_multiplier_free():
 def test_train_step_closed_for_max_goodness():
     torch.manual_seed(0)
     net = TropicalFFNet([64, 32, 32], num_classes=8, goodness="max")
-    trainer = TropicalFFTrainer(net, lr_shift=5, momentum_bits=0, theta="adaptive")
+    trainer = TropicalFFTrainer(net, lr_shift=5, momentum_bits=0, theta="adaptive", host_metrics=False)
     x = torch.rand(16, 64)
     y = torch.randint(0, 8, (16,))
     xp = overlay_label(x, y, 8)
     xn = overlay_label(x, make_negative_labels(y, 8), 8)
     with tt.assert_no_multiply():
         trainer.train_step(xp, xn)
+
+
+def test_adaptive_theta_and_tensor_diagnostics_never_roundtrip_through_python():
+    net = TropicalFFNet([16, 8], num_classes=2, k=2)
+    host_net = deepcopy(net)
+    tensor_trainer = TropicalFFTrainer(net, host_metrics=False)
+    host_trainer = TropicalFFTrainer(host_net)
+    positive, negative = torch.rand(8, 16), torch.rand(8, 16)
+    with tt.assert_no_multiply():
+        theta = tensor_trainer._theta(torch.rand(8), torch.rand(8))
+        tensor_metrics = tensor_trainer.train_step(positive, negative)
+    assert isinstance(theta, torch.Tensor) and theta.ndim == 0 and not theta.requires_grad
+    host_metrics = host_trainer.train_step(positive, negative)
+    for name, values in tensor_metrics.items():
+        assert all(isinstance(value, torch.Tensor) and not value.requires_grad for value in values)
+        assert [float(value) for value in values] == host_metrics[name]
+    for tensor_parameter, host_parameter in zip(net.parameters(), host_net.parameters()):
+        torch.testing.assert_close(tensor_parameter, host_parameter, rtol=0, atol=0)
+    with pytest.raises(tt.ClosureViolation, match="_local_scalar_dense"):
+        with tt.assert_no_multiply():
+            tensor_trainer.train_step(positive, negative, host_metrics=True)
+
+
+@pytest.mark.parametrize("loss_fn", [tropical_ff_hinge_loss, tropical_ff_logistic_loss])
+def test_loss_accepts_detached_tensor_threshold_without_host_conversion(loss_fn):
+    h = torch.randn(8, 8, requires_grad=True)
+    baseline = h.detach().clone().requires_grad_()
+    positive = torch.arange(8) < 4
+    theta = torch.tensor(0.375, requires_grad=True)
+    expected = loss_fn(baseline, positive, theta=0.375, k=2)
+    expected.backward()
+    with tt.assert_no_multiply(allow_transcendental=loss_fn is tropical_ff_logistic_loss):
+        actual = loss_fn(h, positive, theta=theta, k=2)
+        actual.backward()
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+    torch.testing.assert_close(h.grad, baseline.grad, rtol=0, atol=0)
+    assert theta.grad is None
 
 
 def test_hinge_loss_gradient_is_sign_gated():
@@ -234,7 +285,7 @@ def test_model_forward_forward_training_is_multiplier_free():
     import tikitorch as tt
     torch.manual_seed(0)
     m = tt.models.TropicalForwardForward(d_model=64, n_layers=3, num_classes=10)
-    trainer = m.make_trainer(lr_shift=4, margin=2.0)
+    trainer = m.make_trainer(lr_shift=4, margin=2.0, host_metrics=False)
     x, y = torch.rand(16, 784), torch.randint(0, 10, (16,))
     with tt.assert_no_multiply():
         m.forward_forward_step(x, y, trainer)

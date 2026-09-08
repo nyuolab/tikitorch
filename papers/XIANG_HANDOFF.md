@@ -1,70 +1,48 @@
-# Two-manuscript discussion handoff for Xiang
+# Unified TikiTorch discussion handoff for Xiang
 
-Status: viable technical-review drafts, not submission-ready manuscripts.
+The active draft is [TikiTorch: Route-Sufficient Differentiation for Auditable
+Tropical Learning](../manuscript/README.md). The prior two-paper portfolio is
+superseded by one TikiTorch manuscript; the old sources remain historical.
 
-The two papers now have distinct claims, evidence boundaries, and submission
-gates. They should be reviewed separately rather than combined into a single
-TikiTorch paper. The canonical wording authority for both is the
-[research claim ledger](../docs/research/CLAIM_LEDGER.md).
+## The scientific question
 
-## Draft 1: forward traces as differentiation certificates
+Can native additive hard operators make both the state required for reverse
+differentiation and the arithmetic of a learning recipe explicit enough to
+deliver useful resource-constrained training?
 
-- Source and build: [`route_certificates/`](route_certificates/)
-- Root handoff: [`../manuscript/`](../manuscript/)
-- Durable contribution: an operator-scoped contract showing when a typed hard
-  forward trace suffices to replay selected state and additive-parameter VJPs,
-  plus exactness tests and a portable packed representation.
-- Current measured result: portable certificates are 1.97--2.96x smaller than
-  checkpoint-retained state at a common supplied-cotangent boundary across
-  three MorphSSM configurations; the loss-inclusive range is 1.69--2.79x.
-- Principal open gate: complete the frozen five-arm compiled comparison and
-  measure full-cycle latency, retained state, peak allocation, recomputation,
-  and bytes moved.
-- Venue decision: MLSys only if the compiled systems gate closes; otherwise
-  TMLR for the theorem, executable contract, and representation result.
+The paper joins typed route recording, first-order replay, ordinary PyTorch
+integration and fail-closed auditing. It gives scoped proofs and counterexamples,
+including why deterministic local ties do not imply a global Clarke subgradient.
+It credits prior morphological backpropagation, backward-state encodings and
+complete multiplication-free training.
 
-Questions for discussion:
+## What the evidence says
 
-1. Is the operator contract and typed tape a sufficiently sharp conceptual
-   contribution, or should the paper lead with the portable representation?
-2. Which five-arm metric should decide the MLSys-versus-TMLR route?
-3. Who should be included as authors, and what contribution evidence is still
-   needed before fixing the order?
+- A fresh current-code three-cell CPU audit passes exact logits/routes and
+  selected-VJP checks. Device payloads are 2.04–2.98× smaller than an explicitly
+  shape-defined checkpoint boundary set. This is not measured peak-memory or
+  latency superiority.
+- The previous portable-tape table remains appendix-only, with its own legacy
+  source identity and accounting.
+- FPGA evidence is a scoped feasibility case: matching D512 observable fields
+  and separate fabric-trained MNIST weights. Repeated windows, unreconciled
+  evaluators, numerical recipe differences and missing physical comparisons
+  are disclosed.
+- Native compiled AdamW remains a strict update-parity failure on the tested
+  stack; passing a separate SGD recipe is not an AdamW-equivalence claim.
 
-## Draft 2: multiplier-free learning on FPGA
+## Decisions for author review
 
-- Source and build: [`multiplier_free_fpga/`](multiplier_free_fpga/)
-- Durable contribution: a recipe-level closure contract and on-silicon
-  execution of a fused forward--loss--reverse--update transition, paired with
-  a separate small held-out learning result from fabric-only updates.
-- Current measured result: the archived observable record of a 30-update D512
-  run matches C simulation bit for bit; a 2,000-update resident-window run
-  sustains 612 token/s. A separate 16-by-16 MNIST model reaches 74.75% held-out
-  accuracy (74.13% under an independent evaluation path).
-- Principal open gates: disjoint-stream learning, frozen MNIST reproduction,
-  timing-closed headline builds, an iso-model CUDA arm, full-card power, and an
-  immutable artifact bundle.
-- Venue decision: ACM FPGA, FPL, or FCCM only after the systems comparison and
-  artifact gates close.
+1. Does the integrated contract plus a useful real-task resource frontier make
+   a sufficiently strong ICML contribution? The direct chain-rule proof alone
+   is not the novelty.
+2. Which held-out task and low-arithmetic/morphological baseline should anchor
+   the matched-quality study alongside the same-model systems comparison?
+3. Which author contributions, institutional approvals and artifact rights
+   must be confirmed before release and submission?
 
-Questions for discussion:
-
-1. Is feasibility of the complete multiplier-free state transition, with the
-   current scoped exactness evidence, enough to anchor the paper?
-2. Which learning-quality experiment is the minimum credible successor to the
-   repeated-window D512 run?
-3. Should the preliminary D128 replication ladder remain context or move
-   entirely to supplementary material until timing closes?
-
-## Suggested review order
-
-1. Read each abstract and the red/open-gate language before reviewing prose.
-2. Confirm that the durable contribution survives even if every open systems
-   comparison is unfavorable.
-3. Agree on authorship, target audience, and the single decision experiment
-   for each paper.
-4. Freeze protocols before collecting new headline numbers; failed runs and
-   negative comparisons remain part of the record.
-
-Build commands and generated-PDF locations are documented in each paper's
-README. Generated PDFs are review artifacts and are intentionally not tracked.
+Read the [readiness checklist](../manuscript/ICML_READINESS.md),
+[experiment protocol](../manuscript/EXPERIMENT_PROTOCOL.md) and
+[codebase/release roadmap](../docs/release_impact_roadmap.md) after the PDF.
+The current official style is a provisional 2026 template, not a verified
+next-cycle submission guarantee. No manuscript has been submitted.

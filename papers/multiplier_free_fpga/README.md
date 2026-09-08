@@ -1,5 +1,11 @@
 # Multiplier-Free Learning on FPGA
 
+> Historical draft, superseded on 2026-09-08 by the unified
+> [TikiTorch manuscript](../../manuscript/README.md). The scientific sources below
+> are preserved for provenance, not maintained as a separate submission. Former
+> separate-paper and venue instructions are historical. Make new scientific
+> edits in `manuscript/`; do not relabel old hardware measurements as current code.
+
 Status: evidence-bounded discussion draft, suitable for technical review but
 not submission-ready.
 

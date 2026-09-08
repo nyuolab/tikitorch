@@ -1,0 +1,53 @@
+name: Manual GPU validation
+
+# This workflow never provisions an instance and never runs on pull requests.
+# Configure the gpu-validation environment with required maintainer approval and
+# a trusted, preferably ephemeral runner labelled tikitorch-gpu before dispatch.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_existing_runner:
+        description: "Use an already-provisioned trusted CUDA runner (no provisioning)"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-gpu-validation
+  cancel-in-progress: false
+
+jobs:
+  gpu:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_existing_runner
+    environment: gpu-validation
+    runs-on: [self-hosted, linux, x64, tikitorch-gpu]
+    timeout-minutes: 30
+    env:
+      TIKITORCH_REQUIRE_CUDA: "1"
+      TIKITORCH_REQUIRE_COMPILE: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Isolate package install using the runner's existing CUDA PyTorch
+        run: |
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/tikitorch-gpu-venv"
+          "$RUNNER_TEMP/tikitorch-gpu-venv/bin/python" -m pip install -e ".[dev]"
+      - name: Record source and accelerator environment
+        run: |
+          git rev-parse HEAD
+          "$RUNNER_TEMP/tikitorch-gpu-venv/bin/python" -m torch.utils.collect_env
+      - name: Require CUDA and actual fullgraph Inductor execution
+        run: |
+          "$RUNNER_TEMP/tikitorch-gpu-venv/bin/python" -m pytest -q tests/test_accelerator_contract.py
+      - name: Validate public operators and route training on the accelerator
+        run: |
+          "$RUNNER_TEMP/tikitorch-gpu-venv/bin/python" -m pytest -q \
+            tests/test_functional.py tests/test_nn.py tests/test_backend.py \
+            tests/test_morphssm_tape_parity.py tests/test_device_tape.py tests/test_route_training.py \
+            tests/test_training_benchmark.py
