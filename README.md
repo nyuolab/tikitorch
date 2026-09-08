@@ -286,12 +286,12 @@ historical hardware evidence retain separate configurations and claim boundaries
 The old scientific sources remain preserved under
 [`manuscript/archive/`](manuscript/archive/README.md) as historical drafts.
 
-Start with the [Xiang handoff](manuscript/XIANG_HANDOFF.md),
+Start with the [collaboration handoff](manuscript/HANDOFF.md),
 [ICML readiness checklist](manuscript/ICML_READINESS.md), and
 [codebase/release roadmap](docs/release_impact_roadmap.md).
 The next practical studies are recorded in the [ECG and language-pretraining
-research plan](manuscript/RESEARCH_PLAN.md); use the [student handoff](manuscript/STUDENT_HANDOFF.md)
-for CPU-first onboarding before beginning research. The [artifact policy](manuscript/ARTIFACTS.md)
+research plan](manuscript/RESEARCH_PLAN.md). The handoff includes CPU-first
+onboarding and maintainer-review decisions. The [artifact policy](manuscript/ARTIFACTS.md)
 explains the move to `manuscript/results/` and preservation of historical paths.
 The paper is an evidence-bounded draft, not yet submission-ready. Historical
 results under `manuscript/results/` do not certify the current library or a public release.

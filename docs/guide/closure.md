@@ -45,6 +45,25 @@ assert_closed(model, allow={"output_head"})
 The resulting claim is “closed except for the declared output head,” not “fully
 closed.” Module paths must match `model.named_modules()`.
 
+### Command-line structural gate
+
+```bash
+tt-closure tikitorch.models:TropicalForwardForward
+tt-closure tikitorch.models:TropicalForwardForward --report
+```
+
+Targets use `package.module:attribute`. The attribute can be an existing
+`nn.Module`, a class with a zero-argument constructor, or a zero-argument
+factory returning an `nn.Module`. Loading an instance does not call its forward
+method. Only load code you trust: imports and factories execute Python code.
+
+Exit status is `0` for a structural pass under the declared `--allow` policy,
+`1` for a structural violation, and `2` for an invalid target or usage error.
+`--report` adds diagnostics without bypassing the structural gate. An allow
+list is printed as an explicit exception; it is not evidence of full closure.
+The CLI does not certify a supplied training recipe or physical hardware;
+use the executed-path and full-step APIs below for those software boundaries.
+
 ## 2. Executed forward-path tracing
 
 ```python

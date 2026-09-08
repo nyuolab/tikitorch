@@ -247,7 +247,7 @@ build costs and artifact rights require explicit approval.
 
 1. **Now:** document the program, separate historical research artifacts from
    the reusable library, finish a bounded cleanup and offer the
-   [student handoff](STUDENT_HANDOFF.md). Do not launch the studies.
+   [collaboration handoff](HANDOFF.md). Do not launch the studies.
 2. **After an owner accepts:** independently reproduce onboarding and current
    correctness checks, review known numerical/provenance limits, choose a
    tractable first pilot and obtain hardware/data/budget approval.

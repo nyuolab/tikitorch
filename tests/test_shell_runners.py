@@ -131,6 +131,7 @@ def test_launcher_invalid_inputs_fail_offline(setting, value, offline_env, tmp_p
 _EXPLICIT_LAUNCHERS = (
     ("run_tikitorch_gpu_benchmarks.sh", ".tiki_gpu_state"),
     ("run_tikitorch_f2_silicon.sh", ".tiki_f2_state"),
+    ("run_lm_gpu_baseline.sh", ".tiki_lm_gpu_state"),
 )
 
 
@@ -199,8 +200,13 @@ def test_cloud_upload_filters_include_runners_and_exclude_research_and_caches(
         "scripts/.cache/value", "tikitorch/.pytest_cache/value",
         "tikitorch/.ruff_cache/value", "manuscript/results/run/raw.txt",
         "manuscript/main.tex", "results/legacy.txt", "tikitorch/results/stale.txt",
-        "README.md", ".git/config",
+        "README.md", ".git/config", "data/private.txt", "data/nested/private.txt",
+        "tests/test_example.py",
     }
+    if script == "run_lm_gpu_baseline.sh":
+        included.add("data/tinyshakespeare.txt")
+    else:
+        excluded.add("data/tinyshakespeare.txt")
     src, dst = tmp_path / "source", tmp_path / "destination"
     src.mkdir()
     dst.mkdir()
@@ -257,7 +263,14 @@ def _remote_job_command(script):
     assert rendered.returncode == 0, rendered.stderr
     command = re.search(r"tmux new-session[^']*'([^']*)'", rendered.stdout)
     assert command is not None
-    args = shlex.split(command.group(1))
+    # Bash, unlike shlex, removes a backslash before '$' inside double quotes.
+    # Parse the nested command with printf only; do not execute its workload.
+    parsed = subprocess.run(
+        ["bash", "-c", "printf '%s\\0' " + command.group(1)],
+        text=True, capture_output=True, timeout=10,
+    )
+    assert parsed.returncode == 0, parsed.stderr
+    args = parsed.stdout.split("\0")[:-1]
     assert args[:5] == ["bash", "-e", "-o", "pipefail", "-c"]
     return args
 
@@ -302,6 +315,65 @@ def test_fpga_done_marker_requires_verifier_to_succeed(workload_status, offline_
                             capture_output=True, timeout=10)
     assert result.returncode == workload_status, result.stderr
     assert (repo / "tiki_f2_DONE").exists() == (workload_status == 0)
+    assert not sentinel.exists()
+
+
+@pytest.mark.parametrize("failed_task,tee_status", [
+    ("none", 0), ("dense", 0), ("tropical-float", 0), ("none", 23),
+])
+def test_lm_done_marker_requires_both_jobs_and_stops_power_sampler(
+        failed_task, tee_status, offline_env, tmp_path):
+    env, sentinel = offline_env
+    job = _remote_job_command("run_lm_gpu_baseline.sh")
+    repo = tmp_path / "checkout"
+    (repo / "logs").mkdir(parents=True)
+    (repo / "manuscript" / "results" / "lm_gpu_baseline").mkdir(parents=True)
+    (repo / "LM_DONE").touch()
+    calls, power = tmp_path / "job-calls", tmp_path / "power-calls"
+    power_stub = tmp_path / "bin" / "nvidia-smi"
+    power_stub.write_text(
+        '#!/bin/bash\n'
+        'trap \'printf "stop %s\\n" "$$" >> "$TEST_POWER_CALLS"; exit 0\' TERM\n'
+        'printf "start %s\\n" "$$" >> "$TEST_POWER_CALLS"\n'
+        # A broken cleanup contract must fail the test, not leave an unbounded
+        # fake sampler running after pytest exits.
+        'for ((sample=0; sample<200; sample++)); do sleep 0.01; done\n'
+    )
+    power_stub.chmod(0o755)
+    python_stub = tmp_path / "bin" / "python3"
+    python_stub.write_text(
+        '#!/bin/bash\nprintf "%s\\n" "$*" >> "$TEST_JOB_CALLS"\n'
+        # Wait only for the local sampler stub to initialize its termination
+        # trap. This prevents a timing-dependent test without invoking a GPU.
+        'for ((attempt=0; attempt<100; attempt++)); do\n'
+        '  starts=$(grep -c "^start " "$TEST_POWER_CALLS" 2>/dev/null || true)\n'
+        '  calls=$(wc -l < "$TEST_JOB_CALLS")\n'
+        '  [[ ${starts:-0} -ge $calls ]] && break\n'
+        '  sleep 0.01\n'
+        'done\n'
+        '[[ ${starts:-0} -ge $calls ]] || exit 98\n'
+        'case "$*" in *"--runs $TEST_FAILED_TASK "*) exit 17;; esac\n'
+        'printf "fake successful workload\\n"\n'
+    )
+    python_stub.chmod(0o755)
+    if tee_status:
+        tee_stub = tmp_path / "bin" / "tee"
+        tee_stub.write_text(f"#!/bin/bash\ncat >/dev/null\nexit {tee_status}\n")
+        tee_stub.chmod(0o755)
+    job[-1] = job[-1].replace("~/tikitorch", shlex.quote(str(repo)))
+    run_env = dict(os.environ, **env, TEST_JOB_CALLS=str(calls),
+                   TEST_POWER_CALLS=str(power), TEST_FAILED_TASK=failed_task)
+    result = subprocess.run(job, env=run_env, text=True, capture_output=True, timeout=10)
+    expected = tee_status or (0 if failed_task == "none" else 17)
+    assert result.returncode == expected, result.stderr
+    assert (repo / "LM_DONE").exists() == (expected == 0)
+    expected_jobs = 1 if failed_task == "dense" or tee_status else 2
+    assert len(calls.read_text().splitlines()) == expected_jobs
+    power_events = [line.split() for line in power.read_text().splitlines()]
+    started = [pid for action, pid in power_events if action == "start"]
+    stopped = [pid for action, pid in power_events if action == "stop"]
+    assert len(started) == expected_jobs
+    assert stopped == started, "each background power sampler must be stopped"
     assert not sentinel.exists()
 
 

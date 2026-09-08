@@ -19,7 +19,7 @@ model = tt.models.MorphSSM(
 )
 optimizer = tt.optim.PureTropicalSGD(model.parameters())
 
-x = torch.randn(8, 784, 1)
+x = torch.rand(8, 784, 1)  # default quantized input embedding expects [0, 1]
 target = torch.randint(0, 10, (8,))
 
 optimizer.zero_grad()
@@ -33,6 +33,11 @@ print(loss.detach().item(), model.param_count)
 `MorphSSM` is a `torch.nn.Module`; standard calls such as `.parameters()`, `.to(...)`,
 `.train()`, `.eval()`, and `.state_dict()` work normally. TikiTorch optimizers follow
 the `torch.optim.Optimizer` protocol.
+
+The default input embedding bins values over `[0, 1]`, clips outside values,
+and does not differentiate through bin selection. Normalize inputs deliberately
+or choose an explicit linear input embedding. Multilabel tasks need an explicit
+loss such as `BCEWithLogitsLoss`, not this single-label `compute_loss` default.
 
 This sample demonstrates interoperability, not physical multiplier-free closure.
 `compute_loss` uses the model's task loss, and a default model can contain soft-routing

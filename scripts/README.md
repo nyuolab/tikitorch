@@ -31,8 +31,8 @@ probe only; it does not certify the configured training trajectory.
 ## Running safely
 
 1. Read the script source/docstring first: historical runners do not all have
-   safe help or dry-run modes. The `run_tikitorch_gpu_benchmarks.sh` and
-   `run_tikitorch_f2_silicon.sh` launchers require an explicit `launch`; their
+   safe help or dry-run modes. The `run_tikitorch_gpu_benchmarks.sh`,
+   `run_tikitorch_f2_silicon.sh` and `run_lm_gpu_baseline.sh` launchers require an explicit `launch`; their
    `--help` exits without AWS calls or local state creation. Do not assume a
    similarly named mode in another script has the same safety contract.
 2. Record the exact Git revision, command, seed, dependencies, data digest, and hardware
@@ -43,6 +43,11 @@ probe only; it does not certify the configured training trajectory.
    defaults, so inspect and override them before launching in another account.
 4. Write new outputs to a fresh run path. Promote only curated summaries and manifests
    to Git; keep large generated products in external artifact storage.
+
+These remain historical orchestration helpers, not unattended job managers.
+An interrupted launch before local state recording can require AWS-side
+reconciliation. A completion marker means the workload commands succeeded;
+it does not establish matched task quality or valid energy measurements.
 
 A safe, download-free first check is:
 

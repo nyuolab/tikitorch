@@ -54,6 +54,10 @@ manuscript/results/fpga_silicon/**/to_aws/*.dcp
 
 # local API keys (manuscript/results/graphics/.env etc.)
 **/.env
+**/.env.*
+# Deliberately reviewed, credential-free setup templates may be versioned.
+!**/.env.example
+!**/.env.template
 
 # organism/experiments derived state
 /data/experience_stream/

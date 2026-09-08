@@ -19,13 +19,17 @@ SOURCE_NAMES = {
 }
 
 
-def test_research_has_one_workspace_and_active_handoffs():
+def test_research_has_one_workspace_and_one_shared_handoff():
     assert not (ROOT / "papers").exists()
     assert not (ROOT / "papers").is_symlink()
-    for name in ("main.tex", "RESEARCH_PLAN.md", "STUDENT_HANDOFF.md", "XIANG_HANDOFF.md"):
+    for name in ("main.tex", "RESEARCH_PLAN.md", "HANDOFF.md"):
         assert (PAPER / name).is_file()
-    assert not (ARCHIVE / "XIANG_HANDOFF.md").exists()
+    for name in ("STUDENT_HANDOFF.md", "XIANG_HANDOFF.md"):
+        for parent in (PAPER, ARCHIVE):
+            assert not (parent / name).exists()
+            assert not (parent / name).is_symlink()
     assert (PAPER / "results").is_dir()
+    assert set(PAPER.glob("*HANDOFF*.md")) == {PAPER / "HANDOFF.md"}
 
 
 def test_archived_scientific_sources_match_the_pre_merge_snapshot():
@@ -47,7 +51,7 @@ def test_archived_scientific_sources_match_the_pre_merge_snapshot():
 
 
 @pytest.mark.parametrize("relative", [
-    "README.md", "STUDENT_HANDOFF.md", "XIANG_HANDOFF.md", "ARTIFACTS.md",
+    "README.md", "HANDOFF.md", "ARTIFACTS.md",
     "archive/README.md", "archive/route_certificates/README.md",
     "archive/multiplier_free_fpga/README.md", "results/route_certificates/README.md",
 ])

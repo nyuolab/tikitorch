@@ -86,6 +86,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Consolidated reviewer/student onboarding into `manuscript/HANDOFF.md` and
+  made root `ROADMAP.md` a concise entry point to the detailed engineering and
+  research plans. Retired handoff files remain recoverable in Git history.
+
 - Consolidated root `papers/` into `manuscript/`: Xiang's handoff now sits beside
   the active paper, and the two superseded drafts live in `manuscript/archive/`.
   Scientific sources and local build products are preserved; navigation and
@@ -153,6 +157,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   does not produce repository-relative broken links.
 
 ### Fixed
+
+- `tt-closure` accepts module instances without invoking `forward`, reports
+  invalid targets as usage errors, and no longer lets `--report` bypass the
+  closure gate or its exit status.
+- The historical LM GPU launcher requires explicit launch, preserves failed
+  termination state, and cannot mark failed training/logging pipelines complete.
+- Distribution checks reject environment variants, generated trees, duplicate
+  or special entries, and research files hidden in wheel install destinations.
+  Quickstart inputs now match the documented quantized-embedding range.
 
 - The legacy LM `--strict` gate uses canonical no-waiver reports for the actual
   training configuration, separately labels hardened candidates, and rejects

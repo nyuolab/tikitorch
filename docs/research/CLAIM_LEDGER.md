@@ -206,7 +206,7 @@ Parameters, optimizer, loss, common cotangent, metadata and transient
 workspace are excluded. Portable framing is reported separately: 38,298,
 91,342 and 333,715 bytes. Its values differ from the historical format.
 
-**Evidence:** [current source-bound record](https://github.com/nyuolab/tikitorch/blob/main/manuscript/evidence/retained_state_handoff_2026-09-08.json),
+**Evidence:** [current source-bound record](https://github.com/nyuolab/tikitorch/blob/main/manuscript/evidence/retained_state_cleanup_2026-09-08.json),
 [measurement/check command](https://github.com/nyuolab/tikitorch/blob/main/manuscript/measure_retained_state.py),
 [table and boundary ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md).
 The route-consistency oracle shares canonical primitives; it is not an

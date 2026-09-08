@@ -4,6 +4,7 @@
 prune manuscript
 # Legacy root guard; historical drafts now live under manuscript/archive/.
 prune papers
+prune results
 prune scripts
 prune tests
 
@@ -11,4 +12,6 @@ prune tests
 prune build
 prune dist
 prune site
-global-exclude __pycache__ *.py[cod] .DS_Store .env
+prune .venv
+# Environment templates may be tracked for contributors, but are not library data.
+global-exclude __pycache__ *.py[cod] .DS_Store .env .env.*

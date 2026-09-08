@@ -4,7 +4,7 @@ Version: draft protocol 2, 2026-09-08. This document specifies proposed
 experiments, not measurements. The [research plan](RESEARCH_PLAN.md) selects
 ECG classification and language pretraining as the two practical tracks, with
 an eventual FPGA capstone. The immediate milestone is the
-[student handoff](STUDENT_HANDOFF.md), not execution of the protocol. Exact
+[collaboration handoff](HANDOFF.md), not execution of the protocol. Exact
 dataset configuration, hardware/budget, owner and candidate identity must be
 filled and approved before claim-bearing runs. Pilot tuning and final
 evaluation must be separated; never label choices made after viewing results

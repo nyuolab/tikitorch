@@ -25,7 +25,7 @@ SCRIPT = Path(__file__).resolve().relative_to(REPO).as_posix()
 SCALES = ((64, 2, 96), (128, 4, 96), (256, 4, 192))
 ATOL = RTOL = 1e-5
 SCHEMA = "tikitorch.current_route_retained_state.v1"
-DEFAULT_RECORD = REPO / "manuscript/evidence/retained_state_handoff_2026-09-08.json"
+DEFAULT_RECORD = REPO / "manuscript/evidence/retained_state_cleanup_2026-09-08.json"
 DEFAULT_TABLE = REPO / "manuscript/generated/current_retained_state.tex"
 
 

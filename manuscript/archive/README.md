@@ -23,7 +23,7 @@ instructions are superseded by the current user-directed consolidation.
 Do not edit their numerical records to make them agree with new software.
 Make scientific revisions in the active `manuscript/` sources, not this archive.
 
-For Xiang, use the [updated handoff](../XIANG_HANDOFF.md). The canonical
+For contributors and reviewers, use the [shared handoff](../HANDOFF.md). The canonical
 [research claim ledger](../../docs/research/CLAIM_LEDGER.md) continues to constrain
 claim wording; the unified paper's [evidence ledger](../EVIDENCE_LEDGER.md)
 maps individual rows to raw artifacts. The
@@ -38,7 +38,7 @@ On 2026-09-08 the former root `papers/` tree was consolidated into `manuscript/`
 
 | Former path | Current path (from the repository root) |
 |---|---|
-| `papers/XIANG_HANDOFF.md` | `manuscript/XIANG_HANDOFF.md` |
+| `papers/XIANG_HANDOFF.md` | `manuscript/HANDOFF.md` (merged with student onboarding) |
 | `papers/README.md` | `manuscript/archive/README.md` (this index) |
 | `papers/route_certificates/` | `manuscript/archive/route_certificates/` |
 | `papers/multiplier_free_fpga/` | `manuscript/archive/multiplier_free_fpga/` |
@@ -50,6 +50,8 @@ sources, bibliographies and `.latexmkrc` files remain byte-identical to commit
 are recorded in [source_manifest.json](source_manifest.json) and regression-tested.
 Locally ignored `build/` products moved with each draft and remain ignored.
 No draft or result was deleted, combined a second time, or relabeled as current evidence.
+The later documentation cleanup combined the separate Xiang and student handoffs
+into `manuscript/HANDOFF.md`; the original audience-specific documents remain in Git history.
 
 Archived drafts can still be built from their own directories using their
 documented local build commands. Their scientific claims, dependencies, venue

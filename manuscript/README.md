@@ -17,7 +17,7 @@ compact switches, or multiplication-free training.
 manuscript/
   main.tex, *_appendix.tex, refs.bib  # active unified paper
   RESEARCH_PLAN.md                   # proposed ECG / LM / FPGA program
-  XIANG_HANDOFF.md, STUDENT_HANDOFF.md
+  HANDOFF.md                        # shared contributor and reviewer entry point
   results/                          # research artifacts and historical records
   evidence/, generated/             # source-bound measurements and derived tables
   archive/                          # superseded drafts; no new scientific edits
@@ -28,8 +28,8 @@ manuscript/
 - [Evidence ledger](EVIDENCE_LEDGER.md) and [primary-literature comparison](LITERATURE_REVIEW.md).
 - [ICML readiness](ICML_READINESS.md) and [remaining experiment protocol](EXPERIMENT_PROTOCOL.md).
 - [ECG, language pretraining and FPGA research plan](RESEARCH_PLAN.md) and
-  [student handoff](STUDENT_HANDOFF.md).
-- [Xiang discussion handoff](XIANG_HANDOFF.md) and [historical drafts](archive/README.md).
+  [collaboration handoff](HANDOFF.md).
+- [Historical drafts](archive/README.md).
 - [Research results and historical artifacts](results/README.md), kept here
   separately from the reusable library.
 - [Artifact preservation and relocation policy](ARTIFACTS.md).
@@ -77,10 +77,11 @@ python -m pytest -q tests/test_manuscript_tables.py tests/test_manuscript_artifa
 ```
 
 The selected record is
-[`evidence/retained_state_handoff_2026-09-08.json`](evidence/retained_state_handoff_2026-09-08.json),
-an append-only remeasurement after the library cleanup. It reproduces the same
-table; the original `evidence/current_retained_state.json` remains unchanged
-as an earlier source snapshot. The current record hashes every library Python source and its measurement
+[`evidence/retained_state_cleanup_2026-09-08.json`](evidence/retained_state_cleanup_2026-09-08.json),
+an append-only remeasurement after the CLI and documentation cleanup. It
+reproduces the same table; both earlier records (`current_retained_state.json`
+and `retained_state_handoff_2026-09-08.json`) remain unchanged in `evidence/`.
+The current record hashes every library Python source and its measurement
 script. If code changes, the check fails: produce a new append-only record,
 audit it, and deliberately update which table the manuscript cites. The
 current worktree is not a tagged release. To rerun without overwriting evidence:

@@ -50,6 +50,7 @@ execution for every configuration.
 | Check a multiplier-free claim | [Auditing closure](guide/closure.md) |
 | Look up a class or function | [API reference](api/index.md) |
 | Reproduce an experiment | [Research scope and evidence](research/index.md) |
+| Join or review the project | [Shared collaboration handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/HANDOFF.md) |
 
 ## What is in the library?
 

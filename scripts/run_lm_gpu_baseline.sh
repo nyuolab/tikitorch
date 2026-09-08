@@ -1,25 +1,40 @@
 #!/bin/bash
-# LM GPU baseline for the hallmark figure: nanoGPT (dense) + MorphSSM-float on
-# CUDA with nvidia-smi power integration -> measured tok/s AND mJ/token.
+# Historical LM GPU baseline: nanoGPT (dense) + MorphSSM-float on CUDA,
+# with nvidia-smi power samples. This launcher is not evidence of a current
+# matched-quality advantage; review historical AMI/dependency/training defaults.
+# Power traces still need explicit integration and sampling/idle-power caveats.
 # Modeled on scripts/run_tikitorch_gpu_benchmarks.sh (launch/monitor/download/
 # terminate); payload swapped for scripts/nanogpt_shakespeare.py BPE arms.
 #
 # Usage:
 #   AWS_PROFILE=... KEY_NAME=... SG=... bash scripts/run_lm_gpu_baseline.sh launch
 #   ... monitor | download | terminate | ssh
-set -e
+set -e -o pipefail
+usage(){
+  printf 'Usage: %s {launch|monitor|download|terminate|ssh}\n' "$0"
+  printf '%s\n' 'Only an explicit launch provisions paid AWS resources and changes SSH ingress.' \
+    'Set AWS_PROFILE, KEY_NAME, and SG for operational commands; review AMI and REGION.' \
+    'No arguments or --help prints this help without reading credentials or creating state.'
+}
+if [ "$#" -gt 1 ]; then usage >&2; exit 2; fi
+case "${1:-help}" in
+  help|-h|--help) usage; exit 0;;
+  launch|monitor|download|terminate|ssh) COMMAND="$1";;
+  *) usage >&2; exit 2;;
+esac
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE}"
 KEY_NAME="${KEY_NAME:?set KEY_NAME}"; SG="${SG:?set SG}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-g5.xlarge}"; REGION="${REGION:-us-east-1}"
 PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="${PEM:-$HOME/.ssh/$KEY_NAME.pem}"
 AMI="${AMI:-ami-05603a42e5254c4bb}"               # DLAMI PyTorch 2.7 / Ubuntu 22.04
-STATE_DIR="$PROJECT_DIR/.tiki_lm_gpu_state"; mkdir -p "$STATE_DIR"
+STATE_DIR="$PROJECT_DIR/.tiki_lm_gpu_state"
 STATE_FILE="$STATE_DIR/instance.state"
 
 ssh_to(){ local IP=$1; shift; ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i "$PEM" ubuntu@"$IP" "$@"; }
 
 cmd_launch(){
   [ -f "$STATE_FILE" ] && { echo "exists: $(cat $STATE_FILE); terminate first"; exit 1; }
+  mkdir -p "$STATE_DIR"
   SG_VPC=$(aws ec2 describe-security-groups --profile "$PROFILE" --region "$REGION" --group-ids "$SG" --query 'SecurityGroups[0].VpcId' --output text)
   SUBNET=$(aws ec2 describe-subnets --profile "$PROFILE" --region "$REGION" --filters "Name=vpc-id,Values=$SG_VPC" --query 'Subnets[0].SubnetId' --output text)
   MY_IP=$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')
@@ -37,25 +52,41 @@ cmd_launch(){
   echo "$INSTANCE_ID|$IP" > "$STATE_FILE"; echo "IP: $IP"
   echo "Waiting for SSH..."; for i in $(seq 1 60); do ssh_to "$IP" "echo ok" 2>/dev/null && break; sleep 10; done
   echo "Syncing package + scripts + data ..."
-  rsync -avz \
-    --include='tikitorch/***' --include='scripts/***' --include='data/tinyshakespeare.txt' \
-    --include='tests/***' --include='*/' --exclude='*' \
-    --exclude='*/__pycache__/***' --exclude='tikitorch/zoo/***' \
+  # First match wins: exclude caches/archives before broad source includes.
+  # The selected dataset is the only additional input; never upload all data.
+  rsync -avz --exclude='__pycache__/' --exclude='*.py[cod]' \
+    --exclude='.pytest_cache/' --exclude='.ruff_cache/' --exclude='.cache/' \
+    --exclude='.git/' --exclude='zoo/' --exclude='/manuscript/' --exclude='/results/' \
+    --exclude='/tikitorch/results/' \
+    --include='/tikitorch/***' --include='/scripts/***' \
+    --include='/data/' --include='/data/tinyshakespeare.txt' --exclude='*' \
     -e "ssh -i $PEM -o StrictHostKeyChecking=no" "$PROJECT_DIR/" ubuntu@"$IP":~/tikitorch/ 2>&1 | tail -2
-  ssh_to "$IP" 'pip3 install -q tokenizers 2>&1 | tail -1; python3 -c "import torch; print(\"torch\", torch.__version__, \"cuda\", torch.cuda.is_available(), torch.cuda.get_device_name(0))"'
+  ssh_to "$IP" 'set -e; set -o pipefail
+    pip3 install -q tokenizers 2>&1 | tail -1
+    python3 -c "import torch; print(\"torch\", torch.__version__, \"cuda\", torch.cuda.is_available(), torch.cuda.get_device_name(0))"'
   echo "Launching LM baseline in tmux (power-logged) ..."
   ssh_to "$IP" "cd ~/tikitorch; mkdir -p manuscript/results/lm_gpu_baseline logs
-    tmux new-session -d -s lmgpu 'cd ~/tikitorch &&
-      export PYTHONPATH=~/tikitorch PYTHONUNBUFFERED=1 &&
+    tmux new-session -d -s lmgpu 'bash -e -o pipefail -c \"cd ~/tikitorch
+      rm -f LM_DONE
+      export PYTHONPATH=~/tikitorch PYTHONUNBUFFERED=1
+      PWPID=
+      stop_power(){
+        if [[ -n \\\$PWPID ]]; then
+          kill \\\$PWPID 2>/dev/null || true
+          wait \\\$PWPID 2>/dev/null || true
+          PWPID=
+        fi
+      }
+      trap stop_power EXIT
       nvidia-smi --query-gpu=timestamp,power.draw,utilization.gpu --format=csv,noheader -lms 200 > manuscript/results/lm_gpu_baseline/power_dense.csv &
-      PWPID=\$!;
-      python3 scripts/nanogpt_shakespeare.py --runs dense --tokenizer bpe --steps 1500 --device cuda --adam-lr 3e-3 --out manuscript/results/lm_gpu_baseline --tag gpu_dense_bpe 2>&1 | tee logs/gpu_dense.log;
-      kill \$PWPID;
+      PWPID=\\\$!
+      python3 scripts/nanogpt_shakespeare.py --runs dense --tokenizer bpe --steps 1500 --device cuda --adam-lr 3e-3 --out manuscript/results/lm_gpu_baseline --tag gpu_dense_bpe 2>&1 | tee logs/gpu_dense.log
+      stop_power
       nvidia-smi --query-gpu=timestamp,power.draw,utilization.gpu --format=csv,noheader -lms 200 > manuscript/results/lm_gpu_baseline/power_morph.csv &
-      PWPID=\$!;
-      python3 scripts/nanogpt_shakespeare.py --runs tropical-float --variant morphssm --tokenizer bpe --steps 1500 --device cuda --adam-lr 1e-2 --out manuscript/results/lm_gpu_baseline --tag gpu_morphfloat_bpe 2>&1 | tee logs/gpu_morph.log;
-      kill \$PWPID;
-      touch LM_DONE'
+      PWPID=\\\$!
+      python3 scripts/nanogpt_shakespeare.py --runs tropical-float --variant morphssm --tokenizer bpe --steps 1500 --device cuda --adam-lr 1e-2 --out manuscript/results/lm_gpu_baseline --tag gpu_morphfloat_bpe 2>&1 | tee logs/gpu_morph.log
+      stop_power
+      touch LM_DONE\"'
     sleep 3; tmux list-sessions"
   echo "Launched on $IP ($INSTANCE_ID). monitor: $0 monitor"
 }
@@ -72,5 +103,7 @@ cmd_download(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read
     "$PROJECT_DIR/manuscript/results/lm_gpu_baseline/" 2>/dev/null || true; }
 cmd_ssh(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read -r ID IP < "$STATE_FILE"; exec ssh -o StrictHostKeyChecking=no -i "$PEM" ubuntu@"$IP"; }
 cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; IFS='|' read -r ID IP < "$STATE_FILE"
-  aws ec2 terminate-instances --profile "$PROFILE" --region "$REGION" --instance-ids "$ID" 2>&1 | head -3 || true; rm -f "$STATE_FILE"; }
-case "${1:-launch}" in launch) cmd_launch;; monitor) cmd_monitor;; download) cmd_download;; ssh) cmd_ssh;; terminate) cmd_terminate;; *) echo "usage: $0 {launch|monitor|download|terminate|ssh}";; esac
+  # Keep the instance record if AWS fails, so termination can be retried.
+  aws ec2 terminate-instances --profile "$PROFILE" --region "$REGION" --instance-ids "$ID"
+  rm -f "$STATE_FILE"; }
+case "$COMMAND" in launch) cmd_launch;; monitor) cmd_monitor;; download) cmd_download;; ssh) cmd_ssh;; terminate) cmd_terminate;; esac

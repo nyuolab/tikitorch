@@ -10,7 +10,9 @@ multiplier-free recipes. Contributions must keep that boundary explicit.
 ```bash
 git clone https://github.com/nyuolab/tikitorch.git
 cd tikitorch
-pip install -e ".[dev]"        # editable install + pytest + ruff
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m pip install -e ".[dev]"
 ```
 
 `torch` and `numpy` are runtime dependencies. The FPGA backend is pure
@@ -22,17 +24,17 @@ or test the library — the board-dependent tests self-skip without hardware.
 
 Use a Git source checkout for development. Distribution archives contain the
 library, not checkout-only tests, research runners, manuscripts or results.
-For a first contribution, start with the [student handoff](manuscript/STUDENT_HANDOFF.md).
-The [handoff audit](docs/library_handoff_audit_2026-09-08.md) records the latest
-bounded cleanup and remaining limitations.
+For a first contribution or research review, start with the
+[collaboration handoff](manuscript/HANDOFF.md). The [test guide](tests/README.md)
+explains focused checks and optional test groups.
 The [research plan](manuscript/RESEARCH_PLAN.md) is proposed work, not a request
 to launch experiments or provision hardware.
 
-Run the two primary local checks before opening a PR:
+Run these local checks before opening a PR:
 
 ```bash
 python -m ruff check .  # pinned in the dev extra; explicit E4/E7/E9/F rules
-pytest -q               # fast building-block suite: closure, exactness, gradchecks
+python -m pytest -q     # default regression suite, not a scientific benchmark
 python scripts/check_artifact_layout.py  # frozen research evidence and layout
 ```
 
@@ -47,7 +49,7 @@ research/learning claims, not library correctness, and they're stochastic and
 minutes-long. Run them on demand:
 
 ```bash
-pytest -m slow        # the training tests only
+python -m pytest -m slow        # the training tests only
 ```
 
 ## The closure contract (read this before adding an op or layer)

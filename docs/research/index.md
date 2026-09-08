@@ -22,7 +22,7 @@ ledger entry.
 The proposed next studies are ECG classification and language-model pretraining,
 with an eventual complete-learning FPGA capstone. Start with the
 [research plan](https://github.com/nyuolab/tikitorch/blob/main/manuscript/RESEARCH_PLAN.md)
-and [student handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/STUDENT_HANDOFF.md).
+and [collaboration handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/HANDOFF.md).
 These are planning documents, not established workload advantages or approved runs.
 Historical artifacts now live under `manuscript/results/`; the
 [artifact policy](https://github.com/nyuolab/tikitorch/blob/main/manuscript/ARTIFACTS.md)

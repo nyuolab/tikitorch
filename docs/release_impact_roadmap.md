@@ -5,6 +5,13 @@ This is a prioritized plan, not a claim that GPU, hardware or publication gates
 have run. It separates release authority, implementation maturity and research
 evidence so one cannot substitute for another.
 
+This is the detailed engineering roadmap; root `ROADMAP.md` is its short entry
+point. The immediate stopping point is independent collaborator review through
+the [shared handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/HANDOFF.md).
+The [research plan](https://github.com/nyuolab/tikitorch/blob/main/manuscript/RESEARCH_PLAN.md)
+owns task-specific study design. Work below remains gated by owner, protocol
+and resource decisions; listing it here does not launch or authorize a run.
+
 The strongest opportunity is a usable PyTorch companion in which hard
 operators expose a compact exact derivative record and an explicit arithmetic
 contract. The immediate goal is to make that opportunity independently
