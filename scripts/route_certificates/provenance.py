@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 REPO = Path(__file__).resolve().parents[2]
-RESULTS = REPO / "results" / "route_certificates" / "runs"
+RESULTS = REPO / "manuscript" / "results" / "route_certificates" / "runs"
 
 
 def _git(args: list[str], cwd: Path) -> str:

@@ -10,9 +10,9 @@
 #       the pragmas actually close, not the original 4.0 ns target.
 #   (2) TT_CLK_NS (default 6.0 ns = ~166 MHz; A3 accepts 6-8 ns) is exported into
 #       the build so create_clock uses it.
-# The committed baseline (pre-pragma, 4.0 ns target) is results/a2_power/
+# The committed baseline (pre-pragma, 4.0 ns target) is manuscript/results/a2_power/
 # d512_csynth.rpt (11.425 ns). This run's report lands beside it as
-# results/a2_power/d512_recsynth.rpt so the improvement is a direct diff.
+# manuscript/results/a2_power/d512_recsynth.rpt so the improvement is a direct diff.
 #
 #   export AWS_PROFILE=my-profile
 #   bash scripts/run_morph_lm_d512_recsynth.sh launch          # TT_CLK_NS=6.0 default
@@ -122,7 +122,7 @@ cmd_status(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE
   aws_ ec2 describe-instances --instance-ids "$INSTANCE_ID" --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo "(gone)"
   aws_ s3 ls "$S3_RESULTS/DONE" >/dev/null 2>&1 && echo "DONE present" || { echo "(running)"; aws_ s3 cp "$S3_RESULTS/boot.log" - 2>/dev/null | tail -20; }; }
 cmd_fetch(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE_FILE"
-  local D="$PROJECT_DIR/results/a2_power"; mkdir -p "$D"
+  local D="$PROJECT_DIR/manuscript/results/a2_power"; mkdir -p "$D"
   aws_ s3 cp "$S3_RESULTS/${KTOP}_d${ML_D}_recsynth_summary.txt" "$D/d${ML_D}_recsynth_summary.txt" --only-show-errors || true
   aws_ s3 cp "$S3_RESULTS/${KTOP}_d${ML_D}_recsynth.rpt"         "$D/d${ML_D}_recsynth.rpt"         --only-show-errors || true
   aws_ s3 cp "$S3_RESULTS/${KTOP}_d${ML_D}_recsynth_vitis_hls.log" "$D/d${ML_D}_recsynth_vitis_hls.log" --only-show-errors 2>/dev/null || true

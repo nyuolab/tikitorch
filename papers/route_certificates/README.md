@@ -125,7 +125,7 @@ tikitorch/autodiff/                      # schema, reference operators, replay
 tests/test_route_*.py                    # graph, gradient, and composition tests
 tests/test_*sufficiency.py               # state and certificate sufficiency tests
 scripts/route_certificates/              # audit and five-arm runners
-results/route_certificates/              # append-only raw rows and manifests
+manuscript/results/route_certificates/              # append-only raw rows and manifests
 papers/route_certificates/               # this manuscript and table reducer
 ```
 

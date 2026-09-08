@@ -88,7 +88,7 @@ cmd_status(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE
   aws_ s3 ls "$S3_RESULTS/" --recursive 2>/dev/null || echo "(nothing yet)"
   aws_ s3 ls "$S3_RESULTS/DONE" >/dev/null 2>&1 && echo "DONE present" || { echo "-- boot.log tail --"; aws_ s3 cp "$S3_RESULTS/boot.log" - 2>/dev/null | tail -25; }; }
 cmd_fetch(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE_FILE"
-  local DEST="$PROJECT_DIR/results/fpga_training_rig"; mkdir -p "$DEST"
+  local DEST="$PROJECT_DIR/manuscript/results/fpga_training_rig"; mkdir -p "$DEST"
   aws_ s3 cp "$S3_RESULTS/forge_wgrad_probe_csynth.rpt" "$DEST/forge_wgrad_probe_csynth.rpt" --only-show-errors || true
   aws_ s3 cp "$S3_RESULTS/vitis_hls_wgrad.log" "$DEST/wgrad_vitis_hls.log" --only-show-errors 2>/dev/null || true
   ls -1 "$DEST"/forge_wgrad_probe_csynth.rpt 2>/dev/null || echo "(none yet)"; }

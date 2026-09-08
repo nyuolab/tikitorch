@@ -136,7 +136,7 @@ def main():
     ap.add_argument("--drop", type=float, default=0.15)      # input (one-hot) dropout
     ap.add_argument("--subset", type=int, default=None)
     ap.add_argument("--modes", nargs="+", default=["bp_float", "bp_dyadic", "relax", "relax_async"])
-    ap.add_argument("--out", default="results/predictive_coding/charlm_localpc.jsonl")
+    ap.add_argument("--out", default="manuscript/results/predictive_coding/charlm_localpc.jsonl")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
 

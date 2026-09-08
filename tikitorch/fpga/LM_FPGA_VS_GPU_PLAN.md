@@ -8,7 +8,7 @@ train and serve), with estimated-vs-measured clearly labeled.
 
 Strictness doctrine: the FPGA side is Level-B closed by construction (the
 kernel IS the audit); the host-side reference recipes and all quality
-expectations come from results/lm_shakespeare/BAKEOFF_SHAKESPEARE.md Round 4.
+expectations come from manuscript/results/lm_shakespeare/BAKEOFF_SHAKESPEARE.md Round 4.
 
 ## What already exists (verified 2026-06-11)
 
@@ -89,7 +89,7 @@ infra); MPS numbers are not the baseline.
    fused train-window mode and config B.)
 3. ~~SignSGD threshold calibration for Q16 grads~~ DONE: threshold=2048
    (CSIM sweep over {0, 256, 2048, 8192, 32768};
-   results/lm_shakespeare/csim_lutce.json). End-to-end CSIM training of the
+   manuscript/results/lm_shakespeare/csim_lutce.json). End-to-end CSIM training of the
    REAL 1-layer kernel (scripts/_csim_train_lutce.py, 300 windows = 38.4k
    tokens, ~7k tok/s): **LUT-CE tail acc 16.5% vs perceptron 6.8%** — the
    on-chip loss upgrade is worth 2.4x accuracy at matched budget, measured

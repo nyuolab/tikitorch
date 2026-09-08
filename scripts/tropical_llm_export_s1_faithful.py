@@ -1,5 +1,5 @@
 """tropical_llm_export_s1_faithful.py — export the KERNEL-FAITHFUL tropical LLM
-(results/lm_shakespeare/tropical_llm_d64_faithful.pt, trained WITH MAD-LN + pow2 gamma + dyadic weights)
+(manuscript/results/lm_shakespeare/tropical_llm_d64_faithful.pt, trained WITH MAD-LN + pow2 gamma + dyadic weights)
 into the int32 monolithic buffer the forge_train_step_s1 FORWARD kernel reads (mode 0,
 -DS1_FWD_ONLY=1 -DS1_ATTN_HARD=1 -DS1_HEAD_MODE=1 -DS1_POS_EMBED=1 -DS1_N_LAYERS=2 at D=64/V=64).
 
@@ -256,7 +256,7 @@ def load_ce_lut():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--ckpt', default=str(REPO / 'results' / 'lm_shakespeare' / 'tropical_llm_d64_faithful.pt'))
+    ap.add_argument('--ckpt', default=str(REPO / "manuscript" / "results" / 'lm_shakespeare' / 'tropical_llm_d64_faithful.pt'))
     ap.add_argument('--out', default='/tmp/s1_buf.npy')
     # defaults = the best deploy fixed-point found by the FAITHFUL-model scale sweep (deployable bpc 4.71 on
     # 63 val windows, real kernel; logit softmax temperature ~448). VERIFIED FLAT at ~4.7-4.9 across the whole

@@ -11,7 +11,7 @@ agreement; solve_frac = fraction of starts the greedy policy solves):
 GridWorld value is a (min,+) cost-to-go — the tropical-FAVORABLE prior — so this validates that the
 dyadic core (a) trains end-to-end in the real MCTS loop and (b) does NOT regress on the favorable case;
 the dyadic EXPRESSIVITY advantage itself was established on oblique/smooth value in the probes
-(results/capacity_probe/FIX_FINDINGS.md). Uses AdamW to isolate the CORE effect from the optimizer; the
+(manuscript/results/capacity_probe/FIX_FINDINGS.md). Uses AdamW to isolate the CORE effect from the optimizer; the
 software-closure-oriented optimizer (TropicalSGD) is a separate axis (``--optimizer``). The full
 Python loop retains MCTS, normalization, and loss arithmetic boundaries.
 
@@ -25,7 +25,7 @@ from tikitorch.planning.muzero.env import GridWorldNav
 from tikitorch.planning.muzero.agent import TropicalMuZero, MuZeroConfig
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.normpath(os.path.join(HERE, "..", "results", "capacity_probe"))
+OUT = os.path.normpath(os.path.join(HERE, "..", "manuscript", "results", "capacity_probe"))
 
 GRID = ["S...", "....", "....", "...G"]          # 4x4 open, fully connected (V* finite everywhere)
 

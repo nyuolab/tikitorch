@@ -1,6 +1,6 @@
 """G2 gate: recurrence stability + recurrence-earns-its-keep synthetics.
 
-Pre-registered in results/pc_convrnn/PREREG.md.
+Pre-registered in manuscript/results/pc_convrnn/PREREG.md.
 
 2a — drift probe (d=256, L=7 conv-RNN, 20k-char stream, CPU):
   * learned-lambda cell: state must obey u_t <= h_t <= running-max(u); drift
@@ -280,7 +280,7 @@ def main():
     p.add_argument("--lr", type=float, default=1e-2)
     p.add_argument("--lam-min", type=float, default=2 ** -8)
     p.add_argument("--stream", type=int, default=20000)
-    p.add_argument("--out", type=Path, default=REPO / "results" / "pc_convrnn")
+    p.add_argument("--out", type=Path, default=REPO / "manuscript" / "results" / "pc_convrnn")
     args = p.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
 

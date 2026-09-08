@@ -1,6 +1,6 @@
 #!/bin/bash
 # run_connect4_prior_sweep_ec2.sh — a ROBUST, one-shot EC2 runner for the fully
-# multiply-free Connect4 anti-collapse prior sweep (results/board_scaling/CONNECT4_PRIOR_SWEEP.md).
+# multiply-free Connect4 anti-collapse prior sweep (manuscript/results/board_scaling/CONNECT4_PRIOR_SWEEP.md).
 #
 # WHY A NEW RUNNER. The ad-hoc SSH-polling runners (run_tikitorch_gpu_benchmarks.sh etc.)
 # failed this job three times: (1) unpinned torch threads -> 13 h / $20 oversubscription;
@@ -251,7 +251,7 @@ cmd_fetch(){
   [ -f "$STATE_FILE" ] || { echo "no state; launch first"; exit 1; }
   # shellcheck disable=SC1090
   source "$STATE_FILE"
-  local DEST="$PROJECT_DIR/results/board_scaling"
+  local DEST="$PROJECT_DIR/manuscript/results/board_scaling"
   mkdir -p "$DEST/_sweep_logs"
   echo "downloading result JSONs -> $DEST"
   aws_ s3 cp "$S3_RESULTS/" "$DEST/" --recursive --exclude "*" --include "${RESULT_GLOB:-connect4_fully_tropical_*.json}" --only-show-errors

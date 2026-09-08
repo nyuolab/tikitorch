@@ -125,7 +125,7 @@ program, not necessarily a Clarke subgradient of the composed function.
 **Evidence:** [unified manuscript and proofs](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md),
 [claim boundary and preserved evidence](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md),
 [working implementation](https://github.com/nyuolab/tikitorch/tree/main/tikitorch/autodiff/), [working result
-archive](https://github.com/nyuolab/tikitorch/tree/main/results/route_certificates/), and route tests currently under
+archive](https://github.com/nyuolab/tikitorch/tree/main/manuscript/results/route_certificates/), and route tests currently under
 [`tests/`](https://github.com/nyuolab/tikitorch/tree/main/tests/).
 
 **Exactness evidence currently used by the draft:** current source-bound
@@ -171,7 +171,7 @@ payload comparison has its own record and boundary in TT-ROUTE-003.
 **Evidence:** [paper README](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/README.md),
 [manuscript table](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/main.tex), [accounting
 sensitivity](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/supplement.tex), and [raw working
-results](https://github.com/nyuolab/tikitorch/tree/main/results/route_certificates/actual_morphssm/).
+results](https://github.com/nyuolab/tikitorch/tree/main/manuscript/results/route_certificates/actual_morphssm/).
 
 **Do not claim:** lower process RSS, allocator peak, accelerator peak, DRAM
 traffic, latency, energy, or generic whole-model activation memory. The small
@@ -206,7 +206,7 @@ Parameters, optimizer, loss, common cotangent, metadata and transient
 workspace are excluded. Portable framing is reported separately: 38,298,
 91,342 and 333,715 bytes. Its values differ from the historical format.
 
-**Evidence:** [current source-bound record](https://github.com/nyuolab/tikitorch/blob/main/manuscript/evidence/current_retained_state.json),
+**Evidence:** [current source-bound record](https://github.com/nyuolab/tikitorch/blob/main/manuscript/evidence/retained_state_handoff_2026-09-08.json),
 [measurement/check command](https://github.com/nyuolab/tikitorch/blob/main/manuscript/measure_retained_state.py),
 [table and boundary ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md).
 The route-consistency oracle shares canonical primitives; it is not an
@@ -231,8 +231,8 @@ measured 2.4230 held-out bits/character over 3,840 positions and matched the
 kernel-faithful C++ reference. The 62.5 MHz build closed timing with WNS
 `+0.392 ns`.
 
-**Evidence:** [result report](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/S1_KV2_ON_SILICON.md)
-and [raw F2 log](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/onfabric_gen/s1_kv2_f2_gen.txt).
+**Evidence:** [result report](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/S1_KV2_ON_SILICON.md)
+and [raw F2 log](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/onfabric_gen/s1_kv2_f2_gen.txt).
 
 **Do not claim:** on-fabric training of this quality result; competitive
 throughput; large-language-model scale; or model-generated text as a quantitative
@@ -246,8 +246,8 @@ manifest.
 **Secondary inference artifact:** the chess-scale forward kernel measured
 9.22 ms/inference (108.4 inference/s) over 4,000 F2 kicks with DSP=0 and routed
 timing closure. It is forward inference only; the corresponding training kernel
-misses timing and exceeds one SLR. See the [AFI report](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/MUZERO_CHESS_FWD_AFI.md)
-and [comparison audit](https://github.com/nyuolab/tikitorch/blob/main/results/board_scaling/CHESS_MUZERO_COMPARISON.md).
+misses timing and exceeds one SLR. See the [AFI report](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/fpga_silicon/MUZERO_CHESS_FWD_AFI.md)
+and [comparison audit](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/board_scaling/CHESS_MUZERO_COMPARISON.md).
 
 ### TT-FPGA-TRAIN-001 — D512 fused execution with an exact observable-record match
 
@@ -260,9 +260,9 @@ archived resident accuracy, weight CRC, and first 16 predictions from a
 invocation processed 256,000 token positions in 418.3963 seconds, sustaining
 612 token/s, with persistent weight-state change.
 
-**Evidence:** [D512 verification archive](https://github.com/nyuolab/tikitorch/tree/main/results/fpga_silicon/d512_verify/),
-especially [`BITEXACT`](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/d512_verify/BITEXACT),
-[`train_2000.err`](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/d512_verify/train_2000.err), and
+**Evidence:** [D512 verification archive](https://github.com/nyuolab/tikitorch/tree/main/manuscript/results/fpga_silicon/d512_verify/),
+especially [`BITEXACT`](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/fpga_silicon/d512_verify/BITEXACT),
+[`train_2000.err`](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/fpga_silicon/d512_verify/train_2000.err), and
 the [fused kernel](https://github.com/nyuolab/tikitorch/blob/main/tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp).
 
 **Do not claim:** held-out language learning, 256,000 distinct tokens, a quality
@@ -285,8 +285,8 @@ exported fabric-trained weights at 74.13% on a freshly loaded test set. The
 0.62 percentage-point difference is unresolved pipeline variation because the
 two evaluations did not freeze identical inputs and preprocessing.
 
-**Evidence:** [result report](https://github.com/nyuolab/tikitorch/blob/main/results/predictive_coding/ONFABRIC_TRAINING.md)
-and [raw artifacts](https://github.com/nyuolab/tikitorch/tree/main/results/predictive_coding/onfabric_train/).
+**Evidence:** [result report](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/predictive_coding/ONFABRIC_TRAINING.md)
+and [raw artifacts](https://github.com/nyuolab/tikitorch/tree/main/manuscript/results/predictive_coding/onfabric_train/).
 
 **Physical wording:** the model-data path has no multiplication. Synthesis used
 one DSP block as an adder and zero DSP multipliers; therefore call this
@@ -313,7 +313,7 @@ the one-kernel measurement, aggregate throughput was 1.86x at two replicas and
 3.72x at four replicas; these are within-family scaling ratios, not accelerator
 speedups.
 
-**Evidence:** [hallmark result and provenance](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/fig_hallmark_lm.md).
+**Evidence:** [hallmark result and provenance](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/fig_hallmark_lm.md).
 
 **Do not claim:** 2x/4x measured scaling, perfect linearity, timing-robust
 throughput, GPU parity, iso-model speedup, or an energy win. Headline routed
@@ -335,8 +335,8 @@ credit direction. State-settling variants genuinely alter the dependency story,
 but the archived scale-fragility evidence for `settle_nudge` came from an
 implementation that ignored its configured `gamma` and used a unit step.
 Corrected-gamma scale behavior is pending rerun. Evidence: [parallelism
-audit](https://github.com/nyuolab/tikitorch/blob/main/results/predictive_coding/PARALLELISM.md) and [depth
-study](https://github.com/nyuolab/tikitorch/blob/main/results/pc_depth_traction/EXP_RESULTS.md).
+audit](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/predictive_coding/PARALLELISM.md) and [depth
+study](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/pc_depth_traction/EXP_RESULTS.md).
 
 ### TT-NEG-002 — Asynchrony does not yield a free depth speedup
 
@@ -344,7 +344,7 @@ The exact-gradient async round tax grows roughly with depth and inverse
 participation. This removes the prior claim of a depth-growing throughput win
 over backprop. The surviving claim is scheduling tolerance on a suitable
 substrate, not measured GPU acceleration. Evidence: [parallelism
-audit](https://github.com/nyuolab/tikitorch/blob/main/results/predictive_coding/PARALLELISM.md).
+audit](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/predictive_coding/PARALLELISM.md).
 
 ### TT-NEG-003 — Historical language endpoints favor the dense baseline
 
@@ -357,20 +357,20 @@ does not hold for these selected endpoints. The MorphSSM run starts at
 `strict-eager-v3` full-training closure certificate. This is a negative
 historical quality result, not a matched-compute causal cost of strict closure
 or a measurement of the current device-tape implementation. The raw selected
-endpoints are [MorphSSM](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/strictH_bpe_anneal_s9decay_6k.jsonl)
-and [dense GPT](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/bpeA_dense.jsonl).
+endpoints are [MorphSSM](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/strictH_bpe_anneal_s9decay_6k.jsonl)
+and [dense GPT](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/bpeA_dense.jsonl).
 The 2.423
 bpc F2 inference model is a different character setup trained by kernel-faithful
 QAT and must not be substituted into that comparison. Evidence: [hallmark
-ledger](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/fig_hallmark_lm.md) and the [fixed-point
-investigation](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/S1_MULTFREE_CHARLM_WALL.md).
+ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/fig_hallmark_lm.md) and the [fixed-point
+investigation](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/S1_MULTFREE_CHARLM_WALL.md).
 
 ### TT-NEG-004 — No present end-to-end energy win
 
 Core-rail measurements, WNS-derived estimates, and projected replicas do not
 support a board-to-board energy claim. Full-card FPGA power under a matched
 quality/workload protocol remains open. Evidence: [hallmark
-qualifications](https://github.com/nyuolab/tikitorch/blob/main/results/lm_shakespeare/fig_hallmark_lm.md) and the [FPGA
+qualifications](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/fig_hallmark_lm.md) and the [FPGA
 evidence qualifications](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md).
 
 ### TT-NEG-005 — Native compiled AdamW does not pass strict update parity

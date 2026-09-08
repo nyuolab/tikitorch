@@ -37,6 +37,8 @@ jobs:
           PY
       - name: Validate provenance inventory (not release clearance)
         run: python scripts/check_release_provenance.py --inventory-only
+      - name: Verify frozen research artifact relocation
+        run: python scripts/check_artifact_layout.py
 
   test:
     name: test (py${{ matrix.python-version }})
@@ -251,6 +253,7 @@ jobs:
         run: |
           python -m build
           python -m twine check dist/*
+          python scripts/check_distribution_layout.py dist/*.tar.gz dist/*.whl
 
       - name: Install and import the wheel outside the checkout
         run: |

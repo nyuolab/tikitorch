@@ -172,7 +172,7 @@ cmd_status(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE
   aws_ s3 ls "$S3_RESULTS/" --recursive 2>/dev/null || echo "(nothing yet)"
   aws_ s3 ls "$S3_RESULTS/DONE" >/dev/null 2>&1 && echo "DONE present" || { echo "-- a2power.log tail --"; aws_ s3 cp "$S3_RESULTS/a2power.log" - 2>/dev/null | tail -30; }; }
 cmd_fetch(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE_FILE"
-  local DEST="$PROJECT_DIR/results/fpga_silicon/a2power"; mkdir -p "$DEST"
+  local DEST="$PROJECT_DIR/manuscript/results/fpga_silicon/a2power"; mkdir -p "$DEST"
   aws_ s3 cp "$S3_RESULTS/" "$DEST/" --recursive --only-show-errors; ls -1 "$DEST"
   echo "-- reduce --"; python3 "$PROJECT_DIR/scripts/a2_reduce.py" "$DEST" || true; }
 cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; source "$STATE_FILE"

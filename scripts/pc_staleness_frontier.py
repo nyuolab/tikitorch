@@ -150,7 +150,7 @@ for depth in DEPTHS:
     print(f"  CRITICAL PATH: backprop = {2*depth} ordered stages + barrier + weight-transport")
     print(f"                 PC-async = {depth} fwd + R local rounds (above), NO barrier, NO transport")
 
-out = "results/predictive_coding/staleness_frontier.json"
+out = "manuscript/results/predictive_coding/staleness_frontier.json"
 with open(out, "w") as f:
     json.dump(results, f, indent=1)
 print(f"\nwrote {out}")

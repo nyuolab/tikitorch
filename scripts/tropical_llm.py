@@ -75,7 +75,7 @@ def main():
     ap.add_argument("--L",type=int,default=4); ap.add_argument("--T",type=int,default=128)
     ap.add_argument("--taufloor",type=float,default=0.05)
     ap.add_argument("--steps",type=int,default=9000); ap.add_argument("--bs",type=int,default=48)
-    ap.add_argument("--out",type=str,default=str(REPO/"results"/"lm_shakespeare"/"tropical_llm.pt"))
+    ap.add_argument("--out",type=str,default=str(REPO/ "manuscript" / "results"/"lm_shakespeare"/"tropical_llm.pt"))
     a=ap.parse_args(); torch.manual_seed(0)
     tr,va,stoi,itos=load_corpus(); V=len(stoi)
     from collections import Counter

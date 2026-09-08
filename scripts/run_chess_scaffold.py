@@ -17,7 +17,7 @@ from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig
 from tikitorch.planning.muzero.games import play_match
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.normpath(os.path.join(HERE, "..", "results", "board_scaling"))
+OUT = os.path.normpath(os.path.join(HERE, "..", "manuscript", "results", "board_scaling"))
 
 
 def evaluate_vs(mz, opp_factory, n, label):

@@ -80,7 +80,7 @@ class MuZeroConfig:
         self.fc_policy_layers = []
 
         ### Training
-        self.results_path = pathlib.Path(__file__).resolve().parents[1] / "results" / pathlib.Path(__file__).stem / datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")
+        self.results_path = pathlib.Path(__file__).resolve().parents[1] / "manuscript" / "results" / pathlib.Path(__file__).stem / datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")
         self.save_model = True
         self.training_steps = 1000000                  # we stop via a wall-clock window in the runner, not this
         self.batch_size = 128

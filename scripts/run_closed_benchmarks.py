@@ -100,7 +100,7 @@ def main():
     p.add_argument("--lr-shift", type=int, default=8)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--data-root", default="./data")
-    p.add_argument("--out", default="results/closed_benchmarks")
+    p.add_argument("--out", default="manuscript/results/closed_benchmarks")
     args = p.parse_args()
     if args.epochs < 1:
         p.error("--epochs must be at least 1")

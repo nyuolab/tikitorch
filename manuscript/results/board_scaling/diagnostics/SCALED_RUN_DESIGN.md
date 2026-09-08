@@ -2,8 +2,8 @@
 
 Answers two questions: (1) design + cost an experiment to find whether MuZero can be made to **play well**
 with more self-play compute; (2) can it run **natively on FPGA**. Built on measured throughput
-([`muzero_scale_bench.py`](../../../scripts/muzero_scale_bench.py)) + cost model
-([`muzero_scale_cost.py`](../../../scripts/muzero_scale_cost.py)); design adversarially audited.
+([`muzero_scale_bench.py`](../../../../scripts/muzero_scale_bench.py)) + cost model
+([`muzero_scale_cost.py`](../../../../scripts/muzero_scale_cost.py)); design adversarially audited.
 
 ## Honest framing first
 

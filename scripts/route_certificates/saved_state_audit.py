@@ -16,7 +16,7 @@ Usage:
   python -m scripts.route_certificates.saved_state_audit [--dry-run]
 Scales: (64,2,96) / (128,4,96)=the lifetime model / (256,4,192).
 CPU-only; seconds per point. Results ->
-results/route_certificates/runs/exp1_saved_state/<uuid>/.
+manuscript/results/route_certificates/runs/exp1_saved_state/<uuid>/.
 """
 from __future__ import annotations
 
@@ -145,7 +145,7 @@ def main():
     if a.dry_run:
         print(json.dumps(dict(would_run=[
             dict(d_model=d, n_layers=l, T=t) for d, l, t in SCALES],
-            output="results/route_certificates/runs/exp1_saved_state/<uuid>/",
+            output="manuscript/results/route_certificates/runs/exp1_saved_state/<uuid>/",
             est_wall="~1 min CPU total"), indent=1))
         return
     rec = run_record("exp1_saved_state", cmd,

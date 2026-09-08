@@ -15,7 +15,7 @@ from tikitorch.planning.muzero.games import TicTacToe
 from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.normpath(os.path.join(HERE, "..", "results", "capacity_probe"))
+OUT = os.path.normpath(os.path.join(HERE, "..", "manuscript", "results", "capacity_probe"))
 
 ARMS = [
     ("tropical-maxplus", dict(net_kind="tropical", core_kind="maxplus")),

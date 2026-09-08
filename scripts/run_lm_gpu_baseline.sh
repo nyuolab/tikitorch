@@ -44,16 +44,16 @@ cmd_launch(){
     -e "ssh -i $PEM -o StrictHostKeyChecking=no" "$PROJECT_DIR/" ubuntu@"$IP":~/tikitorch/ 2>&1 | tail -2
   ssh_to "$IP" 'pip3 install -q tokenizers 2>&1 | tail -1; python3 -c "import torch; print(\"torch\", torch.__version__, \"cuda\", torch.cuda.is_available(), torch.cuda.get_device_name(0))"'
   echo "Launching LM baseline in tmux (power-logged) ..."
-  ssh_to "$IP" "cd ~/tikitorch; mkdir -p results/lm_gpu_baseline logs
+  ssh_to "$IP" "cd ~/tikitorch; mkdir -p manuscript/results/lm_gpu_baseline logs
     tmux new-session -d -s lmgpu 'cd ~/tikitorch &&
       export PYTHONPATH=~/tikitorch PYTHONUNBUFFERED=1 &&
-      nvidia-smi --query-gpu=timestamp,power.draw,utilization.gpu --format=csv,noheader -lms 200 > results/lm_gpu_baseline/power_dense.csv &
+      nvidia-smi --query-gpu=timestamp,power.draw,utilization.gpu --format=csv,noheader -lms 200 > manuscript/results/lm_gpu_baseline/power_dense.csv &
       PWPID=\$!;
-      python3 scripts/nanogpt_shakespeare.py --runs dense --tokenizer bpe --steps 1500 --device cuda --adam-lr 3e-3 --out results/lm_gpu_baseline --tag gpu_dense_bpe 2>&1 | tee logs/gpu_dense.log;
+      python3 scripts/nanogpt_shakespeare.py --runs dense --tokenizer bpe --steps 1500 --device cuda --adam-lr 3e-3 --out manuscript/results/lm_gpu_baseline --tag gpu_dense_bpe 2>&1 | tee logs/gpu_dense.log;
       kill \$PWPID;
-      nvidia-smi --query-gpu=timestamp,power.draw,utilization.gpu --format=csv,noheader -lms 200 > results/lm_gpu_baseline/power_morph.csv &
+      nvidia-smi --query-gpu=timestamp,power.draw,utilization.gpu --format=csv,noheader -lms 200 > manuscript/results/lm_gpu_baseline/power_morph.csv &
       PWPID=\$!;
-      python3 scripts/nanogpt_shakespeare.py --runs tropical-float --variant morphssm --tokenizer bpe --steps 1500 --device cuda --adam-lr 1e-2 --out results/lm_gpu_baseline --tag gpu_morphfloat_bpe 2>&1 | tee logs/gpu_morph.log;
+      python3 scripts/nanogpt_shakespeare.py --runs tropical-float --variant morphssm --tokenizer bpe --steps 1500 --device cuda --adam-lr 1e-2 --out manuscript/results/lm_gpu_baseline --tag gpu_morphfloat_bpe 2>&1 | tee logs/gpu_morph.log;
       kill \$PWPID;
       touch LM_DONE'
     sleep 3; tmux list-sessions"
@@ -65,11 +65,11 @@ cmd_monitor(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read 
     echo == morph ==; tail -4 logs/gpu_morph.log 2>/dev/null
     echo "== done? =="; [ -f LM_DONE ] && echo YES || echo no'; }
 cmd_download(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read -r ID IP < "$STATE_FILE"
-  mkdir -p "$PROJECT_DIR/results/lm_gpu_baseline"
+  mkdir -p "$PROJECT_DIR/manuscript/results/lm_gpu_baseline"
   rsync -avz -e "ssh -i $PEM -o StrictHostKeyChecking=no" \
-    ubuntu@"$IP":~/tikitorch/results/lm_gpu_baseline/ "$PROJECT_DIR/results/lm_gpu_baseline/" 2>&1 | tail -3
+    ubuntu@"$IP":~/tikitorch/manuscript/results/lm_gpu_baseline/ "$PROJECT_DIR/manuscript/results/lm_gpu_baseline/" 2>&1 | tail -3
   scp -i "$PEM" -o StrictHostKeyChecking=no "ubuntu@$IP:~/tikitorch/logs/gpu_*.log" \
-    "$PROJECT_DIR/results/lm_gpu_baseline/" 2>/dev/null || true; }
+    "$PROJECT_DIR/manuscript/results/lm_gpu_baseline/" 2>/dev/null || true; }
 cmd_ssh(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read -r ID IP < "$STATE_FILE"; exec ssh -o StrictHostKeyChecking=no -i "$PEM" ubuntu@"$IP"; }
 cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; IFS='|' read -r ID IP < "$STATE_FILE"
   aws ec2 terminate-instances --profile "$PROFILE" --region "$REGION" --instance-ids "$ID" 2>&1 | head -3 || true; rm -f "$STATE_FILE"; }

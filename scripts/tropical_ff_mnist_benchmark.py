@@ -18,7 +18,7 @@ Usage::
     python scripts/tropical_ff_mnist_benchmark.py --quick         # fast subset
     python scripts/tropical_ff_mnist_benchmark.py --smoke         # 1 epoch, tiny
 
-Writes JSONL to results/forward_forward/ and prints a comparison table.
+Writes JSONL to manuscript/results/forward_forward/ and prints a comparison table.
 """
 import argparse
 import json
@@ -181,7 +181,7 @@ def main():
     p.add_argument("--quick", action="store_true")
     p.add_argument("--smoke", action="store_true")
     p.add_argument("--no-refs", action="store_true")
-    p.add_argument("--out", type=str, default="results/forward_forward/mnist_benchmark.jsonl")
+    p.add_argument("--out", type=str, default="manuscript/results/forward_forward/mnist_benchmark.jsonl")
     args = p.parse_args()
 
     if args.quick:

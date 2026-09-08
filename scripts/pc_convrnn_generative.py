@@ -1,6 +1,6 @@
 """G6: generative PC inference on cascade-trained tropical sequence models.
 
-The inference half of the program goal (results/pc_convrnn/PREREG.md): the SAME
+The inference half of the program goal (manuscript/results/pc_convrnn/PREREG.md): the SAME
 checkpoint runs feedforward for ordinary decoding, and runs ITERATIVE energy
 relaxation for the PC-unique modes — infilling, denoising — that a causal LM
 has no native way to do.
@@ -434,7 +434,7 @@ def main():
     p.add_argument("--ckpt", type=Path, default=None,
                    help="cascade-trained checkpoint (required for g6b/g6c)")
     p.add_argument("--text", type=Path, default=REPO / "data" / "tinyshakespeare.txt")
-    p.add_argument("--out", type=Path, default=REPO / "results" / "pc_convrnn")
+    p.add_argument("--out", type=Path, default=REPO / "manuscript" / "results" / "pc_convrnn")
     p.add_argument("--tag", type=str, default="")
     p.add_argument("--seq-len", type=int, default=96)
     p.add_argument("--spans", type=int, nargs="+", default=[8, 16, 32])

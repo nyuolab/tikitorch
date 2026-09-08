@@ -1,6 +1,6 @@
 """component_probe — WHICH part of the Tropical MuZero net is the expressivity bottleneck?
 
-The capacity probe (scripts/capacity_probe.py, results/capacity_probe/FINDINGS.md) localized the §2a
+The capacity probe (scripts/capacity_probe.py, manuscript/results/capacity_probe/FINDINGS.md) localized the §2a
 underfit to the LEARNED NET (not the search) and to non-lattice value surfaces. This probe localizes it
 FURTHER — to a single net COMPONENT — so we know the minimal dense/DSP augmentation that closes the gap
 while keeping the MCTS<->net loop on-die.

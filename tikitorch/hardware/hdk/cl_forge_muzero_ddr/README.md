@@ -2,7 +2,7 @@
 
 The sibling `cl_forge_muzero` (PCIM→host-DRAM) routes + loads on F2 and its PCIM master is electrically
 clean, but it **can't be driven for inference from EC2 userspace** — a raw host buffer isn't IOMMU-granted to
-the FPGA, so CL-mastered PCIM reads never complete (see `../../../../results/fpga_silicon/MUZERO_CHESS_FWD_AFI.md`
+the FPGA, so CL-mastered PCIM reads never complete (see `../../../../manuscript/results/fpga_silicon/MUZERO_CHESS_FWD_AFI.md`
 §3b). This variant moves the ~12 MB weight buffer to **on-card DDR4**, the drivable home:
 
 ```

@@ -92,7 +92,7 @@ cmd_status(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE
   aws_ s3 ls "$S3_RESULTS/" --recursive 2>/dev/null || echo "(nothing yet)"
   aws_ s3 ls "$S3_RESULTS/DONE" >/dev/null 2>&1 && { echo "DONE present:"; aws_ s3 cp "$S3_RESULTS/mz_summary.json" - 2>/dev/null; } || { echo "-- boot.log tail --"; aws_ s3 cp "$S3_RESULTS/boot.log" - 2>/dev/null | tail -20; }; }
 cmd_fetch(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE_FILE"
-  local DEST="$PROJECT_DIR/results/chess_gpu_baseline"; mkdir -p "$DEST"
+  local DEST="$PROJECT_DIR/manuscript/results/chess_gpu_baseline"; mkdir -p "$DEST"
   aws_ s3 cp "$S3_RESULTS/" "$DEST/" --recursive --exclude "*" --include "mz_*.json*" --include "power.csv" --include "driver.log" --only-show-errors
   ls -1 "$DEST" 2>/dev/null || echo "(none yet)"; }
 cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; source "$STATE_FILE"

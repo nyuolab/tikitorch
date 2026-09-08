@@ -1,7 +1,7 @@
 # cl_forge_pc_ddr — F2 CL for the multiplier-free PC backward kernel (forge_pc_wgrad)
 
 Deploys the DSP=0, bit-exact **predictive-coding cascade backward** layer-step
-(`forge_pc_wgrad`; see `results/predictive_coding/PC_BACKWARD_SILICON.md`) on F2 silicon, so
+(`forge_pc_wgrad`; see `manuscript/results/predictive_coding/PC_BACKWARD_SILICON.md`) on F2 silicon, so
 the gradient produced **on the chip** can be checked against tikitorch's `cascade_grads`.
 
 Reuses the proven drivable on-card-DDR architecture of `cl_forge_muzero_ddr` verbatim (host

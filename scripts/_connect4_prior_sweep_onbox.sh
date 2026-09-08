@@ -3,7 +3,7 @@
 # prior sweep ON the EC2 box. This is the on-box half of run_connect4_prior_sweep_ec2.sh;
 # it is shipped inside the source tarball and invoked by that runner's user-data.
 #
-# WHY THIS EXISTS / WHAT IT FIXES (see results/board_scaling/CONNECT4_PRIOR_SWEEP.md
+# WHY THIS EXISTS / WHAT IT FIXES (see manuscript/results/board_scaling/CONNECT4_PRIOR_SWEEP.md
 # "OPS MISTAKE"): the first sweep ran the recipes concurrently but each `main` used
 # torch's DEFAULT thread count (= all cores) per process, so the eval phase
 # oversubscribed ~200 threads onto 36 cores and the run took ~13 h instead of ~30 min.
@@ -28,7 +28,7 @@ WORKERS="${WORKERS:-4}"
 S3_RESULTS="${S3_RESULTS:?set S3_RESULTS to the s3:// results prefix}"
 cd "$REPO" || exit 2
 export PYTHONPATH="$REPO" PYTHONUNBUFFERED=1
-mkdir -p logs results/board_scaling
+mkdir -p logs manuscript/results/board_scaling
 
 # tag | extra-args  — EXACTLY the rows of CONNECT4_PRIOR_SWEEP.md. The args contain only
 # simple flags (no spaces inside a token), so the unquoted expansion below is intentional.
@@ -45,7 +45,7 @@ recipes=(
 run_one(){
   local tag="$1" extra="$2"
   local log="logs/sweep_${tag}.log"
-  local json="results/board_scaling/connect4_fully_tropical_${tag}.json"
+  local json="manuscript/results/board_scaling/connect4_fully_tropical_${tag}.json"
   echo "[$tag] START $(date -u +%H:%M:%S)  args: $extra"
   # shellcheck disable=SC2086
   python3 scripts/run_fully_tropical_connect4.py --tag "$tag" --threads 1 --workers "$WORKERS" $extra \

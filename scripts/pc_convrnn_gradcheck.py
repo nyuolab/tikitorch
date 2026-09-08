@@ -1,6 +1,6 @@
 """G1 gate: cascade ≡ settled/async PC relaxation on the unrolled lattice.
 
-Pre-registered in results/pc_convrnn/PREREG.md. G0 (adjoint vs autograd) lives in
+Pre-registered in manuscript/results/pc_convrnn/PREREG.md. G0 (adjoint vs autograd) lives in
 pc_convrnn_charlm.py --gradcheck; this script measures the relaxation side:
 
   - sync reverse-topological relaxation (n_iter=1 and L+2) must equal the
@@ -61,7 +61,7 @@ def main():
     p.add_argument("--dropout", type=float, default=0.0)
     p.add_argument("--lam-min", type=float, default=2 ** -6)
     p.add_argument("--out", type=Path,
-                   default=REPO / "results" / "pc_convrnn" / "g1_equivalence.jsonl")
+                   default=REPO / "manuscript" / "results" / "pc_convrnn" / "g1_equivalence.jsonl")
     args = p.parse_args()
     rows = []
     overall = True

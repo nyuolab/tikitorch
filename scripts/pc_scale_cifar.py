@@ -23,7 +23,7 @@ Modes:
                 the internal contraction, not the complete training recipe.
 
 Usage (matrix, what the EC2 runner invokes):
-    python scripts/pc_scale_cifar.py --matrix --out results/predictive_coding/scale_cifar.jsonl
+    python scripts/pc_scale_cifar.py --matrix --out manuscript/results/predictive_coding/scale_cifar.jsonl
 """
 from __future__ import annotations
 
@@ -279,7 +279,7 @@ def main():
     p.add_argument("--batch", type=int, default=128)
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--data-root", default=os.environ.get("DATA_ROOT", "./_data"))
-    p.add_argument("--out", default="results/predictive_coding/scale_cifar.jsonl")
+    p.add_argument("--out", default="manuscript/results/predictive_coding/scale_cifar.jsonl")
     p.add_argument("--matrix", action="store_true")
     p.add_argument("--smoke", action="store_true", help="tiny CPU sanity run")
     args = p.parse_args()

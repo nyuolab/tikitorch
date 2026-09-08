@@ -108,11 +108,13 @@ useful memory/latency trade-off; it does not have to be a universal speedup.
 
 **E0 — Remove contradictory closure labels from research entry points before release.**
 
-`tikitorch/research/nanogpt.py` still permits division/transcendental waivers and
-can print `[strict] training-closure OK`. Its soft-annealing branch acknowledges
-that Level B is not claimed, but historical summaries have not consistently
-preserved that distinction. The current canonical auditor is fail-closed;
-legacy wrapper messages must not sound like passes under its semantics.
+Addressed in the student-handoff cleanup: `tikitorch/research/nanogpt.py` now
+uses the canonical versioned report with no operation waivers. It audits the
+configured batch/device/training temperature separately from a hardened
+deployment candidate, rejecting soft schedules and untraced accumulation
+windows under `--strict`. The legacy `pc_convrnn --strict-audit` receipt is
+explicitly labeled as a batch-2 hardened cascade/optimizer probe, not proof
+of the configured training run. Historical logs remain unchanged.
 
 Acceptance: route current research commands through the canonical report, or
 explicitly label waived/historical checks as non-certifying. Add regression
@@ -206,7 +208,7 @@ the contribution too thin.
 ## Suggested decision sequence
 
 1. Resolve R1 with maintainers; freeze R2 candidate and empirical protocols.
-2. Complete E0, strengthen the checkpoint baseline, then complete S1/S2 on an
+2. Keep E0 regression coverage green, strengthen the checkpoint baseline, then complete S1/S2 on an
    approved existing GPU, retaining failures.
 3. Complete S3 and choose the strongest supported memory/quality/cost claim.
 4. Implement E1/E2 against the measured need; retain E3 as a clearly scoped

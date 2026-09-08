@@ -20,11 +20,20 @@ or test the library — the board-dependent tests self-skip without hardware.
 
 ## Before you open a PR
 
+Use a Git source checkout for development. Distribution archives contain the
+library, not checkout-only tests, research runners, manuscripts or results.
+For a first contribution, start with the [student handoff](manuscript/STUDENT_HANDOFF.md).
+The [handoff audit](docs/library_handoff_audit_2026-09-08.md) records the latest
+bounded cleanup and remaining limitations.
+The [research plan](manuscript/RESEARCH_PLAN.md) is proposed work, not a request
+to launch experiments or provision hardware.
+
 Run the two primary local checks before opening a PR:
 
 ```bash
 python -m ruff check .  # pinned in the dev extra; explicit E4/E7/E9/F rules
 pytest -q               # fast building-block suite: closure, exactness, gradchecks
+python scripts/check_artifact_layout.py  # frozen research evidence and layout
 ```
 
 CI (`.github/workflows/ci.yml`) runs lint once, the fast suite on Python 3.9 through
@@ -78,6 +87,12 @@ If you add a new op, layer, model, or optimizer:
   the corresponding recipe-level tests and physical gates exist.
 
 ## Docs & notebooks
+
+Research evidence lives in `manuscript/results/`; preserve raw records and use
+new output names for reruns. See the [artifact policy](manuscript/ARTIFACTS.md).
+The manuscript's retained-state record hashes every library Python source:
+source changes require an append-only remeasurement and explicit record
+selection, not editing historical hashes to make validation pass.
 
 - The docs site is mkdocs + mkdocstrings: API pages are auto-generated from in-source
   docstrings, and the prose **Guide** lives under `docs/guide/`. Build it with

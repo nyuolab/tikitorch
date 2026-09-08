@@ -1,7 +1,7 @@
 """dyadic_probe — THE decisive pure-tropical test: can MULTIPLY-FREE oblique weights close the gap?
 
 Prior probes localized the §2a underfit to the max-plus cores' inability to make OBLIQUE slopes, and the
-verdict audit (results/capacity_probe/ ... pure-tropical-verdict-audit) verified in-code that the shipped
+verdict audit (manuscript/results/capacity_probe/ ... pure-tropical-verdict-audit) verified in-code that the shipped
 TropicalProjection has an exactly one-hot input gradient → its piece-normals are the axis vectors {e_i};
 weights move breakpoints, never orientations. The audit's load-bearing correction: obliqueness in tropical
 comes from MONOMIAL EXPONENTS (repeated addition), and a LEARNED BIT-SHIFT layer — weights quantized to

@@ -62,7 +62,7 @@ declaration order buffer->mode->a1->a2->a3->return preserves the register offset
 
 ## Build + run
 
-Build (clone of run_muzero_afi_build.sh with the S1 CL/KERNEL params; see results/fpga_training_rig/S1_AFI_PLAN.md §2):
+Build (clone of run_muzero_afi_build.sh with the S1 CL/KERNEL params; see manuscript/results/fpga_training_rig/S1_AFI_PLAN.md §2):
 ```
 CL=cl_forge_train_step_s1 \
 PKG_REL=tikitorch/hardware/hdk/cl_forge_train_step_s1 \

@@ -287,7 +287,7 @@ if __name__ == "__main__":
     ap.add_argument("--drop", type=float, default=0.0)
     ap.add_argument("--subset", type=int, default=None)
     ap.add_argument("--modes", nargs="+", default=["bp_float", "bp_dyadic", "relax", "relax_async"])
-    ap.add_argument("--out", default="results/predictive_coding/charlm_conv_localpc.jsonl")
+    ap.add_argument("--out", default="manuscript/results/predictive_coding/charlm_conv_localpc.jsonl")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args, _ = ap.parse_known_args()
     if args.gradcheck:

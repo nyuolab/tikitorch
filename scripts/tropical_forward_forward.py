@@ -19,7 +19,7 @@ Usage::
     python scripts/tropical_forward_forward.py --smoke          # 1 step, synthetic, asserts closure
     python scripts/tropical_forward_forward.py --depths 2 4 8
 
-Writes a JSONL row per configuration to ``results/forward_forward/`` and prints a
+Writes a JSONL row per configuration to ``manuscript/results/forward_forward/`` and prints a
 summary table. ``torchvision`` is only needed for the real dataset; ``--smoke``
 runs on synthetic data with no download.
 """
@@ -288,7 +288,7 @@ def main():
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--quick", action="store_true", help="smaller/faster sanity run")
     p.add_argument("--smoke", action="store_true", help="1 step on synthetic data; asserts closure")
-    p.add_argument("--out", type=str, default="results/forward_forward/mnist_results.jsonl")
+    p.add_argument("--out", type=str, default="manuscript/results/forward_forward/mnist_results.jsonl")
     p.add_argument("--no-baselines", action="store_true")
     args = p.parse_args()
 

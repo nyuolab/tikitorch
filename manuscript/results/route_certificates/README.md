@@ -28,4 +28,4 @@ density diagnostics rather than the headline portable comparison.
 
 Do not infer latency, allocator/device peak, memory traffic, energy, or arbitrary
 whole-model activation savings from these records. Those endpoints belong to the pending
-five-arm comparison described in the [paper README](../../papers/route_certificates/README.md).
+five-arm comparison described in the [paper README](../../../papers/route_certificates/README.md).

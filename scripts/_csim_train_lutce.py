@@ -102,7 +102,7 @@ def main():
     p.add_argument("--sweep-windows", type=int, default=60)
     p.add_argument("--lr", type=int, default=1)
     p.add_argument("--out", type=Path,
-                   default=REPO / "results" / "lm_shakespeare" / "csim_lutce.json")
+                   default=REPO / "manuscript" / "results" / "lm_shakespeare" / "csim_lutce.json")
     args = p.parse_args()
 
     results = {}

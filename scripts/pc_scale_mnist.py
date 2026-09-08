@@ -22,7 +22,7 @@ Each (dataset, depth, mode, seed) run logs one JSON line with the test accuracy.
 
 Usage (full matrix, what the EC2 runner invokes):
     python scripts/pc_scale_mnist.py --matrix \
-        --out results/predictive_coding/scale_mnist_gamma_damped.jsonl
+        --out manuscript/results/predictive_coding/scale_mnist_gamma_damped.jsonl
 
 Usage (explicit):
     python scripts/pc_scale_mnist.py --datasets mnist fashion \
@@ -235,7 +235,7 @@ def main():
                    help="run the standard scale matrix over all combos")
     p.add_argument("--data-root", default=os.environ.get("DATA_ROOT", "./_data"))
     p.add_argument("--out",
-                   default="results/predictive_coding/scale_mnist_gamma_damped.jsonl")
+                   default="manuscript/results/predictive_coding/scale_mnist_gamma_damped.jsonl")
     p.add_argument("--append", action="store_true",
                    help="append to an existing output (default: fail if it exists)")
     p.add_argument("--protocol", choices=("matched", "archived-budget"),

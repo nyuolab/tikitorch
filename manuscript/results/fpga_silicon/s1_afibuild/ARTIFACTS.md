@@ -65,7 +65,7 @@ normal branch/tag push cannot upload the oversized historical blobs.
 
 ## Reproduce a new build
 
-[`scripts/run_s1_afi_build.sh`](../../../scripts/run_s1_afi_build.sh) packages a
+[`scripts/run_s1_afi_build.sh`](../../../../scripts/run_s1_afi_build.sh) packages a
 clean Git commit, launches the AWS FPGA Developer AMI build, uploads generated
 products to S3, and supports `status` and `fetch` commands. Use a new run tag
 and archive the resulting toolchain, `aws-fpga` commit, source commit, build

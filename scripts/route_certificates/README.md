@@ -32,7 +32,7 @@ python -m scripts.route_certificates.trajectory_audit
 python -m scripts.route_certificates.route_stability
 ```
 
-Defaults append native JSONL rows beneath `results/route_certificates/`. Do not edit a
+Defaults append native JSONL rows beneath `manuscript/results/route_certificates/`. Do not edit a
 scientific row after creation. Preserve failed runs and fallbacks as incidents, and bind
 every retained row to a clean commit, command, environment, configuration, input/model
 digests, and schema version.

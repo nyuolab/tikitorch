@@ -1,0 +1,13 @@
+# PyPI archives distribute the library, not the manuscript's research archive.
+# Run the complete test suite from a Git source checkout: its fixtures and runners
+# deliberately depend on checkout-only scripts, documentation and evidence.
+prune manuscript
+prune papers
+prune scripts
+prune tests
+
+# Generated local products must not leak into a source distribution.
+prune build
+prune dist
+prune site
+global-exclude __pycache__ *.py[cod] .DS_Store .env

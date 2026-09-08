@@ -14,7 +14,7 @@ delta over baseline (ru_maxrss), and torch CPU peak via a sampling thread;
 plus the analytic activation-storage bytes for the BP graph at this shape.
 3 seeds x 2 sizes (d128/4L, d512/4L). Output: committed jsonl.
 
-Usage: python scripts/bench_cascade_vs_bp.py --out results/pc_convrnn/a1_bench.jsonl
+Usage: python scripts/bench_cascade_vs_bp.py --out manuscript/results/pc_convrnn/a1_bench.jsonl
 """
 import argparse
 import json

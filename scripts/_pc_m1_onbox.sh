@@ -6,7 +6,7 @@
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
-OUT=results/pc_convrnn
+OUT=manuscript/results/pc_convrnn
 mkdir -p "$OUT/ckpts"
 export PYTHONPATH=/opt/tiki    # nanogpt_shakespeare has no sys.path guard
 $PY -c "import torch; assert torch.cuda.is_available(), 'NO CUDA'; print('cuda:', torch.cuda.get_device_name(0))" || echo "JOB-FAILED: cuda-probe" >> "$OUT/onbox_jobs.log"

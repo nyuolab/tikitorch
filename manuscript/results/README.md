@@ -3,7 +3,7 @@
 This tree contains curated outputs from TikiTorch experiments. It is not part of the
 stable Python API, and a file's presence does not promote an exploratory observation
 into a release claim. Start with the
-[claim ledger](../docs/research/CLAIM_LEDGER.md), which records the supported wording,
+[claim ledger](../../docs/research/CLAIM_LEDGER.md), which records the supported wording,
 scope, status, and evidence path for claim-bearing results.
 
 ## Map
@@ -36,5 +36,5 @@ workload; software closure reports do not establish routed hardware resource use
   files. A deliberately published artifact-store URI may retain its non-secret bucket
   or account identifier when that identifier is necessary to retrieve the artifact.
 
-Research runners live under [`scripts/`](../scripts/README.md). Manuscript workspaces
+Research runners live under [`scripts/`](../../scripts/README.md). Manuscript workspaces
 consume selected evidence but are maintained separately.

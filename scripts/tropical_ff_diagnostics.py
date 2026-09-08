@@ -1,9 +1,9 @@
 """Tropical Forward-Forward — archived diagnostics.
 
 Reproduces and PERSISTS the supporting diagnostic numbers cited in
-``results/forward_forward/TROPICAL_FORWARD_FORWARD.md`` (so every claim traces to a
+``manuscript/results/forward_forward/TROPICAL_FORWARD_FORWARD.md`` (so every claim traces to a
 shipped row, not a transient console run). Writes one JSON row per probe to
-``results/forward_forward/diagnostics.jsonl``.
+``manuscript/results/forward_forward/diagnostics.jsonl``.
 
 Probes (all MNIST, seed 0, CPU):
   A. substrate_ceiling  — global backprop on a max-plus dilation MLP, Adam vs
@@ -41,7 +41,7 @@ from tikitorch.forward_forward import (
     scramble_features, goodness_classify,
 )
 
-OUT = "results/forward_forward/diagnostics.jsonl"
+OUT = "manuscript/results/forward_forward/diagnostics.jsonl"
 
 
 def load(ntr, nte, root="./data"):

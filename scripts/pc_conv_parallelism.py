@@ -91,6 +91,6 @@ out["curves"] = curves
 print("\nVERDICT: round-tax ~O(depth) (NOT O(depth*RF)) => dilated conv does not inflate the "
       "fabric round-tax; economics carry from the MLP." if (out['round_tax'].get('stale') or 99) <= 2 * DEPTH
       else "\nVERDICT: round-tax exceeds ~2*depth => dilated RF inflates it; note for the economics.")
-with open("results/predictive_coding/conv_parallelism.json", "w") as f:
+with open("manuscript/results/predictive_coding/conv_parallelism.json", "w") as f:
     json.dump(out, f, indent=1)
-print("wrote results/predictive_coding/conv_parallelism.json")
+print("wrote manuscript/results/predictive_coding/conv_parallelism.json")

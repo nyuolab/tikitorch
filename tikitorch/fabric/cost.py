@@ -5,7 +5,7 @@ pipeline." This adds the other half: "how expensive is moving a neighbour messag
 so the runner produces **comms-aware** throughput and we can quantify the win of each
 chip-to-chip transport BEFORE building it on silicon.
 
-Grounding (results/predictive_coding/multi_fpga/, MEASURED on the L=8 dyadic-MLP rig):
+Grounding (manuscript/results/predictive_coding/multi_fpga/, MEASURED on the L=8 dyadic-MLP rig):
   * per-chip block compute  ~ 10.25 ms  (fwd-kick 8.924 ms + bwd-kick 1.329 ms)
   * host-relay comms is     ~ 61 %  of wall-clock at L=8 (word-at-a-time fpga_pci_peek)
   * throughput regresses 25.8 -> 9.1 -> 4.0 steps/s as chips go 2 -> 4 -> 8

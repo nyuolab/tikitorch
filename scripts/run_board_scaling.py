@@ -21,7 +21,7 @@ from tikitorch.planning.muzero.games import (Connect4, TicTacToe, negamax_agent,
 from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.normpath(os.path.join(HERE, "..", "results", "board_scaling"))
+OUT = os.path.normpath(os.path.join(HERE, "..", "manuscript", "results", "board_scaling"))
 
 GAMES = {"connect4": Connect4, "tictactoe": TicTacToe}
 ARMS = [

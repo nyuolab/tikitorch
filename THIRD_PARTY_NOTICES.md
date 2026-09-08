@@ -45,12 +45,12 @@ evidence and maintainer authority still required; no legal clearance or independ
 replacement has been inferred from the local comments alone.
 
 The historical snapshots identified in
-`results/fpga_silicon/ddr_arch/VENDOR_SNAPSHOT_MANIFEST.tsv` carry Amazon Software
+`manuscript/results/fpga_silicon/ddr_arch/VENDOR_SNAPSHOT_MANIFEST.tsv` carry Amazon Software
 License notices, whose redistribution conditions include retaining that license and
 whose use is limited to Amazon services. The snapshots were not relicensed under
 TikiTorch's GPL. See the [Amazon Software License](https://aws.amazon.com/asl/).
 
-The retained files under `results/fpga_silicon/ddr_arch/` are TikiTorch-produced
+The retained files under `manuscript/results/fpga_silicon/ddr_arch/` are TikiTorch-produced
 indexes and diagnostic logs describing an earlier HDK inspection. They do not
 include the inspected vendor HDL, constraints, templates, or encrypted IP.
 

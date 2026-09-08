@@ -35,7 +35,9 @@ import tikitorch as tt
 import tikitorch.optim as ttoptim
 from tikitorch.nn import DyadicLinear, TropicalAttention, TropicalTopKModule
 
-REPO = Path(__file__).resolve().parents[1]
+from tikitorch.research import _default_workspace
+
+REPO = _default_workspace()
 
 # Architecture variants for the tropical arms (applied post-construction where
 # the TropicalTransformer constructor has no knob). All are multiplier-free at
@@ -353,7 +355,7 @@ def build_model(kind, data, args):
             tropical_proj=True,
             multi_scale=args.morph_multi_scale,
             group_size=args.morph_group_size,
-            dropout=args.dropout, use_soft=True, tau=max(args.tau, 1e-6),
+            dropout=args.dropout, use_soft=args.tau > 0.0, tau=args.tau,
             task_type="lm", vocab_size=data.vocab)
         apply_variant(model, data.vocab, args)
         return model
@@ -398,7 +400,8 @@ def build_model(kind, data, args):
     return model
 
 
-# Strictly closed (zero-DSP) optimizers; "signsgd" with momentum is hole H7.
+# Candidate recipes for --strict, not certificates: their actual configured
+# eager step must pass the versioned auditor. No name implies physical zero DSPs.
 CLOSED_OPTS = ("signsgd0", "puretropical", "tropicallion", "countagree")
 CLOSED_LOSSES = ("tropical_ce_lut", "perceptron")
 
@@ -424,55 +427,85 @@ def make_optimizer(name, model, args):
 
 
 def strict_gate(model, data, args, opt_name, loss_type):
-    """Machine-checked strict closure: deploy-closure always; training-closure
-    (Level B) when training is hard from scratch (tau=0, no anneal)."""
-    from tikitorch.audit import assert_closed_runtime
+    """Fail closed on one configured eager training step, with no waivers.
+
+    A separately hardened, eval-mode forward is only a deployment *candidate*.
+    The training probe keeps the model's current temperature and uses the real
+    batch shape and device; it must not inherit the candidate's hardening. Soft
+    or annealed training and the runner's windowed CountAgreement update are not
+    supported by this gate. Passing does not certify later steps, other inputs,
+    compiled kernels, or physical DSP use. The auditor rolls back probe state.
+    """
+    from tikitorch.audit import closure_report
     from tikitorch.models import classification_loss
 
     if opt_name not in CLOSED_OPTS:
-        raise SystemExit(f"--strict requires a closed optimizer {CLOSED_OPTS}, "
+        raise SystemExit(f"--strict requires a candidate optimizer {CLOSED_OPTS}, "
                          f"got {opt_name!r}")
     if loss_type not in CLOSED_LOSSES:
-        raise SystemExit(f"--strict requires a closed loss {CLOSED_LOSSES}, "
+        raise SystemExit(f"--strict requires a candidate loss {CLOSED_LOSSES}, "
                          f"got {loss_type!r}")
+    if args.tau_floor != 0.0:
+        raise SystemExit(
+            "--strict requires --tau-floor 0; a nonzero floor changes the "
+            "training temperature and cannot certify hard-from-scratch training."
+        )
+    if opt_name == "countagree":
+        raise SystemExit(
+            "--strict does not cover the CountAgreement accumulate/step/reset "
+            "window. Audit that complete window explicitly before claiming closure."
+        )
     gen = torch.Generator().manual_seed(0)
-    x, y = data.batch("train", 2, args.seq_len, gen)
-    assert_closed_runtime(model, x)          # hardens tau=0, traces the graph
-    hard_training = args.tau == 0.0 and not args.anneal
-    if hard_training:
-        from tikitorch.audit import find_training_multiplies
+    x, y = data.batch("train", args.batch_size, args.seq_len, gen)
+    x, y = x.to(args.device), y.to(args.device)
 
-        def loss_fn(logits, tgt):
-            return classification_loss(logits.reshape(-1, logits.shape[-1]),
-                                       tgt.reshape(-1), loss_type)
-        opt_probe = make_optimizer(opt_name, model, args)
-        hits = find_training_multiplies(model, x, y, loss_fn, optimizer=opt_probe)
-        # Sanctioned float-sim artifacts (repo doctrine, tests/test_audit.py):
-        # - elementwise-divide: the loss-VALUE batch mean; sign-invariant, the
-        #   silicon emits the +/-1 gradient directly and never computes it.
-        # - transcendental (LUT loss only): exp2 ROM table build + log2-as-
-        #   leading-zero-count in shift_softmax; BRAM/priority-encoder on chip.
-        exempt = {"elementwise-divide"}
-        if loss_type == "tropical_ce_lut":
-            exempt.add("transcendental")
-        bad = [(c, op) for c, op in hits if c not in exempt]
-        if bad:
-            lines = "\n".join(f"    {c}: {op}" for c, op in bad)
-            raise SystemExit(f"[strict] training step NOT closed:\n{lines}")
-        waived = sorted({c for c, _ in hits if c in exempt})
-        print("[strict] training-closure OK"
-              + (f" (waived float-sim artifacts: {', '.join(waived)})" if waived else ""))
-    print(f"[strict] deploy-closure OK"
-          f"{'' if hard_training else ' (training uses soft-tau anneal — Level B not claimed)'}")
+    def loss_fn(logits, tgt):
+        return classification_loss(logits.reshape(-1, logits.shape[-1]),
+                                   tgt.reshape(-1), loss_type)
+
+    deployment = closure_report(model, x, harden_tau=True)
+    opt_probe = make_optimizer(opt_name, model, args)
+    training = closure_report(model, x, y, loss_fn, optimizer=opt_probe,
+                              harden_tau=False)
+    blockers = []
+    for label, report, phase in (
+        ("deployment-candidate", deployment, "inference"),
+        ("current-training", training, "training"),
+    ):
+        coverage = report["coverage"][phase]
+        status = report[f"{phase}_status"]
+        print(f"[strict] {label}: {status} "
+              f"({report['audit_semantics']}; executed-eager-path; "
+              f"mode={coverage['mode']}; harden_tau={coverage['harden_tau']}; "
+              f"devices={','.join(coverage['devices'])})")
+        if not report[f"{phase}_closed"]:
+            lines = "\n".join(f"    {c}: {op}" for c, op in report[phase])
+            blockers.append(f"{label}: {status}\n{lines}")
+    if args.tau != 0.0 or args.anneal:
+        blockers.append("--strict supports only --tau 0 --no-anneal; a hardened "
+                        "forward candidate does not certify soft/annealed training.")
+    if blockers:
+        raise SystemExit("[strict] recipe not certified (no arithmetic or unknown-op "
+                         "waivers):\n" + "\n".join(blockers))
+    print("[strict] supplied eager step certified; later steps, compiled kernels, "
+          "and physical zero-DSP behavior are not certified.")
+    return {"deployment_candidate": deployment, "current_training": training}
 
 
 def train_run(kind, data, args, log_path):
+    if args.strict and kind in ("dense", "dense-conv"):
+        raise SystemExit("--strict cannot certify a dense control; run dense baselines "
+                         "without --strict and audit tropical recipes separately.")
     torch.manual_seed(args.seed)
     device = torch.device(args.device)
-    model = build_model(kind, data, args)
+    model = build_model(kind, data, args).to(device)
+    is_tropical = kind not in ("dense", "dense-conv")
+    if is_tropical:
+        # Initialize every replaced/head/body module to the actual schedule
+        # before the probe AND the first update, including a fixed tau floor.
+        model.set_tau(tau_at(0, args.steps, args.tau, args.anneal, args.tau_floor))
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    is_tropical = kind not in ("dense", "dense-conv")
     opt_name = args.opt or ("signsgd" if kind == "tropical-closed" else "adamw")
     loss_type = args.loss or ("tropical_ce" if kind == "tropical-closed"
                               else "cross_entropy")
@@ -493,7 +526,6 @@ def train_run(kind, data, args, log_path):
             model.loss_type = loss_type
         if args.strict:
             strict_gate(model, data, args, opt_name, loss_type)
-    model = model.to(device)
     opt = make_optimizer(opt_name, model, args)
     is_countagree = opt_name == "countagree"
 
@@ -596,7 +628,7 @@ def main():
                         "the long-horizon sign-drift collapse into the "
                         "constant-predictor attractor.")
     p.add_argument("--text", type=Path, default=REPO / "data" / "tinyshakespeare.txt")
-    p.add_argument("--out", type=Path, default=REPO / "results" / "lm_shakespeare")
+    p.add_argument("--out", type=Path, default=REPO / "manuscript" / "results" / "lm_shakespeare")
     p.add_argument("--tag", type=str, default="run")
     p.add_argument("--tokenizer", type=str, default="char", choices=["char", "bpe"])
     p.add_argument("--vocab-size", type=int, default=1024,
@@ -614,9 +646,10 @@ def main():
     p.add_argument("--accum-window", type=int, default=4,
                    help="microbatches per CountAgreementSGD window")
     p.add_argument("--strict", action="store_true",
-                   help="machine-checked strict closure: assert_closed_runtime at "
-                        "build; assert_training_closed when hard-from-scratch "
-                        "(--tau 0 --no-anneal); closed optimizer+loss required")
+                   help="fail-closed eager audit of the configured batch/device "
+                        "and one full update, without division/LUT/unknown-op "
+                        "waivers; requires --tau 0 --tau-floor 0 --no-anneal; a hardened forward "
+                        "candidate is reported separately, not a zero-DSP proof")
     p.add_argument("--steps", type=int, default=1500)
     p.add_argument("--batch-size", type=int, default=24)
     p.add_argument("--seq-len", type=int, default=96)

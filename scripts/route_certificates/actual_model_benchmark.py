@@ -18,7 +18,7 @@ Usage::
     python -m scripts.route_certificates.actual_model_benchmark [--dry-run]
 
 Results are append-only under
-``results/route_certificates/runs/exp1_benchmark/<uuid>/``.
+``manuscript/results/route_certificates/runs/exp1_benchmark/<uuid>/``.
 """
 from __future__ import annotations
 
@@ -649,7 +649,7 @@ def main(argv=None):
             hard_wall_s=args.hard_wall_s,
             trajectory=dict(config=TRAJECTORY_CONFIG,
                             checkpoints=TRAJECTORY_CHECKPOINTS),
-            output="results/route_certificates/runs/exp1_benchmark/<uuid>/"), indent=1))
+            output="manuscript/results/route_certificates/runs/exp1_benchmark/<uuid>/"), indent=1))
         return
 
     if args.cell_timeout_s <= 0 or args.hard_wall_s <= 0:

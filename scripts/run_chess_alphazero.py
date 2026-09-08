@@ -21,7 +21,7 @@ from tikitorch.planning.muzero.games import AlphaZeroBoardModel, BoardGameModel,
 from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig  # noqa: E402
 from tikitorch.planning.mcts import TropicalMCTS, MCTSConfig  # noqa: E402
 
-OUT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "results", "board_scaling"))
+OUT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "manuscript", "results", "board_scaling"))
 
 
 def agent(net, model_cls, sims):

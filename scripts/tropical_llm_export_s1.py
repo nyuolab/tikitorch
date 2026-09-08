@@ -1,4 +1,4 @@
-"""tropical_llm_export_s1.py — export the TRAINED tropical LLM (results/lm_shakespeare/tropical_llm_d64.pt)
+"""tropical_llm_export_s1.py — export the TRAINED tropical LLM (manuscript/results/lm_shakespeare/tropical_llm_d64.pt)
 into the int32 monolithic buffer the forge_train_step_s1 FORWARD kernel reads (mode 0,
 -DS1_FWD_ONLY=1 -DS1_ATTN_HARD=1 -DS1_HEAD_MODE=1 -DS1_POS_EMBED=1 -DS1_N_LAYERS=2 at D=64/V=64).
 
@@ -215,7 +215,7 @@ def load_ce_lut():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--ckpt', default=str(REPO / 'results' / 'lm_shakespeare' / 'tropical_llm_d64.pt'))
+    ap.add_argument('--ckpt', default=str(REPO / "manuscript" / "results" / 'lm_shakespeare' / 'tropical_llm_d64.pt'))
     ap.add_argument('--out', default='/tmp/s1_buf.npy')
     # defaults = the best deploy fixed-point found by the scale sweep (deployable bpc 4.05 on 63 val windows,
     # real kernel; logit softmax temperature 192 — verified flat across a wide SA/SGAM/SW/SH/GCOMP grid).
@@ -234,8 +234,8 @@ def main():
     ap.add_argument('--faithful', action='store_true',
                     help='export the MAD-LN kernel-faithful model (ln*.g/.b keys); GCOMP auto=1.0')
     a = ap.parse_args()
-    if a.faithful and a.ckpt == str(REPO / 'results' / 'lm_shakespeare' / 'tropical_llm_d64.pt'):
-        a.ckpt = str(REPO / 'results' / 'lm_shakespeare' / 'tropical_llm_d64_faithful.pt')
+    if a.faithful and a.ckpt == str(REPO / "manuscript" / "results" / 'lm_shakespeare' / 'tropical_llm_d64.pt'):
+        a.ckpt = str(REPO / "manuscript" / "results" / 'lm_shakespeare' / 'tropical_llm_d64_faithful.pt')
     gcomp = a.GCOMP if a.GCOMP >= 0 else (1.0 if a.faithful else 0.8)
     SW = a.SW
     if a.SW_PM:

@@ -29,7 +29,7 @@ from tikitorch.planning.muzero.chess_game import Chess, random_agent, material_a
 from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig
 from tikitorch.planning.muzero.games import play_match
 
-OUT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "results", "board_scaling"))
+OUT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "manuscript", "results", "board_scaling"))
 
 
 # --- parallel eval (chess eval is the bottleneck: ~84 s/game serial). Fan games across a Pool,

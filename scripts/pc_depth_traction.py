@@ -16,7 +16,7 @@ import torch
 
 from pc_charlm import load, run_one_lm, bigram_floor
 
-OUT = "results/pc_depth_traction/exp2_traction.jsonl"
+OUT = "manuscript/results/pc_depth_traction/exp2_traction.jsonl"
 
 
 def main():

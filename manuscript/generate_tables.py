@@ -16,9 +16,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 RUN_ID = "529c45f4-7274-4999-b35c-c59d1db917e6"
-SAVED = f"results/route_certificates/actual_morphssm/exp1_saved_state/{RUN_ID}"
-D512 = "results/fpga_silicon/d512_verify"
-MNIST = "results/predictive_coding/onfabric_train"
+SAVED = f"manuscript/results/route_certificates/actual_morphssm/exp1_saved_state/{RUN_ID}"
+D512 = "manuscript/results/fpga_silicon/d512_verify"
+MNIST = "manuscript/results/predictive_coding/onfabric_train"
 SOURCE_SHA256 = {
     f"{SAVED}/saved_state.jsonl": "351c15fc09455d953db3f53dc9929af1dd961db9f351c9992ba48ba08d25623b",
     f"{SAVED}/manifest.json": "7f5bf7b657b160dc51c51a563267d3ee77412c9b29ad0cd40f802c55f84bac29",

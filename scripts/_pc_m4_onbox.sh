@@ -4,7 +4,7 @@
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
-OUT=results/pc_convrnn
+OUT=manuscript/results/pc_convrnn
 mkdir -p "$OUT/ckpts"
 sync_s3(){ aws s3 sync "$OUT" "$S3_RESULTS/pc_convrnn" --only-show-errors || true; }
 health(){ echo "$(date -u +%H:%M:%S) up=$(cut -d' ' -f1 /proc/uptime) \

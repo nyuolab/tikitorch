@@ -7,6 +7,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+
+- A proposed ECG/language-pretraining research plan and CPU-first student handoff
+  under `manuscript/`, with practical quality/resource gates and a later FPGA capstone.
+- A hash/mode-checked relocation inventory for `manuscript/results/`, preserving
+  frozen research evidence while allowing append-only new runs.
 - Device-resident packed/unpacked route tapes, streaming hard-MorphSSM recording,
   loss-independent VJPs, and `route_logits` integration with ordinary first-order
   PyTorch autograd and saved-tensor hooks.
@@ -21,11 +26,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Hard-route onboarding workflow** — `examples/closure_workflow.py` connects a
   PyTorch-shaped min-plus layer, executed-path closure report, bit-packed winner
   record, and exact selected-VJP replay in one deterministic script.
-- **Research navigation** — root maps under `results/` and `scripts/` distinguish
+- **Research navigation** — root maps under `manuscript/results/` and `scripts/` distinguish
   public examples from revision-bound runners and claim-bearing evidence.
-- **Two-paper Xiang handoff** — one review entry point now separates the
-  route-certificate and multiplier-free-FPGA drafts, their durable claims, and
-  the experiments still required before submission.
+- **Xiang handoff** — one review entry point for the unified manuscript,
+  historical source drafts, durable claims and remaining experiments.
 - **Exact forward-route certificates** — `tikitorch.autodiff` provides a typed
   operator registry, packed certificates, and selected-VJP replay for the
   explicitly supported hard-routed graph. Exactness, composition, tie, saved-state,
@@ -33,14 +37,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Independent research workspaces** — paper sources for route certificates and
   multiplier-free FPGA learning now live under `papers/`, with a shared publication
   map and evidence-controlled claim ledger.
-- **Root manuscript handoff** — `manuscript/` is a zero-copy build entry point and
-  publication brief for the canonical route-certificate source under `papers/`.
+- **Unified manuscript** — `manuscript/` combines the route-certificate and FPGA
+  drafts; former scientific sources under `papers/` remain historical references.
 - **Library-first documentation** — installation, five-minute quickstart, recipes,
   closure boundaries, API index, research map, and namespace reference now form a
   progressive PyTorch-style documentation path.
 - **Reproducible route benchmarks** — matched, trajectory, stability, saved-state,
   and actual-model entry points under `scripts/route_certificates/`, with preserved
-  reference rows under `results/route_certificates/`.
+  reference rows under `manuscript/results/route_certificates/`.
 - **Citation metadata** — `CITATION.cff` identifies the software artifact while the
   two research papers maintain separate bibliographies.
 - **Loss modules** — `tt.nn.TropicalCrossEntropyLoss` and `tt.nn.TropicalPerceptronLoss`,
@@ -70,7 +74,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `TropicalFFLayer`, goodness fns, hinge/logistic loss, `TropicalFFTrainer`,
   negative-data generators, goodness classifier); the models train via
   `forward_forward_fit`, not `loss.backward()`. Experiments + honest report under
-  `results/forward_forward/` (`scripts/tropical_forward_forward.py`,
+  `manuscript/results/forward_forward/` (`scripts/tropical_forward_forward.py`,
   `scripts/tropical_ff_mnist_benchmark.py`, `scripts/tropical_ff_diagnostics.py`).
 - `scripts/build_fpga_local.sh` and an upgraded `examples/fpga_quickstart.py`:
   one command builds the LOCAL host-reference endpoint, while the example
@@ -81,6 +85,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with Twine, and exercises the installed closure CLI.
 
 ### Changed
+
+- Research artifacts now live in `manuscript/results/`, separate from the
+  reusable library. Active paths follow the move; historical raw records and
+  S3 object keys are preserved. Source distributions exclude checkout-only
+  manuscript, research-runner and test trees.
 - Supported Python metadata now matches the tested 3.9–3.12 interpreter window.
 - Hard tropical layers handle arbitrary leading dimensions and use bounded
   reduction tiles/direct gradient accumulation. Hard depthwise and top-k software
@@ -139,6 +148,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   does not produce repository-relative broken links.
 
 ### Fixed
+
+- The legacy LM `--strict` gate uses canonical no-waiver reports for the actual
+  training configuration, separately labels hardened candidates, and rejects
+  unaudited soft schedules and CountAgreement windows.
+- Research CLI defaults no longer resolve inside the Python package. Library
+  quickstart documentation explains quantized-input range and multilabel loss.
+- Two historical GPU/F2 launchers require explicit launch and synchronize their
+  required runner scripts; offline inspection and failure handling are tested.
 - `DyadicPCNet.settle_nudge` and its research runner now apply the configured
   relaxation factor `gamma`. Archived nudge measurements that used the former
   effective unit step are labeled as legacy evidence and require a corrected-gamma

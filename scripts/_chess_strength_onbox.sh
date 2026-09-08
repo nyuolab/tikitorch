@@ -20,7 +20,7 @@ WORKERS="${WORKERS:-8}"
 S3_RESULTS="${S3_RESULTS:?set S3_RESULTS to the s3:// results prefix}"
 cd "$REPO" || exit 2
 export PYTHONPATH="$REPO" PYTHONUNBUFFERED=1
-mkdir -p logs results/board_scaling
+mkdir -p logs manuscript/results/board_scaling
 
 # bounded params (sized from measured chess cost; ~2-2.5h wall-clock on a 36-vCPU box, well under backstop)
 SIMS=48; ITERS=12; GAMES=16; STEPS=30; EVAL=12; ETRACK=6; EEVERY=6
@@ -36,7 +36,7 @@ recipes=(
 run_one(){
   local tag="$1" extra="$2"
   local log="logs/chess_${tag}.log"
-  local json="results/board_scaling/chess_strength_${tag}.json"
+  local json="manuscript/results/board_scaling/chess_strength_${tag}.json"
   echo "[$tag] START $(date -u +%H:%M:%S)  args: $extra"
   # shellcheck disable=SC2086
   python3 scripts/run_chess_strength.py --tag "$tag" --threads 1 --workers "$WORKERS" \

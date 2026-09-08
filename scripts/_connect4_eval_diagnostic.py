@@ -18,7 +18,7 @@ torch.set_num_threads(12)
 from tikitorch.planning.muzero.games import Connect4, negamax_agent  # noqa: E402
 from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig  # noqa: E402
 
-OUT = os.path.join(os.path.dirname(__file__), "..", "results", "board_scaling")
+OUT = os.path.join(os.path.dirname(__file__), "..", "manuscript", "results", "board_scaling")
 
 
 def random_opening(seed, n_plies):

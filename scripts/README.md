@@ -17,13 +17,24 @@ source revision.
 | `_*.py`, `_*.sh` | Internal helpers invoked by another runner; not primary entry points |
 
 For library onboarding, use [`examples/`](../examples/README.md), not these research
-runners. For evidence interpretation, start at [`results/`](../results/README.md) and
+runners. For evidence interpretation, start at [`manuscript/results/`](../manuscript/results/README.md) and
 the [claim ledger](../docs/research/CLAIM_LEDGER.md).
+
+New output defaults use `manuscript/results/`; see the
+[artifact preservation policy](../manuscript/ARTIFACTS.md). Research runner
+defaults resolve the checkout root, or the caller's directory when installed
+without a checkout. Pass explicit data/output paths for reproducible runs.
+`nanogpt --strict` checks current hard training separately from a hardened
+candidate. `pc_convrnn --strict-audit` is a legacy batch-2 hardened cascade
+probe only; it does not certify the configured training trajectory.
 
 ## Running safely
 
-1. Read the script docstring and `--help`; begin with a `--dry-run` or smoke option
-   where one exists.
+1. Read the script source/docstring first: historical runners do not all have
+   safe help or dry-run modes. The `run_tikitorch_gpu_benchmarks.sh` and
+   `run_tikitorch_f2_silicon.sh` launchers require an explicit `launch`; their
+   `--help` exits without AWS calls or local state creation. Do not assume a
+   similarly named mode in another script has the same safety contract.
 2. Record the exact Git revision, command, seed, dependencies, data digest, and hardware
    configuration. Do not infer those values from a filename.
 3. Supply AWS profiles, keys, security groups, AGFIs, vendor-tool locations, and data

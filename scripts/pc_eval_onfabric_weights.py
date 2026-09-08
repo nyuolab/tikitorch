@@ -8,7 +8,7 @@ accuracy, the fabric-trained weights are genuinely good (not a predict() artifac
 forward == the kernel forward. Pure cross-check; no training here.
 
 Run: PYTHONPATH=. DATA_ROOT=/tmp/_tiki_data \
-     python scripts/pc_eval_onfabric_weights.py results/.../trainedW0.i32 results/.../trainedW1.i32
+     python scripts/pc_eval_onfabric_weights.py manuscript/results/.../trainedW0.i32 manuscript/results/.../trainedW1.i32
 """
 import os, sys
 sys.path.insert(0, ".")

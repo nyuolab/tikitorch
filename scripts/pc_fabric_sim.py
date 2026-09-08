@@ -155,7 +155,7 @@ if __name__ == "__main__":
           "  Rung 3B: the GPU/digital-throughput claim does not stand; the substrate claim does.", flush=True)
 
     out = {"compute": cc, "allreduce_ms": {k: v*1e3 for k, v in ar.items()}, "speedup_vs_R": rows}
-    os.makedirs("results/predictive_coding", exist_ok=True)
-    with open("results/predictive_coding/fabric_sim.json", "w") as f:
+    os.makedirs("manuscript/results/predictive_coding", exist_ok=True)
+    with open("manuscript/results/predictive_coding/fabric_sim.json", "w") as f:
         json.dump(out, f, indent=1)
-    print("\nwrote results/predictive_coding/fabric_sim.json", flush=True)
+    print("\nwrote manuscript/results/predictive_coding/fabric_sim.json", flush=True)

@@ -1,5 +1,5 @@
 """Exp 1 — cascade-vs-relaxation gradient divergence vs depth (PREREG.md in
-results/pc_depth_traction/). No training: pure gradient comparison on fixed batches.
+manuscript/results/pc_depth_traction/). No training: pure gradient comparison on fixed batches.
 
 Run: PYTHONPATH=. python scripts/pc_depth_divergence.py
 """
@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from tikitorch.nn.predictive_coding import DyadicPCNet
 from pc_charlm import load, onehot
 
-OUT = "results/pc_depth_traction/exp1_divergence.jsonl"
+OUT = "manuscript/results/pc_depth_traction/exp1_divergence.jsonl"
 DEPTHS = [2, 4, 8, 16]
 HIDDEN, CTX, BATCH, NBATCH = 256, 12, 256, 3
 

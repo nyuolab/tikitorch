@@ -21,7 +21,7 @@ from tikitorch.planning.muzero.games import Connect4, negamax_agent, random_open
 from tikitorch.planning.muzero.board_agent import BoardMuZero, BoardConfig
 from tikitorch.planning.mcts import TropicalMCTS, MCTSConfig
 
-OUT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "results", "board_scaling"))
+OUT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "manuscript", "results", "board_scaling"))
 
 
 def az_agent(net, sims):

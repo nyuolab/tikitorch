@@ -1,6 +1,6 @@
 """M4: FIM-trained MorphSSM — the cross-family uniqueness baseline for G6b.
 
-Pre-registered in results/pc_convrnn/PREREG.md (M4). Trains the SAME MorphSSM
+Pre-registered in manuscript/results/pc_convrnn/PREREG.md (M4). Trains the SAME MorphSSM
 (arch/params/substrate identical; cascade credit) with fill-in-the-middle data
 augmentation (PSM format, 50% of batches), then evaluates span infilling on the
 G6b windows — the "one data-augmentation flag" answer a transformer shop would
@@ -13,7 +13,7 @@ the model learns to emit the middle conditioned on BOTH sides).
 Usage::
 
     python scripts/pc_convrnn_fim.py --steps 6000 --credit cascade
-    python scripts/pc_convrnn_fim.py --eval-only --ckpt results/pc_convrnn/ckpts/m4_fim_d256_6k.pt
+    python scripts/pc_convrnn_fim.py --eval-only --ckpt manuscript/results/pc_convrnn/ckpts/m4_fim_d256_6k.pt
 """
 import argparse
 import json
@@ -93,7 +93,7 @@ def eval_fim_infill(model, data, spans, n_windows, seq_len, seed, device):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--text", type=Path, default=REPO / "data" / "tinyshakespeare.txt")
-    p.add_argument("--out", type=Path, default=REPO / "results" / "pc_convrnn")
+    p.add_argument("--out", type=Path, default=REPO / "manuscript" / "results" / "pc_convrnn")
     p.add_argument("--steps", type=int, default=6000)
     p.add_argument("--batch-size", type=int, default=24)
     p.add_argument("--seq-len", type=int, default=96)

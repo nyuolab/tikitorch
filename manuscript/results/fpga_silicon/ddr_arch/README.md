@@ -14,5 +14,5 @@ observed during the run remain in `ref_index.txt`, `interfaces_ls.txt`,
 `VENDOR_SNAPSHOT_MANIFEST.tsv` records the Git blob identities and captured filenames
 for provenance only. It is not a retrieval mechanism and does not grant permission to
 redistribute those blobs. The history/provenance review described in
-[`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) must be completed before
+[`THIRD_PARTY_NOTICES.md`](../../../../THIRD_PARTY_NOTICES.md) must be completed before
 changing repository visibility.

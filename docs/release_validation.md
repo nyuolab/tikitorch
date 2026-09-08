@@ -45,6 +45,23 @@ as part of adding this configuration.
 
 ## Fail-closed provenance gate
 
+Research-layout integrity is a separate check:
+
+```bash
+python scripts/check_artifact_layout.py
+```
+
+It verifies the frozen archive now under `manuscript/results/`, not permission
+to redistribute it. Library source archives and wheels exclude `manuscript/`,
+`papers/`, `scripts/` and `tests/`; use a Git checkout for the full development
+and research workflow. See the
+[artifact policy](https://github.com/nyuolab/tikitorch/blob/main/manuscript/ARTIFACTS.md).
+After building, verify actual archive contents (also enforced in package CI):
+
+```bash
+python scripts/check_distribution_layout.py dist/*.tar.gz dist/*.whl
+```
+
 ```bash
 python scripts/check_release_provenance.py --inventory-only  # record integrity only
 python scripts/check_release_provenance.py                   # publication gate
@@ -61,7 +78,7 @@ wrappers and records the separate retained-history review. Local evidence establ
 adaptation, not distribution permission: the MuZero header identifies the HDK
 `unused_ddr_template`; the PC header identifies verbatim reuse of that wiring;
 the other wrappers retain related DDR structures. The historical
-[`VENDOR_SNAPSHOT_MANIFEST.tsv`](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/ddr_arch/VENDOR_SNAPSHOT_MANIFEST.tsv)
+[`VENDOR_SNAPSHOT_MANIFEST.tsv`](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/fpga_silicon/ddr_arch/VENDOR_SNAPSHOT_MANIFEST.tsv)
 identifies the captured template blob but does **not** establish an upstream commit,
 complete chain of rights, or license compatibility. No source has been relicensed
 or independently rewritten by this release-preparation change.

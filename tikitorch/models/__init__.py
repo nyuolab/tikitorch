@@ -34,7 +34,7 @@ The ``task_type`` / loss convention:
     not ``loss.backward()``. Their ``forward(x)`` returns goodness-based class logits
     so they are still drop-in classifiers, and ``compute_loss`` is provided only as a
     *non-FF* global-backprop baseline. See :mod:`tikitorch.forward_forward` and
-    ``results/forward_forward/TROPICAL_FORWARD_FORWARD.md``.
+    ``manuscript/results/forward_forward/TROPICAL_FORWARD_FORWARD.md``.
 
 Each model also exposes a cheap ``param_count`` property and, where applicable,
 an optional ``hardware_cost(...)`` method returning a
@@ -1528,7 +1528,7 @@ class TropicalForwardForward(FpgaAccelerable, nn.Module):
       for monitoring and as a *non-FF* global-backprop baseline; it does **not**
       implement the forward-forward rule (use ``forward_forward_*`` for that).
 
-    Method + honest measured numbers: ``results/forward_forward/TROPICAL_FORWARD_FORWARD.md``.
+    Method + honest measured numbers: ``manuscript/results/forward_forward/TROPICAL_FORWARD_FORWARD.md``.
     Classification only (``task_type='classification'``).
     """
 
@@ -1666,8 +1666,9 @@ def classification_loss(logits: torch.Tensor, y: torch.Tensor,
       * ``"perceptron"`` — :func:`~tikitorch.functional.tropical_perceptron_loss`,
         the 2-hot gradient used by a documented F2 kernel path.
       * ``"tropical_ce"`` — :func:`~tikitorch.functional.tropical_cross_entropy`
-        with a host-side exact softmax (zero-DSP kernel + tiny host softmax; the
-        silicon-validated +3.2pp path).
+        with a host-side exact softmax. Historical F2 experiments paired this
+        conditioning rule with a zero-DSP kernel; that build-specific evidence
+        does not certify this Python loss or an arbitrary training recipe.
       * ``"tropical_ce_lut"`` — the same with ``shift_softmax``; this is a
         lookup/shift-oriented conditioning path, not by itself a whole-loop or
         physical closure claim.

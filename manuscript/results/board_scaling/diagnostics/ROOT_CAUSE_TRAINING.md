@@ -9,7 +9,7 @@ The pre-workflow critique's leading hypothesis was that the **closed SignSGD/Tro
 (`W -= lr·sign(grad)`, which discards gradient *magnitude*) is structurally too weak on value-like
 targets, and that the fix is a *new learning rule*. This document tests that, constructively.
 
-Harness: [`scripts/muzero_train_diagnostics.py`](../../../scripts/muzero_train_diagnostics.py)
+Harness: [`scripts/muzero_train_diagnostics.py`](../../../../scripts/muzero_train_diagnostics.py)
 (`optbisect` = stationary supervised bisect; `online` = instrumented self-play loop).
 
 ---

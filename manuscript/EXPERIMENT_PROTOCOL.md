@@ -1,8 +1,12 @@
 # Proposed design for the remaining TikiTorch study
 
-Version: draft protocol 1, 2026-09-08. This document specifies proposed
-experiments, not measurements. Dataset, hardware/budget and candidate identity
-must be filled and approved before claim-bearing runs. Pilot tuning and final
+Version: draft protocol 2, 2026-09-08. This document specifies proposed
+experiments, not measurements. The [research plan](RESEARCH_PLAN.md) selects
+ECG classification and language pretraining as the two practical tracks, with
+an eventual FPGA capstone. The immediate milestone is the
+[student handoff](STUDENT_HANDOFF.md), not execution of the protocol. Exact
+dataset configuration, hardware/budget, owner and candidate identity must be
+filled and approved before claim-bearing runs. Pilot tuning and final
 evaluation must be separated; never label choices made after viewing results
 as preregistered.
 
@@ -49,8 +53,12 @@ before authorizing a full matrix.
 
 The initial proposed shape ladder is `(D,L,T) = (64,2,128), (128,4,512),
 (256,4,2048)`, with batches 1, 4 and 16, fixed task vocabulary and all declared
-seeds. Adjust this ladder only in a documented pilot revision before final
-runs. Record actual OOMs and tested fits; do not extrapolate a maximum capacity.
+seeds. This is an implementation-development ladder, not the final ECG or
+language-pretraining configuration. Task-specific protocols must use justified
+input resolutions/lengths and model capacities from the research plan; do not
+truncate the ECG task or shrink an LM vocabulary silently to fit this ladder.
+Adjust ladders only in a documented pilot revision before final runs. Record
+actual OOMs and tested fits; do not extrapolate a maximum capacity.
 
 Arms: eager autograd, native compiled autograd, checkpoint (per-layer, grouped,
 selective where available), native compiled unpacked routes and native compiled
@@ -81,11 +89,36 @@ whole Pareto frontier. If instrumented, report measured memory traffic with
 its profiler boundary; otherwise leave it unmeasured. Never infer board energy
 from arithmetic counts or allocator metrics.
 
+For the practical task studies, make time to a validation-selected,
+predeclared quality target under a fixed device-memory budget the primary
+resource outcome, then confirm quality on the held-out test split. Report the
+quality/cost frontier and configurations that never reach the target. Match
+effective batches and include compatible gradient accumulation, chunking,
+offloading and optimized loss implementations for all relevant arms. Report
+host/offloaded memory too; saving device memory by moving it elsewhere is a
+trade-off, not eliminated storage. Charge soft-to-hard phases and compile/startup
+costs in end-to-end time, separately from steady-state kernel timing.
+
 ## B. Useful task quality
 
-Choose a legally usable non-synthetic task with a fixed held-out split before
-final evaluation. A corpus study needs distinct training, validation and test
-partitions; the current convenience 85/15 runner is not a full model-selection
+The agreed directions are proposed in [RESEARCH_PLAN.md](RESEARCH_PLAN.md):
+
+- **ECG:** PTB-XL v1.0.3 diagnostic superclasses, five-label prediction,
+  patient-separated folds, 100-Hz quality pilot before any justified 500-Hz
+  study. The pooled-classification route boundary and multilabel loss need
+  implementation and parity tests. Compare continuous and quantized input
+  projections, and tuned conventional ECG networks.
+- **Language pretraining:** a proposed 10–30M-parameter TinyStories development
+  pilot, then a gated 100–150M-parameter natural-text study on a frozen
+  FineWeb-Edu subset. Token budgets, tokenizer, splits and hardware are not
+  approved yet. The scalable vocabulary head/hybrid boundary needs development;
+  the existing small-vocabulary adapter is not sufficient evidence of scaling.
+
+The synthetic TinyStories pilot is diagnostic, not fulfillment of the
+non-synthetic useful-task gate. The final claim needs a legally usable
+non-synthetic task with a fixed held-out split. A corpus study needs distinct
+training, validation and test partitions; the current convenience 85/15 runner
+is not a full model-selection
 protocol. Freeze preprocessing/tokenization and remove known overlap or leakage.
 Use validation only for hyperparameters, stopping and checkpoint selection;
 evaluate the untouched test split once per selected seed/configuration.
@@ -124,6 +157,14 @@ exploratory. No outcome is assumed positive.
 
 ## D. Optional hardware extension
 
+The later capstone targets ECG learning first, without a GPU performing the
+learning computation and with zero DSP use in the declared FPGA learning
+implementation. Specify every input, pooling/head, loss, backward and update
+boundary: host offload of any such computation is not a complete FPGA learning
+loop. Verify DSP utilization separately from absence of data multiplications;
+disclose platform-shell resources. A zero-DSP implementation need not be
+multiplier-free, and a multiplier-free implementation can use DSP adders.
+
 Retaining the current appendix as historical feasibility does not require a
 new speed/energy claim. To add one, match the exact numeric recipe, model,
 data order, update rule and state transition across reference and hardware;
@@ -133,6 +174,11 @@ Measure full-card idle/active power under synchronized workloads with
 uncertainty. Host staging/readback and setup costs must be visible.
 
 ## Required final artifacts
+
+Store research records under `manuscript/results/` from the repository root;
+keep large datasets/checkpoints/images in approved external storage with
+immutable identities and links. Preserve historical raw logs and manifests
+when changing path indexes or derived tables.
 
 Append-only raw rows and incident records; immutable source/environment/data
 identities; deterministic tables/plots; all comparator configurations; explicit

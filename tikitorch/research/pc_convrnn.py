@@ -2,7 +2,7 @@
 
 Track 1 (primary): predictive-coding training of the REAL ``tt.models.MorphSSM``
 (bakeoff config) via a single-sweep cascade over frozen tropical routing — the
-unrolled-graph corollary of cascade≡settled-PC (results/pc_convrnn/
+unrolled-graph corollary of cascade≡settled-PC (manuscript/results/pc_convrnn/
 THEORY_UNROLLED_CASCADE.md). At tau=0 the entire backward is gather/scatter/add:
 weights enter tropical ops ADDITIVELY, so every parameter gradient is a routed
 sum of errors — zero multiplies of any kind (the soft-tau phase has the
@@ -39,7 +39,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-REPO = Path(__file__).resolve().parents[1]
+from tikitorch.research import _default_workspace
+
+REPO = _default_workspace()
 
 import tikitorch as tt                                    # noqa: E402
 from tikitorch.functional import stable_topk               # noqa: E402
@@ -1010,12 +1012,15 @@ def run_one(arch, credit, data, args, log_path):
         cats = Counter(c for c, _ in hits)
         bad = dict(cats)
         row = dict(gate="G5_audit", arch=arch, opt=args.opt, loss=args.loss,
+                   audit_scope="hardened_batch2_cascade_optimizer_probe",
+                   proves_configured_training=False,
                    tau=0.0, violations=bad,
                    waived={}, audit_semantics=tt.audit.AUDIT_SEMANTICS_VERSION,
                    training_closed=not bad)
         with (args.out / "g5_audit.jsonl").open("a") as f:
             f.write(json.dumps(row) + "\n")
-        print(f"[G5-audit] training_closed={not bad} violations={bad} "
+        print(f"[G5-audit legacy candidate] scope={row['audit_scope']} "
+              f"proves_configured_training=False training_closed={not bad} violations={bad} "
               f"waived={dict(row['waived'])}")
         model.set_tau(max(args.tau, 0.0))
         if bad:
@@ -1120,7 +1125,7 @@ def main():
     p.add_argument("--gradcheck", action="store_true", help="run G0 and exit")
     p.add_argument("--gc-seeds", type=int, default=3)
     p.add_argument("--text", type=Path, default=REPO / "data" / "tinyshakespeare.txt")
-    p.add_argument("--out", type=Path, default=REPO / "results" / "pc_convrnn")
+    p.add_argument("--out", type=Path, default=REPO / "manuscript" / "results" / "pc_convrnn")
     p.add_argument("--tag", type=str, default="run")
     p.add_argument("--steps", type=int, default=1500)
     p.add_argument("--batch-size", type=int, default=24)
@@ -1144,8 +1149,8 @@ def main():
     p.add_argument("--loss", type=str, default="ce", choices=["ce", "lut"])
     p.add_argument("--lr-shift", type=int, default=10)
     p.add_argument("--strict-audit", action="store_true",
-                   help="G5: fail if a tau=0 cascade+optimizer step executes any "
-                        "classified multiply, divide, fused, or transcendental op")
+                   help="Legacy G5: audit a batch-2, tau=0 cascade+optimizer candidate; "
+                        "does not certify configured soft/annealed training or non-cascade paths")
     p.add_argument("--ckpt-name", type=str, default=None,
                    help="checkpoint filename override (default arch_credit_seed.pt)")
     p.add_argument("--eval-interval", type=int, default=100)

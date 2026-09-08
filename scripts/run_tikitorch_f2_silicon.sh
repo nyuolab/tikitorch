@@ -1,9 +1,11 @@
 #!/bin/bash
-# Reference: TikiTorch model.fpga() char-LM trained on REAL AWS F2 silicon.
-# Provisions an f2.6xlarge, syncs the tikitorch package, sets up the aws-fpga SDK,
-# loads the validated monolithic forge_train_step AGFI, and runs the proven
-# scripts/run_fpga_f2_verify.sh (binds model.fpga(), runs 50 on-board train_step()s,
-# reports bound/dsp=0/params-evolved). The on-silicon zero-DSP TRAINING reference.
+# Historical TikiTorch model.fpga() char-LM demonstration on AWS F2.
+# Explicit launch provisions a paid f2.6xlarge, syncs package + scripts, sets up
+# the SDK, loads the caller's AGFI, and invokes scripts/run_fpga_f2_verify.sh.
+# A binding, a kernel's declared DSP metadata, and evolving parameters do not
+# establish current numerical parity, whole-loop closure, or physical DSP use.
+# Those claims require a matching build, ABI, and routed resource evidence.
+# Review the verifier's historical layout limitations and AMI/dependency defaults.
 #
 # Usage:
 #   bash scripts/run_tikitorch_f2_silicon.sh launch
@@ -11,6 +13,19 @@
 #   bash scripts/run_tikitorch_f2_silicon.sh download
 #   bash scripts/run_tikitorch_f2_silicon.sh terminate
 set -e
+usage(){
+  printf 'Usage: %s {launch|monitor|download|terminate|ssh}\n' "$0"
+  printf '%s\n' 'Only an explicit launch provisions paid AWS resources and changes SSH ingress.' \
+    'Set AWS_PROFILE, KEY_NAME, SG, and your own AGFI; review AMI, REGION, and image ABI.' \
+    'This historical demonstration is not a current physical zero-DSP certificate.' \
+    'No arguments or --help prints this help without reading credentials or creating state.'
+}
+if [ "$#" -gt 1 ]; then usage >&2; exit 2; fi
+case "${1:-help}" in
+  help|-h|--help) usage; exit 0;;
+  launch|monitor|download|terminate|ssh) COMMAND="$1";;
+  *) usage >&2; exit 2;;
+esac
 # --- REQUIRED: your own AWS account/infra. This script NEVER defaults to anyone's
 # account; set these in your environment before running. ---
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE to your AWS CLI profile (e.g. export AWS_PROFILE=my-profile)}"
@@ -20,13 +35,14 @@ PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="${PEM:-$HO
 EBS_SIZE=200
 AMI="${AMI:-ami-092fc5deb8f3c0f7d}"                       # overridable: the AWS FPGA Developer AMI for $REGION
 AGFI="${AGFI:?set AGFI to your OWN AFI global id — this library ships NO AFI; build one from the bundled HLS (see tikitorch/fpga/BUILD_NATIVE.md)}"
-STATE_DIR="$PROJECT_DIR/.tiki_f2_state"; mkdir -p "$STATE_DIR"
+STATE_DIR="$PROJECT_DIR/.tiki_f2_state"
 STATE_FILE="$STATE_DIR/instance.state"
 
 ssh_to(){ local IP=$1; shift; ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i "$PEM" ubuntu@"$IP" "$@"; }
 
 cmd_launch(){
   [ -f "$STATE_FILE" ] && { echo "exists: $(cat $STATE_FILE); terminate first"; exit 1; }
+  mkdir -p "$STATE_DIR"
   SG_VPC=$(aws ec2 describe-security-groups --profile "$PROFILE" --region "$REGION" --group-ids "$SG" --query 'SecurityGroups[0].VpcId' --output text)
   if [ -n "${SUBNET_OVERRIDE:-}" ]; then SUBNET="$SUBNET_OVERRIDE"; else
     SUBNET=$(aws ec2 describe-subnets --profile "$PROFILE" --region "$REGION" --filters "Name=vpc-id,Values=$SG_VPC" --query 'Subnets[0].SubnetId' --output text); fi
@@ -45,8 +61,13 @@ cmd_launch(){
   echo "$INSTANCE_ID|$IP|$AGFI" > "$STATE_FILE"; echo "IP: $IP"
   echo "Waiting for SSH..."; for i in $(seq 1 60); do ssh_to "$IP" "echo ok" 2>/dev/null && break; sleep 10; done
   echo "Syncing tikitorch package + scripts to ~/tikitorch ..."
-  rsync -avz --include='tikitorch/***' --include='scripts/***' --include='*/' --exclude='*' \
-    --exclude='tikitorch/zoo/***' --exclude='tikitorch/results/***' --exclude='*/__pycache__/***' \
+  # First match wins: exclusions must precede the subtree-wide includes.
+  # Include only the two required roots; do not traverse the artifact archive.
+  rsync -avz --exclude='__pycache__/' --exclude='*.py[cod]' \
+    --exclude='.pytest_cache/' --exclude='.ruff_cache/' --exclude='.cache/' \
+    --exclude='.git/' --exclude='zoo/' --exclude='/manuscript/' --exclude='/results/' \
+    --exclude='/tikitorch/results/' \
+    --include='/tikitorch/***' --include='/scripts/***' --exclude='*' \
     -e "ssh -i $PEM -o StrictHostKeyChecking=no" "$PROJECT_DIR/" ubuntu@"$IP":~/tikitorch/ 2>&1 | tail -2
   echo "SDK setup + system-wide Python deps (torch CPU + numpy) ..."
   ssh_to "$IP" 'set -e; cd ~; mkdir -p ~/tikitorch/logs
@@ -59,17 +80,22 @@ cmd_launch(){
     sudo python3 -c "import numpy,torch; print(\"sudo deps OK np\",numpy.__version__,\"torch\",torch.__version__)"' 2>&1 | tail -6
   echo "Run model.fpga() char-LM on silicon (tmux) ..."
   ssh_to "$IP" "cd ~/tikitorch
-    tmux new-session -d -s tikif2 'cd ~/tikitorch && AGFI=$AGFI bash scripts/run_fpga_f2_verify.sh 2>&1 | tee logs/tikitorch_f2.log; touch tiki_f2_DONE'
+    tmux new-session -d -s tikif2 'bash -e -o pipefail -c \"cd ~/tikitorch
+      rm -f tiki_f2_DONE
+      AGFI=$AGFI bash scripts/run_fpga_f2_verify.sh 2>&1 | tee logs/tikitorch_f2.log
+      touch tiki_f2_DONE\"'
     sleep 3; tmux list-sessions"
   echo "Launched on $IP ($INSTANCE_ID). monitor: $0 monitor"
 }
 cmd_monitor(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read -r ID IP AG < "$STATE_FILE"
   ssh_to "$IP" 'cd ~/tikitorch; echo "== tikitorch_f2 log =="; tail -30 logs/tikitorch_f2.log 2>/dev/null; echo "== done? =="; [ -f tiki_f2_DONE ] && echo YES || echo no'; }
 cmd_download(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read -r ID IP AG < "$STATE_FILE"
-  mkdir -p "$PROJECT_DIR/tikitorch/results/fpga_silicon"
+  mkdir -p "$PROJECT_DIR/manuscript/results/fpga_silicon"
   scp -i "$PEM" -o StrictHostKeyChecking=no "ubuntu@$IP:~/tikitorch/logs/tikitorch_f2.log" \
-    "$PROJECT_DIR/tikitorch/results/fpga_silicon/tikitorch_f2.log" 2>/dev/null || echo "(no log yet)"; }
+    "$PROJECT_DIR/manuscript/results/fpga_silicon/tikitorch_f2.log" 2>/dev/null || echo "(no log yet)"; }
 cmd_ssh(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read -r ID IP AG < "$STATE_FILE"; exec ssh -o StrictHostKeyChecking=no -i "$PEM" ubuntu@"$IP"; }
 cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; IFS='|' read -r ID IP AG < "$STATE_FILE"
-  aws ec2 terminate-instances --profile "$PROFILE" --region "$REGION" --instance-ids "$ID" 2>&1 | head -3 || true; rm -f "$STATE_FILE"; }
-case "${1:-launch}" in launch) cmd_launch;; monitor) cmd_monitor;; download) cmd_download;; ssh) cmd_ssh;; terminate) cmd_terminate;; *) echo "usage: $0 {launch|monitor|download|terminate|ssh}";; esac
+  # Preserve the only local instance record if AWS rejects/fails the request.
+  aws ec2 terminate-instances --profile "$PROFILE" --region "$REGION" --instance-ids "$ID"
+  rm -f "$STATE_FILE"; }
+case "$COMMAND" in launch) cmd_launch;; monitor) cmd_monitor;; download) cmd_download;; ssh) cmd_ssh;; terminate) cmd_terminate;; esac

@@ -19,9 +19,9 @@ esac
 
 MATRIX_ARGS=(--matrix)
 case "$PC_TASK" in
-  mnist) SCRIPT=scripts/pc_scale_mnist.py; OUT=results/predictive_coding/scale_mnist_gamma_damped.jsonl ;;
-  cifar) SCRIPT=scripts/pc_scale_cifar.py; OUT=results/predictive_coding/scale_cifar.jsonl ;;
-  convlm) SCRIPT=scripts/pc_charlm_conv.py; OUT=results/predictive_coding/charlm_conv_localpc.jsonl; MATRIX_ARGS=() ;;
+  mnist) SCRIPT=scripts/pc_scale_mnist.py; OUT=manuscript/results/predictive_coding/scale_mnist_gamma_damped.jsonl ;;
+  cifar) SCRIPT=scripts/pc_scale_cifar.py; OUT=manuscript/results/predictive_coding/scale_cifar.jsonl ;;
+  convlm) SCRIPT=scripts/pc_charlm_conv.py; OUT=manuscript/results/predictive_coding/charlm_conv_localpc.jsonl; MATRIX_ARGS=() ;;
   *) echo "[pcscale] unknown PC_TASK=$PC_TASK"; exit 2 ;;
 esac
 
@@ -58,7 +58,7 @@ fi
 S3_RESULTS="${S3_RESULTS:?set S3_RESULTS}"
 cd "$REPO" || exit 2
 export PYTHONPATH="$REPO" PYTHONUNBUFFERED=1 DATA_ROOT="$REPO/_data"
-mkdir -p results/predictive_coding || exit 2
+mkdir -p manuscript/results/predictive_coding || exit 2
 LOG=/tmp/pc_scale.log
 
 push_best_effort(){

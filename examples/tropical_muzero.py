@@ -3,7 +3,7 @@
 TikiTorch's signature planning model: MuZero whose representation / dynamics / prediction
 cores are tropical and whose MCTS selection and backup use additive/max operations.
 With `core_kind="dyadic"` the cores use signed-power-of-two weights that add the oblique reach the
-plain max-plus core lacks (see results/capacity_probe/FIX_FINDINGS.md). Same PyTorch-shaped
+plain max-plus core lacks (see manuscript/results/capacity_probe/FIX_FINDINGS.md). Same PyTorch-shaped
 loop you already know: build, `.run()`, evaluate. The exported schedule is not a
 whole-agent closure or physical FPGA claim.
 

@@ -1,8 +1,10 @@
 #!/bin/bash
-# Reference: TikiTorch closed image/sequence benchmarks on an EC2 GPU.
-# Provisions a g5.4xlarge (A10G), syncs the tikitorch package, and runs the closed
-# (zero-DSP) sequential-MNIST + sequential-CIFAR benchmarks (MorphSSM + PureTropicalSGD
-# + large effective batch, hard-tau eval) via scripts/run_closed_benchmarks.py.
+# Historical image/sequence experiment launcher on an EC2 GPU.
+# Explicit launch provisions a paid g5.4xlarge, syncs package + runner scripts,
+# and runs sequential-MNIST/CIFAR via scripts/run_closed_benchmarks.py. These
+# experiments use soft training and hard-tau evaluation; they do not certify
+# multiplier-free training, physical zero DSPs, or current release performance.
+# AMI/dependency choices are historical defaults to review before launch.
 #
 # Usage:
 #   bash scripts/run_tikitorch_gpu_benchmarks.sh launch
@@ -10,6 +12,18 @@
 #   bash scripts/run_tikitorch_gpu_benchmarks.sh download
 #   bash scripts/run_tikitorch_gpu_benchmarks.sh terminate
 set -e
+usage(){
+  printf 'Usage: %s {launch|monitor|download|terminate|ssh}\n' "$0"
+  printf '%s\n' 'Only an explicit launch provisions paid AWS resources and changes SSH ingress.' \
+    'Set AWS_PROFILE, KEY_NAME, and SG for operational commands; review AMI and REGION.' \
+    'No arguments or --help prints this help without reading credentials or creating state.'
+}
+if [ "$#" -gt 1 ]; then usage >&2; exit 2; fi
+case "${1:-help}" in
+  help|-h|--help) usage; exit 0;;
+  launch|monitor|download|terminate|ssh) COMMAND="$1";;
+  *) usage >&2; exit 2;;
+esac
 # --- REQUIRED: your own AWS account/infra (this script never defaults to one) ---
 PROFILE="${AWS_PROFILE:?set AWS_PROFILE to your AWS CLI profile}"
 KEY_NAME="${KEY_NAME:?set KEY_NAME to your EC2 key pair name}"; SG="${SG:?set SG to your security-group id (must allow inbound SSH)}"
@@ -17,13 +31,14 @@ INSTANCE_TYPE="${INSTANCE_TYPE:-g5.4xlarge}"; REGION="${REGION:-us-east-1}"
 PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"; PEM="${PEM:-$HOME/.ssh/$KEY_NAME.pem}"
 EBS_SIZE=200
 AMI="${AMI:-ami-05603a42e5254c4bb}"               # GPU AMI used for training
-STATE_DIR="$PROJECT_DIR/.tiki_gpu_state"; mkdir -p "$STATE_DIR"
+STATE_DIR="$PROJECT_DIR/.tiki_gpu_state"
 STATE_FILE="$STATE_DIR/instance.state"
 
 ssh_to(){ local IP=$1; shift; ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i "$PEM" ubuntu@"$IP" "$@"; }
 
 cmd_launch(){
   [ -f "$STATE_FILE" ] && { echo "exists: $(cat $STATE_FILE); terminate first"; exit 1; }
+  mkdir -p "$STATE_DIR"
   SG_VPC=$(aws ec2 describe-security-groups --profile "$PROFILE" --region "$REGION" --group-ids "$SG" --query 'SecurityGroups[0].VpcId' --output text)
   if [ -n "${SUBNET_OVERRIDE:-}" ]; then SUBNET="$SUBNET_OVERRIDE"; else
     SUBNET=$(aws ec2 describe-subnets --profile "$PROFILE" --region "$REGION" --filters "Name=vpc-id,Values=$SG_VPC" --query 'Subnets[0].SubnetId' --output text); fi
@@ -41,22 +56,28 @@ cmd_launch(){
   IP=$(aws ec2 describe-instances --profile "$PROFILE" --region "$REGION" --instance-ids "$INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
   echo "$INSTANCE_ID|$IP" > "$STATE_FILE"; echo "IP: $IP"
   echo "Waiting for SSH..."; for i in $(seq 1 60); do ssh_to "$IP" "echo ok" 2>/dev/null && break; sleep 10; done
-  echo "Syncing tikitorch package ..."
-  rsync -avz --include='tikitorch/***' --include='*/' --exclude='*' \
-    --exclude='tikitorch/zoo/***' --exclude='tikitorch/results/***' --exclude='*/__pycache__/***' \
+  echo "Syncing tikitorch package + scripts ..."
+  # First match wins: exclusions must precede the subtree-wide includes.
+  # Include only the two required roots; do not traverse the artifact archive.
+  rsync -avz --exclude='__pycache__/' --exclude='*.py[cod]' \
+    --exclude='.pytest_cache/' --exclude='.ruff_cache/' --exclude='.cache/' \
+    --exclude='.git/' --exclude='zoo/' --exclude='/manuscript/' --exclude='/results/' \
+    --exclude='/tikitorch/results/' \
+    --include='/tikitorch/***' --include='/scripts/***' --exclude='*' \
     -e "ssh -i $PEM -o StrictHostKeyChecking=no" "$PROJECT_DIR/" ubuntu@"$IP":~/tikitorch/ 2>&1 | tail -2
   echo "Python deps (torch + torchvision) ..."
   ssh_to "$IP" 'set -e
     if ! python3 -c "import torch" 2>/dev/null; then pip3 install -q torch --index-url https://download.pytorch.org/whl/cu121; fi
     pip3 install -q torchvision --index-url https://download.pytorch.org/whl/cu121 2>/dev/null || pip3 install -q torchvision || true
     python3 -c "import torch,torchvision; print(\"torch\",torch.__version__,\"cuda\",torch.cuda.is_available())"' 2>&1 | tail -3
-  echo "Run closed benchmarks (smnist + scifar) in tmux ..."
-  ssh_to "$IP" "cd ~/tikitorch; mkdir -p results/closed_benchmarks logs
-    tmux new-session -d -s bench 'cd ~/tikitorch &&
-      export PYTHONPATH=~/tikitorch PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True PYTHONUNBUFFERED=1 &&
-      python3 scripts/run_closed_benchmarks.py --task smnist --epochs 6 --batch-size 32 --accum-steps 16 --device cuda --out results/closed_benchmarks 2>&1 | tee logs/bench_smnist.log;
-      python3 scripts/run_closed_benchmarks.py --task scifar --epochs 6 --batch-size 24 --accum-steps 16 --device cuda --out results/closed_benchmarks 2>&1 | tee logs/bench_scifar.log;
-      touch bench_DONE'
+  echo "Run historical hard-eval benchmarks (smnist + scifar) in tmux ..."
+  ssh_to "$IP" "cd ~/tikitorch; mkdir -p manuscript/results/closed_benchmarks logs
+    tmux new-session -d -s bench 'bash -e -o pipefail -c \"cd ~/tikitorch
+      rm -f bench_DONE
+      export PYTHONPATH=~/tikitorch PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True PYTHONUNBUFFERED=1
+      python3 scripts/run_closed_benchmarks.py --task smnist --epochs 6 --batch-size 32 --accum-steps 16 --device cuda --out manuscript/results/closed_benchmarks 2>&1 | tee logs/bench_smnist.log
+      python3 scripts/run_closed_benchmarks.py --task scifar --epochs 6 --batch-size 24 --accum-steps 16 --device cuda --out manuscript/results/closed_benchmarks 2>&1 | tee logs/bench_scifar.log
+      touch bench_DONE\"'
     sleep 3; tmux list-sessions"
   echo "Launched on $IP ($INSTANCE_ID). monitor: $0 monitor"
 }
@@ -66,13 +87,15 @@ cmd_monitor(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read 
     echo "== scifar =="; tail -6 logs/bench_scifar.log 2>/dev/null
     echo "== done? =="; [ -f bench_DONE ] && echo YES || echo no'; }
 cmd_download(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read -r ID IP < "$STATE_FILE"
-  mkdir -p "$PROJECT_DIR/tikitorch/results/closed_benchmarks_remote"
+  mkdir -p "$PROJECT_DIR/manuscript/results/closed_benchmarks_remote"
   rsync -avz --include='*.json' --include='*.tt' --include='*.log' --include='*/' --exclude='*' \
     -e "ssh -i $PEM -o StrictHostKeyChecking=no" \
-    ubuntu@"$IP":~/tikitorch/results/closed_benchmarks/ "$PROJECT_DIR/tikitorch/results/closed_benchmarks_remote/" 2>/dev/null || true
+    ubuntu@"$IP":~/tikitorch/manuscript/results/closed_benchmarks/ "$PROJECT_DIR/manuscript/results/closed_benchmarks_remote/" 2>/dev/null || true
   scp -i "$PEM" -o StrictHostKeyChecking=no "ubuntu@$IP:~/tikitorch/logs/bench_*.log" \
-    "$PROJECT_DIR/tikitorch/results/closed_benchmarks_remote/" 2>/dev/null || true; }
+    "$PROJECT_DIR/manuscript/results/closed_benchmarks_remote/" 2>/dev/null || true; }
 cmd_ssh(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; IFS='|' read -r ID IP < "$STATE_FILE"; exec ssh -o StrictHostKeyChecking=no -i "$PEM" ubuntu@"$IP"; }
 cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; IFS='|' read -r ID IP < "$STATE_FILE"
-  aws ec2 terminate-instances --profile "$PROFILE" --region "$REGION" --instance-ids "$ID" 2>&1 | head -3 || true; rm -f "$STATE_FILE"; }
-case "${1:-launch}" in launch) cmd_launch;; monitor) cmd_monitor;; download) cmd_download;; ssh) cmd_ssh;; terminate) cmd_terminate;; *) echo "usage: $0 {launch|monitor|download|terminate|ssh}";; esac
+  # Preserve the only local instance record if AWS rejects/fails the request.
+  aws ec2 terminate-instances --profile "$PROFILE" --region "$REGION" --instance-ids "$ID"
+  rm -f "$STATE_FILE"; }
+case "$COMMAND" in launch) cmd_launch;; monitor) cmd_monitor;; download) cmd_download;; ssh) cmd_ssh;; terminate) cmd_terminate;; esac

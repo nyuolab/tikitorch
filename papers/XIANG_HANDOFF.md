@@ -4,6 +4,13 @@ The active draft is [TikiTorch: Route-Sufficient Differentiation for Auditable
 Tropical Learning](../manuscript/README.md). The prior two-paper portfolio is
 superseded by one TikiTorch manuscript; the old sources remain historical.
 
+The immediate next step is to see whether a student wants to take ownership,
+after local library cleanup and onboarding. The proposed
+[research plan](../manuscript/RESEARCH_PLAN.md) and
+[student handoff](../manuscript/STUDENT_HANDOFF.md) are written down; neither
+constitutes a launched experiment or approved compute budget. Research results
+now live separately under [`manuscript/results/`](../manuscript/results/README.md).
+
 ## The scientific question
 
 Can native additive hard operators make both the state required for reverse
@@ -36,8 +43,10 @@ complete multiplication-free training.
 1. Does the integrated contract plus a useful real-task resource frontier make
    a sufficiently strong ICML contribution? The direct chain-rule proof alone
    is not the novelty.
-2. Which held-out task and low-arithmetic/morphological baseline should anchor
-   the matched-quality study alongside the same-model systems comparison?
+2. Who can own the first bounded pilot? The agreed directions are ECG
+   classification and language pretraining, followed by a possible full-learning
+   FPGA capstone. Confirm task-specific baselines, protocol and resources before
+   beginning; the student need not undertake all three tracks.
 3. Which author contributions, institutional approvals and artifact rights
    must be confirmed before release and submission?
 

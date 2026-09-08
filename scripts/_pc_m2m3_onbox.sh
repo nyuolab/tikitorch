@@ -11,7 +11,7 @@
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
-OUT=results/pc_convrnn
+OUT=manuscript/results/pc_convrnn
 mkdir -p "$OUT/ckpts"
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-4} MKL_NUM_THREADS=4
 NPAR=${NPAR:-10}

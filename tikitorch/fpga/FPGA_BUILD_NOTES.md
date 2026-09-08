@@ -98,7 +98,7 @@ not a routed or on-board result.
   post-route timing** (WNS −1.557 ns) despite plausible HLS numbers. The HLS estimate is
   encouraging, but **P&R timing closure is a genuine open risk** until an AFI is actually built.
 
-Reports: `results/fpga_silicon/forge_train_step_muzero{,_train}_csynth.rpt`.
+Reports: `manuscript/results/fpga_silicon/forge_train_step_muzero{,_train}_csynth.rpt`.
 
 GOTCHA found here: Vitis HLS rejects ambiguous `?:` that g++ accepts — `cond ? x : -x` where `-x`
 widens an `ap_int<32>` to `ap_int<33>`, and `relu`'s `data_t vs int 0`. Fix is an explicit cast on

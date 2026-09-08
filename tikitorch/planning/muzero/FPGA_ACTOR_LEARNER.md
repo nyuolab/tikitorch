@@ -355,7 +355,7 @@ prerequisites.
 
 ## 11. On-silicon evidence — scope it honestly
 
-**[measured] (AWS F2)** — the *tropical shift-LM* fused training-step kernel, `results/fpga_silicon/tikitorch_f2.log`:
+**[measured] (AWS F2)** — the *tropical shift-LM* fused training-step kernel, `manuscript/results/fpga_silicon/tikitorch_f2.log`:
 
 ```
 BOUND on silicon: True | kernel: forge_train_step | dsp: 0
@@ -506,10 +506,10 @@ The §1 domain split is a design hypothesis. The repo supplies the matched
 control (`DenseMuZeroNet`, `hidden_mult=3`, `networks_dense.py:72`) and the
 metrics (`agent.py:131-165`; board win/draw/loss via `play_match`) but **no measured
 tropical-vs-dense delta is recorded here**. The previously cited
-`results/backup_sweep/FINDINGS.md` **does not exist** in the repo (extant
-artifacts: `results/bakeoff_closed_optimizers.{jsonl,md}`,
-`results/confirm_full250.{jsonl,md}`, `results/confirm_short50.{jsonl,md}`,
-`results/closed_benchmarks_remote/`, `results/fpga_silicon/`). Treat `backup`
+`manuscript/results/backup_sweep/FINDINGS.md` **does not exist** in the repo (extant
+artifacts: `manuscript/results/bakeoff_closed_optimizers.{jsonl,md}`,
+`manuscript/results/confirm_full250.{jsonl,md}`, `manuscript/results/confirm_short50.{jsonl,md}`,
+`manuscript/results/closed_benchmarks_remote/`, `manuscript/results/fpga_silicon/`). Treat `backup`
 as a swept hyperparameter whose defaults differ by entry point:
 `MCTSConfig=max` (`mcts.py:51`), `MuZeroConfig/play_game=topk,k=2`
 (`agent.py:43-44`, `selfplay.py:25`), and

@@ -56,7 +56,7 @@ tools, board images, and archived build products are intentionally managed outsi
 `pip`. Start with the repository's
 [FPGA build guide](https://github.com/nyuolab/tikitorch/blob/main/tikitorch/hardware/BUILD_GUIDE.md)
 and the
-[external-artifact manifest](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/s1_afibuild/ARTIFACTS.md).
+[external-artifact manifest](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/fpga_silicon/s1_afibuild/ARTIFACTS.md).
 
 Without compatible hardware, the library remains usable on CPU/GPU. Whether an FPGA
 entry point falls back, raises, or binds a native implementation is API-specific; see

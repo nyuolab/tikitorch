@@ -144,7 +144,7 @@ cmd_status(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE
   aws_ s3 ls "$S3_RESULTS/" 2>/dev/null || echo "(nothing yet)"
   aws_ s3 ls "$S3_RESULTS/DONE" >/dev/null 2>&1 && echo "DONE present" || { echo "-- verify.log tail --"; aws_ s3 cp "$S3_RESULTS/verify.log" - 2>/dev/null | tail -30; }; }
 cmd_fetch(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE_FILE"
-  local DEST="$PROJECT_DIR/results/fpga_silicon/d512_verify"; mkdir -p "$DEST"
+  local DEST="$PROJECT_DIR/manuscript/results/fpga_silicon/d512_verify"; mkdir -p "$DEST"
   aws_ s3 cp "$S3_RESULTS/" "$DEST/" --recursive --only-show-errors; ls -la "$DEST"
   echo "-- verdict --"; cat "$DEST/BITEXACT" 2>/dev/null || cat "$DEST/MISMATCH" 2>/dev/null || echo "(no verdict marker)"; }
 cmd_terminate(){ [ -f "$STATE_FILE" ] || { echo no state; exit 0; }; source "$STATE_FILE"

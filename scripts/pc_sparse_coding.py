@@ -24,7 +24,7 @@ def main():
     p.add_argument("--epochs", type=int, default=40)
     p.add_argument("--n-train", type=int, default=15000)
     p.add_argument("--data-root", default=os.environ.get("DATA_ROOT", "./_data"))
-    p.add_argument("--out-png", default="results/predictive_coding/sparse_pc_infill.png")
+    p.add_argument("--out-png", default="manuscript/results/predictive_coding/sparse_pc_infill.png")
     args = p.parse_args()
 
     from torchvision import datasets

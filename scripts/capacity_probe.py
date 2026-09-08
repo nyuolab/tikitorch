@@ -52,7 +52,7 @@ from tikitorch.planning.muzero.networks_dense import (
     _DenseRepresentation, _DensePrediction, _mlp)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.normpath(os.path.join(HERE, "..", "results", "capacity_probe"))
+RESULTS = os.path.normpath(os.path.join(HERE, "..", "manuscript", "results", "capacity_probe"))
 GS = 5                     # grid side for the multigrid pool (obs_dim = 3*GS*GS = 75)
 SYN_D = 128                # synthetic-target input dim (>= max latent_dim: no rank degeneracy)
 NTR_SYN, NTE_SYN = 192, 512

@@ -450,7 +450,7 @@ class DyadicPCNet(nn.Module):
     Settling needs a small power-of-two ``gamma`` (~2^-3..2^-4, a shift;
     ``0.5=2^-1`` diverges on the deeper energy's curvature) and sweeps scaling
     with depth (``n_steps`` ~ 6·depth; undersettling looks like a depth wall but
-    is not). See ``results/predictive_coding/TROPICAL_PC_DEPTH.md`` for measured
+    is not). See ``manuscript/results/predictive_coding/TROPICAL_PC_DEPTH.md`` for measured
     depth/accuracy curves.
     """
 
@@ -751,7 +751,7 @@ class DyadicPCNet(nn.Module):
         ``n_iter`` defaults to ``depth + 4`` (enough for sync; raise for heavy
         async). ``gen`` (if given) must be a **CPU** ``torch.Generator`` — the async
         draws are control-flow (participation coin, layer order), not on the data
-        device. See ``results/predictive_coding/SCALE_TESTS.md``.
+        device. See ``manuscript/results/predictive_coding/SCALE_TESTS.md``.
         """
         from tikitorch.nn import dyadic_quantize
         if mode not in ("dyadic", "sign"):
@@ -861,7 +861,7 @@ class DyadicPCNet(nn.Module):
           stale=True   : neighbour reads from a round-start snapshot (stale-by-1 / lag)
           rand_order   : random per-pass order (no global schedule)
 
-        See ``results/predictive_coding/ITERATIVE_PC_DISTRIBUTED.md`` for the
+        See ``manuscript/results/predictive_coding/ITERATIVE_PC_DISTRIBUTED.md`` for the
         multi-seed async-robustness table. Drive it via ``train_step_nudge``.
         """
         if (isinstance(n_sweeps, bool) or not isinstance(n_sweeps, Integral)
@@ -948,7 +948,7 @@ class SparseCodingPC(nn.Module):
     answers *arbitrary* inference queries by settling — reconstruction, in-painting
     under ANY mask, denoising — which a discriminative backprop net structurally
     cannot. (Measured: MNIST, recovers digits from 50% random pixel masking ~60%
-    better than mean-fill; see ``results/predictive_coding/GENERATIVE_PC.md``.)
+    better than mean-fill; see ``manuscript/results/predictive_coding/GENERATIVE_PC.md``.)
 
     Closure: the deployed dictionary is ±2^k (shift-add) and the code is a top-k
     gate — multiplier-free as a weight-VALUE property; the float-sim inference

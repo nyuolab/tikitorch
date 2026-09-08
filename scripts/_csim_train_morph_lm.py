@@ -2,7 +2,7 @@
 
 Reuses the validated driver from _validate_kernel_morph_lm.py; logs windowed
 train accuracy toward the Python strict-hard morph reference (~29.7% val acc
-at 3.46M tokens, results/lm_shakespeare/strictG_hard_*.jsonl).
+at 3.46M tokens, manuscript/results/lm_shakespeare/strictG_hard_*.jsonl).
 
 Usage:  PYTHONPATH=. python scripts/_csim_train_morph_lm.py --windows 3000
 """
@@ -26,7 +26,7 @@ def main():
     p.add_argument("--threshold", type=int, default=2048)
     p.add_argument("--log-every", type=int, default=100)
     p.add_argument("--out", type=Path,
-                   default=REPO / "results" / "lm_shakespeare" / "csim_morph_lm.json")
+                   default=REPO / "manuscript" / "results" / "lm_shakespeare" / "csim_morph_lm.json")
     args = p.parse_args()
 
     text = (REPO / "data" / "tinyshakespeare.txt").read_text()

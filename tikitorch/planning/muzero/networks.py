@@ -53,7 +53,7 @@ def _set_tau(module, tau):
 def _make_proj(kind, in_features, out_features, tau):
     """Core projection factory. ``"maxplus"`` -> the (axis-aligned) TropicalProjection;
     ``"dyadic"`` -> the oblique DyadicTropicalProjection used in the §2a capacity
-    experiments (see results/capacity_probe/FIX_FINDINGS.md). Its quantized weights admit
+    experiments (see manuscript/results/capacity_probe/FIX_FINDINGS.md). Its quantized weights admit
     a shift/add implementation; actual FPGA DSP use depends on the concrete lowering and
     must be established by synthesis."""
     if kind == "dyadic":
@@ -211,7 +211,7 @@ class TropicalMuZeroNet(nn.Module):
         # prediction mixing): "maxplus" (axis-aligned, default) | "dyadic" (power-of-two
         # oblique projections used in the §2a capacity experiment). Dynamics stays
         # "maxplus" by default — it is the MCTS
-        # hot loop and was a wash in tropical (results/capacity_probe/COMPONENT_FINDINGS.md).
+        # hot loop and was a wash in tropical (manuscript/results/capacity_probe/COMPONENT_FINDINGS.md).
         # dyadic_heads=True also replaces dense readouts with DyadicLinear. It narrows the
         # software recipe's multiply sites, but min-max scaling and categorical heads retain
         # explicit arithmetic boundaries and hardware closure still requires synthesis.

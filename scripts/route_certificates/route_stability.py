@@ -58,7 +58,7 @@ def main() -> None:
     parser.add_argument("--dtypes", choices=["float32", "float64"], nargs="+", default=["float32", "float64"])
     parser.add_argument(
         "--out", type=Path,
-        default=Path("results/route_certificates/reference/route_stability.jsonl"),
+        default=Path("manuscript/results/route_certificates/reference/route_stability.jsonl"),
     )
     args = parser.parse_args()
     torch.set_num_threads(1)

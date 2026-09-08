@@ -143,7 +143,7 @@ def main():
     p.add_argument("--n-train", type=int, default=10000)
     p.add_argument("--n-test", type=int, default=2000)
     p.add_argument("--data-root", default=os.environ.get("DATA_ROOT", "./_data"))
-    p.add_argument("--out", default="results/predictive_coding/conv_relax.jsonl")
+    p.add_argument("--out", default="manuscript/results/predictive_coding/conv_relax.jsonl")
     args = p.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

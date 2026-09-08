@@ -92,7 +92,7 @@
       "supplied_cotangent": "(checkpoint_retained - boundary_logits) / serialized_bytes"
     },
     "command": "python -m ontogenic_learner.ontogenic_v2.exp1_saved_state",
-    "manifest": "results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/manifest.json",
+    "manifest": "manuscript/results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/manifest.json",
     "rows": [
       {
         "batch": 1,
@@ -155,14 +155,14 @@
   },
   "schema": "tikitorch.manuscript_tables.v1",
   "sources_sha256": {
-    "results/fpga_silicon/d512_verify/golden_fused.jsonl": "43bd34508d457b7d5662482aecb13012bf39136dc666fdb42a4f894d026bbeb3",
-    "results/fpga_silicon/d512_verify/silicon_fused.jsonl": "43bd34508d457b7d5662482aecb13012bf39136dc666fdb42a4f894d026bbeb3",
-    "results/fpga_silicon/d512_verify/train_200.err": "ddda8919bf946b514154bb5efc7e6ec8ad05ed6d37fbca31485b2f112dcc514d",
-    "results/fpga_silicon/d512_verify/train_2000.err": "b8a5d29e207ad3591ca5639bc4a5094b13a5892b2dd273fa77b3403fcc074e36",
-    "results/fpga_silicon/d512_verify/train_30.err": "59c863911b018499a3e49cb165e5c50e3fbd8db4b83dac351eb553a6ae407124",
-    "results/predictive_coding/onfabric_train/crosscheck.txt": "4203d9cff2234bfa9b312ec06e9a94e42165d8a4b5c190560f7fbd93254b7a0a",
-    "results/predictive_coding/onfabric_train/train.txt": "097bdc7d37dbe141feb90dc03b5d673fb3287eb7bf85e193372196368d86143b",
-    "results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/manifest.json": "7f5bf7b657b160dc51c51a563267d3ee77412c9b29ad0cd40f802c55f84bac29",
-    "results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/saved_state.jsonl": "351c15fc09455d953db3f53dc9929af1dd961db9f351c9992ba48ba08d25623b"
+    "manuscript/results/fpga_silicon/d512_verify/golden_fused.jsonl": "43bd34508d457b7d5662482aecb13012bf39136dc666fdb42a4f894d026bbeb3",
+    "manuscript/results/fpga_silicon/d512_verify/silicon_fused.jsonl": "43bd34508d457b7d5662482aecb13012bf39136dc666fdb42a4f894d026bbeb3",
+    "manuscript/results/fpga_silicon/d512_verify/train_200.err": "ddda8919bf946b514154bb5efc7e6ec8ad05ed6d37fbca31485b2f112dcc514d",
+    "manuscript/results/fpga_silicon/d512_verify/train_2000.err": "b8a5d29e207ad3591ca5639bc4a5094b13a5892b2dd273fa77b3403fcc074e36",
+    "manuscript/results/fpga_silicon/d512_verify/train_30.err": "59c863911b018499a3e49cb165e5c50e3fbd8db4b83dac351eb553a6ae407124",
+    "manuscript/results/predictive_coding/onfabric_train/crosscheck.txt": "4203d9cff2234bfa9b312ec06e9a94e42165d8a4b5c190560f7fbd93254b7a0a",
+    "manuscript/results/predictive_coding/onfabric_train/train.txt": "097bdc7d37dbe141feb90dc03b5d673fb3287eb7bf85e193372196368d86143b",
+    "manuscript/results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/manifest.json": "7f5bf7b657b160dc51c51a563267d3ee77412c9b29ad0cd40f802c55f84bac29",
+    "manuscript/results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/saved_state.jsonl": "351c15fc09455d953db3f53dc9929af1dd961db9f351c9992ba48ba08d25623b"
   }
 }

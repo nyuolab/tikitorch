@@ -15,12 +15,12 @@ performance claims.
 | Selected routes can determine both input and additive-parameter VJPs | Explicit primitive rules and graph composition; `tikitorch/autodiff/{primitives,morphssm_tape}.py`; focused route/gradient/tie tests | Conditional mathematical result plus tested implementations, not a novel gradient. Finite graph, declared derivative selection, complete auxiliary fields, supplied cotangent, and available static state are essential. Main text and proof appendix. |
 | The new training path retains device-native packed routes | `tikitorch/autodiff/device_tape.py`, `morphssm_tape.py`; `tests/test_device_tape.py`, `tests/test_route_training.py` | Current implementation, not the implementation that produced the historical retained-state table. Byte-aligned `uint8` fields have up to seven padding bits per field; portable export is a separate CPU representation. Main implementation section. |
 | Closure can be checked for an executed recipe | `tikitorch/audit.py`, `tests/test_audit.py`, `tests/test_closure_guard.py`, `tests/test_dyadic_backward_closure.py` | Current `strict-eager-v3` software semantics classify unknown operations as failures. An executed-path software pass is not a physical no-multiplier or zero-DSP proof. Main text. |
-| Current device-route payload is smaller than a specified checkpoint boundary set | `manuscript/evidence/current_retained_state.json`, `measure_retained_state.py`, `generated/current_retained_state.tex` | New current-code CPU experiment, source-hashed dirty tree; exact logits/canonical routes and selected-VJP checks. Main table. Comparator is analytical boundary storage, not measured peak or an optimal checkpoint policy. |
+| Current device-route payload is smaller than a specified checkpoint boundary set | `manuscript/evidence/retained_state_handoff_2026-09-08.json`, `measure_retained_state.py`, `generated/current_retained_state.tex` | Current-code CPU regression remeasurement after library cleanup, source-hashed dirty tree; exact logits/canonical routes and selected-VJP checks. Original `evidence/current_retained_state.json` is preserved as an earlier source snapshot. Main table. Comparator is analytical boundary storage, not measured peak or an optimal checkpoint policy. |
 | Historical portable representation is smaller than a specified checkpoint-retained set | Run `529c45f4-7274-4999-b35c-c59d1db917e6`, detailed below | Historical imported representation evidence. Three batch-one FP32 CPU configurations, not a current GPU/full-step/optimized-checkpoint result. Appendix only. |
 | Five-arm full-step validation exists | `scripts/route_certificates/training_benchmark.py`; `docs/codebase_audit_2026-09-08.md`; local run `14f00d16-e3ea-4622-9c80-c03d30bb259f` | Local CPU protocol smoke reported by the code audit, not a checked-in comparative research dataset. Width 16, one layer, vocabulary 11, batch 2, sequence 12, seed 0, momentum SGD, five total updates. Do not publish latency or capacity superiority from this run. Implementation/validation scope only. |
-| D512 fused training executes with a matching archived observable record | `results/fpga_silicon/d512_verify/{silicon_fused,golden_fused}.jsonl`, `BITEXACT`; AGFI `agfi-003a8a2f2b1ba7df7` | Historical silicon feasibility. The 30-update records agree on resident accuracy, weight CRC and 16 predictions. Not full-array, every-signal, or 2,000-step trajectory equivalence. Appendix; at most a bounded main-text feasibility sentence. |
-| D512 maintains a live fused update loop for 2,000 updates | `results/fpga_silicon/d512_verify/train_2000.err` and `train_2000.jsonl`; `tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp`; launcher `scripts/run_morph_lm_d512_verify_f2.sh` | Four layers, D512, vocabulary 128, seven taps, one resident 128-position window. 256,000 processed positions in 418.3963 s; log reports 612 token/s. No held-out language result, distinct-token count, final-route certification or accelerator comparison. Appendix. |
-| Fabric-produced weights generalize on downsampled MNIST | `results/predictive_coding/onfabric_train/{train,crosscheck}.txt`, dumped `trainedW0.i32`, `trainedW1.i32`; recipe report `results/predictive_coding/ONFABRIC_TRAINING.md` | Historical small-task feasibility: 256→256→10 dyadic MLP, 16×16 inputs, batch 32, five epochs, 60,000 training/10,000 test examples. Final driver test accuracy 74.75%; independent exported-weight evaluation 74.13%. Unreconciled pipelines, not parity. Appendix. |
+| D512 fused training executes with a matching archived observable record | `manuscript/results/fpga_silicon/d512_verify/{silicon_fused,golden_fused}.jsonl`, `BITEXACT`; AGFI `agfi-003a8a2f2b1ba7df7` | Historical silicon feasibility. The 30-update records agree on resident accuracy, weight CRC and 16 predictions. Not full-array, every-signal, or 2,000-step trajectory equivalence. Appendix; at most a bounded main-text feasibility sentence. |
+| D512 maintains a live fused update loop for 2,000 updates | `manuscript/results/fpga_silicon/d512_verify/train_2000.err` and `train_2000.jsonl`; `tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp`; launcher `scripts/run_morph_lm_d512_verify_f2.sh` | Four layers, D512, vocabulary 128, seven taps, one resident 128-position window. 256,000 processed positions in 418.3963 s; log reports 612 token/s. No held-out language result, distinct-token count, final-route certification or accelerator comparison. Appendix. |
+| Fabric-produced weights generalize on downsampled MNIST | `manuscript/results/predictive_coding/onfabric_train/{train,crosscheck}.txt`, dumped `trainedW0.i32`, `trainedW1.i32`; recipe report `manuscript/results/predictive_coding/ONFABRIC_TRAINING.md` | Historical small-task feasibility: 256→256→10 dyadic MLP, 16×16 inputs, batch 32, five epochs, 60,000 training/10,000 test examples. Final driver test accuracy 74.75%; independent exported-weight evaluation 74.13%. Unreconciled pipelines, not parity. Appendix. |
 
 The theorem's operator inventory is broader than the validated production
 bridge. The present `route_logits` path explicitly rejects, among other cases,
@@ -58,7 +58,7 @@ be created at new paths and explicitly selected, not overwrite the old one.
 ## Historical appendix table
 
 Canonical inputs are
-`results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/{saved_state.jsonl,manifest.json}`.
+`manuscript/results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/{saved_state.jsonl,manifest.json}`.
 
 The archived manifest identifies:
 
@@ -118,7 +118,7 @@ contract as measurements of current device training.
    record, not a complete weight snapshot. A CRC is a collision-prone summary;
    equality plus sampled predictions is not proof of full-state identity.
    The longer invocation records do not supply corresponding golden trajectories.
-   Archived HLS/re-synthesis diagnostics in `results/a2_power/` are not a substitute
+   Archived HLS/re-synthesis diagnostics in `manuscript/results/a2_power/` are not a substitute
    for the exact final D512 routed-build manifest and reports.
 2. **MNIST evaluation boundary.** The driver performs host evaluation of
    fabric-trained weights. Epoch wall times include weight readback and test
@@ -140,7 +140,7 @@ contract as measurements of current device training.
    zero DSP multipliers. A data-multiplier-free recipe and zero physical DSP
    blocks are different claims. Do not assign zero physical DSPs to current
    software or to a D512 build lacking its exact final report.
-6. **D128 scaling.** `results/lm_shakespeare/fig_hallmark_lm.md` reports 14,236,
+6. **D128 scaling.** `manuscript/results/lm_shakespeare/fig_hallmark_lm.md` reports 14,236,
    26,522 and 53,001 token/s (1.86× and 3.72× relative to the single instance).
    WNS is −0.020/−0.097/−0.173 ns. These are not timing-closed measurements or an
    iso-model GPU comparison. Omit the ladder from the main paper; appendix
@@ -151,9 +151,9 @@ contract as measurements of current device training.
 
 ## Historical language-quality correction
 
-The selected endpoints in `results/lm_shakespeare/strictH_bpe_anneal_s9decay_6k.jsonl`
+The selected endpoints in `manuscript/results/lm_shakespeare/strictH_bpe_anneal_s9decay_6k.jsonl`
 (final row: 2.7929592359328628 bpb; 1,004,032 parameters; step 5999) and
-`results/lm_shakespeare/bpeA_dense.jsonl` (2.2731051237221513 bpb; 770,816
+`manuscript/results/lm_shakespeare/bpeA_dense.jsonl` (2.2731051237221513 bpb; 770,816
 parameters; step 1499) round to the older hallmark figure's 2.793/2.273 rows.
 `scripts/make_hallmark_figure.py` selects those tags and uses 24×96 tokens per
 update, giving nominal endpoint budgets of 13.824M/3.456M (rounded 13.8M/3.46M).

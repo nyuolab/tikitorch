@@ -113,7 +113,7 @@ def mnist_experiment(depths=(2, 4, 8, 12), epochs=3, n_train=6000,
     by depth 8-12; identity holds ~0.27), but absolute accuracy is poor (~0.28-
     0.38 vs ~0.92 for a linear classifier). The interior layers stay ≈identity
     (inert); the effective model is a weak single max-plus readout that selects
-    one pixel per class. See results/predictive_coding/TROPICAL_PC_DEPTH.md.
+    one pixel per class. See manuscript/results/predictive_coding/TROPICAL_PC_DEPTH.md.
     """
     from torchvision import datasets, transforms
     tf = transforms.Compose([

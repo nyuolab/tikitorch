@@ -38,7 +38,7 @@ from tikitorch.planning.muzero.games import Connect4
 from tikitorch.planning.muzero.networks import TropicalMuZeroNet
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.normpath(os.path.join(HERE, "..", "results", "board_scaling", "diagnostics"))
+OUT = os.path.normpath(os.path.join(HERE, "..", "manuscript", "results", "board_scaling", "diagnostics"))
 
 
 # --------------------------------------------------------------------------- data

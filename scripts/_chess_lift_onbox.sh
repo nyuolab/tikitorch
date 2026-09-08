@@ -18,7 +18,7 @@ WORKERS="${WORKERS:-34}"
 S3_RESULTS="${S3_RESULTS:?set S3_RESULTS}"
 cd "$REPO" || exit 2
 export PYTHONPATH="$REPO" PYTHONUNBUFFERED=1
-mkdir -p logs results/board_scaling
+mkdir -p logs manuscript/results/board_scaling
 
 # CONSERVATIVE + reliable (prior run was under-sized: serial tracking eval -> recipe 1 exceeded the backstop).
 # Now: parallel tracking AND final eval, modest 480-game scale-up (2.5x the 192 baseline), sims 48. The
@@ -34,7 +34,7 @@ recipes=(
 
 run_one(){
   local tag="$1" extra="$2"
-  local log="logs/chess_${tag}.log" json="results/board_scaling/chess_strength_${tag}.json"
+  local log="logs/chess_${tag}.log" json="manuscript/results/board_scaling/chess_strength_${tag}.json"
   echo "[$tag] START $(date -u +%H:%M:%S)  args: $extra"
   # shellcheck disable=SC2086
   python3 scripts/run_chess_strength.py --tag "$tag" --threads 1 --workers "$WORKERS" --eval-workers "$WORKERS" \

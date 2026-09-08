@@ -72,7 +72,7 @@ NOT committed (gitignored, regenerable): `build/checkpoints/`, `*.dcp`,
 ## PCIM wiring — RESOLVED (probed against the F2 shell, 2026-06-15)
 
 The PCIM signal contract was extracted from the real F2 shell on a build box
-(`run_f2_hdk_probe.sh` → `results/fpga_silicon/hdk_probe/`): aws-fpga **rc/2.3.2**,
+(`run_f2_hdk_probe.sh` → `manuscript/results/fpga_silicon/hdk_probe/`): aws-fpga **rc/2.3.2**,
 `HDK_SHELL_DIR=.../hdk/common/shell_stable`. Ground truth that shaped the wiring:
 
 - PCIM ports are `cl_sh_pcim_*` (CL→shell out) / `sh_cl_pcim_*` (in), **ID width

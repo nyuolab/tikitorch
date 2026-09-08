@@ -19,6 +19,15 @@ ledger entry.
 
 ## Current workstreams
 
+The proposed next studies are ECG classification and language-model pretraining,
+with an eventual complete-learning FPGA capstone. Start with the
+[research plan](https://github.com/nyuolab/tikitorch/blob/main/manuscript/RESEARCH_PLAN.md)
+and [student handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/STUDENT_HANDOFF.md).
+These are planning documents, not established workload advantages or approved runs.
+Historical artifacts now live under `manuscript/results/`; the
+[artifact policy](https://github.com/nyuolab/tikitorch/blob/main/manuscript/ARTIFACTS.md)
+explains unchanged raw records and old embedded paths.
+
 | Workstream | Workspace | Boundary |
 | --- | --- | --- |
 | TikiTorch library | [source and API docs](../api/index.md) | PyTorch-shaped, not complete PyTorch compatibility or production maturity |
@@ -36,12 +45,12 @@ manuscripts are working research artifacts, not release guarantees.
 
 Begin with the relevant paper README and follow its exact commit, environment, script,
 and artifact references. The
-[results map](https://github.com/nyuolab/tikitorch/blob/main/results/README.md)
+[results map](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/README.md)
 distinguishes the major evidence areas, and the
 [runner map](https://github.com/nyuolab/tikitorch/blob/main/scripts/README.md) explains which
 scripts are public examples versus revision-bound research tools. Large FPGA build
 products may remain outside Git; the
-[artifact manifest](https://github.com/nyuolab/tikitorch/blob/main/results/fpga_silicon/s1_afibuild/ARTIFACTS.md)
+[artifact manifest](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/fpga_silicon/s1_afibuild/ARTIFACTS.md)
 records retrieval locations and checksums.
 
 For software behavior, use the default test suite and the focused command documented by

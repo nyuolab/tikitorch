@@ -800,7 +800,7 @@ class TropicalTopKModule(nn.Module):
 # The max-plus-linear primitive ``max_i(W[k,i] + x_i)`` has a one-hot input
 # gradient, so its piecewise-linear normals are exactly the axis vectors {e_i} --
 # it cannot represent OBLIQUE value/policy surfaces (the measured §2a underfit;
-# see results/capacity_probe/FIX_FINDINGS.md). Obliqueness in the tropical
+# see manuscript/results/capacity_probe/FIX_FINDINGS.md). Obliqueness in the tropical
 # semiring comes from MONOMIAL EXPONENTS (repeated addition): a weight ``w = +/-
 # 2^k`` applied as ``w * x`` is a bit-SHIFT, and ``sum_i (+/-2^{k_i}) x_i`` is a
 # shift+add-tree -- ZERO multiply, ZERO DSP -- whose gradient is a dense

@@ -19,7 +19,7 @@ The sampler wrote, per second:
 We take each "Last measured" line's first numeric value as that second's sample
 (mW auto-converted to W when the line says mW), stamped with the most recent TS=.
 
-Usage: a2_reduce.py [results_dir]   (default: results/fpga_silicon/a2power)
+Usage: a2_reduce.py [results_dir]   (default: manuscript/results/fpga_silicon/a2power)
 """
 import glob
 import json
@@ -102,7 +102,7 @@ def stat_block(samples, t0, t1):
 def main(argv):
     d = argv[1] if len(argv) > 1 else os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "..", "results", "fpga_silicon", "a2power")
+        "..", "manuscript", "results", "fpga_silicon", "a2power")
     d = os.path.abspath(d)
     rows = {}  # name -> dict
     for p in sorted(glob.glob(os.path.join(d, "power_*.log"))):

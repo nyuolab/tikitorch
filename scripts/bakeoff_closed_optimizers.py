@@ -19,7 +19,7 @@ the sparse binary DP tasks). We report id (in-distribution, held-out) and ood_le
 (2x length) means +- std over SEEDS. Honest reporting: >=3 seeds, no pre-claiming.
 
 Usage:
-    python scripts/bakeoff_closed_optimizers.py [--quick] [--out results/bakeoff.jsonl]
+    python scripts/bakeoff_closed_optimizers.py [--quick] [--out manuscript/results/bakeoff.jsonl]
 
 Writes one JSON line per (task, arm, seed) cell as it completes, then prints the
 aggregated table to stdout (and a markdown table next to the jsonl).
@@ -146,7 +146,7 @@ def main():
                     help=f"subset of arms (default full grid). choices: {ALL_ARMS}")
     ap.add_argument("--tasks", nargs="*", default=None, help="subset of tasks")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 4) - 1))
-    ap.add_argument("--out", default="results/bakeoff_closed_optimizers.jsonl")
+    ap.add_argument("--out", default="manuscript/results/bakeoff_closed_optimizers.jsonl")
     args = ap.parse_args()
 
     global ARMS, TASKS

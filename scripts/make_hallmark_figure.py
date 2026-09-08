@@ -34,7 +34,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 REPO = Path(__file__).resolve().parents[1]
-OUT = REPO / "results" / "lm_shakespeare"
+OUT = REPO / "manuscript" / "results" / "lm_shakespeare"
 TOK_PER_STEP = 24 * 96
 
 ARMS = {  # tag -> (label, color, style)

@@ -48,7 +48,7 @@ Usage (run from the TikiTorch repository root):
   python -m scripts.route_certificates.compiled_resource_benchmark --smoke
   python -m scripts.route_certificates.compiled_resource_benchmark --pilot
   python -m scripts.route_certificates.compiled_resource_benchmark --full
-Results are append-only under results/route_certificates/runs/<experiment>/<uuid>/.
+Results are append-only under manuscript/results/route_certificates/runs/<experiment>/<uuid>/.
 """
 from __future__ import annotations
 
@@ -908,7 +908,7 @@ def main(argv=None):
     ap.add_argument("--full", action="store_true",
                     help="81-cell prereg grid x 3 seeds")
     ap.add_argument("--experiment", default="compiled_resource_benchmark",
-                    help="results/route_certificates/runs/<experiment>/<uuid>/")
+                    help="manuscript/results/route_certificates/runs/<experiment>/<uuid>/")
     ap.add_argument("--warmup", type=int, default=WARMUP)
     ap.add_argument("--reps", type=int, default=REPS)
     ap.add_argument("--cell-timeout-s", type=float,
@@ -953,7 +953,7 @@ def main(argv=None):
             deterministic_arm_orders={
                 f"d{d}_l{l}_t{t}_s{s}": _dry_order(d, l, t, s)
                 for d, l, t, s in [(*CONFIGS[0], 0), (*LIFETIME, 0)]},
-            output=f"results/route_certificates/runs/{args.experiment}/<uuid>/"),
+            output=f"manuscript/results/route_certificates/runs/{args.experiment}/<uuid>/"),
             indent=1))
         return
 

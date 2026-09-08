@@ -205,7 +205,7 @@ cmd_status(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE
 cmd_fetch(){ [ -f "$STATE_FILE" ] || { echo no state; exit 1; }; source "$STATE_FILE"
   # land each run under its own TAG dir so concurrent/sequential runs never clobber
   # one another's scale_*.jsonl (a shared filename + `aws s3 cp` silently overwrites).
-  local DEST="$PROJECT_DIR/results/predictive_coding/$TAG" name found=0
+  local DEST="$PROJECT_DIR/manuscript/results/predictive_coding/$TAG" name found=0
   local -a result_names include_args
   case "$PC_TASK" in
     mnist) result_names=(scale_mnist_gamma_damped.jsonl scale_mnist.jsonl) ;;

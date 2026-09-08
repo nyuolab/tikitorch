@@ -27,11 +27,11 @@ __pycache__/
 # generated model artifacts (tt.save) — mirror of the *.pt rule above
 *.tt
 !zoo/**/*.tt
-# results/ is a generated-output tree; track only curated, cited evidence
-results/closed_benchmarks/
-results/capacity_probe/
+# manuscript/results/ is a generated-output tree; track only curated, cited evidence
+manuscript/results/closed_benchmarks/
+manuscript/results/capacity_probe/
 # Nondeterministic presentation renders; retain the editable SVG and compact PNG.
-/results/graphics/*_nb.png
+/manuscript/results/graphics/*_nb.png
 # per-run console logs created by the run_* scripts
 /logs/
 # compiled LOCAL FPGA bridge (scripts/build_fpga_local.sh) — incl. _libtikifpga_morphlm.*
@@ -41,18 +41,18 @@ _libtikifpga*
 # .tiki_sweep_state/ too.
 .tiki_*
 # root-level scratch HLS kernel dirs (anchored: does NOT touch packaged
-# tikitorch/hardware/.../cl_forge_* kernels or results/*forge* logs)
+# tikitorch/hardware/.../cl_forge_* kernels or manuscript/results/*forge* logs)
 /forge_*/
 
 # FPGA build/probe fetch scratch (large regenerable DCP/tar/logs)
-results/fpga_silicon/afibuild/
-results/fpga_silicon/hdk_probe/
+manuscript/results/fpga_silicon/afibuild/
+manuscript/results/fpga_silicon/hdk_probe/
 # AWS HDK implementation products are retained in object storage, not ordinary
 # Git. Keep the small timing reports, manifests, and logs in the repository.
-results/fpga_silicon/**/to_aws/*.tar
-results/fpga_silicon/**/to_aws/*.dcp
+manuscript/results/fpga_silicon/**/to_aws/*.tar
+manuscript/results/fpga_silicon/**/to_aws/*.dcp
 
-# local API keys (results/graphics/.env etc.)
+# local API keys (manuscript/results/graphics/.env etc.)
 **/.env
 
 # organism/experiments derived state

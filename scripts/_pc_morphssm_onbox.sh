@@ -1,6 +1,6 @@
 #!/bin/bash
 # _pc_morphssm_onbox.sh — on-box driver for the pc-morphssm EC2 batches
-# (results/pc_convrnn/PREREG.md "EC2 execution plan"). Runs under the
+# (manuscript/results/pc_convrnn/PREREG.md "EC2 execution plan"). Runs under the
 # run_connect4_prior_sweep_ec2.sh machinery: env REPO=/opt/tiki,
 # S3_RESULTS=s3://.../results, python at /opt/venv/bin/python.
 #
@@ -17,7 +17,7 @@
 set -x
 cd "${REPO:?}"
 PY=${PY:-/opt/venv/bin/python}
-OUT=results/pc_convrnn
+OUT=manuscript/results/pc_convrnn
 mkdir -p "$OUT/ckpts"
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-4} MKL_NUM_THREADS=4
 NPAR=${NPAR:-10}

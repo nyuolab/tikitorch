@@ -4,14 +4,14 @@ How to get from the honest Task #3 null (all arms 0.00 vs negamax-d2+ on Connect
 below random) to a *competitive* agent using closure-oriented dyadic recipes and FPGA kernels. Produced by a
 4-proposal adversarial design panel whose claims were re-verified against the repo artifacts (the
 verification corrected several over-optimistic numbers — see "Honest hardware status"). Companion to
-`FPGA_BUILD_NOTES.md` (silicon flow) and `results/board_scaling/TASK3_BENCHMARK.md` (the measured null).
+`FPGA_BUILD_NOTES.md` (silicon flow) and `manuscript/results/board_scaling/TASK3_BENCHMARK.md` (the measured null).
 
 ## The reframe: the binding risk is the OPTIMIZER, not throughput
 
 The obvious story is "we were search/data-starved (48 sims, ~320 games) — scale it up." That is **true
 and necessary**, but the panel surfaced a deeper, evidence-backed risk that must be settled first:
 
-- `results/bakeoff_closed_optimizers.md`: the software-closure-oriented optimizer class (SignSGD / TropicalSGD /
+- `manuscript/results/bakeoff_closed_optimizers.md`: the software-closure-oriented optimizer class (SignSGD / TropicalSGD /
   PureTropicalSGD) is **strong on max-structured targets** (running_max ≈ 0.99) but **weak on
   value-like / DP targets** (min_coin_change **0.00–0.22**, sort **0.12** — vs AdamW **0.70 / 0.97**).
 - A MuZero **value head is value-like, not max-structured**, and the Connect4 null was produced **with
@@ -58,7 +58,7 @@ measured Connect4 starvation, deployed as a QAT actor-farm. M5 (pure on-fabric l
 - **Verdict: not yet a full GO** (nothing beats depth-2), but the on-fabric path is alive. The binding
   blocker is now **training dynamics** (policy learns weak-opponent play, not depth-2 tactics) → the M1
   levers (anti-collapse entropy/KL, n-step value bootstrap, more search), NOT more raw games. See
-  `results/board_scaling/TASK3_BENCHMARK.md` (UPDATE block) + `connect4_eval_diagnostic.json`.
+  `manuscript/results/board_scaling/TASK3_BENCHMARK.md` (UPDATE block) + `connect4_eval_diagnostic.json`.
 
 ## Concrete fixes the panel identified (all PyTorch-validatable, no silicon)
 

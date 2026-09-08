@@ -68,10 +68,10 @@ separate small classifier is trained by fabric-only updates.
 
 ## Evidence roots
 
-- `../../results/fpga_silicon/d512_verify/`
-- `../../results/lm_shakespeare/fig_hallmark_lm.md`
-- `../../results/predictive_coding/ONFABRIC_TRAINING.md`
-- `../../results/predictive_coding/onfabric_train/`
+- `../../manuscript/results/fpga_silicon/d512_verify/`
+- `../../manuscript/results/lm_shakespeare/fig_hallmark_lm.md`
+- `../../manuscript/results/predictive_coding/ONFABRIC_TRAINING.md`
+- `../../manuscript/results/predictive_coding/onfabric_train/`
 - `../../tikitorch/audit.py`
 - `../../tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp`
 - `../../tikitorch/hardware/hls/forge_kernels/forge_buffer_morph_lm.hpp`

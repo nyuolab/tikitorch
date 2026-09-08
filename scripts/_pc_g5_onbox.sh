@@ -4,7 +4,7 @@
 # A failed strict audit stops the expensive quality sweep and the script exits nonzero.
 set -u
 PY=${PY:-/opt/venv/bin/python}
-OUT=results/pc_convrnn
+OUT=manuscript/results/pc_convrnn
 # Keep the displayed and executed commands identical, including quoted arguments.
 BASE_CMD=("$PY" scripts/pc_convrnn_charlm.py --arms morphssm:cascade
   --opt puretropical --loss lut --lr-shift 10)

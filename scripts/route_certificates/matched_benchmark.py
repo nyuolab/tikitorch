@@ -820,7 +820,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("results/route_certificates/reference/matched_benchmark.jsonl"),
+        default=Path("manuscript/results/route_certificates/reference/matched_benchmark.jsonl"),
     )
     args = parser.parse_args(argv)
     if args.batch_size <= 0 or args.warmups < 0 or args.repetitions < 1:

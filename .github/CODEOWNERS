@@ -20,12 +20,13 @@
 
 # Claim-bearing evidence and manuscripts.
 /papers/                   @RespectableGlioma
-/results/                  @RespectableGlioma
+/manuscript/               @RespectableGlioma
 /docs/research/CLAIM_LEDGER.md @RespectableGlioma
 
 # Release metadata, contribution guidance, and CI require owner review.
 /.github/                  @RespectableGlioma
 /pyproject.toml            @RespectableGlioma
+/MANIFEST.in               @RespectableGlioma
 /README.md                 @RespectableGlioma
 /CHANGELOG.md              @RespectableGlioma
 /CITATION.cff              @RespectableGlioma

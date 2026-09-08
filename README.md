@@ -119,7 +119,7 @@ research:
 |---|---|---|
 | **Public** | Import-tested API intended for ordinary use; changes require docs, tests, and a changelog entry | `functional`, core `nn`, `models`, `optim`, serialization, logical devices |
 | **Experimental** | Usable and tested, but schemas or performance may change before the first stable release | `autodiff`, local-learning APIs, FPGA bindings, planning, profiling |
-| **Research artifact** | Evidence, runners, and manuscripts; not a compatibility-guaranteed package API | `scripts/`, `results/`, `papers/`, `manuscript/` |
+| **Research artifact** | Evidence, runners, and manuscripts; not a compatibility-guaranteed package API | `scripts/`, `manuscript/results/`, `papers/`, `manuscript/` |
 
 “Public” does not yet mean semantically frozen: the project has not cut its first
 stable release. Research modules under `tikitorch.research` are explicitly unstable.
@@ -143,7 +143,7 @@ model = tt.models.MorphSSM(
 )
 optimizer = tt.optim.PureTropicalSGD(model.parameters())
 
-x = torch.randn(8, 512, 1)
+x = torch.rand(8, 512, 1)  # default quantized input embedding expects [0, 1]
 y = torch.randint(0, 8, (8,))
 
 loss = model.compute_loss(x, y)
@@ -151,6 +151,12 @@ loss.backward()
 optimizer.step()
 optimizer.zero_grad()
 ```
+
+The default input embedding discretizes values into 32 bins over `[0, 1]` and
+clips values outside that range; it does not provide gradients through bin
+selection. Choose preprocessing or an explicit linear input embedding for other
+input ranges. Multilabel tasks need an explicit loss such as `BCEWithLogitsLoss`,
+not the single-label `compute_loss` default.
 
 This example uses the model's default classification loss. Treat it as a library
 quickstart, not as a closure certificate. To make a multiplier-free training claim,
@@ -228,7 +234,7 @@ latency, or energy advantage.
 The reference implementation, tests, and benchmark entry points are under
 [`scripts/route_certificates`](https://github.com/nyuolab/tikitorch/tree/main/scripts/route_certificates),
 with retained evidence under
-[`results/route_certificates`](https://github.com/nyuolab/tikitorch/tree/main/results/route_certificates).
+[`manuscript/results/route_certificates`](https://github.com/nyuolab/tikitorch/tree/main/manuscript/results/route_certificates).
 
 ### FPGA path
 
@@ -257,7 +263,7 @@ and
 - [Closure auditing](https://github.com/nyuolab/tikitorch/blob/main/docs/guide/closure.md)
 - [API reference](https://github.com/nyuolab/tikitorch/blob/main/docs/api/index.md)
 - [Research scope and evidence](https://github.com/nyuolab/tikitorch/blob/main/docs/research/index.md)
-- [Research-results map](https://github.com/nyuolab/tikitorch/blob/main/results/README.md)
+- [Research-results map](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/README.md)
 - [Research-runner map](https://github.com/nyuolab/tikitorch/blob/main/scripts/README.md)
 - [Tracked model zoo and loading guide](https://github.com/nyuolab/tikitorch/blob/main/zoo/README.md)
 - [Runnable examples](https://github.com/nyuolab/tikitorch/blob/main/examples/README.md)
@@ -282,8 +288,12 @@ The old scientific sources remain preserved under `papers/` as historical drafts
 Start with the [Xiang handoff](papers/XIANG_HANDOFF.md),
 [ICML readiness checklist](manuscript/ICML_READINESS.md), and
 [codebase/release roadmap](docs/release_impact_roadmap.md).
+The next practical studies are recorded in the [ECG and language-pretraining
+research plan](manuscript/RESEARCH_PLAN.md); use the [student handoff](manuscript/STUDENT_HANDOFF.md)
+for CPU-first onboarding before beginning research. The [artifact policy](manuscript/ARTIFACTS.md)
+explains the move to `manuscript/results/` and preservation of historical paths.
 The paper is an evidence-bounded draft, not yet submission-ready. Historical
-results under `results/` do not certify the current library or a public release.
+results under `manuscript/results/` do not certify the current library or a public release.
 
 ## Development
 
