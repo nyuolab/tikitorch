@@ -48,24 +48,23 @@ TikiTorch configuration is multiplier-free.
    wheel/sdist CI, documentation deployment, and a small downstream smoke
    project before considering a software-paper submission.
 
-## Publication tracks
+## Unified research manuscript
 
 Scientific manuscripts have their own gates and do not define the whole
 library's maturity.
 
-- **Route certificates:** the root [manuscript handoff](manuscript/README.md)
-  owns the selected-VJP theorem, schema, exact replay, and five-arm compiled
-  comparison. It must not claim a new gradient or generic activation-free
-  training.
-- **Multiplier-free FPGA learning:** the
-  [hardware paper](papers/multiplier_free_fpga/README.md) owns the physical
-  kernels and silicon measurements. It still requires disjoint-stream held-out
-  learning, matched CUDA, final routed reports, and defensible full-card power.
-- **TikiTorch software:** pursue a software paper only after a tagged stable
-  release, hosted versioned docs, external use, and reproducible examples.
+- The [single TikiTorch manuscript](manuscript/README.md) connects selected-VJP
+  route state, PyTorch integration and recipe-scoped arithmetic auditing.
+  Historical hardware measurements retain their own evidence boundaries.
+- The [research plan](manuscript/RESEARCH_PLAN.md) prioritizes useful ECG and
+  language-pretraining quality/resource results, followed by a possible complete
+  FPGA learning capstone. Studies remain deferred pending the student handoff.
+- The former [route and hardware drafts](manuscript/archive/README.md) are
+  archived sources, not independent papers to maintain. Software release
+  maturity still needs its own tested tag, documentation and external use.
 
 The canonical [claim ledger](docs/research/CLAIM_LEDGER.md) controls wording for
-all three tracks.
+the unified draft and all research summaries.
 
 ## Explicit non-goals
 

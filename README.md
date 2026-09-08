@@ -119,7 +119,7 @@ research:
 |---|---|---|
 | **Public** | Import-tested API intended for ordinary use; changes require docs, tests, and a changelog entry | `functional`, core `nn`, `models`, `optim`, serialization, logical devices |
 | **Experimental** | Usable and tested, but schemas or performance may change before the first stable release | `autodiff`, local-learning APIs, FPGA bindings, planning, profiling |
-| **Research artifact** | Evidence, runners, and manuscripts; not a compatibility-guaranteed package API | `scripts/`, `manuscript/results/`, `papers/`, `manuscript/` |
+| **Research artifact** | Evidence, runners, and manuscripts; not a compatibility-guaranteed package API | `scripts/`, `manuscript/` (including `results/` and `archive/`) |
 
 “Public” does not yet mean semantically frozen: the project has not cut its first
 stable release. Research modules under `tikitorch.research` are explicitly unstable.
@@ -283,9 +283,10 @@ The single active manuscript is
 It combines the earlier route-certificate and FPGA drafts around an executable
 derivative-state and arithmetic-audit contract. Current-code measurements and
 historical hardware evidence retain separate configurations and claim boundaries.
-The old scientific sources remain preserved under `papers/` as historical drafts.
+The old scientific sources remain preserved under
+[`manuscript/archive/`](manuscript/archive/README.md) as historical drafts.
 
-Start with the [Xiang handoff](papers/XIANG_HANDOFF.md),
+Start with the [Xiang handoff](manuscript/XIANG_HANDOFF.md),
 [ICML readiness checklist](manuscript/ICML_READINESS.md), and
 [codebase/release roadmap](docs/release_impact_roadmap.md).
 The next practical studies are recorded in the [ECG and language-pretraining

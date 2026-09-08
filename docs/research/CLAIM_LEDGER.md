@@ -9,7 +9,7 @@ this ledger outranks manuscript prose and the top-level README when wording
 conflicts.
 
 The single active paper is now the [unified TikiTorch manuscript](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md).
-The two `papers/` scientific drafts and their raw results are preserved as
+The two scientific drafts in `manuscript/archive/` and their raw results are preserved as
 historical sources, not competing current claim authorities. The manuscript's
 [evidence ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md) records the selected
 current and historical evidence separately.
@@ -168,9 +168,9 @@ ratios are 1.69x, 2.48x, and 2.79x. Historical payload-only ratios (2.04x, 2.81x
 and 2.98x) are coding diagnostics. The independently measured current device
 payload comparison has its own record and boundary in TT-ROUTE-003.
 
-**Evidence:** [paper README](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/README.md),
-[manuscript table](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/main.tex), [accounting
-sensitivity](https://github.com/nyuolab/tikitorch/blob/main/papers/route_certificates/supplement.tex), and [raw working
+**Evidence:** [historical paper README](https://github.com/nyuolab/tikitorch/blob/main/manuscript/archive/route_certificates/README.md),
+[archived manuscript table](https://github.com/nyuolab/tikitorch/blob/main/manuscript/archive/route_certificates/main.tex), [accounting
+sensitivity](https://github.com/nyuolab/tikitorch/blob/main/manuscript/archive/route_certificates/supplement.tex), and [raw working
 results](https://github.com/nyuolab/tikitorch/tree/main/manuscript/results/route_certificates/actual_morphssm/).
 
 **Do not claim:** lower process RSS, allocator peak, accelerator peak, DRAM

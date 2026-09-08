@@ -2,6 +2,7 @@
 # Run the complete test suite from a Git source checkout: its fixtures and runners
 # deliberately depend on checkout-only scripts, documentation and evidence.
 prune manuscript
+# Legacy root guard; historical drafts now live under manuscript/archive/.
 prune papers
 prune scripts
 prune tests

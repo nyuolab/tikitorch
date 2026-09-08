@@ -2,8 +2,9 @@
 
 This directory is the **single active manuscript**, combining the former
 route-certificate and multiplier-free FPGA drafts around TikiTorch.
-The older scientific sources remain in `papers/` as historical reference;
-they are not parallel submission drafts.
+The older scientific sources are preserved in [archive/](archive/README.md);
+they are not parallel submission drafts. The former root `papers/` directory
+has been consolidated here, so research has one workspace.
 
 The main contribution is an executable connection between the derivative state
 needed by additive hard operators and the arithmetic executed by a learning
@@ -12,12 +13,23 @@ compact switches, or multiplication-free training.
 
 ## Read and build
 
+```text
+manuscript/
+  main.tex, *_appendix.tex, refs.bib  # active unified paper
+  RESEARCH_PLAN.md                   # proposed ECG / LM / FPGA program
+  XIANG_HANDOFF.md, STUDENT_HANDOFF.md
+  results/                          # research artifacts and historical records
+  evidence/, generated/             # source-bound measurements and derived tables
+  archive/                          # superseded drafts; no new scientific edits
+```
+
 - [Main paper](main.tex), [theory appendix](theory_appendix.tex), and
   [methods/evidence appendix](methods_appendix.tex).
 - [Evidence ledger](EVIDENCE_LEDGER.md) and [primary-literature comparison](LITERATURE_REVIEW.md).
 - [ICML readiness](ICML_READINESS.md) and [remaining experiment protocol](EXPERIMENT_PROTOCOL.md).
 - [ECG, language pretraining and FPGA research plan](RESEARCH_PLAN.md) and
   [student handoff](STUDENT_HANDOFF.md).
+- [Xiang discussion handoff](XIANG_HANDOFF.md) and [historical drafts](archive/README.md).
 - [Research results and historical artifacts](results/README.md), kept here
   separately from the reusable library.
 - [Artifact preservation and relocation policy](ARTIFACTS.md).

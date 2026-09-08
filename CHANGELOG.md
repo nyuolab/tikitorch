@@ -86,6 +86,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Consolidated root `papers/` into `manuscript/`: Xiang's handoff now sits beside
+  the active paper, and the two superseded drafts live in `manuscript/archive/`.
+  Scientific sources and local build products are preserved; navigation and
+  ignore rules follow the move.
+
 - Research artifacts now live in `manuscript/results/`, separate from the
   reusable library. Active paths follow the move; historical raw records and
   S3 object keys are preserved. Source distributions exclude checkout-only

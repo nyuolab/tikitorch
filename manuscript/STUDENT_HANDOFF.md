@@ -35,8 +35,9 @@ language-model pretraining, with a later complete-learning FPGA capstone.
 Reusable code lives in `tikitorch/`; small executable examples in `examples/`;
 tests in `tests/`; research runners in `scripts/` and the explicitly unstable
 `tikitorch.research` namespace. The single active paper and research evidence
-live under `manuscript/`. The former scientific sources under `papers/` are
-historical reference, not two additional papers to edit.
+live under `manuscript/`. The former scientific sources under
+[`manuscript/archive/`](archive/README.md) are historical reference, not two
+additional papers to edit. The [Xiang handoff](XIANG_HANDOFF.md) is in this same workspace.
 
 ## First contribution: reproduce and explain, without research hardware
 

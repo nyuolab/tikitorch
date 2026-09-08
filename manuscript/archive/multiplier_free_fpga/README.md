@@ -1,10 +1,13 @@
 # Multiplier-Free Learning on FPGA
 
 > Historical draft, superseded on 2026-09-08 by the unified
-> [TikiTorch manuscript](../../manuscript/README.md). The scientific sources below
+> [TikiTorch manuscript](../../README.md). The scientific sources below
 > are preserved for provenance, not maintained as a separate submission. Former
 > separate-paper and venue instructions are historical. Make new scientific
 > edits in `manuscript/`; do not relabel old hardware measurements as current code.
+> This directory moved from `papers/multiplier_free_fpga/` to
+> `manuscript/archive/multiplier_free_fpga/`; the remaining narrative describes
+> the former standalone draft, not an additional paper to maintain.
 
 Status: evidence-bounded discussion draft, suitable for technical review but
 not submission-ready.
@@ -68,13 +71,13 @@ separate small classifier is trained by fabric-only updates.
 
 ## Evidence roots
 
-- `../../manuscript/results/fpga_silicon/d512_verify/`
-- `../../manuscript/results/lm_shakespeare/fig_hallmark_lm.md`
-- `../../manuscript/results/predictive_coding/ONFABRIC_TRAINING.md`
-- `../../manuscript/results/predictive_coding/onfabric_train/`
-- `../../tikitorch/audit.py`
-- `../../tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp`
-- `../../tikitorch/hardware/hls/forge_kernels/forge_buffer_morph_lm.hpp`
+- `../../results/fpga_silicon/d512_verify/`
+- `../../results/lm_shakespeare/fig_hallmark_lm.md`
+- `../../results/predictive_coding/ONFABRIC_TRAINING.md`
+- `../../results/predictive_coding/onfabric_train/`
+- `../../../tikitorch/audit.py`
+- `../../../tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp`
+- `../../../tikitorch/hardware/hls/forge_kernels/forge_buffer_morph_lm.hpp`
 
 The research branch was integrated into `main` at merge commit `0a12c8b`, but
 this discussion draft does not yet name an immutable release candidate. The

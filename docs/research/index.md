@@ -33,7 +33,7 @@ explains unchanged raw records and old embedded paths.
 | TikiTorch library | [source and API docs](../api/index.md) | PyTorch-shaped, not complete PyTorch compatibility or production maturity |
 | Unified TikiTorch manuscript | [`manuscript`](https://github.com/nyuolab/tikitorch/tree/main/manuscript) | Route-sufficient selected reverse programs and independent arithmetic auditing; current-code representation measurements and historical FPGA feasibility remain separately scoped |
 
-The older route-certificate and FPGA drafts under `papers/` are preserved
+The older route-certificate and FPGA drafts under `manuscript/archive/` are preserved
 historical sources, not independent active submission tracks. See the
 [release and scientific-impact roadmap](../release_impact_roadmap.md) for the
 post-manuscript priorities and required acceptance evidence.

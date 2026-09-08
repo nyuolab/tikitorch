@@ -1,15 +1,16 @@
 # Unified TikiTorch discussion handoff for Xiang
 
 The active draft is [TikiTorch: Route-Sufficient Differentiation for Auditable
-Tropical Learning](../manuscript/README.md). The prior two-paper portfolio is
+Tropical Learning](README.md). The prior two-paper portfolio is
 superseded by one TikiTorch manuscript; the old sources remain historical.
 
 The immediate next step is to see whether a student wants to take ownership,
 after local library cleanup and onboarding. The proposed
-[research plan](../manuscript/RESEARCH_PLAN.md) and
-[student handoff](../manuscript/STUDENT_HANDOFF.md) are written down; neither
+[research plan](RESEARCH_PLAN.md) and
+[student handoff](STUDENT_HANDOFF.md) are written down; neither
 constitutes a launched experiment or approved compute budget. Research results
-now live separately under [`manuscript/results/`](../manuscript/results/README.md).
+now live separately under [`manuscript/results/`](results/README.md).
+The superseded drafts are preserved in [archive/](archive/README.md).
 
 ## The scientific question
 
@@ -50,8 +51,8 @@ complete multiplication-free training.
 3. Which author contributions, institutional approvals and artifact rights
    must be confirmed before release and submission?
 
-Read the [readiness checklist](../manuscript/ICML_READINESS.md),
-[experiment protocol](../manuscript/EXPERIMENT_PROTOCOL.md) and
+Read the [readiness checklist](ICML_READINESS.md),
+[experiment protocol](EXPERIMENT_PROTOCOL.md) and
 [codebase/release roadmap](../docs/release_impact_roadmap.md) after the PDF.
 The current official style is a provisional 2026 template, not a verified
 next-cycle submission guarantee. No manuscript has been submitted.

@@ -122,6 +122,55 @@ def test_inventory_creation_never_overwrites_existing_record(frozen):
     assert output.read_text() == "original inventory"
 
 
+@pytest.mark.parametrize("mutation", [None, "metric", "old_target", "extra_link"])
+def test_recording_allows_only_the_exact_paper_archive_link(tmp_path, monkeypatch, mutation):
+    original = "results/route_certificates/README.md"
+    old_target = "../../papers/route_certificates/README.md"
+    new_target = "../../archive/route_certificates/README.md"
+    before = f"Ratio: 1.69x. See [paper README]({old_target}).\n".encode()
+    after = before.replace(old_target.encode(), new_target.encode())
+    if mutation == "metric":
+        after = after.replace(b"1.69x", b"9.69x")
+    elif mutation == "old_target":
+        after = before
+    elif mutation == "extra_link":
+        after += f"[extra]({new_target})\n".encode()
+    path = tmp_path / "manuscript" / original
+    path.parent.mkdir(parents=True)
+    path.write_bytes(after)
+    path.chmod(0o644)
+    output = tmp_path / "inventory.json"
+    oid = "f" * 40
+
+    def source_snapshot(command, **kwargs):
+        if command[1] == "rev-parse":
+            return layout.SOURCE_COMMIT + "\n"
+        if command[1] == "ls-tree":
+            return f"100644 blob {oid}\t{original}\0".encode()
+        assert command[1:] == ["cat-file", "--batch"]
+        assert kwargs["input"] == f"{oid}\n".encode()
+        return f"{oid} blob {len(before)}\n".encode() + before + b"\n"
+
+    monkeypatch.setattr(layout.subprocess, "check_output", source_snapshot)
+    monkeypatch.setattr(layout, "TRACKED_FILES", 1)
+    monkeypatch.setattr(layout, "NAVIGATION_EDITS", {
+        original: layout.NAVIGATION_EDITS[original],
+    })
+    if mutation:
+        with pytest.raises(ValueError, match="unapproved artifact edit"):
+            layout.record_inventory(tmp_path, layout.SOURCE_COMMIT, output)
+        assert not output.exists()
+    else:
+        manifest = layout.record_inventory(tmp_path, layout.SOURCE_COMMIT, output)
+        assert manifest["source_commit"] == layout.SOURCE_COMMIT
+        assert manifest["files"] == [dict(
+            original_path=original, path="manuscript/" + original, mode="100644",
+            sha256=layout.digest(after), original_sha256=layout.digest(before),
+            change="navigation_links_only",
+        )]
+        assert layout.read_inventory(output) == manifest
+
+
 @pytest.mark.parametrize("source", [
     '{"schema": "one", "schema": "two"}',
     '{"files": [{"path": "one", "path": "two"}]}',

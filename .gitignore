@@ -18,7 +18,7 @@ __pycache__/
 /dist/
 /site/
 /manuscript/build/
-/papers/*/build/
+/manuscript/archive/*/build/
 *.pt
 /data/
 .DS_Store

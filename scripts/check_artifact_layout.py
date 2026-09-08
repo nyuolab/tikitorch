@@ -25,19 +25,26 @@ TRACKED_FILES = 544
 SCHEMA = "tikitorch.artifact_relocation.v1"
 NAVIGATION_EDITS = {
     "results/README.md": (
-        "../docs/research/CLAIM_LEDGER.md", "../scripts/README.md",
+        ("../docs/research/CLAIM_LEDGER.md", "../../docs/research/CLAIM_LEDGER.md"),
+        ("../scripts/README.md", "../../scripts/README.md"),
     ),
     "results/board_scaling/diagnostics/SCALED_RUN_DESIGN.md": (
-        "../../../scripts/muzero_scale_bench.py", "../../../scripts/muzero_scale_cost.py",
+        ("../../../scripts/muzero_scale_bench.py", "../../../../scripts/muzero_scale_bench.py"),
+        ("../../../scripts/muzero_scale_cost.py", "../../../../scripts/muzero_scale_cost.py"),
     ),
     "results/board_scaling/diagnostics/ROOT_CAUSE_TRAINING.md": (
-        "../../../scripts/muzero_train_diagnostics.py",
+        ("../../../scripts/muzero_train_diagnostics.py", "../../../../scripts/muzero_train_diagnostics.py"),
     ),
     "results/route_certificates/README.md": (
-        "../../papers/route_certificates/README.md",
+        # The subsequent papers/ consolidation changes this one navigation target.
+        ("../../papers/route_certificates/README.md", "../../archive/route_certificates/README.md"),
     ),
-    "results/fpga_silicon/ddr_arch/README.md": ("../../../THIRD_PARTY_NOTICES.md",),
-    "results/fpga_silicon/s1_afibuild/ARTIFACTS.md": ("../../../scripts/run_s1_afi_build.sh",),
+    "results/fpga_silicon/ddr_arch/README.md": (
+        ("../../../THIRD_PARTY_NOTICES.md", "../../../../THIRD_PARTY_NOTICES.md"),
+    ),
+    "results/fpga_silicon/s1_afibuild/ARTIFACTS.md": (
+        ("../../../scripts/run_s1_afi_build.sh", "../../../../scripts/run_s1_afi_build.sh"),
+    ),
 }
 
 
@@ -186,10 +193,10 @@ def record_inventory(root, revision, output):
         require(git_mode(path) == mode, f"source executable mode changed: {original}")
         expected = before
         if original in NAVIGATION_EDITS:
-            for target in NAVIGATION_EDITS[original]:
-                old = f"]({target})".encode()
+            for old_target, new_target in NAVIGATION_EDITS[original]:
+                old = f"]({old_target})".encode()
                 require(expected.count(old) == 1, f"ambiguous historical navigation link: {original}")
-                expected = expected.replace(old, f"](../{target})".encode())
+                expected = expected.replace(old, f"]({new_target})".encode())
         require(after == expected, f"unapproved artifact edit: {original}")
         records.append(dict(original_path=original, path=relocated, mode=mode,
                             sha256=digest(after), original_sha256=digest(before),

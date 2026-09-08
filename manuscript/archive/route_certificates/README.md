@@ -1,10 +1,13 @@
 # Forward traces as exact differentiation certificates
 
 > Historical draft, superseded on 2026-09-08 by the unified
-> [TikiTorch manuscript](../../manuscript/README.md). The scientific sources below
+> [TikiTorch manuscript](../../README.md). The scientific sources below
 > are preserved for provenance, not maintained as a separate submission. Former
 > instructions requiring separate papers, old test counts and venue choices are
 > historical. Make new scientific edits in `manuscript/`.
+> This directory moved from `papers/route_certificates/` to
+> `manuscript/archive/route_certificates/`; the remaining narrative describes
+> the former draft, including its old "canonical" and separate-paper wording.
 
 This directory is the canonical TikiTorch manuscript workspace for the
 route-certificate result. It is deliberately separate from the FPGA learning
@@ -126,7 +129,7 @@ tests/test_route_*.py                    # graph, gradient, and composition test
 tests/test_*sufficiency.py               # state and certificate sufficiency tests
 scripts/route_certificates/              # audit and five-arm runners
 manuscript/results/route_certificates/              # append-only raw rows and manifests
-papers/route_certificates/               # this manuscript and table reducer
+manuscript/archive/route_certificates/   # this historical manuscript
 ```
 
 Do not create placeholder scientific rows. Each claim-bearing result should

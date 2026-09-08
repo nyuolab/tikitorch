@@ -1,0 +1,54 @@
+{
+  "schema": "tikitorch.archived_manuscript_sources.v1",
+  "source_commit": "1b4b00308a53919dee6afbc8fdca86011659d348",
+  "files": [
+    {
+      "original_path": "papers/multiplier_free_fpga/.latexmkrc",
+      "path": "manuscript/archive/multiplier_free_fpga/.latexmkrc",
+      "sha256": "e84e777f8e9693761835b0797c76d254dc3fd7042d6dc764e4a9e4e15737e367",
+      "mode": "100644"
+    },
+    {
+      "original_path": "papers/multiplier_free_fpga/main.tex",
+      "path": "manuscript/archive/multiplier_free_fpga/main.tex",
+      "sha256": "5baa1fc03a0036c1625f7d7a46b93e02b715dd880422651abd121e14adc85d3b",
+      "mode": "100644"
+    },
+    {
+      "original_path": "papers/multiplier_free_fpga/refs.bib",
+      "path": "manuscript/archive/multiplier_free_fpga/refs.bib",
+      "sha256": "bd7f39ede751f1ed0040cf1fa2eef5874f1f3659b356d41464ec7169954d8a78",
+      "mode": "100644"
+    },
+    {
+      "original_path": "papers/route_certificates/.latexmkrc",
+      "path": "manuscript/archive/route_certificates/.latexmkrc",
+      "sha256": "e84e777f8e9693761835b0797c76d254dc3fd7042d6dc764e4a9e4e15737e367",
+      "mode": "100644"
+    },
+    {
+      "original_path": "papers/route_certificates/main.tex",
+      "path": "manuscript/archive/route_certificates/main.tex",
+      "sha256": "e1329ab4268210ae6ff1e89627d3d680cf6cb2129fb6c64e4354009b50a73d2c",
+      "mode": "100644"
+    },
+    {
+      "original_path": "papers/route_certificates/methods.tex",
+      "path": "manuscript/archive/route_certificates/methods.tex",
+      "sha256": "258376da216a6e2b9c4b9de4161ac35bf47f4ab5902d23e5905ce0bc695b6cbe",
+      "mode": "100644"
+    },
+    {
+      "original_path": "papers/route_certificates/refs.bib",
+      "path": "manuscript/archive/route_certificates/refs.bib",
+      "sha256": "ab0782eb7a9a5ce6ed9a8a085191f513e2c4dfe8f8e92b6f794cbc722d463a52",
+      "mode": "100644"
+    },
+    {
+      "original_path": "papers/route_certificates/supplement.tex",
+      "path": "manuscript/archive/route_certificates/supplement.tex",
+      "sha256": "fd7ef1741e21d776c61ccfdb08f48303268936f852cfb5aa4efd6b7eb118b0e7",
+      "mode": "100644"
+    }
+  ]
+}
