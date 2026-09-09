@@ -2,12 +2,12 @@
 
 This page is the roadmap entry point. The detailed priorities and acceptance
 criteria live in the [release/impact roadmap](docs/release_impact_roadmap.md);
-research task design lives in the [research plan](manuscript/RESEARCH_PLAN.md).
+research task design lives in the [research plan](manuscript/research/PLAN.md).
 Keep implementation checklists there rather than maintaining conflicting copies.
 
 ## Current order of work
 
-1. **Independent collaborator review.** Use the [shared handoff](manuscript/HANDOFF.md)
+1. **Independent collaborator review.** Use the [shared handoff](manuscript/README.md)
    to reproduce onboarding and select a bounded contribution before running studies.
 2. **Release foundations.** Resolve third-party RTL and retained-history review,
    verify the candidate on the supported CI matrix, and review version/API policy.
@@ -27,7 +27,7 @@ cloud provisioning or release publication.
 - [Contributing](CONTRIBUTING.md): development setup, checks and change policy.
 - [Release validation](docs/release_validation.md): runnable checks and publication gates.
 - [Release/impact roadmap](docs/release_impact_roadmap.md): engineering priorities and acceptance evidence.
-- [Research plan](manuscript/RESEARCH_PLAN.md): ECG, language-pretraining and FPGA study sequence.
+- [Research plan](manuscript/research/PLAN.md): ECG, language-pretraining and FPGA study sequence.
 - [Claim ledger](docs/research/CLAIM_LEDGER.md): what the evidence permits us to claim.
 
 TikiTorch remains an independent PyTorch companion, not a complete PyTorch

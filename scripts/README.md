@@ -21,7 +21,7 @@ runners. For evidence interpretation, start at [`manuscript/results/`](../manusc
 the [claim ledger](../docs/research/CLAIM_LEDGER.md).
 
 New output defaults use `manuscript/results/`; see the
-[artifact preservation policy](../manuscript/ARTIFACTS.md). Research runner
+[artifact preservation policy](../manuscript/research/EVIDENCE.md#artifact-preservation-and-layout). Research runner
 defaults resolve the checkout root, or the caller's directory when installed
 without a checkout. Pass explicit data/output paths for reproducible runs.
 `nanogpt --strict` checks current hard training separately from a hardened

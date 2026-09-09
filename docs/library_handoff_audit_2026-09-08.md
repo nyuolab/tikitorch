@@ -68,8 +68,8 @@ research-workspace fallback and CLI smoke checks. No distribution was uploaded.
 ## Remaining gates and next action
 
 The next action is a student/maintainer review of the
-[handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/HANDOFF.md)
-and [research plan](https://github.com/nyuolab/tikitorch/blob/main/manuscript/RESEARCH_PLAN.md).
+[handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md)
+and [research plan](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/PLAN.md).
 No dataset download, ECG/LM pilot, accelerator allocation, FPGA synthesis or
 paid service call was initiated. Library cleanup is not evidence of a practical
 workload advantage, and research adapters in the plan remain future work.

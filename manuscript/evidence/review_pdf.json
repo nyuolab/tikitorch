@@ -1,0 +1,32 @@
+{
+  "inputs_sha256": {
+    "manuscript/build.py": "ae41976ac3951094316f27e3836256f84e54420b9c5bac4c415ea3f51c0a3c0e",
+    "manuscript/evidence/retained_state_layout_2026-09-09.json": "2e536dd65bc89ac5d59046cb25fe27ccd4fcca1d2b7af50675a3629cc5f8cc4c",
+    "manuscript/results/fpga_silicon/d512_verify/golden_fused.jsonl": "43bd34508d457b7d5662482aecb13012bf39136dc666fdb42a4f894d026bbeb3",
+    "manuscript/results/fpga_silicon/d512_verify/silicon_fused.jsonl": "43bd34508d457b7d5662482aecb13012bf39136dc666fdb42a4f894d026bbeb3",
+    "manuscript/results/fpga_silicon/d512_verify/train_200.err": "ddda8919bf946b514154bb5efc7e6ec8ad05ed6d37fbca31485b2f112dcc514d",
+    "manuscript/results/fpga_silicon/d512_verify/train_2000.err": "b8a5d29e207ad3591ca5639bc4a5094b13a5892b2dd273fa77b3403fcc074e36",
+    "manuscript/results/fpga_silicon/d512_verify/train_30.err": "59c863911b018499a3e49cb165e5c50e3fbd8db4b83dac351eb553a6ae407124",
+    "manuscript/results/predictive_coding/onfabric_train/crosscheck.txt": "4203d9cff2234bfa9b312ec06e9a94e42165d8a4b5c190560f7fbd93254b7a0a",
+    "manuscript/results/predictive_coding/onfabric_train/train.txt": "097bdc7d37dbe141feb90dc03b5d673fb3287eb7bf85e193372196368d86143b",
+    "manuscript/results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/manifest.json": "7f5bf7b657b160dc51c51a563267d3ee77412c9b29ad0cd40f802c55f84bac29",
+    "manuscript/results/route_certificates/actual_morphssm/exp1_saved_state/529c45f4-7274-4999-b35c-c59d1db917e6/saved_state.jsonl": "351c15fc09455d953db3f53dc9929af1dd961db9f351c9992ba48ba08d25623b",
+    "manuscript/source/.latexmkrc": "e6d24c54858a7cef930ebd3f83a497e76242aad047ee95fc4c4157f2254e0738",
+    "manuscript/source/generated/current_retained_state.tex": "07e50bfc1a0c0fecbbce3338f8e59752881c3ab93f99cfc034baef59e0bff99f",
+    "manuscript/source/generated/d512_execution.tex": "bba3683479b40246015657a234edca51d2a79d10fd81afea85320623bb8a8189",
+    "manuscript/source/generated/retained_state.tex": "542f411e7279bfd481526a7019fb2e661cd23c1102999d2216c3e1db6a6f93ef",
+    "manuscript/source/generated/table_provenance.json": "8db1cc18efbe592b44b3aede5814d146a4694372e9c454851db76b8837c18f2e",
+    "manuscript/source/main.tex": "63b26693292cfceb235a1d607686fe08cb047b354613b8c5ac02558efb1fcffb",
+    "manuscript/source/methods_appendix.tex": "b1b8c0f2616869ae7db1af4c28d6b2a87b26af09de6ed2bc28165350196f68cf",
+    "manuscript/source/refs.bib": "52c2cd1bff4db96544045f72207f9e4c838bb05138a2abaf6b17f35dde7ae056",
+    "manuscript/source/template_manifest.json": "e586b41f8789e1613f949cea3c243293e86f344c7009213220d9c07404c5d82b",
+    "manuscript/source/theory_appendix.tex": "fa1fcf681988ff663d38e8f4589ece40c5b345cc95ce4e0050069f8cb1a3ad3a",
+    "manuscript/tools/generate_tables.py": "e5fddaf4cb790453c98cb4c324fbcdd4f429201b87a914e4c86ba84d06fa24e8",
+    "manuscript/tools/measure_retained_state.py": "bb1329a5941d3ad339598311971afbb9d7960ba1eb3f0671288c02aa54e0f7d6"
+  },
+  "main_body_pages": 6,
+  "pdf": "TikiTorch.pdf",
+  "pdf_sha256": "6740ac9404493bf96b2a6583621dc96618a20a9b95fb50e2faf1c1654749ebb8",
+  "schema": "tikitorch.review_pdf.v1",
+  "scope": "repository input freshness and checked build; not scientific, release or venue clearance"
+}

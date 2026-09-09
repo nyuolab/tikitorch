@@ -6,6 +6,11 @@
 \usepackage{hyperref}
 \newcommand{\theHalgorithm}{\arabic{algorithm}}
 \usepackage{icml2026}
+% Discussion-copy label only: retain the pinned upstream style unchanged.
+% Recheck the target venue's actual rules before preparing a submission.
+\makeatletter
+\renewcommand{\Notice@String}{Discussion draft. Not submitted.}
+\makeatother
 \usepackage{amsmath,amssymb,amsthm,mathtools}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning}
@@ -27,7 +32,7 @@
 \newcommand{\code}[1]{\texttt{#1}}
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \icmltitlerunning{TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning}
-\hypersetup{pdfauthor={},pdftitle={TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning}}
+\hypersetup{pdfauthor={},pdftitle={TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning},pdfsubject={TikiTorch discussion draft; not submitted}}
 
 \begin{document}
 \twocolumn[

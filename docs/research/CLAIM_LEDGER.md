@@ -11,7 +11,7 @@ conflicts.
 The single active paper is now the [unified TikiTorch manuscript](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md).
 The two scientific drafts in `manuscript/archive/` and their raw results are preserved as
 historical sources, not competing current claim authorities. The manuscript's
-[evidence ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md) records the selected
+[evidence ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md) records the selected
 current and historical evidence separately.
 
 ## Repository identity
@@ -123,7 +123,7 @@ points this is the classical VJP. At ties it is the specified local reverse
 program, not necessarily a Clarke subgradient of the composed function.
 
 **Evidence:** [unified manuscript and proofs](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md),
-[claim boundary and preserved evidence](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md),
+[claim boundary and preserved evidence](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md),
 [working implementation](https://github.com/nyuolab/tikitorch/tree/main/tikitorch/autodiff/), [working result
 archive](https://github.com/nyuolab/tikitorch/tree/main/manuscript/results/route_certificates/), and route tests currently under
 [`tests/`](https://github.com/nyuolab/tikitorch/tree/main/tests/).
@@ -206,9 +206,9 @@ Parameters, optimizer, loss, common cotangent, metadata and transient
 workspace are excluded. Portable framing is reported separately: 38,298,
 91,342 and 333,715 bytes. Its values differ from the historical format.
 
-**Evidence:** [current source-bound record](https://github.com/nyuolab/tikitorch/blob/main/manuscript/evidence/retained_state_cleanup_2026-09-08.json),
-[measurement/check command](https://github.com/nyuolab/tikitorch/blob/main/manuscript/measure_retained_state.py),
-[table and boundary ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md).
+**Evidence:** [current source-bound record](https://github.com/nyuolab/tikitorch/blob/main/manuscript/evidence/retained_state_layout_2026-09-09.json),
+[measurement/check command](https://github.com/nyuolab/tikitorch/blob/main/manuscript/tools/measure_retained_state.py),
+[table and boundary ledger](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md).
 The route-consistency oracle shares canonical primitives; it is not an
 independent algorithm. The record binds all library Python sources and the
 measurement script and explicitly reports a dirty worktree.
@@ -219,7 +219,7 @@ activation-free training. A byte comparison is not a full-step benchmark.
 
 **Upgrade gate:** clean independent reproduction, then five-arm same-model
 measurements and multi-seed useful-task quality/cost evidence under the
-[declared experiment protocol](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EXPERIMENT_PROTOCOL.md).
+[declared experiment protocol](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/PLAN.md#comparison-protocol).
 
 ### TT-FPGA-INF-001 — Coherent multiplier-free LM inference on F2
 
@@ -371,7 +371,7 @@ Core-rail measurements, WNS-derived estimates, and projected replicas do not
 support a board-to-board energy claim. Full-card FPGA power under a matched
 quality/workload protocol remains open. Evidence: [hallmark
 qualifications](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/fig_hallmark_lm.md) and the [FPGA
-evidence qualifications](https://github.com/nyuolab/tikitorch/blob/main/manuscript/EVIDENCE_LEDGER.md).
+evidence qualifications](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md).
 
 ### TT-NEG-005 — Native compiled AdamW does not pass strict update parity
 

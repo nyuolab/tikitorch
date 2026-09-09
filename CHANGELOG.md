@@ -8,6 +8,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A shareable `manuscript/TikiTorch.pdf` with a source/evidence-bound freshness
+  manifest, offline `build.py --check`, and failed-build preservation tests.
 - A proposed ECG/language-pretraining research plan and CPU-first student handoff
   under `manuscript/`, with practical quality/resource gates and a later FPGA capstone.
 - A hash/mode-checked relocation inventory for `manuscript/results/`, preserving
@@ -85,6 +87,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with Twine, and exercises the installed closure CLI.
 
 ### Changed
+
+- Made `manuscript/README.md` the single status, next-steps and handoff document;
+  consolidated supporting notes into `research/{PLAN,EVIDENCE,LITERATURE}.md` and
+  moved LaTeX/generated tables and helpers into `source/` and `tools/`. Historical
+  measurements and archived scientific sources are preserved; a new append-only
+  CPU audit records the helper relocation without changing numerical results.
 
 - Consolidated reviewer/student onboarding into `manuscript/HANDOFF.md` and
   made root `ROADMAP.md` a concise entry point to the detailed engineering and

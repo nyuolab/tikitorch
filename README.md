@@ -286,12 +286,12 @@ historical hardware evidence retain separate configurations and claim boundaries
 The old scientific sources remain preserved under
 [`manuscript/archive/`](manuscript/archive/README.md) as historical drafts.
 
-Start with the [collaboration handoff](manuscript/HANDOFF.md),
-[ICML readiness checklist](manuscript/ICML_READINESS.md), and
-[codebase/release roadmap](docs/release_impact_roadmap.md).
-The next practical studies are recorded in the [ECG and language-pretraining
-research plan](manuscript/RESEARCH_PLAN.md). The handoff includes CPU-first
-onboarding and maintainer-review decisions. The [artifact policy](manuscript/ARTIFACTS.md)
+Read the [current manuscript PDF](manuscript/TikiTorch.pdf). The
+[manuscript README](manuscript/README.md) is the single status, next-steps and
+collaboration handoff, including CPU-first onboarding and submission gates.
+The [research plan](manuscript/research/PLAN.md) details the proposed ECG and
+language-pretraining studies; the [codebase/release roadmap](docs/release_impact_roadmap.md)
+covers engineering work. The [artifact policy](manuscript/research/EVIDENCE.md#artifact-preservation-and-layout)
 explains the move to `manuscript/results/` and preservation of historical paths.
 The paper is an evidence-bounded draft, not yet submission-ready. Historical
 results under `manuscript/results/` do not certify the current library or a public release.

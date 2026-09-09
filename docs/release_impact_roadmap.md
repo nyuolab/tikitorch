@@ -7,8 +7,8 @@ evidence so one cannot substitute for another.
 
 This is the detailed engineering roadmap; root `ROADMAP.md` is its short entry
 point. The immediate stopping point is independent collaborator review through
-the [shared handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/HANDOFF.md).
-The [research plan](https://github.com/nyuolab/tikitorch/blob/main/manuscript/RESEARCH_PLAN.md)
+the [shared handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md).
+The [research plan](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/PLAN.md)
 owns task-specific study design. Work below remains gated by owner, protocol
 and resource decisions; listing it here does not launch or authorize a run.
 
@@ -187,7 +187,7 @@ recipe through the auditor, and comparing against eager/checkpoint on a fixed
 small task. Execute it in CI. Add a documented support/error matrix,
 serialization round-trip across supported versions, migration/deprecation
 policy, contributor issue templates and a minimal custom-operator example.
-Bind paper tables to raw hashes (`manuscript/generate_tables.py --check`) and
+Bind paper tables to raw hashes (`manuscript/tools/generate_tables.py --check`) and
 release artifacts to a reviewed tag; register archival metadata/DOI only when
 authorized. Have an external contributor reproduce the workflow from a clean
 environment before describing the package as release-ready.

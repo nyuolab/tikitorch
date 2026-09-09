@@ -41,5 +41,5 @@ The historical Python/serialized protocols and current device-native protocol
 must not share claim-bearing rows. `training_benchmark.py` now executes native
 compiled numerical paths, but the small CPU validation is not a completed
 multi-scale GPU or matched-quality study. See the unified
-[experiment protocol](../../manuscript/EXPERIMENT_PROTOCOL.md) and
-[evidence ledger](../../manuscript/EVIDENCE_LEDGER.md).
+[experiment protocol](../../manuscript/research/PLAN.md#comparison-protocol) and
+[evidence ledger](../../manuscript/research/EVIDENCE.md).

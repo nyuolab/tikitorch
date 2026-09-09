@@ -22,14 +22,23 @@ SOURCE_NAMES = {
 def test_research_has_one_workspace_and_one_shared_handoff():
     assert not (ROOT / "papers").exists()
     assert not (ROOT / "papers").is_symlink()
-    for name in ("main.tex", "RESEARCH_PLAN.md", "HANDOFF.md"):
+    for name in (
+        "README.md", "TikiTorch.pdf", "build.py", "source/main.tex",
+        "source/template_manifest.json", "research/PLAN.md",
+        "research/EVIDENCE.md", "research/LITERATURE.md",
+        "tools/generate_tables.py", "tools/measure_retained_state.py",
+        "evidence/artifact_relocation.json", "evidence/review_pdf.json",
+    ):
         assert (PAPER / name).is_file()
-    for name in ("STUDENT_HANDOFF.md", "XIANG_HANDOFF.md"):
+    for name in ("STUDENT_HANDOFF.md", "XIANG_HANDOFF.md", "HANDOFF.md"):
         for parent in (PAPER, ARCHIVE):
             assert not (parent / name).exists()
             assert not (parent / name).is_symlink()
     assert (PAPER / "results").is_dir()
-    assert set(PAPER.glob("*HANDOFF*.md")) == {PAPER / "HANDOFF.md"}
+    assert set(PAPER.glob("*.md")) == {PAPER / "README.md"}
+    assert {path.name for path in (PAPER / "research").glob("*.md")} == {
+        "PLAN.md", "EVIDENCE.md", "LITERATURE.md",
+    }
 
 
 def test_archived_scientific_sources_match_the_pre_merge_snapshot():
@@ -51,7 +60,7 @@ def test_archived_scientific_sources_match_the_pre_merge_snapshot():
 
 
 @pytest.mark.parametrize("relative", [
-    "README.md", "HANDOFF.md", "ARTIFACTS.md",
+    "README.md", "research/PLAN.md", "research/EVIDENCE.md", "research/LITERATURE.md",
     "archive/README.md", "archive/route_certificates/README.md",
     "archive/multiplier_free_fpga/README.md", "results/route_certificates/README.md",
 ])

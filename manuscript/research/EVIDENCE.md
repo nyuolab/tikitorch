@@ -1,7 +1,8 @@
-# Combined TikiTorch manuscript: evidence ledger
+# TikiTorch evidence and artifact policy
 
-Review date: 2026-09-08. This ledger records the evidence available for the
-combined manuscript, including a separately recorded current-code experiment;
+Scientific review: 2026-09-08; layout and source-bound remeasurement: 2026-09-09.
+This ledger records the evidence available for the combined manuscript,
+including a separately recorded current-code experiment;
 it is not publication clearance.
 Raw artifacts outrank prose. Existing hardware and route records are preserved
 unchanged; the current Python implementation must not inherit their build or
@@ -15,7 +16,7 @@ performance claims.
 | Selected routes can determine both input and additive-parameter VJPs | Explicit primitive rules and graph composition; `tikitorch/autodiff/{primitives,morphssm_tape}.py`; focused route/gradient/tie tests | Conditional mathematical result plus tested implementations, not a novel gradient. Finite graph, declared derivative selection, complete auxiliary fields, supplied cotangent, and available static state are essential. Main text and proof appendix. |
 | The new training path retains device-native packed routes | `tikitorch/autodiff/device_tape.py`, `morphssm_tape.py`; `tests/test_device_tape.py`, `tests/test_route_training.py` | Current implementation, not the implementation that produced the historical retained-state table. Byte-aligned `uint8` fields have up to seven padding bits per field; portable export is a separate CPU representation. Main implementation section. |
 | Closure can be checked for an executed recipe | `tikitorch/audit.py`, `tests/test_audit.py`, `tests/test_closure_guard.py`, `tests/test_dyadic_backward_closure.py` | Current `strict-eager-v3` software semantics classify unknown operations as failures. An executed-path software pass is not a physical no-multiplier or zero-DSP proof. Main text. |
-| Current device-route payload is smaller than a specified checkpoint boundary set | `manuscript/evidence/retained_state_cleanup_2026-09-08.json`, `measure_retained_state.py`, `generated/current_retained_state.tex` | Current-code CPU regression remeasurement after library cleanup, source-hashed dirty tree; exact logits/canonical routes and selected-VJP checks. Both earlier `evidence/` records are preserved as prior source snapshots. Main table. Comparator is analytical boundary storage, not measured peak or an optimal checkpoint policy. |
+| Current device-route payload is smaller than a specified checkpoint boundary set | `manuscript/evidence/retained_state_layout_2026-09-09.json`, `manuscript/tools/measure_retained_state.py`, `manuscript/source/generated/current_retained_state.tex` | Current-code CPU regression remeasurement after relocating the helper, source-hashed dirty tree; exact logits/canonical routes and selected-VJP checks. All earlier `evidence/` records are preserved as prior source snapshots. Main table. Comparator is analytical boundary storage, not measured peak or an optimal checkpoint policy. |
 | Historical portable representation is smaller than a specified checkpoint-retained set | Run `529c45f4-7274-4999-b35c-c59d1db917e6`, detailed below | Historical imported representation evidence. Three batch-one FP32 CPU configurations, not a current GPU/full-step/optimized-checkpoint result. Appendix only. |
 | Five-arm full-step validation exists | `scripts/route_certificates/training_benchmark.py`; `docs/codebase_audit_2026-09-08.md`; local run `14f00d16-e3ea-4622-9c80-c03d30bb259f` | Local CPU protocol smoke reported by the code audit, not a checked-in comparative research dataset. Width 16, one layer, vocabulary 11, batch 2, sequence 12, seed 0, momentum SGD, five total updates. Do not publish latency or capacity superiority from this run. Implementation/validation scope only. |
 | D512 fused training executes with a matching archived observable record | `manuscript/results/fpga_silicon/d512_verify/{silicon_fused,golden_fused}.jsonl`, `BITEXACT`; AGFI `agfi-003a8a2f2b1ba7df7` | Historical silicon feasibility. The 30-update records agree on resident accuracy, weight CRC and 16 predictions. Not full-array, every-signal, or 2,000-step trajectory equivalence. Appendix; at most a bounded main-text feasibility sentence. |
@@ -51,9 +52,24 @@ comparator is `(L+1)*B*T*D*4`, excluding common cotangent, loss, parameters,
 optimizer, metadata and transient workspaces. No inference about measured peak,
 traffic, latency or statistical task generalization follows from these ratios.
 
-Run `python manuscript/measure_retained_state.py --check` to verify the selected
+Run `python manuscript/tools/measure_retained_state.py --check` to verify the selected
 record and table. It fails after executable source changes; a new result must
 be created at new paths and explicitly selected, not overwrite the old one.
+
+The selected [layout remeasurement](../evidence/retained_state_layout_2026-09-09.json)
+reproduces the same numerical results after moving the source-bound helper to
+`manuscript/tools/`. The original, handoff and cleanup records remain unchanged
+in `evidence/`; they identify earlier source snapshots, not competing current
+tables. To reproduce without overwriting either evidence or manuscript tables:
+
+```bash
+python manuscript/tools/measure_retained_state.py --run \
+  --output manuscript/build/reproduction.json \
+  --table manuscript/build/reproduction.tex
+```
+
+Use new output names for each run. A maintainer must explicitly select and
+review new evidence before regenerating the main table and review PDF.
 
 ## Historical appendix table
 
@@ -74,19 +90,19 @@ The archived manifest identifies:
   a patch but is not itself a reconstruction of its contents. Clean native
   reproduction remains required for a stronger reproducibility claim.
 
-`generate_tables.py` checks pinned SHA256 identities for every selected raw
+`manuscript/tools/generate_tables.py` checks pinned SHA256 identities for every selected raw
 input, rejects duplicate/missing/unexpected selected cells, checks the middle
 cell against the manifest, derives boundaries, and ignores the legacy
 `ratio_*` fields. Run:
 
 ```bash
-python manuscript/generate_tables.py --check
+python manuscript/tools/generate_tables.py --check
 python -m pytest -q tests/test_manuscript_tables.py
 ```
 
 The exact source hashes, source revisions, environments, accounting equations
 and selected numerical rows are in
-[`generated/table_provenance.json`](generated/table_provenance.json). Generated
+[`source/generated/table_provenance.json`](../source/generated/table_provenance.json). Generated
 LaTeX files contain only `tabular` environments; captions remain responsible
 for the boundary qualifications.
 
@@ -195,3 +211,82 @@ Distribution clearance is an independent gate:
 `docs/release_provenance.json` still records four unresolved AWS-derived RTL
 records and retained-history review. Neither manuscript improvement, a package
 build, nor passing tests resolves those rights/authority questions.
+
+## Artifact preservation and layout
+
+The research archive moved from root `results/` to `manuscript/results/` on
+2026-09-08. Reusable Python code stays in `tikitorch/`; active research runners
+stay in `scripts/`. There is no root compatibility symlink. Use a Git source
+checkout for research: neither the paper nor its archive ships in the library's
+wheel or source distribution.
+
+### What was preserved
+
+The move was checked with SHA-256 before and after: all 686 locally present
+files, including ignored files, were byte-identical immediately after relocation.
+The durable [relocation inventory](../evidence/artifact_relocation.json) covers the 544
+Git-tracked artifacts from commit `197b2644441877a9662d5a33b84b118bef169bc5`:
+538 remain byte-identical and six Markdown files have only relative hyperlink
+adjustments. No numerical results, logs, embedded commands, JSON records,
+checksums or cloud object keys were rewritten. Ignored local files are not
+promoted into the curated inventory or distribution archives.
+
+From the repository root, check this boundary without Git, PyTorch or network access:
+
+```bash
+python scripts/check_artifact_layout.py
+```
+
+This verifies frozen paths, hashes and executable modes and rejects recreation
+of root `results/`, including a broken symlink. Future artifacts may be added;
+do not overwrite frozen evidence to make a check pass. Keep corrections in new
+records with an explanation and source identity. Six navigation exceptions are
+recorded explicitly, not a general permission to change historical Markdown.
+
+#### Paper-directory consolidation amendment
+
+Later on 2026-09-08, root `papers/` was consolidated into this workspace;
+see the [archive map and source preservation record](../archive/README.md).
+The sole results-archive amendment is the hyperlink in
+`results/route_certificates/README.md`: its target changed from
+`../../../papers/route_certificates/README.md` to
+`../../archive/route_certificates/README.md`. Its scientific text is unchanged.
+
+This is an explicit amendment to one of the same six navigation exceptions,
+not permission to regenerate evidence hashes. The inventory-recording path
+reconstructs only the exact permitted transformation from the original Git blob; the
+inventory retains the original source commit and digest and updates only that
+file's current digest. The pre-amendment inventory is preserved at commit
+`1b4b00308a53919dee6afbc8fdca86011659d348`.
+Ordinary read-only verification still needs no Git or network access.
+
+- Previous SHA-256: `1c5ae9a7dbbfd7323235bc99b49b64da6a8e211023f58c5fba2f05d99c7a3e3e`
+- Current SHA-256: `9809baad63f34c2a542d17b0d58efc634fc1d9755d336f1b6566ae389c0dcb54`
+
+All other frozen results files and all numerical records remain unchanged.
+
+### Reading and reproducing historical records
+
+Paths inside historical records retain the original `results/...` spelling.
+For file lookup, translate that prefix to `manuscript/results/...`. Active
+documentation, readers and runner defaults use the new location. S3 bucket
+links and object keys are unchanged: local relocation does not move cloud data.
+
+Some checksum lists use `results/...` paths; those can be resolved with
+`manuscript/` as the working directory. That does **not** make arbitrary archived
+shell commands runnable from there: scripts and hardware sources remain at
+their existing repository locations. Treat old commands as revision-bound
+records; review current runner instructions and use a new output directory.
+Do not run cloud, graphics-generation or hardware scripts merely to inspect
+the archive; some require credentials, paid services or external toolchains.
+
+Relocation is not reproduction or publication clearance. Historical hardware
+reports do not certify current Python code. Follow the evidence boundaries above
+and the [release gates](../../docs/release_validation.md); third-party source and
+retained-history review remain open.
+
+The 2026-09-09 sharing cleanup consolidated the handoff and readiness checklist
+into [the manuscript README](../README.md), combined the plan/protocol in
+[PLAN.md](PLAN.md), and moved build sources/helpers into `source/` and `tools/`.
+The relocation inventory moved to `evidence/artifact_relocation.json` unchanged.
+Historical evidence and archived scientific sources were not rewritten.

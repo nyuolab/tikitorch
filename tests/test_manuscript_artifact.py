@@ -11,22 +11,24 @@ import zipfile
 import pytest
 
 PAPER = Path(__file__).resolve().parents[1] / "manuscript"
+SOURCE = PAPER / "source"
 
 
 def load_script(name):
-    spec = importlib.util.spec_from_file_location(name, PAPER / f"{name}.py")
+    directory = PAPER if name == "build" else PAPER / "tools"
+    spec = importlib.util.spec_from_file_location(name, directory / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
 def test_unified_citations_are_defined_once():
-    bibliography = (PAPER / "refs.bib").read_text()
+    bibliography = (SOURCE / "refs.bib").read_text()
     keys = re.findall(r"@\w+\{([^,]+),", bibliography)
     assert len(keys) == len(set(keys))
     used = set()
     for filename in ("main.tex", "theory_appendix.tex", "methods_appendix.tex"):
-        for group in re.findall(r"\\cite\w*\{([^}]+)\}", (PAPER / filename).read_text()):
+        for group in re.findall(r"\\cite\w*\{([^}]+)\}", (SOURCE / filename).read_text()):
             used.update(k.strip() for k in group.split(","))
     assert used <= set(keys), used - set(keys)
     assert {"groenendijk2023geometric", "kosson2023multiplicationfree",
@@ -87,9 +89,17 @@ def test_style_members_cannot_escape_destination(tmp_path):
 
 
 def test_review_surface_is_single_anonymous_manuscript():
-    source = (PAPER / "main.tex").read_text()
+    source = (SOURCE / "main.tex").read_text()
     assert "\\usepackage{icml2026}" in source
     assert "\\icmlcorrespondingauthor" in source
     assert "\\label{main:end}" in source
     assert "../papers/" not in source
     assert "nyuolab" not in source
+
+
+def test_discussion_copy_does_not_claim_submission_or_acceptance():
+    source = (SOURCE / "main.tex").read_text()
+    assert r"\renewcommand{\Notice@String}{Discussion draft. Not submitted.}" in source
+    assert "pdfsubject={TikiTorch discussion draft; not submitted}" in source
+    assert r"\usepackage[accepted]{icml2026}" not in source
+    assert r"\usepackage[preprint]{icml2026}" not in source

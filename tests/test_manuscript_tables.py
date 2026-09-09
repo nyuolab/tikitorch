@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from manuscript import generate_tables as tables
+from manuscript.tools import generate_tables as tables
 
 
 def fixtures():
@@ -17,7 +17,7 @@ def fixtures():
 
 
 def test_generated_tables_are_current():
-    subprocess.run([sys.executable, "manuscript/generate_tables.py", "--check"],
+    subprocess.run([sys.executable, "manuscript/tools/generate_tables.py", "--check"],
                    cwd=tables.REPO, check=True, capture_output=True, text=True)
 
 

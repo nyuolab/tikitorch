@@ -2,7 +2,7 @@
 
 Primary-source check: 2026-09-08. This is an editorial research note, not a
 claim that the literature search is exhaustive. The bibliography is
-[`refs.bib`](refs.bib); preprints remain labeled as such.
+[`refs.bib`](../source/refs.bib); preprints remain labeled as such.
 
 ## Recommended scientific position
 
@@ -81,26 +81,5 @@ refresh it before submission.
    result. Retain observed silicon behavior as feasibility evidence until
    iso-workload throughput and full-card energy measurements exist.
 
-## ICML policy check
-
-As of this check, ICML 2026 has already taken place. An official machine-learning
-ICML 2027 author-instructions page was not verified; **the 2026 style is a
-provisional drafting aid, not confirmed 2027 submission compliance**. Do not
-invent a 2027 deadline or page allowance.
-
-The official [2026 author instructions](https://icml.cc/Conferences/2026/AuthorInstructions)
-require at most eight main-body pages, anonymization, and a single PDF containing
-references/appendices. Public identifying repository links are inappropriate
-for the anonymous submission. An anonymous code artifact must be frozen and
-distributed only after applicable rights/provenance questions are resolved.
-Do not remove legally required notices from the public source just to satisfy
-anonymity; prepare a legally distributable submission artifact separately.
-
-The [2026 call for papers](https://icml.cc/Conferences/2026/CallForPapers)
-requires an impact statement and permits AI-assisted writing/research while
-holding human authors fully responsible; AI tools are not authors. Meaningful
-use should be described accurately. The separate LLM **reviewing** policies
-must not be misrepresented as prohibiting all author-side assistance.
-
-The responsible submission gate remains human approval of scientific content,
-authorship, data rights, evidence, citations, and the actual target-cycle rules.
+Venue requirements and human submission decisions are maintained only in the
+[manuscript README](../README.md#submission-and-release-gates).

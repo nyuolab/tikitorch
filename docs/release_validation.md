@@ -55,7 +55,7 @@ It verifies the frozen archive now under `manuscript/results/`, not permission
 to redistribute it. Library source archives and wheels exclude `manuscript/`
 (including the archived drafts), `scripts/` and `tests/`; use a Git checkout for the full development
 and research workflow. See the
-[artifact policy](https://github.com/nyuolab/tikitorch/blob/main/manuscript/ARTIFACTS.md).
+[artifact policy](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md#artifact-preservation-and-layout).
 The former root `papers/` directory is gone; its packaging exclusion remains
 as a guard against accidental reintroduction.
 After building, verify actual archive contents (also enforced in package CI):

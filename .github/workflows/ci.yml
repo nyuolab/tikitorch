@@ -39,6 +39,8 @@ jobs:
         run: python scripts/check_release_provenance.py --inventory-only
       - name: Verify frozen research artifact relocation
         run: python scripts/check_artifact_layout.py
+      - name: Verify manuscript review PDF freshness (no LaTeX required)
+        run: python manuscript/build.py --check
 
   test:
     name: test (py${{ matrix.python-version }})

@@ -199,7 +199,7 @@ def test_cloud_upload_filters_include_runners_and_exclude_research_and_caches(
         "tikitorch/orphan.pyc", "scripts/__pycache__/helper.pyc",
         "scripts/.cache/value", "tikitorch/.pytest_cache/value",
         "tikitorch/.ruff_cache/value", "manuscript/results/run/raw.txt",
-        "manuscript/main.tex", "results/legacy.txt", "tikitorch/results/stale.txt",
+        "manuscript/source/main.tex", "results/legacy.txt", "tikitorch/results/stale.txt",
         "README.md", ".git/config", "data/private.txt", "data/nested/private.txt",
         "tests/test_example.py",
     }

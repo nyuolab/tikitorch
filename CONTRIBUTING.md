@@ -25,9 +25,9 @@ or test the library — the board-dependent tests self-skip without hardware.
 Use a Git source checkout for development. Distribution archives contain the
 library, not checkout-only tests, research runners, manuscripts or results.
 For a first contribution or research review, start with the
-[collaboration handoff](manuscript/HANDOFF.md). The [test guide](tests/README.md)
+[collaboration handoff](manuscript/README.md). The [test guide](tests/README.md)
 explains focused checks and optional test groups.
-The [research plan](manuscript/RESEARCH_PLAN.md) is proposed work, not a request
+The [research plan](manuscript/research/PLAN.md) is proposed work, not a request
 to launch experiments or provision hardware.
 
 Run these local checks before opening a PR:
@@ -91,7 +91,7 @@ If you add a new op, layer, model, or optimizer:
 ## Docs & notebooks
 
 Research evidence lives in `manuscript/results/`; preserve raw records and use
-new output names for reruns. See the [artifact policy](manuscript/ARTIFACTS.md).
+new output names for reruns. See the [artifact policy](manuscript/research/EVIDENCE.md#artifact-preservation-and-layout).
 The manuscript's retained-state record hashes every library Python source:
 source changes require an append-only remeasurement and explicit record
 selection, not editing historical hashes to make validation pass.

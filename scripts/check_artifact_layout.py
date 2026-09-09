@@ -19,7 +19,7 @@ import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INVENTORY = Path("manuscript/artifact_relocation.json")
+INVENTORY = Path("manuscript/evidence/artifact_relocation.json")
 SOURCE_COMMIT = "197b2644441877a9662d5a33b84b118bef169bc5"
 TRACKED_FILES = 544
 SCHEMA = "tikitorch.artifact_relocation.v1"
