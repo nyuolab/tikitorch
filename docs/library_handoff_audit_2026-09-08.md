@@ -85,3 +85,9 @@ human review/resolution. Moving or excluding artifacts from a Python archive
 does not clear publication of the repository or its history. See
 [release validation](release_validation.md) and the
 [remaining engineering roadmap](release_impact_roadmap.md).
+
+Follow-up (2026-09-09): the
+[optimizer diagnosis](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md#adamw-numerical-diagnostic)
+clarifies that model/reverse paths were compiled, not AdamW itself. It preserves
+the default failure and documents an explicit epsilon mitigation on a bounded
+CPU fixture. The results above remain the record of the earlier cleanup pass.

@@ -10,13 +10,16 @@ The eager PyTorch code is a reference implementation. Physical multiplier or DSP
 claims require an exported kernel, numeric equivalence checks, and synthesis and
 routed reports; they cannot be inferred from these class docstrings.
 
-Optimizers (all ``torch.optim.Optimizer`` subclasses):
+Optimizer classes (``torch.optim.Optimizer`` subclasses):
     SignSGD          — ``W -= lr * sign(grad)``        (sign-only, momentum-on-sign)
     TropicalSGD      — the semiring view of SignSGD: sign extraction is a
                        comparison, the update is an addition
     PureTropicalSGD  — integer-counter/power-of-two reference path,
                        power-of-2 (bit-shift) learning rate, LFSR noise
                        injection, and sign-L1 adaptive rates
+
+The experimental ``fixed_point_ef_step`` function is a separate checked CPU
+integer recurrence, not an optimizer subclass or an alias for EFTropicalSGD.
 
 Idiomatic usage::
 
@@ -36,9 +39,11 @@ so users instantiate optimizers directly the way they would with ``torch.optim``
 import torch
 import torch.optim as toptim
 
+from .fixed_point import fixed_point_ef_step
+
 __all__ = ["SignSGD", "TropicalSGD", "PureTropicalSGD", "TropicalLion", "TropicalAdam",
            "FrexpMagnitudeSGD", "CountAgreementSGD", "ExponentEMAAdam", "PerLayerStepSGD",
-           "EFTropicalSGD"]
+           "EFTropicalSGD", "fixed_point_ef_step"]
 
 
 def _arshift(x: torch.Tensor, bits: int) -> torch.Tensor:
@@ -877,23 +882,20 @@ class PerLayerStepSGD(toptim.Optimizer):
 
 
 class EFTropicalSGD(toptim.Optimizer):
-    """Experimental error-feedback tropical SGD with bounded state.
+    """Experimental floating-residual, single-step error-feedback optimizer.
 
-    The collapse of naked sign-SGD on our sparse, bursty, non-stationary regime
-    has two root causes; this optimizer addresses both with add/shift/compare only:
+    With default nonadaptive settings, accumulate ``e + g * 2**-lr_shift``
+    and emit at most ONE signed ``2**-lr_shift`` weight step per call when
+    the threshold is reached. The residual uses the parameter's floating dtype,
+    not an exact integer quotient/remainder representation. Persistent gradients
+    can make it grow without bound, and zero-mean noise can cross the threshold;
+    neither denoising nor asymptotic unbiasedness is guaranteed.
 
-      1. **Biased compression.** ``sign(g)`` discards the routed integer magnitude,
-         so a weak-but-consistent gradient is thrown away while zero-mean noise
-         still moves the weight (a random walk whose variance grows with fires).
-         FIX — a conserved fixed-point RESIDUAL ``e``: accumulate the
-         power-of-two-scaled gradient and apply one unit step only once ``|e|``
-         crosses the step threshold, keeping the remainder. This is per-coordinate
-         error feedback (Karimireddy et al., ICML 2019), closed form: noise
-         accumulates to ~0 and never crosses threshold (denoising); a small
-         persistent gradient eventually does (unbiased in the limit).
-      2. **Magnitude runaway.** FIX — an optional state-free soft-bound
-         ``clamp(w, ±bound)`` (a comparator), the anti-runaway that a conserved
-         residual alone does not provide.
+    Optional leakage, momentum, adaptation and weight clamping change this
+    behavior. In particular a clamp may alter the applied weight motion without
+    compensating the residual. This class is NOT the native MorphLM integer EF
+    rule. Use the separate experimental :func:`fixed_point_ef_step` primitive
+    for its explicitly checked integer contract; it is not a drop-in replacement.
 
     A saturating consolidation counter ``c`` (int16) grows with consistent
     directional movement — a metaplastic 'stiffness'/importance that

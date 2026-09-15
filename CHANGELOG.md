@@ -8,18 +8,40 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Experimental `optim.fixed_point_ef_step`: exact integer error-feedback carry,
+  checked overflow, transactional functional updates, and a runnable checkpoint
+  example. This is distinct from floating `EFTropicalSGD`; no optimizer defaults
+  or hardware/learning-performance guarantees change.
+- A fixed paired k18/k20 development screen with immutable historical controls,
+  full native/reference evaluation parity and library/native update checks.
+- A fresh-window integer MorphLM runner with explicit CSIM/PCI backends,
+  compiled native-layout checks, held-out reference evaluation, full checkpoints
+  and paired checkpoint-byte comparison. Local C-simulation records remain
+  separate from historical silicon results and ordinary PyTorch AdamW training.
+- Offline, allowlisted AWS source packaging, budget planning and read-only
+  preflight for a $10 first FPGA pilot. Cloud launch remains disabled until
+  external supervision and durable reservation/teardown controls are validated.
+- An untimed, source-bound AdamW numerical diagnostic with identical-state
+  controls, explicit epsilon sweeps, gradient/moment/update records, and native
+  fresh-batch regression tests. The benchmark exposes shared `--adamw-eps` without
+  changing its default or correctness tolerances.
 - A shareable `manuscript/TikiTorch.pdf` with a source/evidence-bound freshness
   manifest, offline `build.py --check`, and failed-build preservation tests.
-- A proposed ECG/language-pretraining research plan and CPU-first student handoff
-  under `manuscript/`, with practical quality/resource gates and a later FPGA capstone.
+- A consolidated research plan and student handoff under `manuscript/`, now
+  prioritizing FPGA language-model pretraining with staged quality/resource gates.
 - A hash/mode-checked relocation inventory for `manuscript/results/`, preserving
   frozen research evidence while allowing append-only new runs.
 - Device-resident packed/unpacked route tapes, streaming hard-MorphSSM recording,
   loss-independent VJPs, and `route_logits` integration with ordinary first-order
   PyTorch autograd and saved-tensor hooks.
-- A separate five-arm full-step benchmark with strict compiler capture, checkpoint
-  policies, isolated resource cells, source hashes, capacity sweeps and bounded
+- A separate six-arm full-step benchmark with strict compiler capture, eager and
+  compiled checkpoint policies, observed selective-policy coverage, isolated
+  resource cells, source hashes, capacity sweeps and bounded
   held-out learning/trajectory checks; historical evidence remains unchanged.
+- A wider three-seed CPU optimizer follow-up, explicit shape controls and a
+  checked ten-case CPU comparator pilot. A two-layer native selective-checkpoint
+  crash is preserved and isolated; a successful small pilot does not imply
+  universal compiler support, peak-memory savings or language-model quality.
 - Offline AWS runner inspection tests, explicit manual GPU/compiler validation,
   and a fail-closed provenance release gate.
 - **Public-release contribution and provenance guidance** — contribution
@@ -88,6 +110,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Reframed the manuscript for ICLR around additive hard routing's simpler
+  backward dependencies and the library that exploits them. Switched to the
+  pinned official ICLR 2027 style, nine-page initial limit, discussion-copy
+  labels and AI/ethics/reproducibility statements. Added the measured optimizer
+  diagnosis and bounded epsilon mitigation while preserving the default failure.
 - Made `manuscript/README.md` the single status, next-steps and handoff document;
   consolidated supporting notes into `research/{PLAN,EVIDENCE,LITERATURE}.md` and
   moved LaTeX/generated tables and helpers into `source/` and `tools/`. Historical
@@ -166,6 +193,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The PCI bridge now reports sticky transfer/register errors through
+  `tt_fpga_last_error`; failed reads leave destination and host shadow untouched.
+  Compiled fake-AWS tests cover failure paths without requiring a board.
+- Disabled obsolete MorphLM native drivers whose buffer layout omitted the
+  current aligned CE lookup table, preventing unsafe unverified native loads.
 - `tt-closure` accepts module instances without invoking `forward`, reports
   invalid targets as usage errors, and no longer lets `--report` bypass the
   closure gate or its exit status.

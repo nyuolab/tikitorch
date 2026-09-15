@@ -1,0 +1,59 @@
+{
+  "backend": "csim",
+  "complete": true,
+  "distinct_training_windows": 1024,
+  "end_to_end_wall_s": 57.673758124990854,
+  "final_checkpoint": {
+    "bytes": 4784128,
+    "file": "/Users/ekoermann/Documents/tikitorch/manuscript/build/fpga_lm_csim_2026-09-09/checkpoints_d512_1024/checkpoint_001024.i32",
+    "format": "little-endian signed int32, low16 weights",
+    "location_portable": false,
+    "regions": [
+      {
+        "name": "EMBED",
+        "words": 65536
+      },
+      {
+        "name": "MH",
+        "words": 14336
+      },
+      {
+        "name": "MP",
+        "words": 1048576
+      },
+      {
+        "name": "MB",
+        "words": 2048
+      },
+      {
+        "name": "W_HEAD",
+        "words": 65536
+      }
+    ],
+    "sha256": "ab1e5155cdcd36e5e0004181ca83f908400123a17553146b01b89be501bb1940",
+    "step": 1024
+  },
+  "final_validation": {
+    "accuracy": 0.1494140625,
+    "context_reset_accuracy": 0.1494140625,
+    "context_reset_lut_normalized_nll": 3.4087100743421983,
+    "lut_normalized_nll": 3.4087100743421983,
+    "rounded_zero_target_mass": 0.0,
+    "saturation_events": 0.0
+  },
+  "heldout_test_evaluated": false,
+  "initial_validation": {
+    "accuracy": 0.0107421875,
+    "context_reset_accuracy": 0.0205078125,
+    "context_reset_lut_normalized_nll": 4.852030263919617,
+    "lut_normalized_nll": 4.852030263919617,
+    "rounded_zero_target_mass": 0.0,
+    "saturation_events": 0.0
+  },
+  "quality_advantage_established": false,
+  "steps": 1024,
+  "tokens_per_end_to_end_s": 2272.645380866981,
+  "tokens_per_update_wall_s": 3043.136565350909,
+  "training_token_exposures": 131072,
+  "update_including_io_s": 43.0713499658159
+}

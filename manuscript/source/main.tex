@@ -1,15 +1,22 @@
-% Canonical combined manuscript. ICML 2026 is the latest verified template,
-% used provisionally until the target submission cycle releases its rules.
+% Canonical discussion manuscript using the verified ICLR 2027 template.
+% The nine-page initial-submission limit is pinned in template_manifest.json.
 \documentclass{article}
+\usepackage{iclr2027_conference,times}
 \usepackage{microtype,graphicx,booktabs,array}
 \usepackage{xurl}
 \usepackage{hyperref}
-\newcommand{\theHalgorithm}{\arabic{algorithm}}
-\usepackage{icml2026}
 % Discussion-copy label only: retain the pinned upstream style unchanged.
-% Recheck the target venue's actual rules before preparing a submission.
+% Fail visibly if the reviewed template changes either anonymous-copy label.
+\usepackage{etoolbox}
 \makeatletter
-\renewcommand{\Notice@String}{Discussion draft. Not submitted.}
+\patchcmd{\@maketitle}
+  {Under review as a conference paper at ICLR 2027}
+  {Discussion draft. Not submitted.}
+  {}{\PackageError{tikitorch}{ICLR running-head label changed}{Review the pinned template before sharing.}}
+\patchcmd{\@maketitle}
+  {Paper under double-blind review}
+  {Discussion draft. Not submitted.}
+  {}{\PackageError{tikitorch}{ICLR title-page label changed}{Review the pinned template before sharing.}}
 \makeatother
 \usepackage{amsmath,amssymb,amsthm,mathtools}
 \usepackage{tikz}
@@ -31,194 +38,141 @@
 \newcommand{\ttorch}{\textsc{TikiTorch}}
 \newcommand{\code}[1]{\texttt{#1}}
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
-\icmltitlerunning{TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning}
-\hypersetup{pdfauthor={},pdftitle={TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning},pdfsubject={TikiTorch discussion draft; not submitted}}
+\title{TikiTorch: Learning with\\Additive Hard Routing}
+\author{Anonymous Authors}
+\hypersetup{colorlinks=true,allcolors=blue,pdfauthor={},pdftitle={TikiTorch: Learning with Additive Hard Routing},pdfsubject={TikiTorch discussion draft; not submitted}}
 
 \begin{document}
-\twocolumn[
-\icmltitle{\texorpdfstring{TikiTorch: Route-Sufficient Differentiation\\for Auditable Tropical Learning}{TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning}}
-\begin{icmlauthorlist}
-\icmlauthor{Anonymous Authors}{anon}
-\end{icmlauthorlist}
-\icmlaffiliation{anon}{Anonymous Institution}
-\icmlcorrespondingauthor{Anonymous Author}{anonymous@example.invalid}
-\icmlkeywords{tropical learning, morphological networks, automatic differentiation, training memory, arithmetic auditing}
-\vskip 0.3in
-]
-\printAffiliationsAndNotice{}
+\maketitle
 
 \begin{abstract}
-Training systems usually retain or reconstruct forward values, even when a
-local derivative depends only on which branch was selected.
-We present \ttorch{}, a PyTorch-based framework that makes this distinction
-explicit for tropical learning: in additive hard-routed operators, a winner
-can determine both input and parameter reverse actions.
-We formulate a joint trace-sufficiency contract, characterize its composition
-and storage implications, and implement device-resident route recording and
-first-order reverse replay with explicit tie and auxiliary-state semantics.
-A separate, fail-closed arithmetic audit distinguishes a route-sufficient
-model from a multiplier-free training recipe and from a physically validated
-hardware implementation.
-On three current-code MorphSSM configurations, device-tape payloads are
-2.04--2.98$\times$ smaller than a shape-defined layer/embedding checkpoint retained
-set; separately scoped FPGA case studies demonstrate specialized learning
-loops, without establishing generic activation-free training or GPU,
-energy, or matched-quality superiority.
+Additive hard routing changes what a neural network needs to retain for
+learning. In an additive tropical layer, each output selects a candidate
+$x_i+w_i$. Once that winner is known, backpropagation sends the incoming
+gradient to the selected input and weight: it needs their addresses, not
+their forward values. Hard selection therefore turns this layer's backward
+computation into routing and accumulation. We present \ttorch{}, a PyTorch
+companion that makes this property usable across an integrated library of
+tropical operators, layers, models, differentiation tools, and backends.
+We characterize when discrete routes suffice for both activation and
+parameter gradients, show how the property composes, and implement packed
+device-resident route tapes within ordinary first-order autograd.
+The resulting design separates the state needed to learn from the values
+needed to run the forward pass. On three source-snapshotted MorphSSM
+configurations, the retained device-tape payload is
+2.04--2.98$\times$ smaller than a specified layer/embedding checkpoint
+boundary set. These measurements establish a compact backward representation,
+not yet lower peak memory or cheaper learning at matched task quality.
+\ttorch{} provides the software and experimental interfaces needed to test
+that next step, while keeping losses, optimizers, and other non-route
+boundaries explicit.
 \end{abstract}
 
 \section{Introduction}
 
-The arithmetic used in a neural network determines more than its forward
-cost: it determines what information must survive for learning. For a dense
-layer $y=Wx$, the parameter reverse action is $qx^T$, where $q$ is the output
-cotangent. Knowing the weights or the active network path does not remove
-the dependence on $x$. For an additive morphological layer
-$y_j=\max_i(x_i+w_{ji})$, a selected index identifies both the input and
-weight coordinates receiving $q_j$. Neither competing activation values nor
-the selected weight value is needed for that local reverse action.
+The cost of learning is not just the cost of prediction. Backpropagation
+also needs information from the forward pass, often retained as activations
+or recovered through recomputation. This creates a practical question for
+resource-constrained learning: \emph{can we choose operators whose gradients
+need less information in the first place?} Such a choice could let useful
+models train with longer contexts, larger batches, or smaller hardware.
+It need not make every forward operation cheaper to be valuable.
 
-This distinction motivates \ttorch{}, research infrastructure built on
-PyTorch \citep{paszke2019pytorch}. Its organizing question is:
-\emph{which choices of operator, derivative rule, and training recipe make
-learning state compact and arithmetic inspectable?} Tropical and
-morphological networks offer a concrete setting, not a new algebra invented
-for this purpose \citep{ritter1996morphological,zhang2018tropical,franchi2020morphological}.
-The opportunity is especially relevant when retained training state,
-recomputation, or hardware arithmetic is constrained. Realizing an efficiency
-advantage nevertheless requires measuring the complete workload.
+Additive tropical, or morphological, layers offer a particularly direct
+answer \citep{ritter1996morphological,franchi2020morphological}. Instead of a
+sum of products, consider $y_j=\max_i(x_i+w_{ji})$. Away from a tie, the
+winning candidate is locally an addition. Its derivatives with respect to
+the selected input and weight are both one, and all unselected derivatives
+are zero. Backward therefore follows the recorded winners and accumulates
+gradients. In contrast, a dense layer $y=Wx$ has weight gradient $qx^T$:
+even knowing which dense expert was selected does not remove the input
+values from the parameter update.
 
-Two contracts must be distinguished. A \emph{derivative-state contract}
-identifies the forward information sufficient for a requested reverse
-action. An \emph{arithmetic contract} identifies the operations executed by
-the forward, loss, reverse, and update recipe. Neither implies the other:
-route replay can feed ordinary cross-entropy and AdamW, while a shift--add
-linear forward can still need activation-dependent weight gradients.
-Figure~\ref{fig:contracts} shows how \ttorch{} exposes both without confusing
-either with a synthesis or energy certificate.
+The useful simplification is thus in the \emph{derivative graph}: for
+additive hard-selected extrema, activation-valued derivative coefficients
+are replaced by discrete routes. Finding those routes still requires the
+forward comparisons. This is not a claim that hard routing automatically
+makes the forward sparse, or that any sparsely activated architecture can
+discard its activations. It is a consequence of the combination of
+\emph{hard selection and additive parameterization}.
 
-Our contribution is an executable synthesis of these ideas:
+\ttorch{} turns that mathematical structure into a research platform built
+on PyTorch \citep{paszke2019pytorch}. A useful platform needs more than an
+isolated max-plus kernel: researchers need composable layers and models,
+correct gradients through shared operations, compact route recording,
+interoperability with task losses and optimizers, and measurements of the
+complete training step. \ttorch{} connects these pieces so that operator
+choices can be studied jointly with their learning dynamics and systems
+costs. Its general-purpose tropical library is broader than its current
+route-tape adapter; support for each optimized training path is explicit.
+
+We make three contributions:
 \begin{enumerate}
-\item A joint state-and-parameter trace contract for additive extrema and
-their compositions, including an explicit program-level interpretation at
-ties, conditional information bounds, and counterexamples.
-\item An integrated implementation: bounded-intermediate tropical operators,
-streamed device-resident route tapes, ordinary first-order autograd
-integration, and a versioned fail-closed executed-arithmetic audit.
-\item An evidence-separated evaluation of reverse correctness, retained
-representation, and specialized FPGA feasibility, with a matched full-step
-protocol that refuses invalid performance comparisons.
+\item \textbf{A precise explanation of the simplification.} We characterize
+when routes determine both input and trainable-parameter gradients, and
+show how these local rules compose without recovering internal activations.
+Explicit tie rules and counterexamples delimit the result.
+\item \textbf{A library that exploits it.} Tropical operators, neural-network
+modules and model families connect to streamed, packed route tapes,
+first-order PyTorch autograd, pluggable backends, and training-recipe audits.
+The implementation exposes both the optimized subset and its boundaries.
+\item \textbf{An executable evaluation path.} Correctness checks and
+source-bound retained-state measurements establish the measured
+representation benefit. A full-step comparison protocol makes the remaining
+question---useful learning at lower total resource cost---testable.
 \end{enumerate}
 
-The graph composition proof is a direct specialization of reverse-mode AD,
-not a new chain rule. Morphological backpropagation already exploits active
-paths \citep{groenendijk2023geometric}, and multiplication-free complete
-training also has prior demonstrations \citep{kosson2023multiplicationfree}.
-The contribution here is the explicit joint contract and its realization
-across differentiation, storage, and arithmetic-audit interfaces, with
-measured and unmeasured consequences kept separate.
+Morphological backpropagation already exploits active paths
+\citep{groenendijk2023geometric}, and compact backward encodings have a long
+history \citep{jain2018gist}. Our contribution is not a new chain rule.
+It is an explicit, compositional account of the required learning state,
+realized in a library that lets researchers build, train, and compare the
+corresponding models. Arithmetic audits and historical FPGA experiments
+provide a further path toward specialized hardware, rather than a
+prerequisite for the training-state opportunity.
 
 \begin{figure*}[t]
 \centering
 \begin{tikzpicture}[>=Latex, every node/.style={font=\small},
  box/.style={draw,rounded corners,align=center,minimum height=10mm,text width=31mm}]
-\node[box] (forward) at (0,0) {Hard tropical\\forward};
-\node[box] (boundary) at (4.6,0) {Output / loss\\boundary};
-\node[box] (update) at (9.2,0) {Parameter update\\and optimizer state};
-\node[box,fill=black!5] (tape) at (0,-1.8) {Typed routes +\\declared auxiliary state};
-\node[box,fill=black!5] (reverse) at (4.6,-1.8) {Selected reverse\\replay};
-\node[box] (audit) at (9.2,-1.8) {Executed-recipe audit\\safe / unsafe / unknown};
-\draw[->] (forward) -- node[above] {logits} (boundary);
-\draw[->] (forward) -- node[left] {record} (tape);
+\node[box] (forward) at (0,0) {Evaluate additive\\candidates and select};
+\node[box] (boundary) at (4.6,0) {Task readout\\and loss};
+\node[box] (update) at (9.2,-1.8) {Ordinary optimizer\\and parameter state};
+\node[box,fill=black!5] (tape) at (0,-1.8) {Store routes, not\\candidate values};
+\node[box,fill=black!5] (reverse) at (4.6,-1.8) {Route and accumulate\\backward gradients};
+\draw[->] (forward) -- node[above] {outputs} (boundary);
+\draw[->] (forward) -- node[left] {winners} (tape);
 \draw[->] (tape) -- node[above] {decode} (reverse);
-\draw[->] (boundary) -- node[right] {cotangent} (reverse);
-\draw[->] (reverse.north east) -- node[right] {gradients} (update.south west);
-\draw[dashed,->] (update) -- (audit);
-\draw[dashed,->] (reverse) -- (audit);
+\draw[->] (boundary) -- node[right] {output gradient} (reverse);
+\draw[->] (reverse) -- node[above,align=center,font=\scriptsize] {weight\\gradients} (update);
 \end{tikzpicture}
-\caption{Two independent contracts in one training system. The shaded route
-path determines declared reverse actions; logits, loss state, and optimizer
-state remain explicit. The arithmetic audit observes the whole declared
-recipe, including forward and loss, not only the drawn reverse/update links.
-Physical resource, timing, and power evidence is a separate build-specific
-validation layer.}
+\caption{What additive hard routing buys. The forward still evaluates
+candidates, but the shaded backward path uses winner addresses instead of
+their activation values. A supported composite model also records any
+required auxiliary fields, such as normalization exponents. The task
+boundary and optimizer retain their own state; they need not be tropical or
+multiplier-free to benefit from a route-trained body.}
 \label{fig:contracts}
 \end{figure*}
 
-\section{Positioning and Closest Prior Work}
-
-\paragraph{Morphological and tropical learning.}
-Morphological networks, maxout, and tropical interpretations of neural
-networks establish the surrounding model class
-\citep{ritter1996morphological,goodfellow2013maxout,zhang2018tropical,franchi2020morphological}.
-Geometric back-propagation in morphological networks is particularly close:
-its treatment of active morphological paths means that the observation
-``the winning branch routes the gradient'' is not new
-\citep{groenendijk2023geometric}. We isolate the explicit storage-interface question
-of which stored fields determine \emph{both} state and additive-parameter
-actions throughout a declared program, and make that interface executable.
-We do not claim a new expressive-power result for tropical networks.
-
-\paragraph{Backward-state reduction.}
-Adjoint tapes and checkpoint schedules trade stored values for reverse work
-\citep{giering1998recipes,griewank2000revolve,chen2016sublinear,jain2020checkmate};
-reversible networks reconstruct values through architectural structure
-\citep{gomez2017reversible}. Pooling switches and Gist already exploit exact
-backward-relevant encodings \citep{zeiler2014visualizing,jain2018gist}.
-Few-bit Backward and GACT address reduced-precision backward state
-\citep{novikov2023fewbit,liu2022gact}.
-Our route representation is exact for its declared local rule rather than
-an approximation to stored continuous activations. This does not make it
-universally better than compression or recomputation: its applicability and
-cost depend on the operator and the retained boundary.
-
-\paragraph{Arithmetic-efficient learning.}
-AdderNet, DeepShift, and ShiftAddNet change the arithmetic of learned layers
-\citep{addernet,deepShift,shiftaddnet}. Low-precision multiplier-free
-training and piecewise-affine transformer training extend this question to
-training arithmetic \citep{liu2023multfree,kosson2023multiplicationfree}.
-MatMul-free language modeling and BitNet supply important scalable
-comparators for low-arithmetic models \citep{zhu2024matmulfree,ma2024bitnet,ma2025bitnet}.
-These are not interchangeable with an additive tropical parameterization,
-nor does any absence of dense matrix multiplication prove absence of all
-run-time products. We make no first-multiplier-free-training claim.
-FINN provides FPGA inference context, not a matched training baseline
-\citep{umuroglu2017finn}. IO-aware algorithms such as FlashAttention likewise
-underscore why a smaller retained representation alone is not a measured
-memory-traffic or latency improvement \citep{dao2022flashattention}.
-
-\section{The Derivative-State Contract}
+\section{From Forward Values to Backward Routes}
 \label{sec:contract}
 
-Consider a finite executed DAG. Node $v$ evaluates
-$z_v=f_v((z_u)_{u\in\mathrm{pa}(v)},\theta_v)$ and emits $c_v$.
-Its declared local differentiation rule specifies state maps $A_{vu}$ and
-parameter map $B_v$. Let $S$ contain all other reverse-available information:
-static topology, addresses, shapes, any required parameter snapshot, and
-explicit boundary values. The contract is joint when evaluators using only
-$(q,c_v,S)$ return every requested $A_{vu}^Tq$ and $B_v^Tq$, for every
-admissible incoming cotangent $q$. Every realized auxiliary value must be
-recorded or named in $S$; it cannot disappear into unspecified metadata.
+\subsection{A Winner Determines Two Gradients}
 
-\begin{theorem}[Trace-sufficient reverse accumulation]
-\label{thm:main}
-If every required local state and parameter action of a finite executed
-graph satisfies the joint contract, then its records and supplied output
-cotangents determine the declared reverse program without unrecorded
-activations or forward recomputation. Reverse-topological addition handles
-fan-out, repeated arguments, and shared parameters. Where the local maps are
-classical derivatives, the result is the graph's classical VJP.
-\end{theorem}
+Consider $y=\max(x_1+w_1,x_2+w_2,x_3+w_3)$ and suppose the second
+candidate wins. Locally, $y=x_2+w_2$. For an incoming gradient
+$q=\partial\mathcal{L}/\partial y$, the selected backward rule is simply
+\begin{equation}
+ \bar x=(0,q,0),\qquad \bar w=(0,q,0).
+ \label{eq:worked-route}
+\end{equation}
+The same result holds for any forward values that produce that winner.
+Saving its index is enough to compute both gradients for \emph{any} later
+value of $q$. This is stronger than sparsity: the surviving derivatives do
+not have activation-dependent magnitudes.
 
-\noindent\emph{Proof sketch.} At each reverse visit, all consumer
-contributions have accumulated at that node. Apply the recorded local
-transpose actions and add them to parents and global parameter coordinates.
-Induction gives the same reverse program. Appendix~\ref{app:composition}
-states the argument-occurrence and parameter-alias maps explicitly. Finite
-recurrence follows by unrolling; it is not an infinite-horizon result.
-
-\subsection{Why the Additive Parameterization Matters}
-
-For example index $a$, output $j$, and candidate $i$, write
+For a batch index $a$, output $j$, and candidate $i$, the general form is
 \begin{equation}
  y_{aj}=\mathop{\mathrm{ext}}_i(x_{ai}+\sigma w_{ji})+b_j,
 \end{equation}
@@ -230,42 +184,59 @@ If $r_{aj}$ is the selected candidate, then
  \bar b_j=\sum_a q_{aj}.
  \label{eq:main-route}
 \end{align}
-The route identifies both reverse actions; max versus min does not itself
-change the weight-derivative sign. The sign comes from the candidate
-parameterization, e.g. $x-w$ versus $x+w$.
-Convolution supplies static offset addresses and accumulates overlap.
-A top-$k$ \emph{sum} supplies a selected set with unit coefficients; an
-average would require an additional scale. An embedding needs token
-addresses, a dropout needs its realized gates, and the supported quantized
-normalization needs selected exponents and a centering rule.
+Equation~\ref{eq:main-route} is a scatter-add operation: routes specify the
+destinations and the incoming gradients supply the values. Max versus min
+changes the winner, not the derivative sign; the sign comes from $x+w$
+versus $x-w$. Convolution adds static offset addresses and sums overlapping
+contributions. A top-$k$ \emph{sum} routes to a selected set with unit
+coefficients; averaging would additionally require a scale.
 
-For contrast, $y=Wx$ has $\bar W=qx^T$: a route around a dense expert does
-not determine its weight gradient. Smooth mixtures and ordinary layer
-normalization generally need continuous realized values. Constraining a
-dense weight to a power of two simplifies multiplication but does not, by
-itself, remove the activation factor from its parameter update.
+By comparison, hard-selecting a dense expert $y=W_rx$ still gives
+$\bar W_r=qx^T$. Maxout and gated dense networks therefore do not inherit
+route-only parameter gradients simply because they have a winner.
+Smooth mixtures and ordinary layer normalization also generally need
+continuous forward values. These examples identify the architectural
+choice that the mathematics rewards: use trainable additive candidates
+when route-only backward state is desirable, and account for other
+operators at explicit boundaries.
 
-\subsection{Ties and Numerical Exactness}
+\subsection{The Simplification Composes}
 
-We define first-index ties in a fixed candidate order and stable index
-ordering for top-$k$. Agreement at ties means agreement with this
-\emph{local reverse program}, not an unconditional subgradient theorem.
-For $f(x)=\max(x,0)-\max(-x,0)=x$, ordering the candidates as written makes
-first-index AD return $2$ at zero, although $f'(0)=1$.
-The two local variable-branch choices are not simultaneously realizable
-near zero. Determinism therefore does not imply that the composed result
-belongs to the composite Clarke generalized gradient
-\citep{bolte2020model,bolte2023nonsmooth}.
+Call a recorded execution \emph{route-sufficient} when its routes, declared
+auxiliary fields, and explicit boundary information determine all required
+input and parameter backward actions. The requirement is joint: knowing
+the input gradient alone is insufficient for training the parameters.
+Shapes, static addresses and any required parameter snapshots are also
+part of the declared reverse-available information. The formal definition
+allows more general sufficient traces (Appendix~\ref{app:composition}).
 
-Away from boundaries the usual differentiable interpretation applies.
-A winner with score gap $\gamma>2\epsilon$ is unchanged if every candidate
-score moves by at most $\epsilon$; this is a local score-space condition,
-not a general parameter-space or training-stability guarantee
-(Appendix~\ref{app:margin}). Real-arithmetic equality also does not imply
-bitwise floating-point equality. Tests separately check route identity and
-tolerance-gated gradient/update agreement, including repeated updates.
+\begin{theorem}[Trace-sufficient reverse accumulation]
+\label{thm:main}
+For a finite executed graph, suppose every required local input and
+parameter backward action can be computed from its recorded trace and
+declared boundary information, for every incoming gradient. Then the
+complete declared backward program can be evaluated from these records
+and the output gradients, without recovering unrecorded internal
+activations. Where the local rules are classical derivatives, the result
+is the graph's classical vector--Jacobian product.
+\end{theorem}
 
-\subsection{What the Storage Bound Does and Does Not Say}
+\noindent\emph{Proof sketch.} Visit nodes in reverse topological order.
+Each node receives the sum of its consumers' gradients, evaluates its
+recorded local backward rule, and adds contributions to its inputs and
+parameters. Induction reproduces ordinary reverse-mode accumulation.
+Fan-out, repeated arguments and shared parameters require addition, not
+the original activation values. Appendix~\ref{app:composition} gives the
+full argument and its application to finite recurrent unrollings.
+
+This result justifies a different execution strategy: record routes while
+the forward is live, release covered internal values when no longer
+needed by the forward, and replay the routes during backward. Residuals
+and overlapping paths may accumulate many contributions; the global
+derivative need not be a permutation or a uniformly sparse matrix.
+The benefit is a structured representation of its \emph{local} actions.
+
+\subsection{How Much State Can a Route Replace?}
 
 An $N$-example, $O$-output, $I$-candidate additive layer can record its winners
 in $NO\lceil\log_2 I\rceil$ logical bits, excluding addresses and metadata.
@@ -273,52 +244,92 @@ Retaining an $NI$-element input at $p$ bits costs $NIp$ bits. Thus even this
 local comparison is favorable only when
 $O\lceil\log_2 I\rceil<Ip$; it is not a universal layer-memory improvement.
 
-Conditioning on all reverse-available information $S$, let $M_s$ count
-attainable \emph{distinguishable reverse actions}, not route labels. An
-exact universal-cotangent decoder needs at least
-$\lceil\log_2M_s\rceil$ fixed-length bits at $S=s$, by injectivity.
-The condition is essential: if original inputs and weights already
-determine the forward, the conditional information bound can be zero.
-Merely disallowing recomputation does not create a positive Shannon bound
-without a computational model. Correlated routes and equivalent top-$k$
-orders also prevent interpreting independent field packing as globally
-optimal (Appendix~\ref{app:information}).
+For an equal-width layer with $I=O=512$ and FP32 inputs, this logical
+comparison is 9 bits per winner versus 32 bits per input coordinate.
+Actual savings depend on packing, auxiliary fields, and which tensors the
+comparison retains. A wide output head or a large selected set can erase
+the advantage. Appendix~\ref{app:information} derives a conditional coding
+bound over distinguishable backward actions; it does not assert that our
+independent field packing is globally optimal.
 
-\section{TikiTorch as an Executable Contract}
+\subsection{Ties and Finite Precision}
+
+For exact ties, we select the first index in a fixed candidate order and
+use stable ordering for top-$k$. Replay must reproduce this local rule.
+At a composed nonsmooth boundary, such agreement is not a guarantee of a
+global Clarke subgradient \citep{bolte2020model,bolte2023nonsmooth};
+Appendix~\ref{app:ties} gives a counterexample. Away from boundaries,
+ordinary differentiation applies. A winner with score gap
+$\gamma>2\epsilon$ survives candidate-score perturbations bounded by
+$\epsilon$ (Appendix~\ref{app:margin}).
+
+The equalities above are real-arithmetic identities. Changing the order of
+floating-point additions can alter accumulated gradients even when routes
+match exactly. We therefore test route identity separately from numerical
+gradient and optimizer-trajectory agreement. This distinction is especially
+important for adaptive optimizers near zero gradients.
+
+\section{Making the Mathematics Usable in TikiTorch}
 \label{sec:implementation}
 
-\subsection{Operators, Recording, and Autograd}
+\subsection{A Composable Library, Not an Isolated Kernel}
 
-\ttorch{} provides familiar \code{nn}, \code{functional}, \code{models},
-\code{optim}, and \code{autodiff} namespaces over PyTorch tensors. It is an
-extension, not a complete replacement for PyTorch. Hard reductions accept
-arbitrary leading dimensions, tile candidate intermediates, and accumulate
-gradients directly rather than materializing a batch--output--input gradient
-tensor. Public layers resolve an explicit backend binding, the logical
-default, and then the tensor's physical device. Registered kernel errors are
-not swallowed. A value-only custom kernel is not assumed to satisfy a
-route-derivative contract.
+\ttorch{} exposes \code{functional}, \code{nn}, \code{models},
+\code{optim}, and \code{autodiff} namespaces over ordinary PyTorch tensors.
+Its operators include additive extrema, top-$k$ aggregation and
+morphological convolution; modules compose them into projections,
+normalization, sequence blocks and attention variants. Model families
+include tropical MLPs, MorphSSM, tropical transformers and mixtures of
+tropical experts. Researchers can change an architectural component
+without rebuilding the surrounding data, loss and training machinery.
+Soft relaxations and conventional input/output layers support comparisons,
+but do not automatically inherit the hard operator's route-only backward.
 
-The hard MorphSSM adapter streams each layer's winners into a
-\code{DeviceRouteTape} as the forward executes; it does not first retain an
-engine-wide activation-cache list. Packing and decoding operate on tensors
-on the input device. Each field is byte-aligned, with at most seven padding
-bits per field. \code{packed=False} stores owned int64 fields as a matched
-unpacked baseline. Portable serialization is a separate, explicitly
-CPU-accessing export with versioned framing and configuration fingerprinting;
-it is not required on the training path.
+This breadth makes the mathematical property experimentally useful.
+An operator-level observation can be tested in a complete model, and a
+route-efficient body can be evaluated together with the boundaries a task
+actually needs. Conversely, making those boundaries visible identifies
+where an attractive local saving is lost. \ttorch{} is a PyTorch companion,
+not a replacement for its tensor runtime or a claim that every library
+model already has an optimized route implementation.
 
-\code{route\_logits(model, ids)} participates in ordinary
-\code{loss.backward()} and optimizer calls. It saves route tensors through
-PyTorch saved-tensor hooks. The lower-level forward/VJP interface accepts an
-external cotangent and returns named parameter gradients without mutating
-\code{.grad}. These are first-order interfaces. The current adapter covers
-plain token-embedding MorphSSM with hard single-scale depthwise convolution,
-tropical projection/normalization, a top-$k$ sum head and unit residuals.
-It rejects soft layers, recurrent scans, parameter aliases, and modified
-forward behavior. The graph theorem is more general than this adapter.
+\subsection{From Selected Operators to a Device Route Tape}
 
-\subsection{Auxiliary State and Boundaries}
+The hard kernels tile candidate intermediates and accumulate backward
+contributions directly, avoiding a materialized batch--output--input
+gradient tensor. Public layers resolve an explicit backend binding, then
+the logical default and the tensor's physical device. A backend providing
+correct forward values must separately support the required route semantics
+before it can participate in route replay.
+
+For the supported hard MorphSSM configuration, the forward streams layer
+winners into a \code{DeviceRouteTape}. There is no preliminary list of
+all layer activation caches. Packing and decoding operate on the input
+device, with at most seven padding bits per byte-aligned field. An
+unpacked option stores owned int64 fields, allowing the effect of packing
+to be measured separately from changing the backward representation.
+Portable export adds versioned framing and a configuration fingerprint;
+its host access is not part of the training path.
+
+The current tape adapter supports token-embedding MorphSSM with hard
+single-scale depthwise convolution, tropical projection/normalization,
+a top-$k$ sum head and unit residuals. It rejects soft layers, recurrent
+scans, parameter aliases and modified forward behavior. Thus the library
+offers a broad architecture space while the tape implements a narrow,
+tested starting point. Extending it means implementing and checking each
+new local backward rule, not merely enabling an unsupported model flag.
+
+\subsection{Interoperability Without Hiding Boundary Costs}
+
+\code{route\_logits(model, ids)} plugs into ordinary
+\code{loss.backward()} and optimizer calls, using PyTorch's saved-tensor
+mechanism to retain routes. A lower-level forward/VJP interface accepts an
+output gradient and returns named parameter gradients without mutating
+\code{.grad}. Both interfaces are first order. This separation permits
+standard task losses and updates: a route-sufficient body does not require
+a novel optimizer, a tropical loss, or a wholly multiplier-free pipeline.
+It also provides the interface for future conventional readout boundaries,
+whose saved values and computation must be included in the comparison.
 
 For supported normalization, a row is centered and rescaled by $2^{-s}$,
 where $s=\operatorname{clip}(\operatorname{round}(\log_2 a),-8,8)$ and $a$
@@ -327,47 +338,43 @@ stop-gradient rule for the rounded exponent,
 \begin{equation}
  \bar x=2^{-s}\bigl(q-\operatorname{mean}(q)\bigr).
 \end{equation}
-Five bits encode $s$. This does not certify the arithmetic used to compute
-it: \code{log2}, reductions, and non-dyadic centering widths remain relevant
-to the arithmetic audit. Masks, token addresses, logits, cotangents, live
-workspaces and optimizer moments likewise have explicit, different roles.
-The full field formula appears in Appendix~\ref{app:payload}.
+Five bits encode $s$, so this backward rule needs a small auxiliary field
+rather than the original normalization statistics. It is not a pure
+unit-coefficient route: the exponent and centering operation remain part
+of the computation. Embeddings similarly require token addresses, and
+dropout requires its realized gates. Logits, output gradients, live
+workspaces and optimizer moments are not eliminated by packing routes.
+Appendix~\ref{app:payload} specifies the retained fields.
 
-\subsection{Fail-Closed Arithmetic Auditing}
+\subsection{An Additional Path Toward Restricted Arithmetic}
 
-An arithmetic audit declares a primitive vocabulary and an executed scope.
-\ttorch{} distinguishes structural module inspection, dispatched forward
-operations, and a complete forward--loss--reverse--update trace.
-Its current executed classifier reports \emph{safe}, \emph{unsafe}, or
-\emph{unknown}; unrecognized numerical operations cannot certify closure.
-ATen namespace, overload, scale arguments, tensor provenance and reduction
-semantics matter. A runtime tensor is not accepted as a static shift merely
-because its current entries happen to be powers of two.
+The same additive structure also motivates learning on hardware where
+multipliers are expensive. That is a separate question from how much state
+backward needs. For example, a route-trained body can use conventional
+cross-entropy and AdamW, even though those operations do not form a
+multiplier-free training recipe.
 
-Reports bind their schema and semantic version, executed input coverage,
-dtype/device and operator classifications. Host extraction of data-dependent
-scalars remains visible; tensor-only diagnostics let callers omit optional
-host metrics from the traced recipe without waiving arithmetic. Audits
-restore supported model, optimizer and RNG state, but do not undo arbitrary
-external effects of user code. A pass is restricted to observed paths under
-the declared software primitive model, not unexecuted branches.
-
-Finally, software closure is not physical zero-DSP utilization. A DSP block
-can be used as an adder; a compiler can introduce arithmetic absent from a
-source-level count. HLS, post-route timing/resources and on-silicon checks
-must bind the same specific build before a physical claim is made. No
-automatic code-generation equivalence between the floating-point tape
-adapter and the archived integer FPGA kernels is assumed.
+To study this second opportunity, \ttorch{} can inspect modules or trace
+a complete forward--loss--backward--update step against a declared
+arithmetic vocabulary. The executed audit reports safe, unsafe or unknown;
+unrecognized operations cannot produce a passing report. Reports record
+the observed paths, dtype/device and operator semantics, including
+data-dependent host extraction. This helps locate the operations a
+restricted-hardware recipe would need to replace. A software pass is not
+proof of physical zero-DSP use or measured energy savings: those require
+build-specific synthesis and silicon evidence. The historical FPGA kernels
+are separate implementations, not automatic exports of the current tape.
 
 \section{Evaluation}
 \label{sec:evaluation}
 
-We separate three questions: whether the declared reverse is reproduced,
-whether its retained representation is smaller under a specified boundary,
-and whether a complete learning workload is more efficient at matched
-quality. The first two can be tested locally; the third requires further
-comparative evidence. Raw records, protocol choices, source digests, and
-limitations are mapped in the artifact's evidence ledger.
+The evaluation follows the causal argument: first establish that routes
+reproduce the intended gradients, then measure what they retain, and
+finally ask whether the resulting training system improves a useful
+workload. The current results establish the first two steps. The third
+requires optimizer-trajectory agreement, strong systems baselines and
+held-out task quality. The artifact links each reported measurement to
+its source, configuration and raw record.
 
 \subsection{Reverse Correctness and Current-Code Retained State}
 
@@ -379,8 +386,8 @@ local rule. Dtype-appropriate numerical tolerances are separate from exact
 index identity. Higher derivatives and unsupported model modifications are
 rejected rather than silently assigned a derivative.
 
-Table~\ref{tab:current-state} uses a new CPU protocol on the current
-implementation: batch one, vocabulary 38, top-$k$ sum with $k=8$, hard routing,
+Table~\ref{tab:current-state} uses a CPU protocol on the preserved
+implementation snapshot: batch one, vocabulary 38, top-$k$ sum with $k=8$, hard routing,
 no dropout, kernel width seven, and fixed parameter/input seeds. The supplied output cotangent
 is common to eager differentiation and replay. Each row checks output and
 parameter-reverse agreement and records device payload and portable-export
@@ -391,7 +398,7 @@ excluded symmetrically.
 
 \begin{table*}[t]
 \centering
-\caption{Current-code retained-state audit. Payload is actual device-tape
+\caption{Source-snapshotted retained-state audit. Payload is actual device-tape
 storage; portable includes export framing. ``Boundary B'' is the specified
 layer/embedding checkpoint retained set; Ratio is Boundary B / Packed B.
 Both use a common supplied-cotangent boundary, not
@@ -411,116 +418,162 @@ The older portable implementation has a separate three-cell accounting
 archive (Appendix~\ref{app:legacy-state}); those historical rows are neither
 substituted for current device measurements nor pooled into a new run.
 
-\subsection{Matched Full-Step Protocol and Negative Results}
+\subsection{Full-Step Comparisons and Optimizer Sensitivity}
 
-The executable systems protocol compares eager autograd, fullgraph-compiled
-autograd, checkpoint/recompute, compiled unpacked VJP, and compiled packed
-VJP. Checkpointing tests per-layer, grouped and selective policies where
-supported. Each execution case starts from the same model/data digests and
-runs the same number of forward--reverse--optimizer updates. Compilation
-and the first update are separate from warmup and steady-step timing;
-packing, decoding and optimizer work remain inside the relevant full step.
+The full-step protocol compares eager autograd, native compiled autograd,
+checkpointing, and compiled unpacked/packed replay from identical initial
+models and batches. Loss, precision, optimizer and update count are shared;
+packing, decoding and optimizer work belong inside the measured step.
+Gradients and parameters are checked after the same complete update count,
+not only on a fresh single step. Appendix~\ref{app:methods} specifies the
+resource accounting and failure handling.
 
-After measurement, final parameters, last gradients and loss are compared
-with eager after the \emph{same full update count}. A fresh single-step
-check is insufficient to validate a repeated compiled training loop.
-Timeouts, unavailable compilation, nonfinite values, OOMs, and failed parity
-remain recorded. A failed worker cannot contribute a successful row merely
-because it wrote a partial result. The fastest successful checkpoint policy
-is selected under a declared allocator budget, if any. If an arm is missing,
-the complete speedup comparison is inconclusive.
+The comparator includes eager and compiled checkpoint policies, with
+separate observations of selective-save policy calls. Compiled observations
+describe tracing, not measured kernel counts or recomputation savings.
+The present retained-byte table and small CPU checks are not a substitute
+for matched-quality, target-device comparisons.
+An initial ten-case CPU pilot passes the measured-final-state checks but
+does not show a packed-replay speed advantage over the best baseline
+(Appendix~\ref{app:cpu-pilot}).
 
-The current checkpoint arms run eagerly. A strong deployment comparison must
-also evaluate compatible compiled-checkpoint variants and verify actual
-selective save/recompute coverage; a configured policy name alone does not
-establish that it retains the intended operators.
+A local FP32 failure illustrates why the optimizer belongs in this test.
+The benchmark compiles the model and its backward computation; the stock
+AdamW update itself remains eager \citep{loshchilov2019adamw}. Nevertheless, feeding it compiled
+gradients fails a strict repeated-update comparison for ordinary autograd
+as well as packed and unpacked replay. In the diagnosed case, the first
+primitive difference is a mean reduction in the initial normalization,
+despite identical embeddings. Small accumulation differences can leave
+nonzero residual gradients where an invariant loss would give zero.
+Ignoring the separate weight-decay term, AdamW's first adaptive update
+from zero moments has the form
+\begin{equation}
+ \Delta\theta=-\eta\frac{g}{|g|+\epsilon}.
+\end{equation}
+Thus a gradient difference near $\epsilon$ can produce a substantial
+fraction of the learning-rate-sized update. This is a numerical
+sensitivity of the complete recipe, not evidence that route replay uses
+the wrong mathematical derivative or that AdamW itself was miscompiled.
+An explicit epsilon experiment gives a bounded practical response. On the
+diagnostic CPU configuration, $\epsilon=10^{-4}$ passes 20 fresh-batch
+updates for seeds 0, 1 and 2 across compiled autograd and both route paths,
+using the unchanged $10^{-4}$ absolute/relative tolerances. The default
+$10^{-8}$ fails; $10^{-6}$ passes some short checks but fails two seeds in
+the longer test. These are different configurations of standard AdamW,
+not a new optimizer or a claim that its default has been repaired.
+Appendix~\ref{app:optimizer-diagnostic} records the controls and scope;
+Appendix~\ref{app:adamw-sensitivity} gives the first-step sensitivity bound.
+The epsilon setting must be shared by every comparison arm and its
+learning-quality effect remains to be tested. Failed trajectories still
+cannot serve as speedup denominators.
 
-CPU process RSS includes interpreter/compiler memory and is not a tensor
-allocator peak. CUDA would require synchronized timing and separate allocated
-and reserved peaks. Neither is measured DRAM traffic or energy. Capacity is
-reported only for tested fits, with their validation status; unvalidated fits
-are not wins. The current small native-compiler checks support functional
-integration, not a headline scalability or accelerator comparison.
+\subsection{A Separate Hardware Feasibility Study}
 
-A negative result is already informative: in a small local FP32 test,
-native compiled AdamW fails the strict update-equivalence check for
-ordinary compiled autograd \emph{and} packed replay. Small gradient rounding
-differences can be amplified near zero by AdamW's epsilon-scaled update.
-The separate momentum-SGD protocol passes, but changing optimizers does not
-establish AdamW equivalence. We retain this failure rather than relax the
-criterion or use a failed arm as a speedup denominator.
+Historical FPGA experiments explore a longer-term consequence of the
+arithmetic: full learning transitions on fabric. An integer MorphSSM
+kernel performs forward, lookup-table loss differentiation, reverse routing
+and SignSGD \citep{bernstein2018signsgd}; a separate dyadic classifier
+performs fabric-only updates with small-scale held-out MNIST evaluation.
+These results concern specialized implementations, not current-Python
+export equivalence or competitive language learning. Their observable
+agreement, evaluator discrepancy and unresolved timing/power limitations
+are reported in Appendix~\ref{app:hardware}. They are feasibility evidence,
+not the basis of the current training-state claim.
 
-\subsection{Specialized FPGA Learning as a Case Study}
+\section{Related Work}
 
-The archived FPGA artifacts test a different question: whether selected
-integer recipes can execute a complete learning transition on fabric.
-A four-layer width-512 MorphSSM kernel runs forward, a lookup-table loss
-gradient, reverse routing and SignSGD \citep{bernstein2018signsgd} in a fused AWS F2 invocation.
-Its 30-update archived observable record matches C simulation, but this is
-not an exhaustive comparison of all state. The longer run repeats one
-resident 128-token window; it demonstrates persistent execution and updates,
-not held-out language learning.
+\paragraph{Morphological learning and hard selection.}
+Morphological networks and their deep variants establish learned extrema
+of additive candidates \citep{ritter1996morphological,franchi2020morphological}.
+Geometric back-propagation already uses active morphological paths
+\citep{groenendijk2023geometric}. We make their required state-and-parameter
+backward information explicit and connect it to a reusable execution
+interface. Maxout \citep{goodfellow2013maxout} and tropical representations
+of dense ReLU networks \citep{zhang2018tropical} offer related geometry,
+but selecting a dense affine branch does not remove its activation-valued
+weight derivatives. Expressivity and sparse-gradient trainability remain
+architectural questions \citep{fotopoulos2025training}, not consequences of
+the route-sufficiency theorem.
 
-A separate two-layer dyadic classifier trained with fabric-only updates on
-16-by-16 MNIST reaches 74.75\% in its recorded final evaluation; exported
-weights reach 74.13\% under an independent evaluator. This is small-scale
-held-out utility, not a competitive quality result or a reconciled evaluator
-parity check. Preprocessing and recipe differences remain unresolved.
-These kernels are not the floating-point route benchmark and do not
-establish deployment equivalence for the current Python model. Resource,
-timing and evaluation qualifications appear in Appendix~\ref{app:hardware}.
+\paragraph{Reducing backward state.}
+Adjoint tapes and checkpoint schedules trade saved values for reverse work
+\citep{giering1998recipes,griewank2000revolve,chen2016sublinear,jain2020checkmate};
+reversible networks reconstruct values through architectural structure
+\citep{gomez2017reversible}. Pooling switches and Gist already retain compact
+backward-relevant encodings \citep{zeiler2014visualizing,jain2018gist}.
+Few-bit Backward and GACT compress derivative or activation information
+\citep{novikov2023fewbit,liu2022gact}. Our representation is exact for its
+declared local rule, including additive-parameter gradients. It is
+complementary to checkpointing at uncovered boundaries, rather than a
+universal replacement for recomputation or compression. FlashAttention's
+IO-aware design also illustrates why retained bytes must be connected to
+actual data movement and latency \citep{dao2022flashattention}.
 
-\section{Limitations and Research Implications}
+\paragraph{Low-arithmetic learning.}
+AdderNet, DeepShift and ShiftAddNet change learned-layer arithmetic
+\citep{addernet,deepShift,shiftaddnet}; low-precision and piecewise-affine
+training extend this idea across the learning step
+\citep{liu2023multfree,kosson2023multiplicationfree}. MatMul-free language
+modeling and BitNet provide important scalable quality/resource comparators
+\citep{zhu2024matmulfree,ma2024bitnet,ma2025bitnet}. These approaches are
+distinct from native additive tropical parameterization, and complete
+multiplication-free training predates \ttorch{}. FINN provides related
+FPGA inference infrastructure \citep{umuroglu2017finn}, not a matched
+training baseline. Our focus is the backward-state opportunity and the
+library needed to evaluate it, with restricted arithmetic as an additional
+design choice.
 
-The most consequential unresolved question is \emph{matched-quality utility}.
-Hard routes create sparse selected parameter updates, a known optimization
-challenge for morphological networks \citep{fotopoulos2025training}; soft-to-hard schedules
-can change optimization and leave the certified hard subset. Historical
-host language-model endpoints favor the dense baseline, but differ in
-parameter count and token budget; their legacy waived audit does not
-certify a closed training trajectory (Appendix~\ref{app:host-quality}). A small
-synthetic successor-task regression detects broken learning integration but
-does not establish language modeling ability. The optional corpus runner
-uses a held-out suffix and a train-only vocabulary; recording finite corpus
-metrics is not a passed quality gate. Credible comparisons require multiple
-seeds, fixed data/preprocessing, tuned budgets and dense or low-arithmetic
-baselines at matched quality, not only equal parameter count.
+\section{Toward Cheaper Useful Learning}
 
-Likewise, route bytes do not disappear into a universal memory theorem.
-The loss boundary, vocabulary head, live layer workspaces and optimizer
-state can dominate. Adaptive checkpointing or hybrid checkpoint-plus-route
-policies may be preferable. Decode and scatter costs, stable tie handling,
-compile time and transfer overhead must be included before asserting a
-systems advantage. No deployment-scale GPU capacity or full-card energy
-advantage is established here.
+The remaining empirical question is whether the simpler backward graph
+helps a model learn a useful task with less total resource cost. There are
+two complementary comparisons. Holding the model and training recipe
+fixed isolates the route implementation against eager, compiled and
+strong checkpoint baselines. Holding useful task quality fixed asks
+whether a tropical model is competitive with tuned conventional or
+low-arithmetic models. Neither comparison can substitute for the other.
 
-The FPGA evidence remains configuration-specific. The archived D128 replica
-measurements have negative routed slack; D512 lacks a final public routed
-report in the current bundle; core-rail power is not full-card power.
-Neither a successful software audit nor an execution log repairs these
-physical evidence gaps. The library also remains research software, with
-release-candidate provenance and third-party distribution review pending.
+Hard routing can also make optimization harder: only selected candidate
+parameters receive a local gradient. Route coverage, gradient density,
+route churn and soft-to-hard schedules are therefore informative
+ablations \citep{fotopoulos2025training}. Any soft training phase has its
+own backward state and cost. Historical language-model endpoints in the
+artifact favor the dense baseline under unequal parameter/token budgets;
+they motivate further modeling work rather than a language-quality claim
+(Appendix~\ref{app:host-quality}). Synthetic learning regressions check
+integration, not generalization.
 
-These limitations suggest a focused use of \ttorch{}: treat operator
-parameterization, retained derivative state and arithmetic vocabulary as
-joint experimental choices. Its value is to make those choices inspectable
-and testable, not to assert that tropical models universally replace dense
-networks, checkpointing or modern accelerators.
+After validating the optimizer recipe on the intended workload and device,
+the next systems study should
+compare complete steps under the same numerical recipe, including
+compatible compiled-checkpoint policies. A convincing task result would
+then demonstrate matched held-out quality at lower measured memory or on
+smaller hardware across multiple seeds. For language pretraining, the
+vocabulary head is an early feasibility gate: a top-$k$ route record grows
+with vocabulary size, while a conventional head introduces a separate
+value-dependent boundary. Both can dominate a compact model body.
+
+These costs are exactly why a comprehensive library matters. It lets the
+operator, architecture, retained-state representation and optimizer be
+varied within one testable training system. The mathematical simplification
+defines a design opportunity; the complete workload decides whether it is
+useful. Current results do not establish deployment-scale GPU capacity,
+time-to-quality or energy improvements.
 
 \section{Conclusion}
 
-\ttorch{} exposes a useful consequence of additive hard routing: a compact
-forward record can determine both state and additive-parameter reverse
-actions. The framework connects this derivative-state contract to an
-independent audit of the executed learning arithmetic. Scoped proofs,
-counterexamples, device-tape implementations and evidence-separated
-experiments make the opportunity precise. Converting it into general
-efficiency at useful task quality remains an empirical question requiring
-matched workloads, complete accounting and configuration-bound artifacts.
+Additive hard routing changes what backpropagation needs to remember.
+For supported operators, winner addresses replace activation-valued
+derivative coefficients, and backward becomes routing and accumulation.
+\ttorch{} connects that structure to composable models, packed device
+tapes and ordinary PyTorch training. The present measurements establish a
+smaller retained representation under a specified boundary. The next
+scientific test is whether this foundation makes useful learning cheaper
+or accessible on smaller hardware.
 \FloatBarrier
 \label{main:end}
 
-\section*{Impact Statement}
+\section*{Ethics Statement}
 
 Reducing the state or arithmetic required for learning could broaden access
 to on-device adaptation and resource-constrained research. The present work
@@ -532,7 +585,26 @@ derivative rules and failed comparisons explicit. Applications involving
 personal data require their own privacy and safety assessment; compact
 route records are not a privacy mechanism.
 
-\bibliographystyle{icml2026}
+\section*{Reproducibility Statement}
+
+The selected reverse rules and proofs are given in Appendix~\ref{app:theory}.
+Appendix~\ref{app:methods} specifies the configurations, accounting boundaries
+and numerical diagnostics. The artifact contains source-bound records,
+table reducers, integrity checks and an offline PDF freshness check.
+These support local reproduction; an independently reproduced release
+candidate and a distributable anonymous source bundle remain to be reviewed.
+
+\section*{AI Use Statement}
+
+Generative AI tools assisted manuscript organization and drafting, mathematical
+exposition and proof review, literature discovery, experimental design,
+software implementation and testing, and interpretation of the numerical
+diagnostics. Automated tests and source/evidence checks accompany this work.
+This is a discussion draft: human authors must independently verify the
+scientific content and finalize this disclosure before any submission;
+automated checks do not substitute for that review.
+
+\bibliographystyle{iclr2027_conference}
 \bibliography{refs}
 
 \clearpage

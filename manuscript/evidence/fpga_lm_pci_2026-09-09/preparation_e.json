@@ -1,0 +1,18 @@
+{
+  "schema": "tikitorch.fpga_lm_live_integration.v1",
+  "run": "pilot-20260909-e",
+  "status": "abandoned_preparation",
+  "scientific_result": null,
+  "ec2_launch_attempted": false,
+  "watchdog_deployed": false,
+  "controller_reservation_created": false,
+  "instance_id": null,
+  "reason": "Frozen inputs were staged before the full preflight, which correctly requires an empty new S3 prefix. Preflight rejected the sequence. The staged prefix and local configuration are preserved, not overwritten or treated as a completed preflight.",
+  "retained_resources": "Dedicated input/result-only EC2 role and profile, three private immutable input objects; no EC2 instance or Step Functions execution.",
+  "source_archive_sha256": "e868a0e53306067404422d0f9312c3e2b7400a4cdb983e9d1b108b7a35989a87",
+  "numpy_archive_sha256": "539f2f23225a3108ef8a7a73740a35cf991cfa51cab8214f5c6d81b152197fb1",
+  "artifact_prefix": "s3://tiki-sweep-739966866637/tikitorch-fpga-lm/pilot-20260909-e/",
+  "actual_billed_usd": null,
+  "billing_note": "This was preparation only, not a reserved compute attempt; ancillary object storage/request costs are still real and covered conservatively by the retained envelopes. Cumulative prior reservations remain USD40; invoicing is pending.",
+  "fix": "Use a new identity and complete preflight before staging inputs; do not bypass the empty-prefix check."
+}

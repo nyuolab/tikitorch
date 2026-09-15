@@ -1,0 +1,18 @@
+{
+  "purpose": "Bounded development follow-up, not a tuning sweep or quality/speed advantage claim",
+  "protocol_registered_before_execution": "manuscript/research/PLAN.md",
+  "external_subprocess_timeout_seconds": 180,
+  "cwd": "/Users/ekoermann/Documents/tikitorch",
+  "command": [
+    "python", "scripts/fpga_lm_pretrain.py",
+    "--backend", "csim", "--width", "512",
+    "--library", "manuscript/build/fpga_lm_csim_2026-09-09/native_d512/libmorphlm.dylib",
+    "--corpus", "data/tinyshakespeare.txt",
+    "--output", "manuscript/evidence/fpga_lm_csim_2026-09-09/d512_1024",
+    "--checkpoint-dir", "manuscript/build/fpga_lm_csim_2026-09-09/checkpoints_d512_1024",
+    "--steps", "1024", "--eval-every", "256", "--eval-windows", "8",
+    "--lr", "1", "--threshold", "2048", "--seed", "0"
+  ],
+  "timing_note": "Other development tests may run concurrently; these clocks are not comparative performance evidence.",
+  "checkpoint_note": "Full weight payloads remain in ignored local build storage. Run JSON records their hashes and explicitly nonportable absolute paths."
+}

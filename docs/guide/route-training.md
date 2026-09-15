@@ -72,11 +72,95 @@ The returned dictionary does not mutate `.grad`. The historical
 Exactness refers to the declared selected derivative; floating-point reduction
 orders can differ within dtype-appropriate tolerances.
 
+## AdamW numerical diagnosis
+
+The native compiler comparison compiles the model/reverse path, **not AdamW's
+update**. On the diagnosed CPU stack, a changed mean-reduction order produces
+tiny upstream rounding differences. Cross-entropy cancellation can leave signed
+residuals even along a structurally zero-gradient direction. For zero initial
+moments, AdamW's adaptive update is `-lr*g/(abs(g)+eps)`: its default `eps=1e-8`
+can turn a `1e-8` gradient discrepancy into a learning-rate-sized update.
+
+The untimed diagnostic separates identical-input primitives, identical-logit
+loss derivatives, identical-tape VJPs, equal-gradient optimizer updates, and
+independent fresh-batch trajectories. The
+[source-bound evidence](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md#adamw-numerical-diagnostic)
+preserves a source snapshot recording both default failure and a bounded mitigation: explicit `eps=1e-4`
+passes 20 updates across three seeds and compiled autograd/packed/unpacked paths
+on the tested small FP32 CPU configuration, without changing tolerances.
+This uses **standard PyTorch AdamW**, not `tt.optim.TropicalAdam` (a different,
+Rprop-like algorithm). It does not establish an optimal epsilon for task learning.
+
+```bash
+# Verify selected historical evidence against its pinned original sources:
+python -m manuscript.tools.historical_cpu_evidence --check
+# Untimed native diagnostic; choose a new output path for each reproduction:
+python -m scripts.route_certificates.optimizer_diagnostic --steps 20 \
+  --eps 1e-8 1e-6 1e-5 1e-4 --output manuscript/build/adamw-reproduction.json
+# Inspect a separately configured benchmark recipe without starting it:
+python -m scripts.route_certificates.training_benchmark --dry-run --adamw-eps 1e-4
+```
+
+All benchmark arms and learning controls receive the same recorded epsilon;
+the default remains `1e-8`. Validate the intended shape/device/precision and
+learning consequences before adopting a recipe. Larger epsilon is not a
+long-horizon route-stability guarantee, and failed default cells remain failures.
+These historical-source checks are not fresh measurements of the current
+library. The original diagnostic's direct `--check` remains strict against the
+current checkout and rejects stale records. Strong benchmark comparisons and
+LM pretraining are subsequent work.
+
+## Integer error-feedback contract
+
+The experimental `tt.optim.fixed_point_ef_step` exposes the exact integer update
+used by the CPU MorphLM diagnostic. For `Q = 2**k`:
+
+```text
+a = remainder + raw_gradient
+update = trunc_toward_zero(a / Q)
+weights_next = weights - update
+remainder_next = a - update * Q
+```
+
+```python
+import torch
+from tikitorch.optim import fixed_point_ef_step
+
+w = torch.tensor([10, -10], dtype=torch.int16)
+r = torch.zeros(2, dtype=torch.int32)
+g = torch.tensor([1, -1], dtype=torch.int32)
+for _ in range(4):
+    w, r = fixed_point_ef_step(w, r, g, k=2)
+assert w.tolist() == [9, -9] and r.tolist() == [0, 0]
+```
+
+Run `python -m examples.fixed_point_workflow` for a checked carry/resume example.
+The function returns new tensors, accepts matching-shape dense strided CPU
+tensors only, rejects noncanonical remainders (`abs(r) >= Q`), int32 accumulator
+overflow and int16 weight clipping. Save **weights, remainder and fixed k** in
+checkpoints. Do not reset remainders between minibatches or reinterpret existing
+remainders with a different k.
+
+What the math buys: `z = w - r/Q` obeys `z_next = z - g/Q` exactly for the supplied
+gradient sequence, while the visible integer weight differs from z by less than
+one weight unit. Deferred sub-unit updates are retained. This does **not** prove
+loss descent or equivalence to a floating model that queries different gradients
+along its own trajectory. Upstream gradient accumulation must also be checked.
+
+This is a primitive for callers that already supply integer gradients in declared
+units, not a drop-in AdamW replacement or automatic quantizer for autograd. The
+MorphLM study supplies summed raw LUT gradients and its own integer surrogate
+backward; neither its k nor its quality results transfer unchanged to a mean-CE
+PyTorch training loop. The existing `EFTropicalSGD` uses floating residuals and at
+most one emitted step per call, with optional adaptive/leaking/momentum behavior;
+it is a different algorithm. No optimizer default changes here. CPU parity does
+not establish physical FPGA compatibility, speed, energy or a zero-DSP design.
+
 ## Matched full-step benchmark
 
 ```bash
 python -m scripts.route_certificates.training_benchmark --dry-run
-python -m scripts.route_certificates.training_benchmark --device cpu --reps 5
+python -m scripts.route_certificates.training_benchmark --device cpu --adamw-eps 1e-4 --reps 5
 # A matched momentum-SGD recipe, also checked by the native compiler gate:
 python -m scripts.route_certificates.training_benchmark --optimizer sgd --reps 5
 # Fast graph-capture correctness smoke; not optimized-kernel performance evidence:
@@ -87,19 +171,37 @@ python -m scripts.route_certificates.training_benchmark --device cuda --batches 
 python -m scripts.route_certificates.training_benchmark --corpus /path/to/corpus.txt --learning-steps 500
 ```
 
-The five arms are eager autograd, fullgraph-compiled autograd, checkpointing,
-fullgraph-compiled unpacked routes, and fullgraph-compiled packed routes. Every
+The six arms are eager autograd, fullgraph-compiled autograd, eager checkpointing,
+fullgraph-compiled checkpointing, fullgraph-compiled unpacked routes, and
+fullgraph-compiled packed routes. Every
 arm starts with the same seeded parameters/data and performs the same number of
 complete forward/reverse/optimizer updates (AdamW by default, momentum SGD with
-`--optimizer sgd`). One startup step (including compilation
+`--optimizer sgd`). `--adamw-eps` is shared across every AdamW arm and both
+auxiliary learning controls, including when timing momentum SGD as a separate
+recipe. One startup step (including compilation
 when applicable) is reported separately from warmup and steady-step timing.
 
-Checkpointing tests per-layer, grouped, and selective policies. Selective
+Both checkpoint arms test per-layer, grouped, and selective policies. Selective
 checkpointing is unavailable on older PyTorch versions and is reported as such;
 it is not silently replaced. The fastest successful checkpoint policy is chosen
-within an optional CUDA allocator budget. A compiler failure makes a missing arm
+within an optional CUDA allocator budget, separately for eager and compiled
+checkpointing. The best baseline includes both. A compiler failure makes a missing arm
 inconclusive, never a speedup against an omitted baseline. `aot_eager` validates
 graph capture but is not an optimized systems result.
+
+The selective policy includes the actual `amax`/`amin` projection reductions.
+A separate untimed forward/backward records visited operations and save/recompute
+policy decisions. Eager counts are runtime policy calls; compiled counts are
+compiler-trace policy calls, **not** physical kernel counts, saved bytes or
+measured recomputation savings. Requested but unobserved targets remain visible;
+a selective cell without observed coverage cannot win a comparison.
+
+Known local limitation: on the diagnosed PyTorch 2.10 CPU/Inductor stack,
+native selective checkpointing passed the one-layer pilot but a two-layer
+SGD case terminated with `SIGSEGV`. The normal benchmark isolates this in its
+worker and excludes it; the optional native-policy test also runs in a separate,
+timeout-bounded process. Do not infer broader selective support from either
+the one-layer success or graph-capture-only checks.
 
 Every measured arm also receives a matched gradient-and-update value check:
 its measured final parameters, gradients and loss are compared with eager after
@@ -119,6 +221,9 @@ batch/context cells. CPU reports process RSS (including interpreter/compiler),
 only validated fits support comparisons, without extrapolating a maximum.
 Source hashes include the runner, its executable protocol/provenance helpers and
 new library source files as well as the Git revision and patch.
+Rows also record the constructed model's causal receptive field separately from
+the timed sequence length. With kernel size three, one/two/four layers have
+spans of 3/7/31 tokens; long tensor timing is not evidence of long-context learning.
 Summaries require equal initialization/data hashes and update counts, and source
 changes during the run invalidate completion. An eager validation OOM is recorded
 separately from whether the measured packed execution fit; unvalidated fits are

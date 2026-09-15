@@ -1,0 +1,946 @@
+{
+  "artifact_files_verified": 107,
+  "artifact_manifest_sha256": "37aa3fdab40ec3240ca73d9efb34f447981eb12b1203472226806bca75b6a7a9",
+  "artifact_payload_bytes": 11118102,
+  "baseline_means": {
+    "shadow": {
+      "accuracy": 0.171875,
+      "lut_nll": 2.6788372072068816,
+      "true_ce": 2.681314908955295
+    },
+    "visible": {
+      "accuracy": 0.22265625,
+      "lut_nll": 2.594827970116971,
+      "true_ce": 2.5950758288214564
+    }
+  },
+  "baselines": [
+    {
+      "shadow": {
+        "accuracy": 0.125,
+        "lut_nll": 2.746891964549869,
+        "true_ce": 2.750440432681607
+      },
+      "visible": {
+        "accuracy": 0.1796875,
+        "lut_nll": 2.655926424589133,
+        "true_ce": 2.6579206266526008
+      },
+      "window_index": 4
+    },
+    {
+      "shadow": {
+        "accuracy": 0.140625,
+        "lut_nll": 2.789787441536064,
+        "true_ce": 2.792448059975314
+      },
+      "visible": {
+        "accuracy": 0.203125,
+        "lut_nll": 2.686961207745563,
+        "true_ce": 2.6873495352151844
+      },
+      "window_index": 5
+    },
+    {
+      "shadow": {
+        "accuracy": 0.2265625,
+        "lut_nll": 2.6133971666533506,
+        "true_ce": 2.614921845004808
+      },
+      "visible": {
+        "accuracy": 0.2734375,
+        "lut_nll": 2.5466732409247497,
+        "true_ce": 2.546578573500744
+      },
+      "window_index": 6
+    },
+    {
+      "shadow": {
+        "accuracy": 0.1953125,
+        "lut_nll": 2.5652722560882433,
+        "true_ce": 2.5674492981594503
+      },
+      "visible": {
+        "accuracy": 0.234375,
+        "lut_nll": 2.48975100720844,
+        "true_ce": 2.4884545799172963
+      },
+      "window_index": 7
+    }
+  ],
+  "candidates": [
+    {
+      "candidate": {
+        "alpha": 0.0,
+        "base_k": 18,
+        "committed": false,
+        "exact_shadow_recurrence": true,
+        "k": 18,
+        "native_execution": false,
+        "prefix_max_abs": {
+          "gradient": 7604847,
+          "remainder_plus_gradient": 261993
+        },
+        "prefix_scope": "raw G prefixes checked; actual zero-update carry unchanged",
+        "public_reference_equal": true,
+        "schema": "tikitorch.fpga_lm_step_fraction.v1",
+        "shift": null,
+        "tensor_sha256": {
+          "fresh_ideal": "52a84ed30870383af460b115aec7b4270dd1afa18a713da2ed275220565efa76",
+          "gradient": "8eec5375c8edef1675faa71dbad2d6f73a7368971f98c55ee43efd02c94aa458",
+          "ideal": "104f02d72f60c7d74bac934ef9c637804a458807dc39fe00bcc057a0221b1885",
+          "remainders": "de270afc31ffcb338dbfc615c81f057388e1e41857a9f16639b05ae11a76d452",
+          "shadow_before": "104f02d72f60c7d74bac934ef9c637804a458807dc39fe00bcc057a0221b1885",
+          "weights": "52a84ed30870383af460b115aec7b4270dd1afa18a713da2ed275220565efa76"
+        },
+        "visible_minus_fresh_ideal": {
+          "l1": 0.0,
+          "l2": 0.0,
+          "max_abs": 0.0,
+          "nonzero_words": 0
+        }
+      },
+      "fraction_committed": false,
+      "label": "zero",
+      "mean_metrics": {
+        "carry_affine": {
+          "accuracy": 0.169921875,
+          "lut_nll": 2.679391083630823,
+          "true_ce": 2.680916894457197
+        },
+        "dynamic_integer": {
+          "accuracy": 0.22265625,
+          "lut_nll": 2.594827970116971,
+          "true_ce": 2.5950758288214564
+        },
+        "fixed_integer": {
+          "accuracy": 0.22265625,
+          "lut_nll": 2.594827970116971,
+          "true_ce": 2.5950758288214564
+        },
+        "fresh_affine": {
+          "accuracy": 0.22265625,
+          "lut_nll": 2.594827970116971,
+          "true_ce": 2.5950758288214564
+        },
+        "rounded_affine": {
+          "accuracy": 0.22265625,
+          "lut_nll": 2.594827970116971,
+          "true_ce": 2.5950758288214564
+        }
+      },
+      "windows": [
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.125,
+              "lut_nll": 2.747676160803513,
+              "true_ce": 2.7505970046692036
+            },
+            "dynamic_integer": {
+              "accuracy": 0.1796875,
+              "lut_nll": 2.655926424589133,
+              "true_ce": 2.6579206266526008
+            },
+            "fixed_integer": {
+              "accuracy": 0.1796875,
+              "lut_nll": 2.655926424589133,
+              "true_ce": 2.6579206266526008
+            },
+            "fresh_affine": {
+              "accuracy": 0.1796875,
+              "lut_nll": 2.655926424589133,
+              "true_ce": 2.6579206266526008
+            },
+            "rounded_affine": {
+              "accuracy": 0.1796875,
+              "lut_nll": 2.655926424589133,
+              "true_ce": 2.6579206266526008
+            }
+          },
+          "window_index": 4
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.140625,
+              "lut_nll": 2.7905259849862745,
+              "true_ce": 2.7919049196042347
+            },
+            "dynamic_integer": {
+              "accuracy": 0.203125,
+              "lut_nll": 2.686961207745563,
+              "true_ce": 2.6873495352151844
+            },
+            "fixed_integer": {
+              "accuracy": 0.203125,
+              "lut_nll": 2.686961207745563,
+              "true_ce": 2.6873495352151844
+            },
+            "fresh_affine": {
+              "accuracy": 0.203125,
+              "lut_nll": 2.686961207745563,
+              "true_ce": 2.6873495352151844
+            },
+            "rounded_affine": {
+              "accuracy": 0.203125,
+              "lut_nll": 2.686961207745563,
+              "true_ce": 2.6873495352151844
+            }
+          },
+          "window_index": 5
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.2109375,
+              "lut_nll": 2.614320797305862,
+              "true_ce": 2.6149987369877774
+            },
+            "dynamic_integer": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.5466732409247497,
+              "true_ce": 2.546578573500744
+            },
+            "fixed_integer": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.5466732409247497,
+              "true_ce": 2.546578573500744
+            },
+            "fresh_affine": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.5466732409247497,
+              "true_ce": 2.546578573500744
+            },
+            "rounded_affine": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.5466732409247497,
+              "true_ce": 2.546578573500744
+            }
+          },
+          "window_index": 6
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.203125,
+              "lut_nll": 2.565041391427642,
+              "true_ce": 2.5661669165675725
+            },
+            "dynamic_integer": {
+              "accuracy": 0.234375,
+              "lut_nll": 2.48975100720844,
+              "true_ce": 2.4884545799172963
+            },
+            "fixed_integer": {
+              "accuracy": 0.234375,
+              "lut_nll": 2.48975100720844,
+              "true_ce": 2.4884545799172963
+            },
+            "fresh_affine": {
+              "accuracy": 0.234375,
+              "lut_nll": 2.48975100720844,
+              "true_ce": 2.4884545799172963
+            },
+            "rounded_affine": {
+              "accuracy": 0.234375,
+              "lut_nll": 2.48975100720844,
+              "true_ce": 2.4884545799172963
+            }
+          },
+          "window_index": 7
+        }
+      ]
+    },
+    {
+      "candidate": {
+        "alpha": 0.0625,
+        "base_k": 18,
+        "committed": false,
+        "exact_shadow_recurrence": true,
+        "k": 22,
+        "native_execution": false,
+        "prefix_max_abs": {
+          "gradient": 7604847,
+          "remainder_plus_gradient": 5631391
+        },
+        "prefix_scope": "raw G and scaled-old-carry-plus-G at every ordered prefix",
+        "public_reference_equal": true,
+        "schema": "tikitorch.fpga_lm_step_fraction.v1",
+        "shift": 4,
+        "tensor_sha256": {
+          "fresh_ideal": "84266ea5a333c96690a2a9aabe39055789069c647cecc3c72ea1bbb29c2531df",
+          "gradient": "8eec5375c8edef1675faa71dbad2d6f73a7368971f98c55ee43efd02c94aa458",
+          "ideal": "fea3440140bfb0d997aac885988ead4149d3bdf105aba2f9d272726eb637c996",
+          "remainders": "d519c2656b4876b79f229dcf7645073ac75c093fa4fc84edadb908ed423b75f5",
+          "shadow_before": "104f02d72f60c7d74bac934ef9c637804a458807dc39fe00bcc057a0221b1885",
+          "weights": "3f1fac668c133f358b82572f6c031317f7e51044f5d1d8ce5cb3bc703d084382"
+        },
+        "visible_minus_fresh_ideal": {
+          "l1": 173.01647472381592,
+          "l2": 5.991505243057422,
+          "max_abs": 1.2087483406066895,
+          "nonzero_words": 30079
+        }
+      },
+      "fraction_committed": false,
+      "label": "sixteenth",
+      "mean_metrics": {
+        "carry_affine": {
+          "accuracy": 0.23828125,
+          "lut_nll": 2.600143581020797,
+          "true_ce": 2.6003824976013634
+        },
+        "dynamic_integer": {
+          "accuracy": 0.244140625,
+          "lut_nll": 2.581528378136939,
+          "true_ce": 2.581830278261589
+        },
+        "fixed_integer": {
+          "accuracy": 0.244140625,
+          "lut_nll": 2.581350365085183,
+          "true_ce": 2.5817667809439024
+        },
+        "fresh_affine": {
+          "accuracy": 0.28125,
+          "lut_nll": 2.5346443573804,
+          "true_ce": 2.534413673631273
+        },
+        "rounded_affine": {
+          "accuracy": 0.244140625,
+          "lut_nll": 2.581195213901647,
+          "true_ce": 2.5818286072871324
+        }
+      },
+      "windows": [
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.2109375,
+              "lut_nll": 2.6763453353714857,
+              "true_ce": 2.6778817567678304
+            },
+            "dynamic_integer": {
+              "accuracy": 0.203125,
+              "lut_nll": 2.6444441158009684,
+              "true_ce": 2.646352104130119
+            },
+            "fixed_integer": {
+              "accuracy": 0.203125,
+              "lut_nll": 2.6444400213783794,
+              "true_ce": 2.6462842359852567
+            },
+            "fresh_affine": {
+              "accuracy": 0.25,
+              "lut_nll": 2.6053176396131397,
+              "true_ce": 2.6049549035753383
+            },
+            "rounded_affine": {
+              "accuracy": 0.203125,
+              "lut_nll": 2.644320639620084,
+              "true_ce": 2.6463366978627603
+            }
+          },
+          "window_index": 4
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.2265625,
+              "lut_nll": 2.694252127734228,
+              "true_ce": 2.6940584010206745
+            },
+            "dynamic_integer": {
+              "accuracy": 0.25,
+              "lut_nll": 2.6718477376462104,
+              "true_ce": 2.6706656654591185
+            },
+            "fixed_integer": {
+              "accuracy": 0.25,
+              "lut_nll": 2.671203521911742,
+              "true_ce": 2.6706378786589227
+            },
+            "fresh_affine": {
+              "accuracy": 0.2890625,
+              "lut_nll": 2.6109389810429118,
+              "true_ce": 2.6099475830806367
+            },
+            "rounded_affine": {
+              "accuracy": 0.25,
+              "lut_nll": 2.6706128885234723,
+              "true_ce": 2.6707577259116477
+            }
+          },
+          "window_index": 5
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.265625,
+              "lut_nll": 2.5446376129825277,
+              "true_ce": 2.545404202605468
+            },
+            "dynamic_integer": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.535022224823438,
+              "true_ce": 2.5367478607957477
+            },
+            "fixed_integer": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.5352660459395557,
+              "true_ce": 2.536649299112833
+            },
+            "fresh_affine": {
+              "accuracy": 0.3125,
+              "lut_nll": 2.495841988908122,
+              "true_ce": 2.4965802267417825
+            },
+            "rounded_affine": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.5349144978797087,
+              "true_ce": 2.5367756232263954
+            }
+          },
+          "window_index": 6
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.25,
+              "lut_nll": 2.485339247994946,
+              "true_ce": 2.484185630011482
+            },
+            "dynamic_integer": {
+              "accuracy": 0.25,
+              "lut_nll": 2.4747994342771396,
+              "true_ce": 2.4735554826613715
+            },
+            "fixed_integer": {
+              "accuracy": 0.25,
+              "lut_nll": 2.4744918711110535,
+              "true_ce": 2.473495710018597
+            },
+            "fresh_affine": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.426478819957426,
+              "true_ce": 2.4261719811273346
+            },
+            "rounded_affine": {
+              "accuracy": 0.25,
+              "lut_nll": 2.4749328295833237,
+              "true_ce": 2.473444382147726
+            }
+          },
+          "window_index": 7
+        }
+      ]
+    },
+    {
+      "candidate": {
+        "alpha": 0.25,
+        "base_k": 18,
+        "committed": false,
+        "exact_shadow_recurrence": true,
+        "k": 20,
+        "native_execution": false,
+        "prefix_max_abs": {
+          "gradient": 7604847,
+          "remainder_plus_gradient": 7111483
+        },
+        "prefix_scope": "raw G and scaled-old-carry-plus-G at every ordered prefix",
+        "public_reference_equal": true,
+        "schema": "tikitorch.fpga_lm_step_fraction.v1",
+        "shift": 2,
+        "tensor_sha256": {
+          "fresh_ideal": "8deb9546ab3bfe216a03f24f0ddc946d9f4bb6e9e1ad0fcd3c6ace7d0fa77818",
+          "gradient": "8eec5375c8edef1675faa71dbad2d6f73a7368971f98c55ee43efd02c94aa458",
+          "ideal": "8f5d5467bb2deb1cdcb7c2e4ee3ead8afe539b9ff032c1b3b03580a4ef311526",
+          "remainders": "bf271d3b5cd073751163ff5ab6a1a8da659710ddc315b0fdf9664002d876f793",
+          "shadow_before": "104f02d72f60c7d74bac934ef9c637804a458807dc39fe00bcc057a0221b1885",
+          "weights": "741d5f199f8a7f3680b12d4d2bf8edac8dc27701bba79ebb6b686fa3f6ef788a"
+        },
+        "visible_minus_fresh_ideal": {
+          "l1": 622.5127849578857,
+          "l2": 15.966973975084974,
+          "max_abs": 1.8349933624267578,
+          "nonzero_words": 30079
+        }
+      },
+      "fraction_committed": false,
+      "label": "quarter",
+      "mean_metrics": {
+        "carry_affine": {
+          "accuracy": 0.28125,
+          "lut_nll": 2.522269387780817,
+          "true_ce": 2.521970622193835
+        },
+        "dynamic_integer": {
+          "accuracy": 0.28515625,
+          "lut_nll": 2.519935852977831,
+          "true_ce": 2.519917344395315
+        },
+        "fixed_integer": {
+          "accuracy": 0.28515625,
+          "lut_nll": 2.5201296105039415,
+          "true_ce": 2.519721248902206
+        },
+        "fresh_affine": {
+          "accuracy": 0.263671875,
+          "lut_nll": 2.506883098939362,
+          "true_ce": 2.507643193086543
+        },
+        "rounded_affine": {
+          "accuracy": 0.28515625,
+          "lut_nll": 2.5201819588647165,
+          "true_ce": 2.519736917805478
+        }
+      },
+      "windows": [
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.296875,
+              "lut_nll": 2.6270829093493764,
+              "true_ce": 2.626457040028894
+            },
+            "dynamic_integer": {
+              "accuracy": 0.2578125,
+              "lut_nll": 2.605156342836322,
+              "true_ce": 2.6053077488310064
+            },
+            "fixed_integer": {
+              "accuracy": 0.2578125,
+              "lut_nll": 2.605396106638885,
+              "true_ce": 2.604999680479331
+            },
+            "fresh_affine": {
+              "accuracy": 0.2265625,
+              "lut_nll": 2.6042828228585204,
+              "true_ce": 2.6051903813089683
+            },
+            "rounded_affine": {
+              "accuracy": 0.2578125,
+              "lut_nll": 2.6058108862106155,
+              "true_ce": 2.6050009432136307
+            }
+          },
+          "window_index": 4
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.2890625,
+              "lut_nll": 2.5720182002239844,
+              "true_ce": 2.571857143692149
+            },
+            "dynamic_integer": {
+              "accuracy": 0.3046875,
+              "lut_nll": 2.574376957025673,
+              "true_ce": 2.574543345447154
+            },
+            "fixed_integer": {
+              "accuracy": 0.3046875,
+              "lut_nll": 2.575247888974836,
+              "true_ce": 2.5742291210526593
+            },
+            "fresh_affine": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.5388731241137434,
+              "true_ce": 2.5412787511834
+            },
+            "rounded_affine": {
+              "accuracy": 0.3046875,
+              "lut_nll": 2.5747381190790835,
+              "true_ce": 2.5742725959175683
+            }
+          },
+          "window_index": 5
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.491545131889972,
+              "true_ce": 2.490987318180406
+            },
+            "dynamic_integer": {
+              "accuracy": 0.3046875,
+              "lut_nll": 2.498723830988599,
+              "true_ce": 2.4983731105310802
+            },
+            "fixed_integer": {
+              "accuracy": 0.3046875,
+              "lut_nll": 2.4989076198406095,
+              "true_ce": 2.4982446550580026
+            },
+            "fresh_affine": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.4924044819307403,
+              "true_ce": 2.4919708179933924
+            },
+            "rounded_affine": {
+              "accuracy": 0.3046875,
+              "lut_nll": 2.49837458528136,
+              "true_ce": 2.4982440892281503
+            }
+          },
+          "window_index": 6
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.265625,
+              "lut_nll": 2.398431309659934,
+              "true_ce": 2.3985809868738923
+            },
+            "dynamic_integer": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.4014862810607287,
+              "true_ce": 2.4014451727720196
+            },
+            "fixed_integer": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.4009668265614357,
+              "true_ce": 2.40141153901883
+            },
+            "fresh_affine": {
+              "accuracy": 0.28125,
+              "lut_nll": 2.3919719668544435,
+              "true_ce": 2.39213282186041
+            },
+            "rounded_affine": {
+              "accuracy": 0.2734375,
+              "lut_nll": 2.401804244887807,
+              "true_ce": 2.4014300428625637
+            }
+          },
+          "window_index": 7
+        }
+      ]
+    },
+    {
+      "candidate": {
+        "alpha": 1.0,
+        "base_k": 18,
+        "committed": false,
+        "exact_shadow_recurrence": true,
+        "k": 18,
+        "native_execution": false,
+        "prefix_max_abs": {
+          "gradient": 7604847,
+          "remainder_plus_gradient": 7481506
+        },
+        "prefix_scope": "raw G and scaled-old-carry-plus-G at every ordered prefix",
+        "public_reference_equal": true,
+        "schema": "tikitorch.fpga_lm_step_fraction.v1",
+        "shift": 0,
+        "tensor_sha256": {
+          "fresh_ideal": "a4ed0bd1d64e0646093fb155878eb70d69235927e5589b752d0b21f8844c7647",
+          "gradient": "8eec5375c8edef1675faa71dbad2d6f73a7368971f98c55ee43efd02c94aa458",
+          "ideal": "9f38742eb0c81d37894aa5d5d5c8b96a60595093647ff5407ef58d8e288634d3",
+          "remainders": "7d85a58421a443bef0f0c93464ded0759b8d5260576d8a6020df7c09f1b7e806",
+          "shadow_before": "104f02d72f60c7d74bac934ef9c637804a458807dc39fe00bcc057a0221b1885",
+          "weights": "047672b8eda0cc7845d9d69992e3ec337cb96ceffad3b4738ddf4cffa4ff4dbd"
+        },
+        "visible_minus_fresh_ideal": {
+          "l1": 1713.3636474609375,
+          "l2": 28.944284572306657,
+          "max_abs": 1.7562713623046875,
+          "nonzero_words": 30079
+        }
+      },
+      "fraction_committed": false,
+      "label": "full",
+      "mean_metrics": {
+        "carry_affine": {
+          "accuracy": 0.220703125,
+          "lut_nll": 3.3309035377921803,
+          "true_ce": 3.3442907195620433
+        },
+        "dynamic_integer": {
+          "accuracy": 0.220703125,
+          "lut_nll": 3.25684653445526,
+          "true_ce": 3.261983352312748
+        },
+        "fixed_integer": {
+          "accuracy": 0.220703125,
+          "lut_nll": 3.2600540060099816,
+          "true_ce": 3.267087842531663
+        },
+        "fresh_affine": {
+          "accuracy": 0.193359375,
+          "lut_nll": 3.4561755650249246,
+          "true_ce": 3.474870932873175
+        },
+        "rounded_affine": {
+          "accuracy": 0.220703125,
+          "lut_nll": 3.259339664119784,
+          "true_ce": 3.2670504609445423
+        }
+      },
+      "windows": [
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.171875,
+              "lut_nll": 3.5540016775672294,
+              "true_ce": 3.5813497919124693
+            },
+            "dynamic_integer": {
+              "accuracy": 0.1640625,
+              "lut_nll": 3.4756184671701353,
+              "true_ce": 3.48320314931906
+            },
+            "fixed_integer": {
+              "accuracy": 0.1640625,
+              "lut_nll": 3.4769317459423084,
+              "true_ce": 3.490132914119207
+            },
+            "fresh_affine": {
+              "accuracy": 0.171875,
+              "lut_nll": 3.6626336244738917,
+              "true_ce": 3.702685562792494
+            },
+            "rounded_affine": {
+              "accuracy": 0.1640625,
+              "lut_nll": 3.477171756657471,
+              "true_ce": 3.4901904411130826
+            }
+          },
+          "window_index": 4
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.2421875,
+              "lut_nll": 3.2559362042518574,
+              "true_ce": 3.264554437336687
+            },
+            "dynamic_integer": {
+              "accuracy": 0.234375,
+              "lut_nll": 3.177856224267412,
+              "true_ce": 3.1812707800905065
+            },
+            "fixed_integer": {
+              "accuracy": 0.234375,
+              "lut_nll": 3.183480683970592,
+              "true_ce": 3.1887188839701586
+            },
+            "fresh_affine": {
+              "accuracy": 0.1953125,
+              "lut_nll": 3.3749701690894076,
+              "true_ce": 3.386370433005043
+            },
+            "rounded_affine": {
+              "accuracy": 0.234375,
+              "lut_nll": 3.1819606888933984,
+              "true_ce": 3.188677189910917
+            }
+          },
+          "window_index": 5
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.2578125,
+              "lut_nll": 3.3338927279231045,
+              "true_ce": 3.342211807411595
+            },
+            "dynamic_integer": {
+              "accuracy": 0.2578125,
+              "lut_nll": 3.2695099981795814,
+              "true_ce": 3.2734300664026508
+            },
+            "fixed_integer": {
+              "accuracy": 0.2578125,
+              "lut_nll": 3.272199526421078,
+              "true_ce": 3.276175769390971
+            },
+            "fresh_affine": {
+              "accuracy": 0.21875,
+              "lut_nll": 3.466817254031141,
+              "true_ce": 3.4822849700135077
+            },
+            "rounded_affine": {
+              "accuracy": 0.2578125,
+              "lut_nll": 3.272086403709345,
+              "true_ce": 3.276285564010827
+            }
+          },
+          "window_index": 6
+        },
+        {
+          "models": {
+            "carry_affine": {
+              "accuracy": 0.2109375,
+              "lut_nll": 3.1797835414265294,
+              "true_ce": 3.189046841587422
+            },
+            "dynamic_integer": {
+              "accuracy": 0.2265625,
+              "lut_nll": 3.1044014482039097,
+              "true_ce": 3.110029413438775
+            },
+            "fixed_integer": {
+              "accuracy": 0.2265625,
+              "lut_nll": 3.1076040677059478,
+              "true_ce": 3.1133238026463177
+            },
+            "fresh_affine": {
+              "accuracy": 0.1875,
+              "lut_nll": 3.3202812125052583,
+              "true_ce": 3.3281427656816542
+            },
+            "rounded_affine": {
+              "accuracy": 0.2265625,
+              "lut_nll": 3.1061398072189195,
+              "true_ce": 3.1130486487433435
+            }
+          },
+          "window_index": 7
+        }
+      ]
+    }
+  ],
+  "candidates_committed": false,
+  "check_scope": "complete saved-point/state algebra and metrics; --recompute repeats four existing full gradients and all88 forwards with the recipe-declared oracle boundaries",
+  "complete": true,
+  "completed_fractions": 4,
+  "full_fraction_parent_endpoint_equal": true,
+  "heldout_corpus_evaluated": false,
+  "new_gradient_pair_exposures": 0,
+  "new_training_updates": 0,
+  "paid_execution_authorized": false,
+  "physical_fpga_execution": false,
+  "readouts": 88,
+  "recipe": {
+    "adaptive_extension": false,
+    "base_k": 18,
+    "baseline_readouts": 8,
+    "baseline_shadow": "original fractional shadow z with dynamic floor forward; not native integer",
+    "baselines": [
+      "visible",
+      "shadow"
+    ],
+    "block_selection": "fixed already-observed first failing block; not searched at execution",
+    "candidate_readouts": 80,
+    "candidates_committed": false,
+    "carry_affine": "z-alpha*G/2**18 with the SAME original visible-state affine tape",
+    "carry_rule": "preserve z=w-r/2**18; scale fresh G only, never reset or rescale its physical carry",
+    "comparison_policy": "compare each model with its OWN zero-fraction readout; dynamic shadow is not the baseline for the visible-tape carry-affine model",
+    "deadline_s": 1800,
+    "dynamic_integer": "candidate integer weights with recomputed routes and floor means",
+    "fixed_integer": "candidate integer weights, original routes, recomputed floor means",
+    "fractional_state": "positive shift j stores r*2**j with denominator2**(18+j) before adding G",
+    "fractions": [
+      0.0,
+      0.0625,
+      0.25,
+      1.0
+    ],
+    "fresh_affine": "w-alpha*G/2**18 with original visible-state selections and centering offsets",
+    "full_state": "exact actual parent batch4 state008 weights/remainders/k18",
+    "gradient_rule": "four saved raw legacy LUT zshift2 gradients at the same original block-start weights",
+    "heldout_corpus_evaluated": false,
+    "labels": [
+      "zero",
+      "sixteenth",
+      "quarter",
+      "full"
+    ],
+    "models": [
+      "fresh_affine",
+      "carry_affine",
+      "rounded_affine",
+      "fixed_integer",
+      "dynamic_integer"
+    ],
+    "new_fitting_pair_exposures": 0,
+    "new_gradient_pair_exposures": 0,
+    "new_training_updates": 0,
+    "paid_execution_authorized": false,
+    "parent_after_exposures": 8,
+    "parent_arm": "batch4",
+    "parent_before_exposures": 4,
+    "partition": "train",
+    "physical_fpga_execution": false,
+    "range_policy": "all readout parameters are finite and within int16 bounds, including fractional ideals; affine internal activations are unconstrained algebraic extrapolations, not deployable; dynamic and fixed-integer forwards reject all would-clip intermediate outputs",
+    "readouts": 88,
+    "recipe_promoted": false,
+    "recompute_gradient_pair_observations": 512,
+    "recompute_gradient_queries": 4,
+    "recompute_scope": "four independent observer gradients; distinct integer dynamic oracle; affine/fixed-integer/shadow replay reuse frozen defining helpers",
+    "rounded_affine": "candidate integer weights with original affine tape",
+    "schema": "tikitorch.fpga_lm_batch_step.v1",
+    "selected_fraction": null,
+    "shifts": [
+      null,
+      4,
+      2,
+      0
+    ],
+    "statistical_significance_claim": false,
+    "torch_threads": 1,
+    "windows": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "zero_state": "exact unchanged original visible weights/remainders/k18"
+  },
+  "recipe_promoted": false,
+  "run_directory": "/Users/ekoermann/Documents/tikitorch/manuscript/build/fpga_lm_batch_step_2026-09-10/v1",
+  "schema": "tikitorch.fpga_lm_batch_step.v1",
+  "scope": "same-point exploratory training-block diagnostics; no training continuation, selection or promotion",
+  "selected_fraction": null,
+  "source_hashes": {
+    "manuscript/tools/audit_fpga_lm_budget.py": "cd2e1b0b4cee123d60863a12294eaf8e2123d6bb04456391143941415ac0b36e",
+    "manuscript/tools/audit_fpga_lm_head_screen.py": "5c773b9ff0213fd7263290bd80d52369cf142416733e0631ed4cb17ee2fd9d0b",
+    "manuscript/tools/check_fpga_lm_bigram_capacity.py": "662c4bae7416b014ff6e21a917d93e6d585a1957159a088d3af5c06fa2be69fe",
+    "manuscript/tools/confirm_fpga_lm_efsgd.py": "b4d4a4b56a2e410b09e3dd7dda52ecf513bccddc38249118e172b4bf44135472",
+    "manuscript/tools/diagnose_fpga_lm_batch_step.py": "584d34206072d23de52e928f83973dbd553efac813bdc67ac6d4a51deeab726c",
+    "manuscript/tools/diagnose_fpga_lm_calibration.py": "747608d6342982609f12f46643319fd221dcf66c8e5cc4cdc448142338526d97",
+    "manuscript/tools/diagnose_fpga_lm_gradient_accumulation.py": "f6eb495672f2a5cd3df4fef205b6e178dd04f85964e08d25540fa3be34e6d975",
+    "manuscript/tools/diagnose_fpga_lm_learning_contract.py": "14fba01e81b935205e4522335a8779adcdc042ed0674d1abb5d57db655ebadf9",
+    "manuscript/tools/diagnose_fpga_lm_persistent_trajectory.py": "baf4545ee305c735a594a3e9fe03e01c823b9df37092fd90d82ec05bd1557d00",
+    "manuscript/tools/extend_fpga_lm_budget.py": "e0d1bcc969adb565147a9e109db3896522551907bbf1a1d6295615d438cd5fe6",
+    "manuscript/tools/fpga_lm_accumulation_arithmetic.py": "689e7b4c3e736015a064c56d95a610c72d15c283e733bb18fdc8fd6964f8a1ad",
+    "manuscript/tools/fpga_lm_diverse_projection.py": "e23b8503cd7b0ecf7c13e16ee1b5c11d4ec90eb200278b0320eee8c787d4cfa2",
+    "manuscript/tools/fpga_lm_efsgd.py": "83c5b56c4192e54cf907ac1d158646ede1d1af4cb86bf77a8b4257a1397b3b30",
+    "manuscript/tools/fpga_lm_efsgd_v1.cpp": "e2b6c1d63ca33508766d620f36182e755a0a7d15a3612ad30e3b5ac790c30f45",
+    "manuscript/tools/fpga_lm_float_reference.py": "299dc145f175ab2883f4f313c232c979bc3d8e23f6ee3a18fc6a5ba359f339d1",
+    "manuscript/tools/fpga_lm_numeric_diagnostic.py": "78dd3afcc3ab3faa5c16f2abb18d6347ad405b6b11752cfda76f8b8ffc8ba48b",
+    "manuscript/tools/fpga_lm_step_fraction.py": "b93081dbf0fc9445f85b9f5387c5491dc001c618a6470e58f439243fef677a87",
+    "manuscript/tools/fpga_lm_trajectory_arithmetic.py": "bc50abff25df1675b59b14fa82cf40633bb9f494eac85e24964bce9bc8b9d969",
+    "manuscript/tools/fpga_lm_trajectory_reference.py": "0640679857973b13d93cf33730abf9f2af67fe50959c3c3223841d337a71ec61",
+    "manuscript/tools/observe_fpga_lm_routes.py": "fcd849f98511afdbd34db09d0244b4aa7fbc676fe89629da290ae591027f62a1",
+    "manuscript/tools/screen_fpga_lm_heads.py": "b2f26f36caf2a4867db2ced30b582f4e286c3f3ccdeb13fdebbec04ba625dcf2",
+    "manuscript/tools/train_fpga_lm_diverse_projection.py": "fb65efc5aabb45168f6f96d5e664dd5337b6806e00539e66d9a6e34c75298625",
+    "manuscript/tools/train_fpga_lm_efsgd.py": "b7b2ba21177df8960fc76c342517f3a161d6841cffb2ff11a8769b9f1401997e",
+    "scripts/fpga_lm_layout.cpp": "61e52a3c92c5eb8d07a5746bc9bdf010826e6b228fd773969ee843f01255147c",
+    "scripts/fpga_lm_pretrain.py": "2d3303e288a3464ddb15327f5982f7f89630dc336fdd0715f160e2cbfeb33796",
+    "tests/test_fixed_point_ef.py": "84099311bf12e87aa6c5a4cf74078b2f6ea9aacad26aeb91fc5b99a9d7fe1d9d",
+    "tests/test_fpga_lm_accumulation_arithmetic.py": "97c034e23924f5619c7f639267d56ae97d4ed0e2c0859d10d32ec89c8c484048",
+    "tests/test_fpga_lm_batch_step.py": "3c88c70a1bd978ff87b620a51ed70fbf54be34320d5309ed423f9e25ae620468",
+    "tests/test_fpga_lm_float_reference.py": "d749f0278e8a8ade48b3bf61c90ff0d7831b090c7b66ce6afb28f6fd35532dae",
+    "tests/test_fpga_lm_gradient_accumulation.py": "b9905266ac7ceb7f2f3d46a5490c7dc9fdd5b2c115bca57ee9672fc92fe76281",
+    "tests/test_fpga_lm_gradient_accumulation_replay.py": "014ee506f7210ebdf1d1146641e19e5ef0ff945c1bb34b4a1334ac4170098ef6",
+    "tests/test_fpga_lm_learning_contract.py": "49acdf1e157d2beb022ef552f99ce8053f2a4c8e1a864f9a518ee50d0271050e",
+    "tests/test_fpga_lm_numeric_diagnostic.py": "9c38b947a3f2083912588da38dec7aacacc0591d4085d6c6cf6b41f6726de57b",
+    "tests/test_fpga_lm_persistent_lifecycle.py": "8fb8e202836031894352c06ea4cc49f58c0eaa0ef8d2a556853006df7e584080",
+    "tests/test_fpga_lm_persistent_trajectory.py": "a06ee6a15328493c7b0075b7d0fecf442bdd735477238bff3f68c81ded43ecc6",
+    "tests/test_fpga_lm_step_fraction.py": "f0a6dccf3cf2714f529a755dead9e69ea4ddbc4713896b51e98be62eb2378abf",
+    "tests/test_fpga_lm_trajectory_arithmetic.py": "391bdd5b73085d52a65e0e8ab3111068f1b453c09cf26ee63271d574a0c05675",
+    "tests/test_fpga_lm_trajectory_reference.py": "1a56368ec601d847e8630b7c73235a6c89a3a6cfc174307dc2b51c6d519c593a",
+    "tikitorch/fpga/bridge.cpp": "3ccf3028b2e7405a4cb7931dbedfb5d87186b7f45ed9e177af5f5e8702ec941d",
+    "tikitorch/fpga/silicon/gen_buffer_init.py": "4f3792e17bbf341be407d0351e267bb1dc8a4b75779abc160c2ed55745ad0081",
+    "tikitorch/hardware/hls/forge_hls_types.hpp": "7909a9a331c6c7fc73d32a6500458ae972eb87e1bb4ed620bb9302b4d4600fcc",
+    "tikitorch/hardware/hls/forge_kernels/forge_buffer_morph_lm.hpp": "11d8bbddd74c4ac638a77d326e60e31d2a80775e7dc020a3077f5f00a8d2cd11",
+    "tikitorch/hardware/hls/forge_kernels/forge_ce_lut.hpp": "dcbbce6a797295bdd319fabc5df68d50a5e5f0e8dbcc6a9c3488c8661db8b200",
+    "tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp": "cbef7f82803baf662f91755dcf1205c82cd7049f6cbde2e84accffcd520e547d",
+    "tikitorch/optim/__init__.py": "e9f9b5a09acfe5034c933dcec5d326e45fe58a9170d864f05dd4233e60ba6e8b",
+    "tikitorch/optim/fixed_point.py": "0249e9f3b114c3f12b07e6deff42f60edaa733c457159a49dc0f1dd661cde842"
+  },
+  "zero_fraction_original_state_equal": true
+}

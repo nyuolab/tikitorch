@@ -1,0 +1,310 @@
+{
+  "arm": "checkpoint",
+  "checkpoint_policy": "selective",
+  "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+  "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+  "config": {
+    "device": "cpu",
+    "dtype": "float32",
+    "width": 16,
+    "layers": 1,
+    "vocab": 11,
+    "seed": 0,
+    "lr": 0.001,
+    "optimizer": "adamw",
+    "adamw_eps": 0.0001,
+    "warmup": 2,
+    "reps": 5,
+    "compile_backend": "inductor",
+    "batch": 2,
+    "sequence": 12
+  },
+  "compile_fullgraph": false,
+  "compile_backend": null,
+  "optimizer_execution": "eager",
+  "model_context": {
+    "convolution_layers": [
+      {
+        "kernel_size": 3,
+        "dilation": 1
+      }
+    ],
+    "causal_receptive_field": 3,
+    "scope": "maximum causal input span; measured sequence length is not learned context capability"
+  },
+  "startup_and_first_update_ms": 13.40699999127537,
+  "process_peak_rss_bytes": 294256640,
+  "cuda_peak_allocated_bytes": null,
+  "cuda_peak_reserved_bytes": null,
+  "cpu_tensor_peak_bytes": null,
+  "samples_ms": [
+    1.4272499829530716,
+    1.3788330252282321,
+    1.3818329898640513,
+    1.3675420195795596,
+    1.4501669793389738
+  ],
+  "median_ms": 1.3818329898640513,
+  "mad_ms": 0.014290970284491777,
+  "update_count": 8,
+  "final_loss": 2.19575834274292,
+  "final_params_sha256": "681ff9185c0ca5f277453564239d26b7fa148d6bd6c7c78b3451155f320cf087",
+  "measurement_status": "fit",
+  "auxiliary_route_payload_bytes": 1401,
+  "auxiliary_route_storage_packed": true,
+  "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+  "loss_boundary_bytes": 1248,
+  "parity": {
+    "status": "pass",
+    "updates_checked": 8,
+    "compared_measured_state": true,
+    "atol": 0.0001,
+    "rtol": 0.0001,
+    "loss_max_abs": 0.0,
+    "parameters": [
+      {
+        "parameter": "embed.weight",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "output_head.weight",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "output_head.bias",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "layers.0.norm.beta",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "layers.0.morph_conv.weight",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "layers.0.morph_conv.bias",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "layers.0.out_proj.weight",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "layers.0.out_proj.bias",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "layers.0.post_norm.beta",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      },
+      {
+        "parameter": "ln_final.beta",
+        "gradient_max_abs": 0.0,
+        "update_max_abs": 0.0
+      }
+    ]
+  },
+  "status": "ok",
+  "selective_policy_coverage": {
+    "status": "observed",
+    "scope": "eager_runtime_policy_calls",
+    "separate_untimed_forward_backward": true,
+    "compile_fullgraph": false,
+    "compile_backend": null,
+    "requested_save_ops": [
+      "aten.sort.stable",
+      "aten.max.dim",
+      "aten.min.dim",
+      "aten.amax.default",
+      "aten.amin.default"
+    ],
+    "observed_save_ops": [
+      "aten.max.dim",
+      "aten.amax.default",
+      "aten.amin.default"
+    ],
+    "unobserved_save_ops": [
+      "aten.sort.stable",
+      "aten.min.dim"
+    ],
+    "target_policy_calls": {
+      "aten.sort.stable": {
+        "forward": 0,
+        "recompute": 0
+      },
+      "aten.max.dim": {
+        "forward": 1,
+        "recompute": 1
+      },
+      "aten.min.dim": {
+        "forward": 0,
+        "recompute": 0
+      },
+      "aten.amax.default": {
+        "forward": 1,
+        "recompute": 1
+      },
+      "aten.amin.default": {
+        "forward": 1,
+        "recompute": 1
+      }
+    },
+    "all_policy_calls": {
+      "forward": 62,
+      "recompute": 60
+    },
+    "visited_op_policy_calls": {
+      "aten.mean.dim": {
+        "forward": 4,
+        "recompute": 4,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.sub.Tensor": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.abs.default": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.clamp_min.default": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.log2.default": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.round.default": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.clamp_.default": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.neg.default": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.exp2.default": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.mul.Tensor": {
+        "forward": 3,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.add.Tensor": {
+        "forward": 9,
+        "recompute": 8,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.transpose.int": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.constant_pad_nd.default": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.arange.default": {
+        "forward": 2,
+        "recompute": 2,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.unsqueeze.default": {
+        "forward": 9,
+        "recompute": 9,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.arange.start_step": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.index.Tensor": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.max.dim": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "MUST_SAVE"
+      },
+      "aten.clone.default": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten._unsafe_view.default": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.view.default": {
+        "forward": 4,
+        "recompute": 4,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.amax.default": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "MUST_SAVE"
+      },
+      "aten.eq.Tensor": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.isnan.default": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.bitwise_or.Tensor": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.scalar_tensor.default": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.where.self": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.amin.default": {
+        "forward": 1,
+        "recompute": 1,
+        "decision": "MUST_SAVE"
+      }
+    },
+    "physical_retention_or_recompute_savings_measured": false
+  }
+}

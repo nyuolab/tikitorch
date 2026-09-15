@@ -46,22 +46,33 @@ dependency/platform manifests; a reviewed version/changelog/API compatibility
 decision. Publish a support table distinguishing eager reference, compiled CPU,
 compiled CUDA and FPGA rather than giving one undifferentiated support badge.
 
-## Highest scientific priority: demonstrate useful training, not only smaller codes
+## Research priority update — 2026-09-15
 
-**S1 — Run the actual five-arm protocol on an existing authorized GPU.**
+The FPGA-first track supersedes the GPU-first ordering in the original
+September 8 audit below. Existing-image checkpoint equivalence is complete;
+the present blocker is the quality gap to the matched-data GRU. Review the
+frozen-readout conditioning diagnostic before choosing another bounded quality
+experiment. GPU comparator work remains valuable as a separate systems study.
+The [shared handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md#handoff-for-xiang)
+contains current outcomes and the next decision; the original acceptance criteria
+below remain requirements for any claims that depend on those measurements.
+
+## Software systems study: demonstrate useful training, not only smaller codes
+
+**S1 — Run the actual six-arm protocol on an existing authorized GPU.**
 
 `scripts/route_certificates/training_benchmark.py` now has real eager, compiled,
-checkpoint, unpacked and packed paths. The historical saved-state table is a
+eager/compiled checkpoint, unpacked and packed paths. The historical saved-state table is a
 portable representation comparison against a declared checkpoint set, not an
 allocator measurement. The current seven-case CPU SGD smoke is intentionally
 tiny. Neither establishes the central practical benefit.
 
-Before ranking arms, strengthen the checkpoint baseline: the current checkpoint
-policies execute eagerly while the compiled-autograd/route arms compile. Add
-compatible compiled-checkpoint variants or explicitly report unsupported cells.
-The selective save list includes `max.dim`/`min.dim`, while current hard
-projection reductions use `amax`/`amin`; instrument which operations are actually
-saved and recomputed instead of assuming the policy covers them.
+The comparator includes compiled-checkpoint candidates and actual `amax`/`amin`
+save targets. Separate policy observations distinguish eager runtime calls from
+compiler-trace calls; they do not measure physical retention or recomputation
+savings. The two-layer native selective policy crashes on the diagnosed local
+CPU stack, whereas the one-layer pilot passes. Preserve unsupported cells and
+validate the intended configuration before claiming broader compatibility.
 
 Acceptance: source-bound CUDA runs over preregistered widths, lengths and batch
 sizes; identical initialization, data and update count; best successful
@@ -79,10 +90,15 @@ and repeated optimizer trajectories on the claimed accelerator stack.
 
 **S2 — Resolve or explicitly scope native AdamW parity before making it the default comparison.**
 
-The audited default native-Inductor AdamW comparison fails strict update parity
-on the local stack, including ordinary compiled autograd. Small near-zero
-gradient differences can be amplified by the optimizer. Switching to momentum
-SGD is a legitimate separate configuration, not a fix or an AdamW pass.
+The default native-Inductor-gradient/AdamW comparison fails strict trajectory
+parity on the local stack, including ordinary compiled autograd. The 2026-09-09
+[diagnostic](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md#adamw-numerical-diagnostic)
+isolates upstream mean-reduction rounding and near-zero cancellation amplified
+by **eager** stock AdamW. Explicit `eps=1e-4` passes a bounded 20-update,
+three-seed FP32 CPU check with unchanged tolerances; default `1e-8` still fails.
+The shared epsilon knob records a distinct optimizer configuration, not a new
+algorithm. Validate the actual workload/device and quality before adopting it;
+switching to momentum SGD remains another distinct recipe.
 
 Acceptance: minimal deterministic reproducer identifying the first differing
 operator/gradient/update, recorded dtype/compiler/device versions, and either a
@@ -192,7 +208,14 @@ release artifacts to a reviewed tag; register archival metadata/DOI only when
 authorized. Have an external contributor reproduce the workflow from a clean
 environment before describing the package as release-ready.
 
-## Hardware experiments: required only for the claims retained
+## Hardware experiments: FPGA-first research priority (2026-09-09)
+
+The owner has reprioritized FPGA language-model pretraining and authorized
+AWS spending below $1,000 cumulative for this continuation. The canonical
+[research plan](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/PLAN.md) sets a $10 first-pilot envelope
+and staged correctness, learning, profiling and scale gates. A GPU speedup is
+not a prerequisite: custom hardware is a primary place to test the arithmetic
+advantage. Useful quality and complete-system efficiency remain unproven.
 
 For a stronger FPGA learning claim, first freeze the MNIST input tensors and
 preprocessing, run the missing one-step full-training KAT, reconcile the 74.75%
@@ -207,19 +230,22 @@ and synchronized full-card energy with uncertainty. Negative-WNS replica
 results and core-rail power remain appendix feasibility context, not speed or
 energy superiority.
 
-A focused TikiTorch software submission can proceed without claiming FPGA
-superiority. The strongest near-term investment is S1–S3 plus a stable public
-route interface; expanding hardware claims before those results would spread
-the contribution too thin.
+A focused software submission remains possible without FPGA superiority, but
+it is no longer the primary experiment sequence. The existing on-chip D512
+image is a small character model; larger pretraining needs external-memory
+architecture work after the fresh-window reference/silicon pilot. Independent
+model replicas must not be counted as scaling one training run.
 
 ## Suggested decision sequence
 
 1. Resolve R1 with maintainers; freeze R2 candidate and empirical protocols.
-2. Keep E0 regression coverage green, strengthen the checkpoint baseline, then complete S1/S2 on an
-   approved existing GPU, retaining failures.
-3. Complete S3 and choose the strongest supported memory/quality/cost claim.
-4. Implement E1/E2 against the measured need; retain E3 as a clearly scoped
-   experimental backend unless its full acceptance bundle exists.
+2. Keep E0 regression coverage green; validate the new fresh-window integer
+   reference and full checkpoint comparisons before the short FPGA pilot.
+3. Demonstrate held-out learning, profile host/device costs and memory limits,
+   then implement the measured external-memory/compute changes for scale.
+4. Maintain S1–S3 and E1/E2 as secondary software opportunities. E3 remains
+   experimental until its full acceptance bundle exists; a new research
+   priority is not a broader support or hardware-efficiency claim.
 5. Finish E4, external reproduction, author review and venue-compliant artifact
    packaging; then authorize the public release and submission separately.
 

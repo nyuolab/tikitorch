@@ -14,7 +14,8 @@ checkout.
 | `actual_model_benchmark.py` | Actual MorphSSM benchmark with isolated workers and incident records |
 | `saved_state_audit.py` | Actual MorphSSM retained-state accounting |
 | `compiled_resource_benchmark.py` | Consolidated five-arm grid, peak/proxy accounting, and frozen systems gates |
-| `training_benchmark.py` | Current device-native five-arm full-step protocol, repeated-update parity, checkpoint policies and learning checks |
+| `training_benchmark.py` | Current device-native six-arm full-step protocol, eager/compiled checkpoint policies, observed selective coverage, repeated-update parity and learning checks |
+| `optimizer_diagnostic.py` | Untimed AdamW first-divergence controls, explicit epsilon sweeps, fresh-batch trajectories and offline evidence checking |
 | `provenance.py` | Shared manifests, digests, environment records, and append-only helpers |
 
 Smoke-check the actual-model configurations without starting a measured run:
@@ -43,3 +44,11 @@ compiled numerical paths, but the small CPU validation is not a completed
 multi-scale GPU or matched-quality study. See the unified
 [experiment protocol](../../manuscript/research/PLAN.md#comparison-protocol) and
 [evidence ledger](../../manuscript/research/EVIDENCE.md).
+
+For the optimizer investigation, start with
+`python -m scripts.route_certificates.optimizer_diagnostic --check`; this only
+verifies the preserved source-bound record. See the
+[route-training guide](../../docs/guide/route-training.md#adamw-numerical-diagnosis)
+for reproduction commands and the bounded `--adamw-eps 1e-4` CPU recipe.
+Default epsilon and failed trajectories remain unchanged. Benchmark expansion
+and language pretraining follow review of the numerical configuration.

@@ -1,0 +1,30 @@
+{
+  "bytes": 22528,
+  "file": "/Users/ekoermann/Documents/tikitorch/manuscript/build/fpga_lm_csim_2026-09-09/checkpoints_d16/checkpoint_000004.i32",
+  "format": "little-endian signed int32, low16 weights",
+  "location_portable": false,
+  "regions": [
+    {
+      "name": "EMBED",
+      "words": 2048
+    },
+    {
+      "name": "MH",
+      "words": 448
+    },
+    {
+      "name": "MP",
+      "words": 1024
+    },
+    {
+      "name": "MB",
+      "words": 64
+    },
+    {
+      "name": "W_HEAD",
+      "words": 2048
+    }
+  ],
+  "sha256": "492d77b0f23fb049110591a87b6fc7991e4c2ed969645bc90fb2957332d0787c",
+  "step": 4
+}

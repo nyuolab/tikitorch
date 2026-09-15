@@ -1,16 +1,17 @@
 {
-  "venue": "ICML",
-  "template_year": 2026,
-  "status": "Provisional latest verified template, not a claim about the next submission cycle",
-  "verified_date": "2026-09-08",
-  "author_instructions": "https://icml.cc/Conferences/2026/AuthorInstructions",
-  "archive_url": "https://media.icml.cc/Conferences/ICML2026/Styles/icml2026.zip",
-  "archive_sha256": "8b29290f5828e176debb57ea9cc00252502973d55ea561a2f18a7f0a326bfc6c",
+  "venue": "ICLR",
+  "template_year": 2027,
+  "status": "Verified initial-submission template; discussion draft is not submitted",
+  "verified_date": "2026-09-09",
+  "author_instructions": "https://iclr.cc/Conferences/2027/AuthorGuidelines",
+  "main_body_page_limit": 9,
+  "page_limit_scope": "Initial submission; references, appendices and permitted statements excluded",
+  "archive_url": "https://media.iclr.cc/Conferences/ICLR2027/iclr-2027-style-files.zip",
+  "archive_sha256": "0d940dfa9398ae99a18f24a85a8a683f367204b6af6d17d2899e60a67102529e",
   "members": {
-    "icml2026.sty": "7cdcf90f6a59c5219e7f15c88f7ed09fcaf598dad91e6cdddc4dc3cb0e397a95",
-    "icml2026.bst": "0ec3d5eb9b02efb7e0b44a32f3775882f42a743d0bdc618f34e6936309b98764",
-    "fancyhdr.sty": "9130c52f91087abc6d223164ffa587e207e3257fcbcd069ef09ecb5391043f14",
-    "algorithm.sty": "93fd0eb31c112eb405833db8f1d7f5d238c7e691b1c05680d7276e68f36d564a",
-    "algorithmic.sty": "48d18794a5d97c0479a588cc2eac0917992feb9da83acc4631b8f55757d80f9b"
+    "iclr2027/iclr2027_conference.sty": "797deef41724e93761426ac0cbcca46279a91cc650dd1f0ce76a4f08d2098ea6",
+    "iclr2027/iclr2027_conference.bst": "2d67552db7ed38ccfccb5957b52f95656e25c249724761d3cf5f7922ad1844c5",
+    "iclr2027/fancyhdr.sty": "b56ec4434b9f4607529a4b23dc68ad8d4b94f1f631c8cddaf7da78140d53a5ea",
+    "iclr2027/natbib.sty": "88bc70c0e48461934cab5b2accef06b74a8b3ac45ad03ccd3f2a6b7e0d6d530d"
   }
 }

@@ -21,7 +21,8 @@ def review_workspace(tmp_path, monkeypatch):
     (paper / "evidence").mkdir()
     style = b"% pinned upstream style\n"
     (build / "style/example.sty").write_bytes(style)
-    manifest = {"members": {"example.sty": hashlib.sha256(style).hexdigest()}}
+    manifest = {"main_body_page_limit": 9,
+                "members": {"example.sty": hashlib.sha256(style).hexdigest()}}
     (source / "template_manifest.json").write_text(json.dumps(manifest))
     (build / "main.pdf").write_bytes(b"%PDF-1.4\nnew build\n")
     (build / "main.log").write_text("No layout warnings.\n")
@@ -48,6 +49,36 @@ def test_successful_build_publishes_pdf_and_bound_record(review_workspace):
     assert record["main_body_pages"] == 6
     assert record["inputs_sha256"] == builder.review_inputs()
     assert not list((review_workspace / "build").glob("review-*"))
+
+
+def test_nine_main_pages_pass_verified_initial_submission_limit(review_workspace):
+    (review_workspace / "build/main.aux").write_text(
+        r"\newlabel{main:end}{{7}{9}{Conclusion}{section.7}{}}")
+    assert builder.main([]) == 0
+    assert builder.check_review_pdf()["main_body_pages"] == 9
+
+
+def test_page_limit_is_read_from_manifest_not_hardcoded(review_workspace):
+    path = review_workspace / "source/template_manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["main_body_page_limit"] = 5
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(RuntimeError, match="verified 5-page limit"):
+        builder.main([])
+
+
+@pytest.mark.parametrize("limit", [None, True, False, 0, -1, 9.0, "9"])
+def test_invalid_manifest_page_limit_preserves_previous_review_copy(review_workspace, limit):
+    before_pdf = builder.REVIEW_PDF.read_bytes()
+    before_record = builder.REVIEW_RECORD.read_bytes()
+    path = review_workspace / "source/template_manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["main_body_page_limit"] = limit
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="main_body_page_limit must be a positive integer"):
+        builder.main([])
+    assert builder.REVIEW_PDF.read_bytes() == before_pdf
+    assert builder.REVIEW_RECORD.read_bytes() == before_record
 
 
 @pytest.mark.parametrize("failure", [
@@ -81,7 +112,7 @@ def test_failed_build_preserves_previous_review_copy(review_workspace, monkeypat
     elif failure == "overfull":
         (build / "main.log").write_text(r"Overfull \hbox (2.0pt too wide)")
     elif failure.startswith("page_"):
-        page = {"page_missing": "", "page_zero": "0", "page_over": "9"}[failure]
+        page = {"page_missing": "", "page_zero": "0", "page_over": "10"}[failure]
         (build / "main.aux").write_text(r"\newlabel{main:end}{{7}{" + page + "}{Conclusion}{section.7}{}}")
     elif failure == "size":
         with (build / "main.pdf").open("r+b") as pdf:
@@ -125,7 +156,7 @@ def test_readonly_check_rejects_style_install_options(review_workspace, option):
     assert error.value.code == 2
 
 
-@pytest.mark.parametrize("failure", ["pdf", "input", "schema", "pages", "missing_record"])
+@pytest.mark.parametrize("failure", ["pdf", "input", "schema", "pages", "pages_over", "missing_record"])
 def test_review_check_rejects_stale_or_corrupt_snapshot(review_workspace, monkeypatch, failure):
     builder.main([])
     record = json.loads(builder.REVIEW_RECORD.read_text())
@@ -138,6 +169,9 @@ def test_review_check_rejects_stale_or_corrupt_snapshot(review_workspace, monkey
         builder.REVIEW_RECORD.write_text(json.dumps(record))
     elif failure == "pages":
         record["main_body_pages"] = True
+        builder.REVIEW_RECORD.write_text(json.dumps(record))
+    elif failure == "pages_over":
+        record["main_body_pages"] = 10
         builder.REVIEW_RECORD.write_text(json.dumps(record))
     else:
         builder.REVIEW_RECORD.unlink()
@@ -161,7 +195,34 @@ def test_review_input_record_covers_sources_generators_and_selected_evidence():
         "manuscript/source/generated/current_retained_state.tex",
         "manuscript/source/generated/table_provenance.json",
         "manuscript/tools/generate_tables.py", "manuscript/tools/measure_retained_state.py",
+        "manuscript/tools/historical_cpu_evidence.py",
+        "manuscript/research/source_snapshots/cpu_2026-09-10/manifest.json",
+        "manuscript/research/source_snapshots/cpu_2026-09-10/sources.tar.gz",
+        "manuscript/tools/summarize_training_pilot.py",
+        "manuscript/source/generated/training_pilot.tex",
+        "manuscript/results/route_certificates/runs/device_route_training/172834f0-c1cf-42c1-ab87-ec0cdf6f0da9/manifest.json",
+        "manuscript/results/route_certificates/runs/compiled_selective_followup/907579f2-5b1c-42a5-93b0-0d1867e8577e/manifest.json",
         "manuscript/evidence/retained_state_layout_2026-09-09.json",
+        "scripts/route_certificates/optimizer_diagnostic.py",
+        "manuscript/evidence/adamw_diagnostic_benchmarks_2026-09-09.json",
+        "manuscript/evidence/adamw_diagnostic_wider_2026-09-09.json",
     }
     assert expected <= set(inputs)
     assert any(name.startswith("manuscript/results/") for name in inputs)
+
+
+def test_review_input_discovery_does_not_execute_mutable_original_cpu_checkers(monkeypatch):
+    original = builder.runpy.run_path
+    loaded = []
+
+    def guarded(path, *args, **kwargs):
+        assert Path(path).name not in {
+            "measure_retained_state.py", "optimizer_diagnostic.py", "summarize_training_pilot.py",
+        }
+        loaded.append(Path(path).name)
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(builder.runpy, "run_path", guarded)
+    inputs = builder.review_inputs()
+    assert loaded == ["generate_tables.py", "historical_cpu_evidence.py"]
+    assert "manuscript/tools/measure_retained_state.py" in inputs

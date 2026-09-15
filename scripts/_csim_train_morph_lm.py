@@ -1,6 +1,9 @@
-"""Long CSIM training of the config-B morph LM kernel (quality trajectory).
+"""Historical config-B morph LM training; native execution is disabled.
 
-Reuses the validated driver from _validate_kernel_morph_lm.py; logs windowed
+The imported legacy driver has an unsafe obsolete buffer layout. Use
+scripts/fpga_lm_pretrain.py for current, layout-checked fresh-window training.
+
+Originally reused the driver from _validate_kernel_morph_lm.py; logged windowed
 train accuracy toward the Python strict-hard morph reference (~29.7% val acc
 at 3.46M tokens, manuscript/results/lm_shakespeare/strictG_hard_*.jsonl).
 

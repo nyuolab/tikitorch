@@ -1,0 +1,118 @@
+{
+  "arm": "compiled_checkpoint",
+  "checkpoint_policy": "grouped",
+  "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+  "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+  "config": {
+    "device": "cpu",
+    "dtype": "float32",
+    "width": 16,
+    "layers": 1,
+    "vocab": 11,
+    "seed": 0,
+    "lr": 0.001,
+    "optimizer": "adamw",
+    "adamw_eps": 0.0001,
+    "warmup": 2,
+    "reps": 5,
+    "compile_backend": "inductor",
+    "batch": 2,
+    "sequence": 12
+  },
+  "compile_fullgraph": true,
+  "compile_backend": "inductor",
+  "optimizer_execution": "eager",
+  "model_context": {
+    "convolution_layers": [
+      {
+        "kernel_size": 3,
+        "dilation": 1
+      }
+    ],
+    "causal_receptive_field": 3,
+    "scope": "maximum causal input span; measured sequence length is not learned context capability"
+  },
+  "startup_and_first_update_ms": 3767.441042000428,
+  "process_peak_rss_bytes": 401080320,
+  "cuda_peak_allocated_bytes": null,
+  "cuda_peak_reserved_bytes": null,
+  "cpu_tensor_peak_bytes": null,
+  "samples_ms": [
+    0.3708750009536743,
+    0.3542500198818743,
+    0.33774995245039463,
+    0.3387080505490303,
+    0.3836670075543225
+  ],
+  "median_ms": 0.3542500198818743,
+  "mad_ms": 0.016500067431479692,
+  "update_count": 8,
+  "final_loss": 2.195758581161499,
+  "final_params_sha256": "9519ce40709de08a6f67fa2b00997c55a3cf9603ca7f3a4974953b62c8a25aa9",
+  "measurement_status": "fit",
+  "auxiliary_route_payload_bytes": 1401,
+  "auxiliary_route_storage_packed": true,
+  "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+  "loss_boundary_bytes": 1248,
+  "parity": {
+    "status": "pass",
+    "updates_checked": 8,
+    "compared_measured_state": true,
+    "atol": 0.0001,
+    "rtol": 0.0001,
+    "loss_max_abs": 2.384185791015625e-07,
+    "parameters": [
+      {
+        "parameter": "embed.weight",
+        "gradient_max_abs": 2.9802322387695312e-08,
+        "update_max_abs": 7.152557373046875e-07
+      },
+      {
+        "parameter": "output_head.weight",
+        "gradient_max_abs": 2.2351741790771484e-08,
+        "update_max_abs": 2.9802322387695312e-08
+      },
+      {
+        "parameter": "output_head.bias",
+        "gradient_max_abs": 2.2351741790771484e-08,
+        "update_max_abs": 9.313225746154785e-10
+      },
+      {
+        "parameter": "layers.0.norm.beta",
+        "gradient_max_abs": 1.0302755981683731e-08,
+        "update_max_abs": 2.516591166568105e-07
+      },
+      {
+        "parameter": "layers.0.morph_conv.weight",
+        "gradient_max_abs": 6.810296326875687e-09,
+        "update_max_abs": 4.172325134277344e-07
+      },
+      {
+        "parameter": "layers.0.morph_conv.bias",
+        "gradient_max_abs": 1.0302755981683731e-08,
+        "update_max_abs": 2.516591166568105e-07
+      },
+      {
+        "parameter": "layers.0.out_proj.weight",
+        "gradient_max_abs": 4.0978193283081055e-08,
+        "update_max_abs": 6.221234798431396e-07
+      },
+      {
+        "parameter": "layers.0.out_proj.bias",
+        "gradient_max_abs": 5.21540641784668e-08,
+        "update_max_abs": 8.220564495786675e-07
+      },
+      {
+        "parameter": "layers.0.post_norm.beta",
+        "gradient_max_abs": 2.60770320892334e-08,
+        "update_max_abs": 2.988353742239269e-07
+      },
+      {
+        "parameter": "ln_final.beta",
+        "gradient_max_abs": 2.60770320892334e-08,
+        "update_max_abs": 3.4714446428552037e-07
+      }
+    ]
+  },
+  "status": "ok"
+}

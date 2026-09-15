@@ -1,4 +1,4 @@
-# TikiTorch: literature positioning and submission boundaries
+# TikiTorch: literature positioning
 
 Primary-source check: 2026-09-08. This is an editorial research note, not a
 claim that the literature search is exhaustive. The bibliography is
@@ -6,13 +6,21 @@ claim that the literature search is exhaustive. The bibliography is
 
 ## Recommended scientific position
 
-TikiTorch is a PyTorch companion for studying **learning rules whose arithmetic
-and retained reverse state can be specified together**. In its declared hard
-additive operators, the same winner route determines selected input and
-additive-parameter pullbacks. TikiTorch makes that property executable through
-typed device-resident tapes, declared derivative conventions, ordinary autograd
-integration, and fail-closed audits of a concrete training recipe. Hardware
-artifacts test a separate, configuration-specific implementation boundary.
+The ICLR-oriented narrative starts with a mathematical payoff: **additive hard
+routing turns backward computation into routing and accumulation**. Once the
+winner of `max_i(x_i + w_ji)` is known, both input and weight gradients can be
+formed from the incoming gradient and that index. Unlike a dense weight gradient,
+neither needs the original activation values. This simplifies the supported
+backward dependencies, not the forward search for winners or every operation
+in a full learning step.
+
+TikiTorch is the PyTorch companion that makes this structure usable: tropical
+operators and modules, model composition, device-resident route tapes and
+ordinary autograd/optimizer interfaces, backed by explicit derivative rules and
+tests. Arithmetic audits additionally distinguish practical hybrid learning
+from fully constrained recipes. Historical hardware artifacts test a separate,
+configuration-specific implementation boundary; they are not the central
+justification for the software contribution.
 
 This is an integrated representation-and-systems contribution. Neither max-plus
 networks, routing gradients, compact backward state, nor multiplication-free

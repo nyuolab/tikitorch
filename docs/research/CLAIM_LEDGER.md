@@ -1,6 +1,6 @@
 # TikiTorch research claim ledger
 
-Status: canonical working ledger, 2026-09-08.
+Status: canonical working ledger, updated 2026-09-15.
 
 This file controls research wording for TikiTorch. A result may be described
 more narrowly than this ledger, but not more broadly without adding evidence
@@ -373,15 +373,33 @@ quality/workload protocol remains open. Evidence: [hallmark
 qualifications](https://github.com/nyuolab/tikitorch/blob/main/manuscript/results/lm_shakespeare/fig_hallmark_lm.md) and the [FPGA
 evidence qualifications](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md).
 
-### TT-NEG-005 — Native compiled AdamW does not pass strict update parity
+### TT-NEG-005 — Default AdamW can amplify compiled-gradient roundoff
 
 On the audited local FP32 stack, ordinary native compiled autograd and packed
 replay both fail the repeated-update parity check against eager AdamW, with
 approximately 0.002 maximum parameter difference after two updates. Separate
-momentum-SGD integration passes are not AdamW equivalence. Keep this failed
-configuration visible; do not loosen tolerances to obtain a speed ranking.
-Evidence: [local codebase audit](../codebase_audit_2026-09-08.md) and the
+momentum-SGD integration passes are not AdamW equivalence. The model/reverse path
+is compiled; **the stock AdamW update itself is eager**. The new diagnostic
+isolates initial-normalization mean-reduction rounding and cancellation near
+zero gradients. Its explicit `eps=1e-4` recipe passes 20 fresh-batch updates
+across three seeds and all three compiled paths at unchanged tolerances on the
+small CPU fixture. This is a bounded mitigation, not a repaired default, a new
+optimizer or evidence of task quality/GPU stability. Keep the failed default
+visible; do not loosen tolerances to obtain a speed ranking.
+Evidence: [optimizer diagnosis and record](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md#adamw-numerical-diagnostic),
+[original local codebase audit](../codebase_audit_2026-09-08.md) and the
 [full-step benchmark](https://github.com/nyuolab/tikitorch/blob/main/scripts/route_certificates/training_benchmark.py).
+
+### TT-NEG-006 — Packed CPU pilot is not a speedup; native selective support is scoped
+
+The current ten-case, one-layer CPU pilot passes measured-final-state checks
+but packed replay is not faster than the best compiled-checkpoint baseline
+(`0.375` versus `0.349` ms median). Unpacked replay measures `0.265` ms. These
+five fixed-order samples at one tiny shape are not task-scale speed, peak-memory
+or quality evidence. A separate two-layer momentum-SGD compiled-selective worker
+terminates with `SIGSEGV`; it is retained as a failed cell, not a denominator.
+The cause is unresolved and the one-layer selective success remains valid.
+Evidence: [checked pilot and native failure](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md#current-cpu-comparator-pilot).
 
 ## Next claim gates, in order
 
@@ -394,11 +412,14 @@ Evidence: [local codebase audit](../codebase_audit_2026-09-08.md) and the
    audit; obtain green remote candidate CI across the supported matrix and
    independent installed-artifact reproduction before authorizing a release.
 3. **Practical route utility:** resolve or scope native AdamW support, complete
-   the five-arm CUDA comparison, and measure full-cycle latency, retained bytes,
+   the six-arm CUDA comparison, and measure full-cycle latency, retained bytes,
    peak and recomputation. Add multi-seed real-task quality/cost comparisons;
    traffic or energy requires separate measurement, not inference from bytes.
-4. **FPGA learning:** run D512 on disjoint windows with held-out evaluation and a
-   matched reference trajectory.
+4. **FPGA learning:** preserve the completed 64-update D512 checkpoint-equivalence
+   pilot. The varied-text CPU recipe still trails GRU in every tested order;
+   close the quality gate before scaling, then independently validate any changed
+   integer recipe in C-simulation and silicon. CPU readout diagnostics do not
+   establish a deployable FPGA head. See the [current handoff](https://github.com/nyuolab/tikitorch/blob/main/manuscript/README.md#handoff-for-xiang).
 5. **FPGA systems comparison:** close timing with margin; add iso-model CUDA and
    full-card power; then freeze the paper tables.
 6. **External validity:** repeat fabric-only learning beyond downsampled MNIST

@@ -50,4 +50,5 @@ jobs:
           "$RUNNER_TEMP/tikitorch-gpu-venv/bin/python" -m pytest -q \
             tests/test_functional.py tests/test_nn.py tests/test_backend.py \
             tests/test_morphssm_tape_parity.py tests/test_device_tape.py tests/test_route_training.py \
-            tests/test_training_benchmark.py
+            tests/test_training_benchmark.py \
+            tests/test_optimizer_diagnostic.py

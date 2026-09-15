@@ -1,0 +1,233 @@
+{
+  "schema": "tikitorch.fpga_lm_live_integration.v1",
+  "run": "pilot-20260909-g",
+  "status": "paired_checkpoint_correctness_passed_and_terminated",
+  "scientific_result": "Physical-FPGA fresh-window fixed-point training with full checkpoint equivalence; not useful LLM quality or a cost advantage.",
+  "completion_receipt": {
+    "account": "739966866637",
+    "artifact_count": 35,
+    "artifact_manifest_sha256": "032eaa35ba2562f3a2524b2b89bf637b2b3013f6c0203b1d241cf2feae9a435f",
+    "bundle_bytes": 4224302,
+    "bundle_name": "results.tar.gz",
+    "bundle_sha256": "a0f7f4ef6a20f2dbcd37e9548fdec04b675f672977b0c02ebf3eb103dacff2d8",
+    "client_token": "2f0a880f09467b30db8881fb60a94f236c18709f395a3ef28bf9196340e9ecdc",
+    "deadline_utc": "2026-09-09T18:53:24.963017+00:00",
+    "durable_artifacts_verified": true,
+    "exit_code": 0,
+    "instance_id": "i-0eb88dfe114549c87",
+    "region": "us-east-1",
+    "run_prefix": "tikitorch-fpga-lm/pilot-20260909-g",
+    "schema": "tikitorch.fpga_lm_guest_completion.v1",
+    "scope": "paired correctness only; no quality, speed or DSP claim",
+    "source_sha256": "e868a0e53306067404422d0f9312c3e2b7400a4cdb983e9d1b108b7a35989a87",
+    "status": "SUCCESS",
+    "watchdog_execution_arn": "arn:aws:states:us-east-1:739966866637:execution:tt-fpga-lm-wd-2f0a880f09467b30db8881fb60a94f23:run-2f0a880f09467b30db8881fb60a94f23"
+  },
+  "source_archive_sha256": "e868a0e53306067404422d0f9312c3e2b7400a4cdb983e9d1b108b7a35989a87",
+  "source_hashes": {
+    "scripts/fpga_lm_layout.cpp": "61e52a3c92c5eb8d07a5746bc9bdf010826e6b228fd773969ee843f01255147c",
+    "scripts/fpga_lm_pretrain.py": "2d3303e288a3464ddb15327f5982f7f89630dc336fdd0715f160e2cbfeb33796",
+    "tikitorch/fpga/bridge.cpp": "3ccf3028b2e7405a4cb7931dbedfb5d87186b7f45ed9e177af5f5e8702ec941d",
+    "tikitorch/fpga/silicon/gen_buffer_init.py": "4f3792e17bbf341be407d0351e267bb1dc8a4b75779abc160c2ed55745ad0081",
+    "tikitorch/hardware/hls/forge_hls_types.hpp": "7909a9a331c6c7fc73d32a6500458ae972eb87e1bb4ed620bb9302b4d4600fcc",
+    "tikitorch/hardware/hls/forge_kernels/forge_buffer_morph_lm.hpp": "11d8bbddd74c4ac638a77d326e60e31d2a80775e7dc020a3077f5f00a8d2cd11",
+    "tikitorch/hardware/hls/forge_kernels/forge_ce_lut.hpp": "dcbbce6a797295bdd319fabc5df68d50a5e5f0e8dbcc6a9c3488c8661db8b200",
+    "tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp": "cbef7f82803baf662f91755dcf1205c82cd7049f6cbde2e84accffcd520e547d"
+  },
+  "generator_sha256": {
+    "scripts/fpga_lm_aws.py": "004cb4dd1c5e8ce404aa94d4a84a3977f3e98f8112b9db95aaef643fcc515042",
+    "scripts/fpga_lm_cloud.py": "9d00327b8b31cca4ac05d264c60cd354ce3f72b68b0121beaa1077944954bb9a",
+    "scripts/fpga_lm_control.py": "307df63152ed9a008667f2de0233c4b99d916cdb2fd613e48d793cc21feca864",
+    "scripts/fpga_lm_guest.py": "f250cdf694671a9ba90104a39769e688ac9adbd2dfa780a83e5a9de056b7416d",
+    "scripts/fpga_lm_watchdog.py": "850865f5eaa5e80fcd621f44d278b242951f3d6672a1e649298791ad9f2ffc28"
+  },
+  "resumption": {
+    "explicit_source_upload_approved": true,
+    "original_unexecuted_config_preserved": true,
+    "changed_config_fields": [
+      "deadline_utc",
+      "guest_user_data"
+    ],
+    "staged_full_byte_readbacks_verified": true,
+    "exact_token_instance_and_watchdog_absence_verified_before_resumption": true,
+    "deadline_utc": "2026-09-09T18:53:24.963017+00:00"
+  },
+  "model": {
+    "width": 512,
+    "layers": 4,
+    "vocabulary": 128,
+    "sequence_length": 128,
+    "kernel_size": 7,
+    "batch": 1,
+    "parameters": 1196032,
+    "checkpoint_payload_bytes": 4784128
+  },
+  "dataset": {
+    "bytes": 1115394,
+    "encoding": "strict ASCII128, one byte per token",
+    "sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "splits": {
+      "test": {
+        "start": 1003854,
+        "stop": 1115394,
+        "windows": 864
+      },
+      "train": {
+        "start": 0,
+        "stop": 892315,
+        "windows": 6917
+      },
+      "validation": {
+        "start": 892315,
+        "stop": 1003854,
+        "windows": 864
+      }
+    },
+    "test_policy": "reserved, not evaluated",
+    "window_stride": 129
+  },
+  "optimizer": {
+    "ce_zshift": 4,
+    "kind": "integer thresholded SignSGD",
+    "loss": "balanced LUT surrogate",
+    "lr": 1,
+    "threshold": 2048
+  },
+  "seed": 0,
+  "steps": 64,
+  "distinct_training_windows": 64,
+  "training_token_exposures": 8192,
+  "paired_comparison": {
+    "all_checkpoint_payloads_equal": true,
+    "checkpoints": [
+      {
+        "sha256": "76688ec0a9673b55fa89be3978472171d02a75f231cc3965082af22b3173fa84",
+        "step": 0
+      },
+      {
+        "sha256": "b99520e9b4df097dea90f102ddeaa0c4c6135711b946fd17527ec038b3a21d9a",
+        "step": 32
+      },
+      {
+        "sha256": "453cf85d733f1e495afd76cf2269abf2a35429808a3e62511265c93d2c82f331",
+        "step": 64
+      }
+    ],
+    "comparison": "paired CSIM/PCI full checkpoint payload digests",
+    "complete": true,
+    "quality_or_speed_advantage_established": false
+  },
+  "observed_runtime": {
+    "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "numpy": "1.24.4",
+    "numpy_archive_sha256": "539f2f23225a3108ef8a7a73740a35cf991cfa51cab8214f5c6d81b152197fb1",
+    "numpy_version_expected": "1.24.4",
+    "numpy_wheel": {
+      "filename": "numpy-1.24.4-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "python_tag": "cp38",
+      "sha256": "dd80e219fd4c71fc3699fc1dadac5dcf4fd882bfc6f7ec53d30fa197b8ee22dc"
+    },
+    "platform": "Linux-5.15.0-1081-aws-x86_64-with-glibc2.29",
+    "python": "3.8.10 (default, Mar 18 2025, 20:04:55) \n[GCC 9.4.0]",
+    "python_tag": "cp38",
+    "scope": "paired correctness only; no quality, speed or DSP claim",
+    "sdk_revision": "b603a81f65666e0cf7a67ee5cf18b148eb6b08c3",
+    "sdk_sha256": "35885c50a082cd572614f75452e4095396ab44a460609fc7668a7141ae169b9f",
+    "source_sha256": "e868a0e53306067404422d0f9312c3e2b7400a4cdb983e9d1b108b7a35989a87"
+  },
+  "loaded_image_before_and_after": {
+    "agfi": "agfi-003a8a2f2b1ba7df7",
+    "error": "ok",
+    "error_code": 0,
+    "shell_version": "0x10212415",
+    "slot": 0,
+    "status": "loaded",
+    "status_code": 0
+  },
+  "independent_artifact_audit": {
+    "manifest_files": 35,
+    "manifest_payload_bytes": 28770845,
+    "all_payload_sizes_and_hashes_verified": true,
+    "all_checkpoint_bytes_equal_at_steps": [
+      0,
+      32,
+      64
+    ],
+    "final_checkpoint_matches_actual_earlier_local_csim_bytes": true,
+    "validation_metrics_recomputed_from_checkpoints_and_corpus": true,
+    "native_prediction_and_gradient_checks_recorded": true,
+    "native_raw_prediction_and_gradient_arrays_archived": false,
+    "outside_group_cold_start_reproduction": false
+  },
+  "quality": {
+    "initial_validation": {
+      "accuracy": 0.01171875,
+      "context_reset_accuracy": 0.01953125,
+      "context_reset_lut_normalized_nll": 4.852030263919617,
+      "lut_normalized_nll": 4.852030263919617,
+      "rounded_zero_target_mass": 0,
+      "saturation_events": 0
+    },
+    "final_validation": {
+      "accuracy": 0.16796875,
+      "context_reset_accuracy": 0.16796875,
+      "context_reset_lut_normalized_nll": 4.630206714559771,
+      "lut_normalized_nll": 4.630206714559771,
+      "rounded_zero_target_mass": 0,
+      "saturation_events": 0
+    },
+    "validation_tokens_per_checkpoint": 256,
+    "heldout_test_evaluated": false,
+    "context_learning_advantage_established": false,
+    "competitive_quality_established": false
+  },
+  "timing": {
+    "pci": {
+      "update_including_io_s": 14.036504254999926,
+      "runner_wall_s": 31.325185011000002,
+      "tokens_per_update_wall_s": 583.6210961915206,
+      "tokens_per_runner_wall_s": 261.5148161813996
+    },
+    "csim": {
+      "update_including_io_s": 35.74816370000005,
+      "runner_wall_s": 42.689341888000016
+    },
+    "clock_boundaries": {
+      "end_to_end_wall_s": "includes native setup, NumPy import, baseline fit, full initialization, training, frozen evaluation, checkpoints and metrics I/O; excludes compilation, corpus loading/hashing, directory creation and final summary write",
+      "native_kick_s": "mode-3 call including host polling, excludes transfers",
+      "update_including_io_s": "stage/readback inputs, mode-3, prediction readback"
+    },
+    "scope": "One paired correctness run. Runner times exclude provisioning, boot, dependency download/build, AFI loading, corpus hashing and final artifact transfer. Serial C++ simulation is not an optimized CPU/GPU baseline.",
+    "speed_or_cost_advantage_established": false,
+    "new_dsp_or_energy_measurement": false
+  },
+  "lifecycle": {
+    "watchdog_startup_health_verified": true,
+    "instance_id": "i-0eb88dfe114549c87",
+    "workload_complete_at_utc": "2026-09-09T18:30:10.516347+00:00",
+    "termination_verified_at_utc": "2026-09-09T18:36:07.929617+00:00",
+    "cleanup_resource_readback_at_utc": "2026-09-09T18:37:46+00:00",
+    "exact_disposable_ebs_volumes_remaining": 0,
+    "pilot_interfaces_remaining": 0,
+    "active_new_project_instances_remaining": 0,
+    "controller_exit_note": "Successful workload/retrieval; controller exited nonzero only because EC2 termination exceeded its 60-second confirmation window. Explicit recovery subsequently confirmed termination and operational reconciliation.",
+    "watchdog_issued_termination_demonstrated": false,
+    "historical_sentinel_action": "untouched; remains outside this new-run ledger"
+  },
+  "accounting": {
+    "reserved_usd_retained": "10.00",
+    "cumulative_reserved_usd_retained": "60.00",
+    "actual_billed_usd": null,
+    "note": "All six reservations remain conservatively counted. No AWS invoice imported; billed_usd=0 in the internal ledger is not zero spend. Ancillary storage/requests and the separately running historical sentinel are not erased by compute cleanup."
+  },
+  "artifacts": {
+    "bundle_uri": "s3://tiki-sweep-739966866637/tikitorch-fpga-lm/pilot-20260909-g/results/results.tar.gz",
+    "completion_uri": "s3://tiki-sweep-739966866637/tikitorch-fpga-lm/pilot-20260909-g/results/completion.json",
+    "bundle_sha256": "a0f7f4ef6a20f2dbcd37e9548fdec04b675f672977b0c02ebf3eb103dacff2d8",
+    "bundle_bytes": 4224302,
+    "artifact_manifest_sha256": "032eaa35ba2562f3a2524b2b89bf637b2b3013f6c0203b1d241cf2feae9a435f",
+    "comparison_sha256": "e3d75fa23673d8a8aa2f5907109bdf73573d79f8271586bb10d752dd72a104c4",
+    "access": "Private approved S3; authorized access required. JSON is not a substitute for the payload bundle."
+  },
+  "next_gate": "Run the declared CPU/CSIM multi-seed head-routing/gradient-flow repair with matched-data unigram/bigram baselines and context ablations before more paid scaling."
+}

@@ -1,0 +1,2179 @@
+{
+ "schema": "tikitorch.route-certificates.run.v1",
+ "experiment": "device_route_training",
+ "run_id": "172834f0-c1cf-42c1-ab87-ec0cdf6f0da9",
+ "timestamp_utc": "2026-09-09T14:43:33Z",
+ "command": "/Users/ekoermann/Documents/tikitorch/scripts/route_certificates/training_benchmark.py --device cpu --adamw-eps 1e-4 --warmup 2 --reps 5 --timeout 60 --learning-steps 50",
+ "config": {
+  "cells": [
+   {
+    "device": "cpu",
+    "dtype": "float32",
+    "width": 16,
+    "layers": 1,
+    "vocab": 11,
+    "seed": 0,
+    "lr": 0.001,
+    "optimizer": "adamw",
+    "adamw_eps": 0.0001,
+    "warmup": 2,
+    "reps": 5,
+    "compile_backend": "inductor",
+    "batch": 2,
+    "sequence": 12
+   }
+  ],
+  "learning_steps": 50,
+  "protocol": "device-route-training-v2"
+ },
+ "tikitorch_commit": "ea951fdbb09c0b86a9fb4044ca71dc1b2beb2d35",
+ "tikitorch_dirty_patch_sha256": "71e6100e31231dfef9b972016113f6053d1b337c948f78496a141dd4b870e8c3",
+ "host": "Erics-MacBook-Pro.local",
+ "platform": "macOS-26.6.2-arm64-arm-64bit",
+ "python": "3.11.5",
+ "torch": "2.10.0",
+ "numpy": "1.26.4",
+ "device": "cpu",
+ "modules": [
+  {
+   "module": "tikitorch",
+   "file": "/Users/ekoermann/Documents/tikitorch/tikitorch/__init__.py",
+   "repo": "tikitorch",
+   "commit": "ea951fdbb09c0b86a9fb4044ca71dc1b2beb2d35"
+  }
+ ],
+ "inputs": [
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/scripts/route_certificates/training_benchmark.py",
+   "bytes": 31512,
+   "sha256": "072d93a12305ec5f4d9fb7fca8ec23fce9a6f469d1ab27dfd8d61c71f91ff223"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/scripts/route_certificates/actual_model_benchmark.py",
+   "bytes": 32587,
+   "sha256": "6aa77fa11022988231925e5c1bf440ac01d92dbef5f7a5e5af095244c95f365a"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/scripts/route_certificates/provenance.py",
+   "bytes": 5383,
+   "sha256": "31c4f02553e2326f22fe1c71f34939b292431f5b5bace24c8245bf790318a191"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/__init__.py",
+   "bytes": 5471,
+   "sha256": "3e8d575426575fcfb8dff3154c9a3428c9854106fc829c388817b10421d4adb5"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/__main__.py",
+   "bytes": 3784,
+   "sha256": "4404a0e7d55e9cc3c460cd8c228494ae24c5b5f88cdd47f60dcc2ce4cd722f31"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/_hardware.py",
+   "bytes": 2660,
+   "sha256": "b25ed65596dc09e0e625b85ec1ced036ea22b1c8d9ef1400fb2d4ef839f71e59"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/algorithmic.py",
+   "bytes": 42703,
+   "sha256": "b18220ab40f33d5ba8c8b8f4c7b25a10060195e6c528e1c49aa8bf922f2e7379"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/audit.py",
+   "bytes": 72187,
+   "sha256": "2c0614de0d9dc579d658184154f0c9a0c7b79a5b75d899d0dc6ce9d958c7ea0e"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/__init__.py",
+   "bytes": 2461,
+   "sha256": "c131fe7aaee9b52241f558d0b97659bc9238c1eaf73f1315c73ac8d11ab28d32"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/device_tape.py",
+   "bytes": 9686,
+   "sha256": "d068a5db53d2c8d0c5796a2d5d3b2eab488e2cc2009d58deb74665179616eb48"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/morphssm_tape.py",
+   "bytes": 18609,
+   "sha256": "60d9b0b2d7fad18a75f7b6e9742a1d334220811d9e4bdaef83f30f7dfa6f8c55"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/packed_tape.py",
+   "bytes": 21808,
+   "sha256": "fcd0f0876a972ebf9c6cc5b9f8310595e077bb83a1b1d2627de121dd227f2aab"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/primitives.py",
+   "bytes": 20033,
+   "sha256": "f9ca7354e21cd1afb356ff73cdbb135b697446649161d516d8c8a32540a0a362"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/backend/__init__.py",
+   "bytes": 6197,
+   "sha256": "254d9a71d5e6d755d55f3d36930b1c670a726bb4fbe06c8f84e85ad613e4f517"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/backend/device.py",
+   "bytes": 5403,
+   "sha256": "3379c1074ed6a3c16aaa8d812bdd948c93f60fd507aad7bb5aec5082d8331431"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/backend/registry.py",
+   "bytes": 18238,
+   "sha256": "e9bb85be462a646d0da64fd6ab138d6777d363bee87785556a2f831812d6302a"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/classical.py",
+   "bytes": 8343,
+   "sha256": "e457ba0f5c7cfa9c0ecb01ebb08059e3d352604581e68975ec67c7e47a5ff6fc"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/cli.py",
+   "bytes": 3469,
+   "sha256": "694f401e5f05e67a310282e37ea778b4615832349ed510507e27904b8a8c4d4f"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/__init__.py",
+   "bytes": 1636,
+   "sha256": "b6676297fd0aa79ae5177c3abc1a755c24cb143e1abe4da09c3c57932dd5d7c8"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/cost.py",
+   "bytes": 4038,
+   "sha256": "80883bff0b12d9c804d9a4e54c97dd12a7f6fd79bd25f27077b05047bfe3590b"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/link.py",
+   "bytes": 5967,
+   "sha256": "b78bbc51859196aaff58b95988c7af7bd26bd74982cd488134bce290c2254c57"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/runner.py",
+   "bytes": 14879,
+   "sha256": "4458fb5e70a5b529dead9f9d3955a01b882fbd172e069d08dd624e8533aea8c7"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/stages.py",
+   "bytes": 2919,
+   "sha256": "65c173b3981ed5274a3813840273740bf5803735e043891dcd79aced427e0603"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/tcp_link.py",
+   "bytes": 23892,
+   "sha256": "bdea51d1b33332c7101eb8487fd155e4a1cb96f7b18981e3dda005c4621eb426"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/thread_link.py",
+   "bytes": 9379,
+   "sha256": "6e0c54a88e7769cb4828cfb69836f056f92f0144538a31d4adab8b789826a2ae"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/transformer_stage.py",
+   "bytes": 8233,
+   "sha256": "37025aa48687f75135a72b451d0803316676ff29418ec89c5563cf30eb6e888f"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/forward_forward.py",
+   "bytes": 32312,
+   "sha256": "318c1e39149932f903af1b6a472bdded071bdaf70ee1321d5e481c6211896153"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/__init__.py",
+   "bytes": 5007,
+   "sha256": "c7e8957142c2e42c9f7509a7fc4b5620f8a994a1b2be2b0c08997314fe9f2ddf"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/_native.py",
+   "bytes": 6733,
+   "sha256": "89fe8ba5523bdb238fcc2e43a84d550aaafb3c58aca78021cd9fda4c07d6da8c"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/_session.py",
+   "bytes": 4799,
+   "sha256": "62aa2af6857c59a95c65221c3805caafb52c1c7c0d625d5797857ee9b6176222"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/accelerate.py",
+   "bytes": 9467,
+   "sha256": "b0b2d5fe8d029a1b1bed5252a6866121f91591207adbb2dd75babe2963088394"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/backend.py",
+   "bytes": 4156,
+   "sha256": "cf3c3323506e51c674099251189ecc46be967e6ebfc560174fbbc43e909d3087"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/dyadic_export.py",
+   "bytes": 3109,
+   "sha256": "1f6704f78197e6c6952de3a7581dd993805de5c47a9e2dd4878892ed630cb391"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/kernels.py",
+   "bytes": 27569,
+   "sha256": "4364eee03d7c2f0ecd5d616e8d6c13634d631ce05fa27ab6cda9ba59b3e799a5"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/runners.py",
+   "bytes": 1675,
+   "sha256": "6bb2973552d67c41b0eaf07f5d0e629155e3e88e9c425ef513393527060c523f"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/silicon/gen_buffer_init.py",
+   "bytes": 11723,
+   "sha256": "4f3792e17bbf341be407d0351e267bb1dc8a4b75779abc160c2ed55745ad0081"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/silicon/morph_lm_a2_power.py",
+   "bytes": 11268,
+   "sha256": "b2dbbb206507845661177ab22b3f72845ad2c84fcc9e997d91f1b14baf3fef12"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/silicon/morph_lm_silicon.py",
+   "bytes": 10797,
+   "sha256": "5f5d7ec67f080f28d2a6084dab0cbd5105d8b112230d3f770af0eb206e139f7b"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/silicon/morph_lm_silicon_n4.py",
+   "bytes": 6218,
+   "sha256": "d5d9c331dcf5986ea790f1818e488debee54c74cbdec888880b33f922c1a6e2d"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/functional.py",
+   "bytes": 60209,
+   "sha256": "7df53f2891359e7c9dcebd859d83e968cbb72faa0049e3adbd4afeac103b2149"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/geometry.py",
+   "bytes": 4727,
+   "sha256": "359bbf971d2244e08934b20ca1c9757ee3a5c372b2b8e05e927a023811db317f"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/hardware/__init__.py",
+   "bytes": 1967,
+   "sha256": "6869621cca3f10d33150a8685e113582beff6a2e9edb6a5bfca1f867c2d6234c"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/models/__init__.py",
+   "bytes": 75561,
+   "sha256": "6a785fb3a61a8d4942ae397be2697c795cc96164790f92fa3a23b5f8a142b532"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/nn/__init__.py",
+   "bytes": 118035,
+   "sha256": "f340e5fdc8eb7a45e0718e7840b1e936bbd020229d393fd58f68790c1d3e6709"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/nn/predictive_coding.py",
+   "bytes": 53442,
+   "sha256": "12a13bf8d77e8bfddf95b4cf396d07c21a8ba9237fa7961960dcceb261c54efe"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/optim/__init__.py",
+   "bytes": 48645,
+   "sha256": "50648f99c90fdc8a2aea9ba5b03e916f925a39211d80f83a0b9df801b2c552bb"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/__init__.py",
+   "bytes": 2034,
+   "sha256": "f2b2efe15eeeec6dfed23f9cfa3c842396b78c4447ff6272cd811a009b68c9a5"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/bellman.py",
+   "bytes": 5442,
+   "sha256": "aea2869656474e6ca80f29d845b950300b621e0c263b7189c02498bf6ccb320a"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/dp.py",
+   "bytes": 10800,
+   "sha256": "f1ca1a1c51191091e4e4bb692c9f630abdd375dc0744c6aad6fa8b134d637cb7"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/functional.py",
+   "bytes": 9379,
+   "sha256": "931069a6d4de7738dd2a63489e1bc32d437fef212d3bdb024e08b23ac2714a5f"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/mcts.py",
+   "bytes": 12660,
+   "sha256": "937c7f91d6afe8b708062c03a00962f104fbe0f762afcd71c900bd5c15169a90"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/__init__.py",
+   "bytes": 2179,
+   "sha256": "bb2aad7eaeb9adc99f61f2f92315046999c209b007aeb19a50d20d70b27be733"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/agent.py",
+   "bytes": 9219,
+   "sha256": "283fb42842d1673fbbe45356de09d793c8b24f3c58b734522dc976dfba7cfb8b"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/board_agent.py",
+   "bytes": 19075,
+   "sha256": "5724bf02edf6603164b026c5d482a60ad15cf3b6214a5470506885126081252d"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/chess_game.py",
+   "bytes": 5877,
+   "sha256": "c8c605cdb267e5a071d2c71d89867e34e9587ae402b1d9e4cdd9c8e38861fd6e"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/env.py",
+   "bytes": 7311,
+   "sha256": "4a9414bf2726dbc2b1b0b1239a3158a9832387b6b67730ae44a00a27f791e582"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/games.py",
+   "bytes": 12183,
+   "sha256": "1e9a714c997269b82f05cda57df20cd1de563fb035b4f178aeccbe087a027337"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/networks.py",
+   "bytes": 10937,
+   "sha256": "a6e64fcab225f6b19a4e7b3e57699c2adf312857a2d2035892dfc2ca2148a007"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/networks_dense.py",
+   "bytes": 4717,
+   "sha256": "14fd3f65bb3962543a9206426744ce1727ae46e1486b0390cedb3b24cf72eff1"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/replay.py",
+   "bytes": 3616,
+   "sha256": "1db07230300c618e262569ecb202bc943bee4ad914553ef47dcd46ea08d5150a"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/selfplay.py",
+   "bytes": 6120,
+   "sha256": "899761b54899f2879532a4d23ea57ec549bfa7fe453e1e995909f3e6cad5da99"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/profile.py",
+   "bytes": 8098,
+   "sha256": "e6496ce1ab3374f6b2fff45f234d61b345a4cdda6da8ced2cf4602ebf135309d"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/prune.py",
+   "bytes": 3418,
+   "sha256": "578e282910dbcb8577db21ae3aa979e79facabd30fc8b784122cbf08921d96f9"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/research/__init__.py",
+   "bytes": 912,
+   "sha256": "93e35b21cb866e5055f95ebfa17f4843219265ee7a7b3b0b7bfa58b6f8bc9afd"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/research/nanogpt.py",
+   "bytes": 36141,
+   "sha256": "568203580df5e7b1f2aa7a77e52602dc593e08ec06200788575b9ded1342acb1"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/research/pc_convrnn.py",
+   "bytes": 59007,
+   "sha256": "1256adc963d245bc4be7b857781573e85d6971d010a575bc8fff2a0b87b8bb4c"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/serialization.py",
+   "bytes": 14903,
+   "sha256": "3b33b7e3de7514555c8cbf02abec09619786bbc25bc08d68ec739df24204dff1"
+  },
+  {
+   "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/train.py",
+   "bytes": 15482,
+   "sha256": "4ed0c2fee3389efd388326aac3a0e34d9ec1586df4dd79658396227475dfcb7b"
+  }
+ ],
+ "incident_status": "completed",
+ "wall_s": 43.302,
+ "metrics": {
+  "rows": [
+   {
+    "arm": "eager",
+    "checkpoint_policy": null,
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": false,
+    "compile_backend": null,
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 13.325374980922788,
+    "process_peak_rss_bytes": 297402368,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.6817500106990337,
+     0.7038750336505473,
+     0.6765000289306045,
+     0.6687080021947622,
+     0.6981249898672104
+    ],
+    "median_ms": 0.6817500106990337,
+    "mad_ms": 0.013042008504271507,
+    "update_count": 8,
+    "final_loss": 2.19575834274292,
+    "final_params_sha256": "681ff9185c0ca5f277453564239d26b7fa148d6bd6c7c78b3451155f320cf087",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 0.0,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      }
+     ]
+    },
+    "status": "ok",
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 42726,
+     "elapsed_s": 1.271,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "compiled",
+    "checkpoint_policy": null,
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": true,
+    "compile_backend": "inductor",
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 3795.7959580235183,
+    "process_peak_rss_bytes": 405864448,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.4079159698449075,
+     0.37033401895314455,
+     0.3279999946244061,
+     0.3177920007146895,
+     0.38695900002494454
+    ],
+    "median_ms": 0.37033401895314455,
+    "mad_ms": 0.03758195089176297,
+    "update_count": 8,
+    "final_loss": 2.195758581161499,
+    "final_params_sha256": "9519ce40709de08a6f67fa2b00997c55a3cf9603ca7f3a4974953b62c8a25aa9",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 2.384185791015625e-07,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 7.152557373046875e-07
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 2.2351741790771484e-08,
+       "update_max_abs": 2.9802322387695312e-08
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 2.2351741790771484e-08,
+       "update_max_abs": 9.313225746154785e-10
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.516591166568105e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 6.810296326875687e-09,
+       "update_max_abs": 4.172325134277344e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.516591166568105e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 4.0978193283081055e-08,
+       "update_max_abs": 6.221234798431396e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 5.21540641784668e-08,
+       "update_max_abs": 8.220564495786675e-07
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 2.60770320892334e-08,
+       "update_max_abs": 2.988353742239269e-07
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 2.60770320892334e-08,
+       "update_max_abs": 3.4714446428552037e-07
+      }
+     ]
+    },
+    "status": "ok",
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 42784,
+     "elapsed_s": 5.352,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "checkpoint",
+    "checkpoint_policy": "layer",
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": false,
+    "compile_backend": null,
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 11.907583975698799,
+    "process_peak_rss_bytes": 297238528,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.8955419762060046,
+     0.9217500337399542,
+     0.8857089560478926,
+     0.8754589944146574,
+     0.9077920112758875
+    ],
+    "median_ms": 0.8955419762060046,
+    "mad_ms": 0.01225003506988287,
+    "update_count": 8,
+    "final_loss": 2.19575834274292,
+    "final_params_sha256": "681ff9185c0ca5f277453564239d26b7fa148d6bd6c7c78b3451155f320cf087",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 0.0,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      }
+     ]
+    },
+    "status": "ok",
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 42902,
+     "elapsed_s": 1.276,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "checkpoint",
+    "checkpoint_policy": "grouped",
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": false,
+    "compile_backend": null,
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 12.318458990193903,
+    "process_peak_rss_bytes": 294617088,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.9653749875724316,
+     0.9003329905681312,
+     0.8844170370139182,
+     0.8722920319996774,
+     0.8995829848572612
+    ],
+    "median_ms": 0.8995829848572612,
+    "mad_ms": 0.01516594784334302,
+    "update_count": 8,
+    "final_loss": 2.19575834274292,
+    "final_params_sha256": "681ff9185c0ca5f277453564239d26b7fa148d6bd6c7c78b3451155f320cf087",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 0.0,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      }
+     ]
+    },
+    "status": "ok",
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 42926,
+     "elapsed_s": 1.278,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "checkpoint",
+    "checkpoint_policy": "selective",
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": false,
+    "compile_backend": null,
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 13.40699999127537,
+    "process_peak_rss_bytes": 294256640,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     1.4272499829530716,
+     1.3788330252282321,
+     1.3818329898640513,
+     1.3675420195795596,
+     1.4501669793389738
+    ],
+    "median_ms": 1.3818329898640513,
+    "mad_ms": 0.014290970284491777,
+    "update_count": 8,
+    "final_loss": 2.19575834274292,
+    "final_params_sha256": "681ff9185c0ca5f277453564239d26b7fa148d6bd6c7c78b3451155f320cf087",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 0.0,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 0.0,
+       "update_max_abs": 0.0
+      }
+     ]
+    },
+    "status": "ok",
+    "selective_policy_coverage": {
+     "status": "observed",
+     "scope": "eager_runtime_policy_calls",
+     "separate_untimed_forward_backward": true,
+     "compile_fullgraph": false,
+     "compile_backend": null,
+     "requested_save_ops": [
+      "aten.sort.stable",
+      "aten.max.dim",
+      "aten.min.dim",
+      "aten.amax.default",
+      "aten.amin.default"
+     ],
+     "observed_save_ops": [
+      "aten.max.dim",
+      "aten.amax.default",
+      "aten.amin.default"
+     ],
+     "unobserved_save_ops": [
+      "aten.sort.stable",
+      "aten.min.dim"
+     ],
+     "target_policy_calls": {
+      "aten.sort.stable": {
+       "forward": 0,
+       "recompute": 0
+      },
+      "aten.max.dim": {
+       "forward": 1,
+       "recompute": 1
+      },
+      "aten.min.dim": {
+       "forward": 0,
+       "recompute": 0
+      },
+      "aten.amax.default": {
+       "forward": 1,
+       "recompute": 1
+      },
+      "aten.amin.default": {
+       "forward": 1,
+       "recompute": 1
+      }
+     },
+     "all_policy_calls": {
+      "forward": 62,
+      "recompute": 60
+     },
+     "visited_op_policy_calls": {
+      "aten.mean.dim": {
+       "forward": 4,
+       "recompute": 4,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.sub.Tensor": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.abs.default": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.clamp_min.default": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.log2.default": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.round.default": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.clamp_.default": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.neg.default": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.exp2.default": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.mul.Tensor": {
+       "forward": 3,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.add.Tensor": {
+       "forward": 9,
+       "recompute": 8,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.transpose.int": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.constant_pad_nd.default": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.arange.default": {
+       "forward": 2,
+       "recompute": 2,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.unsqueeze.default": {
+       "forward": 9,
+       "recompute": 9,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.arange.start_step": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.index.Tensor": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.max.dim": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "MUST_SAVE"
+      },
+      "aten.clone.default": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten._unsafe_view.default": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.view.default": {
+       "forward": 4,
+       "recompute": 4,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.amax.default": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "MUST_SAVE"
+      },
+      "aten.eq.Tensor": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.isnan.default": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.bitwise_or.Tensor": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.scalar_tensor.default": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.where.self": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.amin.default": {
+       "forward": 1,
+       "recompute": 1,
+       "decision": "MUST_SAVE"
+      }
+     },
+     "physical_retention_or_recompute_savings_measured": false
+    },
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 42968,
+     "elapsed_s": 1.278,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "compiled_checkpoint",
+    "checkpoint_policy": "layer",
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": true,
+    "compile_backend": "inductor",
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 3831.798625004012,
+    "process_peak_rss_bytes": 404209664,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.3642499796114862,
+     0.35608402686193585,
+     0.3329159808345139,
+     0.332291005179286,
+     0.3760829567909241
+    ],
+    "median_ms": 0.35608402686193585,
+    "mad_ms": 0.01999892992898822,
+    "update_count": 8,
+    "final_loss": 2.195758581161499,
+    "final_params_sha256": "9519ce40709de08a6f67fa2b00997c55a3cf9603ca7f3a4974953b62c8a25aa9",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 2.384185791015625e-07,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 7.152557373046875e-07
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 2.2351741790771484e-08,
+       "update_max_abs": 2.9802322387695312e-08
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 2.2351741790771484e-08,
+       "update_max_abs": 9.313225746154785e-10
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.516591166568105e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 6.810296326875687e-09,
+       "update_max_abs": 4.172325134277344e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.516591166568105e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 4.0978193283081055e-08,
+       "update_max_abs": 6.221234798431396e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 5.21540641784668e-08,
+       "update_max_abs": 8.220564495786675e-07
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 2.60770320892334e-08,
+       "update_max_abs": 2.988353742239269e-07
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 2.60770320892334e-08,
+       "update_max_abs": 3.4714446428552037e-07
+      }
+     ]
+    },
+    "status": "ok",
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 42972,
+     "elapsed_s": 5.585,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "compiled_checkpoint",
+    "checkpoint_policy": "grouped",
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": true,
+    "compile_backend": "inductor",
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 3767.441042000428,
+    "process_peak_rss_bytes": 401080320,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.3708750009536743,
+     0.3542500198818743,
+     0.33774995245039463,
+     0.3387080505490303,
+     0.3836670075543225
+    ],
+    "median_ms": 0.3542500198818743,
+    "mad_ms": 0.016500067431479692,
+    "update_count": 8,
+    "final_loss": 2.195758581161499,
+    "final_params_sha256": "9519ce40709de08a6f67fa2b00997c55a3cf9603ca7f3a4974953b62c8a25aa9",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 2.384185791015625e-07,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 7.152557373046875e-07
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 2.2351741790771484e-08,
+       "update_max_abs": 2.9802322387695312e-08
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 2.2351741790771484e-08,
+       "update_max_abs": 9.313225746154785e-10
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.516591166568105e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 6.810296326875687e-09,
+       "update_max_abs": 4.172325134277344e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.516591166568105e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 4.0978193283081055e-08,
+       "update_max_abs": 6.221234798431396e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 5.21540641784668e-08,
+       "update_max_abs": 8.220564495786675e-07
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 2.60770320892334e-08,
+       "update_max_abs": 2.988353742239269e-07
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 2.60770320892334e-08,
+       "update_max_abs": 3.4714446428552037e-07
+      }
+     ]
+    },
+    "status": "ok",
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 43141,
+     "elapsed_s": 5.348,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "compiled_checkpoint",
+    "checkpoint_policy": "selective",
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": true,
+    "compile_backend": "inductor",
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 6929.753792006522,
+    "process_peak_rss_bytes": 419627008,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.37525000516325235,
+     0.3494580159895122,
+     0.34854200202971697,
+     0.3382499562576413,
+     0.38425001548603177
+    ],
+    "median_ms": 0.3494580159895122,
+    "mad_ms": 0.01120805973187089,
+    "update_count": 8,
+    "final_loss": 2.195758581161499,
+    "final_params_sha256": "9519ce40709de08a6f67fa2b00997c55a3cf9603ca7f3a4974953b62c8a25aa9",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 2.384185791015625e-07,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 7.152557373046875e-07
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 2.2351741790771484e-08,
+       "update_max_abs": 2.9802322387695312e-08
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 2.2351741790771484e-08,
+       "update_max_abs": 9.313225746154785e-10
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.516591166568105e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 6.810296326875687e-09,
+       "update_max_abs": 4.172325134277344e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.516591166568105e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 4.0978193283081055e-08,
+       "update_max_abs": 6.221234798431396e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 5.21540641784668e-08,
+       "update_max_abs": 8.220564495786675e-07
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 2.60770320892334e-08,
+       "update_max_abs": 2.988353742239269e-07
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 2.60770320892334e-08,
+       "update_max_abs": 3.4714446428552037e-07
+      }
+     ]
+    },
+    "status": "ok",
+    "selective_policy_coverage": {
+     "status": "observed",
+     "scope": "compile_trace_policy_calls",
+     "separate_untimed_forward_backward": true,
+     "compile_fullgraph": true,
+     "compile_backend": "inductor",
+     "requested_save_ops": [
+      "aten.sort.stable",
+      "aten.max.dim",
+      "aten.min.dim",
+      "aten.amax.default",
+      "aten.amin.default"
+     ],
+     "observed_save_ops": [
+      "aten.max.dim",
+      "aten.amax.default",
+      "aten.amin.default"
+     ],
+     "unobserved_save_ops": [
+      "aten.sort.stable",
+      "aten.min.dim"
+     ],
+     "target_policy_calls": {
+      "aten.sort.stable": {
+       "forward": 0,
+       "recompute": 0
+      },
+      "aten.max.dim": {
+       "forward": 2,
+       "recompute": 0
+      },
+      "aten.min.dim": {
+       "forward": 0,
+       "recompute": 0
+      },
+      "aten.amax.default": {
+       "forward": 2,
+       "recompute": 0
+      },
+      "aten.amin.default": {
+       "forward": 2,
+       "recompute": 0
+      }
+     },
+     "all_policy_calls": {
+      "forward": 124,
+      "recompute": 0
+     },
+     "visited_op_policy_calls": {
+      "aten.mean.dim": {
+       "forward": 8,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.sub.Tensor": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.abs.default": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.clamp_min.default": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.log2.default": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.round.default": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.clamp_.default": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.neg.default": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.exp2.default": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.mul.Tensor": {
+       "forward": 6,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.add.Tensor": {
+       "forward": 18,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.transpose.int": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.constant_pad_nd.default": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.arange.default": {
+       "forward": 4,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.unsqueeze.default": {
+       "forward": 18,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.arange.start_step": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.index.Tensor": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.max.dim": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "MUST_SAVE"
+      },
+      "aten.clone.default": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten._unsafe_view.default": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.view.default": {
+       "forward": 8,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.amax.default": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "MUST_SAVE"
+      },
+      "aten.eq.Tensor": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.isnan.default": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.bitwise_or.Tensor": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.scalar_tensor.default": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.where.self": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "PREFER_RECOMPUTE"
+      },
+      "aten.amin.default": {
+       "forward": 2,
+       "recompute": 0,
+       "decision": "MUST_SAVE"
+      }
+     },
+     "physical_retention_or_recompute_savings_measured": false
+    },
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 43289,
+     "elapsed_s": 8.913,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "unpacked",
+    "checkpoint_policy": null,
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": true,
+    "compile_backend": "inductor",
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 4392.198749992531,
+    "process_peak_rss_bytes": 402931712,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.2654999843798578,
+     0.2609580405987799,
+     0.2668339875526726,
+     0.2610000083222985,
+     0.2888329909183085
+    ],
+    "median_ms": 0.2654999843798578,
+    "mad_ms": 0.004499976057559252,
+    "update_count": 8,
+    "final_loss": 2.19575834274292,
+    "final_params_sha256": "92e3063aa9a0d2a935fc1881156523b8f98004ca9d419b2c533d8f297df09ad8",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 23808,
+    "auxiliary_route_storage_packed": false,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 0.0,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 5.960464477539062e-07
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 2.9802322387695312e-08
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 3.725290298461914e-08,
+       "update_max_abs": 9.313225746154785e-10
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.1665019289685006e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 6.984919309616089e-09,
+       "update_max_abs": 4.172325134277344e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.1665019289685006e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 3.3527612686157227e-08,
+       "update_max_abs": 5.62518835067749e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 8.195638656616211e-08,
+       "update_max_abs": 7.749412134216982e-07
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 2.715524374252709e-07
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 1.862645149230957e-08,
+       "update_max_abs": 3.2474810041094315e-07
+      }
+     ]
+    },
+    "status": "ok",
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 43519,
+     "elapsed_s": 6.103,
+     "stop_reason": null,
+     "termination": {}
+    }
+   },
+   {
+    "arm": "packed",
+    "checkpoint_policy": null,
+    "init_sha256": "f06146dea0d76505451f0fb0288f819f03c97a7512d2c4d5d803f174989e5c7f",
+    "batch_sha256": "0e21acab5e4e521491b6893b1756afc71c34b6c130edbbabf5466f45c1cd3045",
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "compile_fullgraph": true,
+    "compile_backend": "inductor",
+    "optimizer_execution": "eager",
+    "model_context": {
+     "convolution_layers": [
+      {
+       "kernel_size": 3,
+       "dilation": 1
+      }
+     ],
+     "causal_receptive_field": 3,
+     "scope": "maximum causal input span; measured sequence length is not learned context capability"
+    },
+    "startup_and_first_update_ms": 4603.124541987199,
+    "process_peak_rss_bytes": 419266560,
+    "cuda_peak_allocated_bytes": null,
+    "cuda_peak_reserved_bytes": null,
+    "cpu_tensor_peak_bytes": null,
+    "samples_ms": [
+     0.3759589744731784,
+     0.36862498382106423,
+     0.3655829932540655,
+     0.37470803363248706,
+     0.3997919848188758
+    ],
+    "median_ms": 0.37470803363248706,
+    "mad_ms": 0.006083049811422825,
+    "update_count": 8,
+    "final_loss": 2.19575834274292,
+    "final_params_sha256": "92e3063aa9a0d2a935fc1881156523b8f98004ca9d419b2c533d8f297df09ad8",
+    "measurement_status": "fit",
+    "auxiliary_route_payload_bytes": 1401,
+    "auxiliary_route_storage_packed": true,
+    "auxiliary_accounting_scope": "separate route forward; not autograd/checkpoint retained state",
+    "loss_boundary_bytes": 1248,
+    "parity": {
+     "status": "pass",
+     "updates_checked": 8,
+     "compared_measured_state": true,
+     "atol": 0.0001,
+     "rtol": 0.0001,
+     "loss_max_abs": 0.0,
+     "parameters": [
+      {
+       "parameter": "embed.weight",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 5.960464477539062e-07
+      },
+      {
+       "parameter": "output_head.weight",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 2.9802322387695312e-08
+      },
+      {
+       "parameter": "output_head.bias",
+       "gradient_max_abs": 3.725290298461914e-08,
+       "update_max_abs": 9.313225746154785e-10
+      },
+      {
+       "parameter": "layers.0.norm.beta",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.1665019289685006e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.weight",
+       "gradient_max_abs": 6.984919309616089e-09,
+       "update_max_abs": 4.172325134277344e-07
+      },
+      {
+       "parameter": "layers.0.morph_conv.bias",
+       "gradient_max_abs": 1.0302755981683731e-08,
+       "update_max_abs": 2.1665019289685006e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.weight",
+       "gradient_max_abs": 3.3527612686157227e-08,
+       "update_max_abs": 5.62518835067749e-07
+      },
+      {
+       "parameter": "layers.0.out_proj.bias",
+       "gradient_max_abs": 8.195638656616211e-08,
+       "update_max_abs": 7.749412134216982e-07
+      },
+      {
+       "parameter": "layers.0.post_norm.beta",
+       "gradient_max_abs": 2.9802322387695312e-08,
+       "update_max_abs": 2.715524374252709e-07
+      },
+      {
+       "parameter": "ln_final.beta",
+       "gradient_max_abs": 1.862645149230957e-08,
+       "update_max_abs": 3.2474810041094315e-07
+      }
+     ]
+    },
+    "status": "ok",
+    "worker_outcome": {
+     "returncode": 0,
+     "process_group": 43653,
+     "elapsed_s": 6.35,
+     "stop_reason": null,
+     "termination": {}
+    }
+   }
+  ],
+  "summaries": [
+   {
+    "config": {
+     "device": "cpu",
+     "dtype": "float32",
+     "width": 16,
+     "layers": 1,
+     "vocab": 11,
+     "seed": 0,
+     "lr": 0.001,
+     "optimizer": "adamw",
+     "adamw_eps": 0.0001,
+     "warmup": 2,
+     "reps": 5,
+     "compile_backend": "inductor",
+     "batch": 2,
+     "sequence": 12
+    },
+    "status": "complete",
+    "matched_initialization_data_updates": true,
+    "selected_checkpoint_policy": "layer",
+    "selected_compiled_checkpoint_policy": "selective",
+    "best_baseline_arm": "compiled_checkpoint",
+    "best_baseline_checkpoint_policy": "selective",
+    "packed_speedup_vs_best_baseline": 0.9326141545506867,
+    "missing_arms": []
+   }
+  ],
+  "checks": {
+   "trajectory": {
+    "steps": 5,
+    "max_grad_error": 2.9802322387695312e-08,
+    "max_param_error": 0.0,
+    "status": "pass"
+   },
+   "learning": {
+    "task": "synthetic token successor; regression only",
+    "models": {
+     "route_morphssm": {
+      "before": {
+       "loss": 2.4587273597717285,
+       "accuracy": 0.1510416716337204,
+       "perplexity": 11.689925000564402
+      },
+      "after": {
+       "loss": 0.47695955634117126,
+       "accuracy": 1.0,
+       "perplexity": 1.611168281196257
+      },
+      "updates": 50,
+      "parameters": 747
+     },
+     "dense_token_baseline": {
+      "before": {
+       "loss": 2.332348108291626,
+       "accuracy": 0.0833333358168602,
+       "perplexity": 10.302103609262097
+      },
+      "after": {
+       "loss": 0.08580785989761353,
+       "accuracy": 1.0,
+       "perplexity": 1.0895969529209748
+      },
+      "updates": 50,
+      "parameters": 363
+     }
+    },
+    "status": "pass",
+    "acceptance": "each model: loss < 0.75 * initial loss and accuracy > 0.8",
+    "optimizer": {
+     "name": "AdamW",
+     "lr": 0.01,
+     "eps": 0.0001,
+     "betas": [
+      0.9,
+      0.999
+     ],
+     "weight_decay": 0.01,
+     "execution": "eager",
+     "scope": "learning control; separate from the timed update recipe"
+    },
+    "train_seed_start": 10000,
+    "eval_seed": 90000
+   },
+   "sources_unchanged": true
+  },
+  "measured_fit_cells": {
+   "eager": [
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    }
+   ],
+   "compiled": [
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    }
+   ],
+   "checkpoint": [
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    },
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    },
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    }
+   ],
+   "compiled_checkpoint": [
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    },
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    },
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    }
+   ],
+   "unpacked": [
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    }
+   ],
+   "packed": [
+    {
+     "batch": 2,
+     "sequence": 12,
+     "validation": "pass"
+    }
+   ]
+  },
+  "capacity_scope": "measured fits with separate validation status; unvalidated fits are not wins; no extrapolated maximum",
+  "platform": "macOS-26.6.2-arm64-arm-64bit"
+ }
+}

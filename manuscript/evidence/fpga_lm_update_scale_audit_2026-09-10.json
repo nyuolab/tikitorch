@@ -1,0 +1,159 @@
+{
+  "audit_manifest_sha256": "1a03404b1c1e490ded4b1751eeb4b5f1e669ea7c022d6a48f8c64cdf34320547",
+  "complete": true,
+  "evaluations_recomputed": 14,
+  "gates": {
+    "by_initialization": {
+      "diverse": {
+        "all_screen_criteria": false,
+        "mean_bigram_advantage_nats": 0.0169952762322505,
+        "mean_paired_improvement_nats": 0.002858148088218678,
+        "per_seed": [
+          {
+            "bigram_advantage_nats": 0.01792510002953085,
+            "context": true,
+            "context_growth_nats": 0.029419885575356464,
+            "context_nats": 0.029419885575356464,
+            "k18_nll": 2.6489412017011396,
+            "k20_nll": 2.6674671338507716,
+            "mechanism": true,
+            "paired_improvement_nats": -0.01852593214963205,
+            "seed": 0,
+            "unigram_advantage_nats": 0.6479582447639372
+          },
+          {
+            "bigram_advantage_nats": 0.015543651830914662,
+            "context": true,
+            "context_growth_nats": 0.02342011489495599,
+            "context_nats": 0.02342011489495599,
+            "k18_nll": 2.668318215078167,
+            "k20_nll": 2.669848582049388,
+            "mechanism": true,
+            "paired_improvement_nats": -0.0015303669712207757,
+            "seed": 1,
+            "unigram_advantage_nats": 0.645576796565321
+          },
+          {
+            "bigram_advantage_nats": 0.01751707683630599,
+            "context": true,
+            "context_growth_nats": 0.02574029911391218,
+            "context_nats": 0.02574029911391218,
+            "k18_nll": 2.6965059004295053,
+            "k20_nll": 2.6678751570439965,
+            "mechanism": true,
+            "paired_improvement_nats": 0.02863074338550886,
+            "seed": 2,
+            "unigram_advantage_nats": 0.6475502215707123
+          }
+        ]
+      },
+      "historical": {
+        "all_screen_criteria": false,
+        "mean_bigram_advantage_nats": 0.007906233575207663,
+        "mean_paired_improvement_nats": -0.045470238929866756,
+        "per_seed": [
+          {
+            "bigram_advantage_nats": 0.007999154751808568,
+            "context": false,
+            "context_growth_nats": 0.005129526921464844,
+            "context_nats": 0.005129526921464844,
+            "k18_nll": 2.6120771809618692,
+            "k20_nll": 2.677393079128494,
+            "mechanism": true,
+            "paired_improvement_nats": -0.06531589816662464,
+            "seed": 0,
+            "unigram_advantage_nats": 0.6380322994862149
+          },
+          {
+            "bigram_advantage_nats": 0.007882897956868806,
+            "context": false,
+            "context_growth_nats": 0.006584229746550374,
+            "context_nats": 0.006584229746550374,
+            "k18_nll": 2.658839287852471,
+            "k20_nll": 2.6775093359234337,
+            "mechanism": true,
+            "paired_improvement_nats": -0.01867004807096251,
+            "seed": 1,
+            "unigram_advantage_nats": 0.6379160426912751
+          },
+          {
+            "bigram_advantage_nats": 0.007836648016945613,
+            "context": false,
+            "context_growth_nats": 0.005971627578264638,
+            "context_nats": 0.005971627578264638,
+            "k18_nll": 2.6251308153113437,
+            "k20_nll": 2.677555585863357,
+            "mechanism": true,
+            "paired_improvement_nats": -0.05242477055201311,
+            "seed": 2,
+            "unigram_advantage_nats": 0.6378697927513519
+          }
+        ]
+      }
+    },
+    "confirmation_required_before_recipe_promotion": true,
+    "historical_is_fallback_candidate": false,
+    "paid_execution_authorized": false,
+    "primary_screen_pass": false,
+    "recipe_promoted": false
+  },
+  "native_execution": false,
+  "new_training_updates": 0,
+  "parity_anchors_recomputed": 12,
+  "public_record_sha256": "0213e78e1c6574a1534e04818c9818618524f72b30aa4f1f65ce60a6550722a9",
+  "reserved_or_final_test_evaluated": false,
+  "row_sha256": {
+    "diverse_seed_0_k18": "6c901ff6d333621d324c1029f4b8969186ffc296f6f5e6cd9fd427f4a5cf846d",
+    "diverse_seed_0_k20": "83f906a293e463f0126dd076787b6e7b9f15c6aefd8b446c3d1d3d65f3ae0abd",
+    "diverse_seed_1_k18": "178858e2b8ab571acaadafb826989d066dbf212f857f1295dbc249067e4d105a",
+    "diverse_seed_1_k20": "4f0593eaf2a96521918a15f6c919ee0036f769fa7a120978c7f41e63340aae5f",
+    "diverse_seed_2_k18": "8dd21ba00d9a75b8cddb554206c77ca28e520a4581b6b396ddd582c37e2881b4",
+    "diverse_seed_2_k20": "56effa01ef199d7146920d528a6ad3eb057f310a7fd54ce26dc81e35f85fc3f4",
+    "historical_seed_0_k18": "fff6f7cd4b2acf255449be00641eaf42bf457b1121a8bb82b3511616bac1e8bc",
+    "historical_seed_0_k20": "0e92b571aeea5f0f307d3c2c4b61be3344b8dd6e09920c62f0806f4009cb5f88",
+    "historical_seed_1_k18": "f9cdb942c8777c40dd9b06161054b7287b1d8b1378335b03aa39cce42a6a3efd",
+    "historical_seed_1_k20": "ac3f27ae4aace8760620bcea5c4d8b09b402ad7b24ef36a5aa49a2c548687ea0",
+    "historical_seed_2_k18": "ce0d6faddb11c39867fed738474dfc5011fd55695aea33d583176d51e9c8566f",
+    "historical_seed_2_k20": "d04c824e7d1747cc3b658021f76decd75fbad1258a3d5a7351fe7cc0f3ecc356",
+    "initial_diverse": "b7b6adea13250f81fd25d676499f1957f6ff71b38c36445abb24df5e6ce4077b",
+    "initial_historical": "c980293aa65f077fe1a5c2c6d8b81e2110bcf141cb3fc3106c89ca5fd2f324a3"
+  },
+  "run_directory": "/Users/ekoermann/Documents/tikitorch/manuscript/build/fpga_lm_update_scale_2026-09-10/v1",
+  "schema": "tikitorch.fpga_lm_update_scale.incremental_audit.v1",
+  "source_hashes": {
+    "manuscript/tools/audit_fpga_lm_budget.py": "cd2e1b0b4cee123d60863a12294eaf8e2123d6bb04456391143941415ac0b36e",
+    "manuscript/tools/audit_fpga_lm_head_screen.py": "5c773b9ff0213fd7263290bd80d52369cf142416733e0631ed4cb17ee2fd9d0b",
+    "manuscript/tools/audit_fpga_lm_update_scale.py": "427fdcc13685351bdb382c5eb53e0a031d3193a72efe9a3d1bcf9853c0171fe7",
+    "manuscript/tools/check_fpga_lm_bigram_capacity.py": "662c4bae7416b014ff6e21a917d93e6d585a1957159a088d3af5c06fa2be69fe",
+    "manuscript/tools/confirm_fpga_lm_efsgd.py": "b4d4a4b56a2e410b09e3dd7dda52ecf513bccddc38249118e172b4bf44135472",
+    "manuscript/tools/diagnose_fpga_lm_calibration.py": "747608d6342982609f12f46643319fd221dcf66c8e5cc4cdc448142338526d97",
+    "manuscript/tools/diagnose_fpga_lm_learning_contract.py": "14fba01e81b935205e4522335a8779adcdc042ed0674d1abb5d57db655ebadf9",
+    "manuscript/tools/extend_fpga_lm_budget.py": "e0d1bcc969adb565147a9e109db3896522551907bbf1a1d6295615d438cd5fe6",
+    "manuscript/tools/fpga_lm_diverse_projection.py": "e23b8503cd7b0ecf7c13e16ee1b5c11d4ec90eb200278b0320eee8c787d4cfa2",
+    "manuscript/tools/fpga_lm_efsgd.py": "83c5b56c4192e54cf907ac1d158646ede1d1af4cb86bf77a8b4257a1397b3b30",
+    "manuscript/tools/fpga_lm_efsgd_v1.cpp": "e2b6c1d63ca33508766d620f36182e755a0a7d15a3612ad30e3b5ac790c30f45",
+    "manuscript/tools/fpga_lm_float_reference.py": "299dc145f175ab2883f4f313c232c979bc3d8e23f6ee3a18fc6a5ba359f339d1",
+    "manuscript/tools/fpga_lm_numeric_diagnostic.py": "78dd3afcc3ab3faa5c16f2abb18d6347ad405b6b11752cfda76f8b8ffc8ba48b",
+    "manuscript/tools/observe_fpga_lm_routes.py": "fcd849f98511afdbd34db09d0244b4aa7fbc676fe89629da290ae591027f62a1",
+    "manuscript/tools/screen_fpga_lm_heads.py": "b2f26f36caf2a4867db2ced30b582f4e286c3f3ccdeb13fdebbec04ba625dcf2",
+    "manuscript/tools/test_fpga_lm_update_scale.py": "5d5bd0bf540e6cd147a79218b50537fafb3ddf596d9ef05836daf8eafed9cdef",
+    "manuscript/tools/train_fpga_lm_diverse_projection.py": "fb65efc5aabb45168f6f96d5e664dd5337b6806e00539e66d9a6e34c75298625",
+    "manuscript/tools/train_fpga_lm_efsgd.py": "b7b2ba21177df8960fc76c342517f3a161d6841cffb2ff11a8769b9f1401997e",
+    "scripts/fpga_lm_layout.cpp": "61e52a3c92c5eb8d07a5746bc9bdf010826e6b228fd773969ee843f01255147c",
+    "scripts/fpga_lm_pretrain.py": "2d3303e288a3464ddb15327f5982f7f89630dc336fdd0715f160e2cbfeb33796",
+    "tests/test_fixed_point_ef.py": "84099311bf12e87aa6c5a4cf74078b2f6ea9aacad26aeb91fc5b99a9d7fe1d9d",
+    "tests/test_fpga_lm_float_reference.py": "d749f0278e8a8ade48b3bf61c90ff0d7831b090c7b66ce6afb28f6fd35532dae",
+    "tests/test_fpga_lm_learning_contract.py": "49acdf1e157d2beb022ef552f99ce8053f2a4c8e1a864f9a518ee50d0271050e",
+    "tests/test_fpga_lm_numeric_diagnostic.py": "9c38b947a3f2083912588da38dec7aacacc0591d4085d6c6cf6b41f6726de57b",
+    "tests/test_fpga_lm_update_scale.py": "fdde0bcd0f9dde5b7174198c6917740e40b8c335cf59ab03db41ba34d12fb7e8",
+    "tests/test_fpga_lm_update_scale_audit.py": "4d75dcd42ba294aca8f7768b8935367d53df5960d929948258853b714f8c02fd",
+    "tikitorch/fpga/bridge.cpp": "3ccf3028b2e7405a4cb7931dbedfb5d87186b7f45ed9e177af5f5e8702ec941d",
+    "tikitorch/fpga/silicon/gen_buffer_init.py": "4f3792e17bbf341be407d0351e267bb1dc8a4b75779abc160c2ed55745ad0081",
+    "tikitorch/hardware/hls/forge_hls_types.hpp": "7909a9a331c6c7fc73d32a6500458ae972eb87e1bb4ed620bb9302b4d4600fcc",
+    "tikitorch/hardware/hls/forge_kernels/forge_buffer_morph_lm.hpp": "11d8bbddd74c4ac638a77d326e60e31d2a80775e7dc020a3077f5f00a8d2cd11",
+    "tikitorch/hardware/hls/forge_kernels/forge_ce_lut.hpp": "dcbbce6a797295bdd319fabc5df68d50a5e5f0e8dbcc6a9c3488c8661db8b200",
+    "tikitorch/hardware/hls/forge_kernels/forge_train_step_morph_lm.cpp": "cbef7f82803baf662f91755dcf1205c82cd7049f6cbde2e84accffcd520e547d",
+    "tikitorch/optim/fixed_point.py": "0249e9f3b114c3f12b07e6deff42f60edaa733c457159a49dc0f1dd661cde842"
+  },
+  "validation_windows_recomputed": 896
+}

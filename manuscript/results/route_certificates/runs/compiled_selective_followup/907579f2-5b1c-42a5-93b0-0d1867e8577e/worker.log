@@ -1,0 +1,6 @@
+W0909 10:47:14.800000 47941 site-packages/torch/_logging/_internal.py:1204] [0/0] 
+W0909 10:47:14.800000 47941 site-packages/torch/_logging/_internal.py:1204] [0/0] Detected that context_fn is passed to torch.utils.checkpoint under torch.compile.
+W0909 10:47:14.800000 47941 site-packages/torch/_logging/_internal.py:1204] [0/0] Please make sure the checkpointed region does not contain in-place ops (e.g. torch.relu_).
+W0909 10:47:14.800000 47941 site-packages/torch/_logging/_internal.py:1204] [0/0] 
+/Users/ekoermann/anaconda3/lib/python3.11/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

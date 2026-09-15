@@ -1,0 +1,390 @@
+{
+  "schema": "tikitorch.route-certificates.run.v1",
+  "experiment": "device_route_training",
+  "run_id": "172834f0-c1cf-42c1-ab87-ec0cdf6f0da9",
+  "timestamp_utc": "2026-09-09T14:43:33Z",
+  "command": "/Users/ekoermann/Documents/tikitorch/scripts/route_certificates/training_benchmark.py --device cpu --adamw-eps 1e-4 --warmup 2 --reps 5 --timeout 60 --learning-steps 50",
+  "config": {
+    "cells": [
+      {
+        "device": "cpu",
+        "dtype": "float32",
+        "width": 16,
+        "layers": 1,
+        "vocab": 11,
+        "seed": 0,
+        "lr": 0.001,
+        "optimizer": "adamw",
+        "adamw_eps": 0.0001,
+        "warmup": 2,
+        "reps": 5,
+        "compile_backend": "inductor",
+        "batch": 2,
+        "sequence": 12
+      }
+    ],
+    "learning_steps": 50,
+    "protocol": "device-route-training-v2"
+  },
+  "tikitorch_commit": "ea951fdbb09c0b86a9fb4044ca71dc1b2beb2d35",
+  "tikitorch_dirty_patch_sha256": "71e6100e31231dfef9b972016113f6053d1b337c948f78496a141dd4b870e8c3",
+  "host": "Erics-MacBook-Pro.local",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.11.5",
+  "torch": "2.10.0",
+  "numpy": "1.26.4",
+  "device": "cpu",
+  "modules": [
+    {
+      "module": "tikitorch",
+      "file": "/Users/ekoermann/Documents/tikitorch/tikitorch/__init__.py",
+      "repo": "tikitorch",
+      "commit": "ea951fdbb09c0b86a9fb4044ca71dc1b2beb2d35"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/scripts/route_certificates/training_benchmark.py",
+      "bytes": 31512,
+      "sha256": "072d93a12305ec5f4d9fb7fca8ec23fce9a6f469d1ab27dfd8d61c71f91ff223"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/scripts/route_certificates/actual_model_benchmark.py",
+      "bytes": 32587,
+      "sha256": "6aa77fa11022988231925e5c1bf440ac01d92dbef5f7a5e5af095244c95f365a"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/scripts/route_certificates/provenance.py",
+      "bytes": 5383,
+      "sha256": "31c4f02553e2326f22fe1c71f34939b292431f5b5bace24c8245bf790318a191"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/__init__.py",
+      "bytes": 5471,
+      "sha256": "3e8d575426575fcfb8dff3154c9a3428c9854106fc829c388817b10421d4adb5"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/__main__.py",
+      "bytes": 3784,
+      "sha256": "4404a0e7d55e9cc3c460cd8c228494ae24c5b5f88cdd47f60dcc2ce4cd722f31"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/_hardware.py",
+      "bytes": 2660,
+      "sha256": "b25ed65596dc09e0e625b85ec1ced036ea22b1c8d9ef1400fb2d4ef839f71e59"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/algorithmic.py",
+      "bytes": 42703,
+      "sha256": "b18220ab40f33d5ba8c8b8f4c7b25a10060195e6c528e1c49aa8bf922f2e7379"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/audit.py",
+      "bytes": 72187,
+      "sha256": "2c0614de0d9dc579d658184154f0c9a0c7b79a5b75d899d0dc6ce9d958c7ea0e"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/__init__.py",
+      "bytes": 2461,
+      "sha256": "c131fe7aaee9b52241f558d0b97659bc9238c1eaf73f1315c73ac8d11ab28d32"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/device_tape.py",
+      "bytes": 9686,
+      "sha256": "d068a5db53d2c8d0c5796a2d5d3b2eab488e2cc2009d58deb74665179616eb48"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/morphssm_tape.py",
+      "bytes": 18609,
+      "sha256": "60d9b0b2d7fad18a75f7b6e9742a1d334220811d9e4bdaef83f30f7dfa6f8c55"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/packed_tape.py",
+      "bytes": 21808,
+      "sha256": "fcd0f0876a972ebf9c6cc5b9f8310595e077bb83a1b1d2627de121dd227f2aab"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/autodiff/primitives.py",
+      "bytes": 20033,
+      "sha256": "f9ca7354e21cd1afb356ff73cdbb135b697446649161d516d8c8a32540a0a362"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/backend/__init__.py",
+      "bytes": 6197,
+      "sha256": "254d9a71d5e6d755d55f3d36930b1c670a726bb4fbe06c8f84e85ad613e4f517"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/backend/device.py",
+      "bytes": 5403,
+      "sha256": "3379c1074ed6a3c16aaa8d812bdd948c93f60fd507aad7bb5aec5082d8331431"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/backend/registry.py",
+      "bytes": 18238,
+      "sha256": "e9bb85be462a646d0da64fd6ab138d6777d363bee87785556a2f831812d6302a"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/classical.py",
+      "bytes": 8343,
+      "sha256": "e457ba0f5c7cfa9c0ecb01ebb08059e3d352604581e68975ec67c7e47a5ff6fc"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/cli.py",
+      "bytes": 3469,
+      "sha256": "694f401e5f05e67a310282e37ea778b4615832349ed510507e27904b8a8c4d4f"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/__init__.py",
+      "bytes": 1636,
+      "sha256": "b6676297fd0aa79ae5177c3abc1a755c24cb143e1abe4da09c3c57932dd5d7c8"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/cost.py",
+      "bytes": 4038,
+      "sha256": "80883bff0b12d9c804d9a4e54c97dd12a7f6fd79bd25f27077b05047bfe3590b"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/link.py",
+      "bytes": 5967,
+      "sha256": "b78bbc51859196aaff58b95988c7af7bd26bd74982cd488134bce290c2254c57"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/runner.py",
+      "bytes": 14879,
+      "sha256": "4458fb5e70a5b529dead9f9d3955a01b882fbd172e069d08dd624e8533aea8c7"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/stages.py",
+      "bytes": 2919,
+      "sha256": "65c173b3981ed5274a3813840273740bf5803735e043891dcd79aced427e0603"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/tcp_link.py",
+      "bytes": 23892,
+      "sha256": "bdea51d1b33332c7101eb8487fd155e4a1cb96f7b18981e3dda005c4621eb426"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/thread_link.py",
+      "bytes": 9379,
+      "sha256": "6e0c54a88e7769cb4828cfb69836f056f92f0144538a31d4adab8b789826a2ae"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fabric/transformer_stage.py",
+      "bytes": 8233,
+      "sha256": "37025aa48687f75135a72b451d0803316676ff29418ec89c5563cf30eb6e888f"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/forward_forward.py",
+      "bytes": 32312,
+      "sha256": "318c1e39149932f903af1b6a472bdded071bdaf70ee1321d5e481c6211896153"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/__init__.py",
+      "bytes": 5007,
+      "sha256": "c7e8957142c2e42c9f7509a7fc4b5620f8a994a1b2be2b0c08997314fe9f2ddf"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/_native.py",
+      "bytes": 6733,
+      "sha256": "89fe8ba5523bdb238fcc2e43a84d550aaafb3c58aca78021cd9fda4c07d6da8c"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/_session.py",
+      "bytes": 4799,
+      "sha256": "62aa2af6857c59a95c65221c3805caafb52c1c7c0d625d5797857ee9b6176222"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/accelerate.py",
+      "bytes": 9467,
+      "sha256": "b0b2d5fe8d029a1b1bed5252a6866121f91591207adbb2dd75babe2963088394"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/backend.py",
+      "bytes": 4156,
+      "sha256": "cf3c3323506e51c674099251189ecc46be967e6ebfc560174fbbc43e909d3087"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/dyadic_export.py",
+      "bytes": 3109,
+      "sha256": "1f6704f78197e6c6952de3a7581dd993805de5c47a9e2dd4878892ed630cb391"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/kernels.py",
+      "bytes": 27569,
+      "sha256": "4364eee03d7c2f0ecd5d616e8d6c13634d631ce05fa27ab6cda9ba59b3e799a5"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/runners.py",
+      "bytes": 1675,
+      "sha256": "6bb2973552d67c41b0eaf07f5d0e629155e3e88e9c425ef513393527060c523f"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/silicon/gen_buffer_init.py",
+      "bytes": 11723,
+      "sha256": "4f3792e17bbf341be407d0351e267bb1dc8a4b75779abc160c2ed55745ad0081"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/silicon/morph_lm_a2_power.py",
+      "bytes": 11268,
+      "sha256": "b2dbbb206507845661177ab22b3f72845ad2c84fcc9e997d91f1b14baf3fef12"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/silicon/morph_lm_silicon.py",
+      "bytes": 10797,
+      "sha256": "5f5d7ec67f080f28d2a6084dab0cbd5105d8b112230d3f770af0eb206e139f7b"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/fpga/silicon/morph_lm_silicon_n4.py",
+      "bytes": 6218,
+      "sha256": "d5d9c331dcf5986ea790f1818e488debee54c74cbdec888880b33f922c1a6e2d"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/functional.py",
+      "bytes": 60209,
+      "sha256": "7df53f2891359e7c9dcebd859d83e968cbb72faa0049e3adbd4afeac103b2149"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/geometry.py",
+      "bytes": 4727,
+      "sha256": "359bbf971d2244e08934b20ca1c9757ee3a5c372b2b8e05e927a023811db317f"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/hardware/__init__.py",
+      "bytes": 1967,
+      "sha256": "6869621cca3f10d33150a8685e113582beff6a2e9edb6a5bfca1f867c2d6234c"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/models/__init__.py",
+      "bytes": 75561,
+      "sha256": "6a785fb3a61a8d4942ae397be2697c795cc96164790f92fa3a23b5f8a142b532"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/nn/__init__.py",
+      "bytes": 118035,
+      "sha256": "f340e5fdc8eb7a45e0718e7840b1e936bbd020229d393fd58f68790c1d3e6709"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/nn/predictive_coding.py",
+      "bytes": 53442,
+      "sha256": "12a13bf8d77e8bfddf95b4cf396d07c21a8ba9237fa7961960dcceb261c54efe"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/optim/__init__.py",
+      "bytes": 48645,
+      "sha256": "50648f99c90fdc8a2aea9ba5b03e916f925a39211d80f83a0b9df801b2c552bb"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/__init__.py",
+      "bytes": 2034,
+      "sha256": "f2b2efe15eeeec6dfed23f9cfa3c842396b78c4447ff6272cd811a009b68c9a5"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/bellman.py",
+      "bytes": 5442,
+      "sha256": "aea2869656474e6ca80f29d845b950300b621e0c263b7189c02498bf6ccb320a"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/dp.py",
+      "bytes": 10800,
+      "sha256": "f1ca1a1c51191091e4e4bb692c9f630abdd375dc0744c6aad6fa8b134d637cb7"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/functional.py",
+      "bytes": 9379,
+      "sha256": "931069a6d4de7738dd2a63489e1bc32d437fef212d3bdb024e08b23ac2714a5f"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/mcts.py",
+      "bytes": 12660,
+      "sha256": "937c7f91d6afe8b708062c03a00962f104fbe0f762afcd71c900bd5c15169a90"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/__init__.py",
+      "bytes": 2179,
+      "sha256": "bb2aad7eaeb9adc99f61f2f92315046999c209b007aeb19a50d20d70b27be733"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/agent.py",
+      "bytes": 9219,
+      "sha256": "283fb42842d1673fbbe45356de09d793c8b24f3c58b734522dc976dfba7cfb8b"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/board_agent.py",
+      "bytes": 19075,
+      "sha256": "5724bf02edf6603164b026c5d482a60ad15cf3b6214a5470506885126081252d"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/chess_game.py",
+      "bytes": 5877,
+      "sha256": "c8c605cdb267e5a071d2c71d89867e34e9587ae402b1d9e4cdd9c8e38861fd6e"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/env.py",
+      "bytes": 7311,
+      "sha256": "4a9414bf2726dbc2b1b0b1239a3158a9832387b6b67730ae44a00a27f791e582"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/games.py",
+      "bytes": 12183,
+      "sha256": "1e9a714c997269b82f05cda57df20cd1de563fb035b4f178aeccbe087a027337"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/networks.py",
+      "bytes": 10937,
+      "sha256": "a6e64fcab225f6b19a4e7b3e57699c2adf312857a2d2035892dfc2ca2148a007"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/networks_dense.py",
+      "bytes": 4717,
+      "sha256": "14fd3f65bb3962543a9206426744ce1727ae46e1486b0390cedb3b24cf72eff1"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/replay.py",
+      "bytes": 3616,
+      "sha256": "1db07230300c618e262569ecb202bc943bee4ad914553ef47dcd46ea08d5150a"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/planning/muzero/selfplay.py",
+      "bytes": 6120,
+      "sha256": "899761b54899f2879532a4d23ea57ec549bfa7fe453e1e995909f3e6cad5da99"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/profile.py",
+      "bytes": 8098,
+      "sha256": "e6496ce1ab3374f6b2fff45f234d61b345a4cdda6da8ced2cf4602ebf135309d"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/prune.py",
+      "bytes": 3418,
+      "sha256": "578e282910dbcb8577db21ae3aa979e79facabd30fc8b784122cbf08921d96f9"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/research/__init__.py",
+      "bytes": 912,
+      "sha256": "93e35b21cb866e5055f95ebfa17f4843219265ee7a7b3b0b7bfa58b6f8bc9afd"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/research/nanogpt.py",
+      "bytes": 36141,
+      "sha256": "568203580df5e7b1f2aa7a77e52602dc593e08ec06200788575b9ded1342acb1"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/research/pc_convrnn.py",
+      "bytes": 59007,
+      "sha256": "1256adc963d245bc4be7b857781573e85d6971d010a575bc8fff2a0b87b8bb4c"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/serialization.py",
+      "bytes": 14903,
+      "sha256": "3b33b7e3de7514555c8cbf02abec09619786bbc25bc08d68ec739df24204dff1"
+    },
+    {
+      "path": "/Users/ekoermann/Documents/tikitorch/tikitorch/train.py",
+      "bytes": 15482,
+      "sha256": "4ed0c2fee3389efd388326aac3a0e34d9ec1586df4dd79658396227475dfcb7b"
+    }
+  ],
+  "incident_status": "running",
+  "_out_dir": "/Users/ekoermann/Documents/tikitorch/manuscript/results/route_certificates/runs/device_route_training/172834f0-c1cf-42c1-ab87-ec0cdf6f0da9",
+  "_t0": 378599.313507833
+}

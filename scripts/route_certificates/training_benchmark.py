@@ -1,9 +1,11 @@
 """Matched route-training resource/learning benchmark (new, nonhistorical protocol).
 
 One fresh worker per arm and batch/context cell. Compilation is fullgraph and
-errors are recorded, never silently replaced by eager execution. The checkpoint
-baseline includes per-layer, grouped and selective policies when available;
-selection is the fastest successful policy within the declared GPU memory budget.
+errors are recorded, never silently replaced by eager execution. Eager and
+compiled checkpoint baselines each include per-layer, grouped and selective
+policies when available. Selection is the fastest validated policy within the
+declared GPU memory budget. Selective-policy coverage is observed separately
+from timing and peak memory; compile-trace counts are not physical savings.
 CPU process RSS includes interpreter/compiler state and is not tensor peak memory.
 The synthetic successor task is a learning regression, not evidence of competitive
 language modeling. Real-task publication measurements remain a separate gate.
@@ -12,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
-from functools import lru_cache
+from functools import lru_cache, partial
 import gc
 import hashlib
 import json
@@ -29,7 +31,10 @@ import torch.nn.functional as F
 from tikitorch.autodiff import morphssm_forward_tape, morphssm_vjp, route_logits
 from tikitorch.models import MorphSSM
 
-ARMS = ("eager", "compiled", "checkpoint", "unpacked", "packed")
+ARMS = ("eager", "compiled", "checkpoint", "compiled_checkpoint", "unpacked", "packed")
+CHECKPOINT_ARMS = ("checkpoint", "compiled_checkpoint")
+COMPILED_ARMS = ("compiled", "compiled_checkpoint", "unpacked", "packed")
+BASELINE_ARMS = ("eager", "compiled", *CHECKPOINT_ARMS)
 POLICIES = ("layer", "grouped", "selective")
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -51,6 +56,16 @@ def make_model(config):
                      dropout=0.0)
     model.set_tau(0)
     return model.to(device=config["device"], dtype=getattr(torch, config["dtype"])).eval()
+
+
+def model_context_metadata(model):
+    """Read the causal convolution span, which is not the timed sequence length."""
+    layers = [dict(kernel_size=layer.morph_conv.kernel_size,
+                   dilation=layer.morph_conv.dilation) for layer in model.layers]
+    return dict(convolution_layers=layers,
+                causal_receptive_field=1 + sum((layer["kernel_size"] - 1) * layer["dilation"]
+                                               for layer in layers),
+                scope="maximum causal input span; measured sequence length is not learned context capability")
 
 
 def make_batch(config, seed):
@@ -81,14 +96,22 @@ def synchronize(device):
         torch.cuda.synchronize(device)
 
 
-def checkpoint_forward(model, ids, policy):
+def selective_checkpoint_ops():
+    """Requested save targets; observing these requests is a separate check."""
+    return (torch.ops.aten.sort.stable, torch.ops.aten.max.dim, torch.ops.aten.min.dim,
+            torch.ops.aten.amax.default, torch.ops.aten.amin.default)
+
+
+def checkpoint_forward(model, ids, policy, *, policy_callback=None):
     from torch.utils.checkpoint import checkpoint
+    if policy not in POLICIES:
+        raise ValueError(f"unknown checkpoint policy: {policy}")
     context = {}
     if policy == "selective":
         from torch.utils.checkpoint import create_selective_checkpoint_contexts
         # Save expensive routed reductions/sorts; recompute cheap pointwise work.
-        save = [torch.ops.aten.sort.stable, torch.ops.aten.max.dim, torch.ops.aten.min.dim]
-        context["context_fn"] = lambda: create_selective_checkpoint_contexts(save)
+        save = list(selective_checkpoint_ops()) if policy_callback is None else policy_callback
+        context["context_fn"] = partial(create_selective_checkpoint_contexts, save)
     hidden = model.dropout(model.embed(ids))
     group = 2 if policy == "grouped" else 1
     for start in range(0, len(model.layers), group):
@@ -101,6 +124,54 @@ def checkpoint_forward(model, ids, policy):
     return model.output_head(model.ln_final(hidden))
 
 
+def selective_policy_coverage(config, arm):
+    """Observe SAC decisions in a separate, untimed forward/backward.
+
+    Compiled callbacks execute while tracing the graph, not once per device
+    execution. Their counts establish that the requested ops reached the policy;
+    they do not establish physical retention, kernel count, or saved compute.
+    Eager recompute callbacks may be cache lookups, not recomputed operations.
+    """
+    from torch.utils.checkpoint import CheckpointPolicy
+    if arm not in CHECKPOINT_ARMS:
+        raise ValueError("selective coverage requires a checkpoint arm")
+    save = selective_checkpoint_ops()
+    counts = {str(op): dict(forward=0, recompute=0) for op in save}
+    all_calls = dict(forward=0, recompute=0)
+    visited = {}
+
+    def policy(ctx, op, *args, **kwargs):
+        phase = "recompute" if ctx.is_recompute else "forward"
+        all_calls[phase] += 1
+        observed = visited.setdefault(str(op), dict(forward=0, recompute=0,
+                                      decision="MUST_SAVE" if op in save else "PREFER_RECOMPUTE"))
+        observed[phase] += 1
+        if op in save:
+            counts[str(op)][phase] += 1
+            return CheckpointPolicy.MUST_SAVE
+        return CheckpointPolicy.PREFER_RECOMPUTE
+
+    model = make_model(config)
+    ids, targets = make_batch(config, config["seed"] + 100)
+    forward = lambda x: checkpoint_forward(model, x, "selective", policy_callback=policy)
+    compiled = arm == "compiled_checkpoint"
+    if compiled:
+        forward = torch.compile(forward, fullgraph=True, backend=config["compile_backend"])
+    logits = forward(ids)
+    F.cross_entropy(logits.reshape(-1, logits.shape[-1]).float(), targets.reshape(-1)).backward()
+    synchronize(config["device"])
+    seen = [op for op, phases in counts.items() if phases["forward"]]
+    return dict(status="observed" if seen else "unobserved",
+                scope="compile_trace_policy_calls" if compiled else "eager_runtime_policy_calls",
+                separate_untimed_forward_backward=True,
+                compile_fullgraph=compiled,
+                compile_backend=config["compile_backend"] if compiled else None,
+                requested_save_ops=list(counts), observed_save_ops=seen,
+                unobserved_save_ops=[op for op in counts if op not in seen],
+                target_policy_calls=counts, all_policy_calls=all_calls, visited_op_policy_calls=visited,
+                physical_retention_or_recompute_savings_measured=False)
+
+
 def route_gradient_function(model, ids, targets, packed):
     logits, tape = morphssm_forward_tape(model, ids, packed=packed)
     # Different algebraic CE derivative expressions can differ by a few ULPs;
@@ -111,11 +182,22 @@ def route_gradient_function(model, ids, targets, packed):
     return loss, morphssm_vjp(tape, model, error)
 
 
+def adamw_epsilon(config):
+    """Explicit shared optimizer protocol, never a parity-tolerance override."""
+    eps = config.get("adamw_eps", 1e-8)
+    if not math.isfinite(eps) or eps <= 0:
+        raise ValueError("AdamW epsilon must be finite and positive")
+    return eps
+
+
 def build_step(model, ids, targets, config, arm, policy="layer"):
+    if arm not in ARMS:
+        raise ValueError(f"unknown benchmark arm: {arm}")
     if config.get("optimizer", "adamw") == "sgd":
         optimizer = torch.optim.SGD(model.parameters(), lr=config["lr"], momentum=0.9, weight_decay=0.01)
     else:
-        optimizer = torch.optim.AdamW(model.parameters(), lr=config["lr"], weight_decay=0.01)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=config["lr"], weight_decay=0.01,
+                                      eps=adamw_epsilon(config))
     forward = model
     routed = None
     if arm == "compiled":
@@ -124,8 +206,10 @@ def build_step(model, ids, targets, config, arm, policy="layer"):
         def gradient_fn(x, y):
             return route_gradient_function(model, x, y, arm == "packed")
         routed = torch.compile(gradient_fn, fullgraph=True, backend=config["compile_backend"])
-    elif arm == "checkpoint":
+    elif arm in CHECKPOINT_ARMS:
         forward = lambda x: checkpoint_forward(model, x, policy)
+        if arm == "compiled_checkpoint":
+            forward = torch.compile(forward, fullgraph=True, backend=config["compile_backend"])
 
     def step():
         optimizer.zero_grad(set_to_none=True)
@@ -189,10 +273,11 @@ def measure_cell(config, arm, policy="layer"):
         raise RuntimeError("CUDA requested but unavailable; no CPU fallback")
     model = make_model(config)
     ids, targets = make_batch(config, config["seed"] + 100)
-    result = dict(arm=arm, checkpoint_policy=policy if arm == "checkpoint" else None,
+    result = dict(arm=arm, checkpoint_policy=policy if arm in CHECKPOINT_ARMS else None,
                   init_sha256=digest(model.parameters()), batch_sha256=digest((ids, targets)),
-                  config=config, compile_fullgraph=arm in ("compiled", "packed", "unpacked"),
-                  compile_backend=config["compile_backend"])
+                  config=config, compile_fullgraph=arm in COMPILED_ARMS,
+                  compile_backend=config["compile_backend"] if arm in COMPILED_ARMS else None,
+                  optimizer_execution="eager", model_context=model_context_metadata(model))
     step = build_step(model, ids, targets, config, arm, policy)
     synchronize(config["device"])
     begin = time.perf_counter()
@@ -253,6 +338,14 @@ def measure_cell(config, arm, policy="layer"):
         # to fit. Keep measured fit, but prohibit any unvalidated comparison.
         result["parity"] = dict(status="unavailable", error=f"{type(exc).__name__}: {exc}")
     result["status"] = "ok" if result["parity"]["status"] == "pass" else "parity_failed"
+    if arm in CHECKPOINT_ARMS and policy == "selective":
+        try:
+            result["selective_policy_coverage"] = selective_policy_coverage(config, arm)
+        except Exception as exc:
+            result["selective_policy_coverage"] = dict(
+                status="unavailable", error=f"{type(exc).__name__}: {exc}")
+        if result["status"] == "ok" and result["selective_policy_coverage"]["status"] != "observed":
+            result["status"] = "coverage_unavailable"
     return result
 
 
@@ -301,7 +394,7 @@ def learning_check(config, steps=50):
     eval_ids, eval_targets = make_batch({**config, "batch": 32, "split": "eval"}, config["seed"] + 90000)
     results = {}
     for name, model in (("route_morphssm", tropical), (baseline, dense)):
-        opt = torch.optim.AdamW(model.parameters(), lr=0.01)
+        opt = torch.optim.AdamW(model.parameters(), lr=0.01, eps=adamw_epsilon(config))
         def evaluate():
             with torch.no_grad():
                 logits = model(eval_ids)
@@ -326,13 +419,18 @@ def learning_check(config, steps=50):
     return dict(task="synthetic token successor; regression only" if synthetic else "held-out character prediction",
                 models=results, status=("pass" if passes else "fail") if synthetic else "observed",
                 acceptance="each model: loss < 0.75 * initial loss and accuracy > 0.8" if synthetic else "no universal corpus quality threshold; metrics only",
-                optimizer=dict(name="AdamW", lr=0.01),
+                optimizer=dict(name="AdamW", lr=0.01, eps=adamw_epsilon(config),
+                               betas=[0.9, 0.999], weight_decay=0.01, execution="eager",
+                               scope="learning control; separate from the timed update recipe"),
                 train_seed_start=config["seed"] + 10000, eval_seed=config["seed"] + 90000)
 
 
 def summarize(rows, memory_budget_bytes=None):
     """Never infer a winning baseline or capacity beyond successfully run cells."""
-    successful = [r for r in rows if r.get("status") == "ok"]
+    successful = [r for r in rows if r.get("status") == "ok"
+                  and (r.get("arm") not in CHECKPOINT_ARMS
+                       or r.get("checkpoint_policy") != "selective"
+                       or r.get("selective_policy_coverage", {}).get("status") == "observed")]
     matching = all(len({r.get(key) for r in successful}) == 1
                    and all(r.get(key) is not None for r in successful)
                    for key in ("init_sha256", "batch_sha256", "update_count"))
@@ -342,11 +440,14 @@ def summarize(rows, memory_budget_bytes=None):
     by_arm = {arm: [r for r in successful if r["arm"] == arm] for arm in ARMS}
     best = {arm: min(cells, key=lambda r: r["median_ms"]) for arm, cells in by_arm.items() if cells}
     complete = set(best) == set(ARMS) and matching
-    baseline_ms = min(best[a]["median_ms"] for a in ("eager", "compiled", "checkpoint")) if complete else None
+    baseline = min((best[a] for a in BASELINE_ARMS), key=lambda r: r["median_ms"]) if complete else None
     return dict(status="complete" if complete else "inconclusive",
                 matched_initialization_data_updates=matching,
                 selected_checkpoint_policy=best.get("checkpoint", {}).get("checkpoint_policy"),
-                packed_speedup_vs_best_baseline=baseline_ms / best["packed"]["median_ms"] if complete else None,
+                selected_compiled_checkpoint_policy=best.get("compiled_checkpoint", {}).get("checkpoint_policy"),
+                best_baseline_arm=baseline["arm"] if complete else None,
+                best_baseline_checkpoint_policy=baseline.get("checkpoint_policy") if complete else None,
+                packed_speedup_vs_best_baseline=baseline["median_ms"] / best["packed"]["median_ms"] if complete else None,
                 missing_arms=sorted(set(ARMS) - set(best)))
 
 
@@ -382,6 +483,8 @@ def main(argv=None):
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--optimizer", choices=("adamw", "sgd"), default="adamw")
+    parser.add_argument("--adamw-eps", type=float, default=1e-8,
+                        help="Shared AdamW epsilon for every arm and learning control; default unchanged (1e-8)")
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--reps", type=int, default=5)
     parser.add_argument("--compile-backend", default="inductor", choices=("inductor", "aot_eager"))
@@ -408,23 +511,26 @@ def main(argv=None):
         parser.error("allocator memory budgets require CUDA; CPU RSS is not tensor memory")
     if not math.isfinite(args.timeout) or args.timeout <= 0 or not math.isfinite(args.lr) or args.lr <= 0:
         parser.error("timeout and learning rate must be finite and positive")
+    if not math.isfinite(args.adamw_eps) or args.adamw_eps <= 0:
+        parser.error("AdamW epsilon must be finite and positive")
     if args.memory_budget_mib is not None and (not math.isfinite(args.memory_budget_mib) or args.memory_budget_mib <= 0):
         parser.error("memory budget must be finite and positive")
     config = {k: v for k, v in vars(args).items() if k in (
-        "device", "dtype", "width", "layers", "vocab", "seed", "lr", "optimizer", "warmup", "reps", "compile_backend")}
+        "device", "dtype", "width", "layers", "vocab", "seed", "lr", "optimizer", "adamw_eps", "warmup", "reps", "compile_backend")}
     if args.corpus:
         config["corpus"] = str(args.corpus.resolve())
         _, _, config["vocab"] = corpus_tokens(config["corpus"])
     cells = [{**config, "batch": b, "sequence": t} for b in args.batches for t in args.sequences]
     if args.dry_run:
-        print(json.dumps(dict(cells=cells, arms=ARMS, checkpoint_policies=POLICIES), indent=2))
+        print(json.dumps(dict(cells=cells, arms=ARMS, checkpoint_arms=CHECKPOINT_ARMS,
+                              checkpoint_policies=POLICIES), indent=2))
         return 0
     from scripts.route_certificates.actual_model_benchmark import run_subprocess_cell
     from scripts.route_certificates.provenance import file_digest, finish, run_record
     source_files = protocol_source_files(args.corpus)
     record = run_record("device_route_training", " ".join(sys.argv),
                         dict(cells=cells, learning_steps=args.learning_steps,
-                             protocol="device-route-training-v1"),
+                             protocol="device-route-training-v2"),
                         inputs=source_files, device=args.device, output_root=args.output)
     out = Path(record["_out_dir"])
     (out / "manifest.start.json").write_text(json.dumps(record, indent=2))
@@ -432,7 +538,7 @@ def main(argv=None):
     for cell_index, cell in enumerate(cells):
         cell_rows = []
         for arm in ARMS:
-            for policy in POLICIES if arm == "checkpoint" else ("layer",):
+            for policy in POLICIES if arm in CHECKPOINT_ARMS else ("layer",):
                 name = f"{cell_index}-{arm}-{policy}"
                 destination = out / f"{name}.json"
                 job = dict(config=cell, arm=arm, policy=policy, output=str(destination))

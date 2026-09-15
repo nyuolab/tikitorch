@@ -357,3 +357,39 @@ audit must inspect the executed forward, backward, loss, and update under
 its versioned operation semantics. A physical zero-DSP or timing claim
 additionally requires evidence for a particular synthesized design; neither
 the route theorem nor a software pass supplies that evidence.
+
+\subsection{Why small gradient errors can change an AdamW trajectory}
+\label{app:adamw-sensitivity}
+
+Route sufficiency is a statement about reverse dependencies, not numerical
+conditioning of the optimizer. For standard AdamW
+\citep{loshchilov2019adamw}, zero initial moments, learning rate $\eta>0$
+and $\epsilon>0$, bias correction gives the scalar first-step adaptive term
+\begin{equation}
+ u(g)=-\eta\frac{g}{|g|+\epsilon}.
+ \label{eq:adamw-first-step}
+\end{equation}
+Decoupled weight decay adds the same term $-\eta\lambda\theta$ to two
+executions starting from the same parameter; it does not remove this
+sensitivity. For $g\ne0$,
+$|u'(g)|=\eta\epsilon/(|g|+\epsilon)^2\le\eta/\epsilon$; the same
+bound follows at zero by continuity of the derivative. The mean value
+theorem therefore gives
+\begin{equation}
+ |u(g+\delta)-u(g)|\le\frac{\eta}{\epsilon}|\delta|.
+\end{equation}
+At $\eta=10^{-3}$ and $\epsilon=10^{-8}$ the local amplification bound is
+$10^5$. In particular, sign-opposed cancellation residuals of order
+$\epsilon$ can produce updates of order $\eta$. This elementary
+conditioning observation is not specific to tropical models or a new
+optimizer result. Hard selection adds a second source of sensitivity:
+after parameters move, crossing a score tie can change the selected
+derivative discontinuously.
+
+It is consequently important to distinguish three checks: the correctness
+of VJPs at identical model state and supplied cotangent; the optimizer's
+behavior on identical supplied gradients and moment state; and agreement
+of independently evolving finite-precision training trajectories. Changing
+$\epsilon$ defines a different AdamW configuration and lowers this
+\emph{first-step} bound, but does not guarantee long-horizon route identity,
+learning quality or equivalent conditioning after moments have accumulated.

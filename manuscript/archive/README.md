@@ -1,8 +1,8 @@
 # Archived TikiTorch drafts
 
-The single active, ICML-targeted manuscript is in [the parent workspace](../README.md):
+The single active, ICLR-oriented manuscript is in [the parent workspace](../README.md):
 
-**TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning**
+**TikiTorch: Learning with Additive Hard Routing**
 
 It combines the derivative-state and arithmetic-closure strands of the former
 two-paper plan. Theory and current-code experiments anchor the main text;

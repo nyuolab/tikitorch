@@ -67,3 +67,9 @@ does not claim that remote workflows or all matrix combinations were executed.
 - Real-task, multi-seed, matched-quality experiments remain research work. The
   optional corpus protocol records held-out metrics without claiming quality
   superiority. Manuscript positioning should reflect these evidence boundaries.
+
+Follow-up (2026-09-09): the
+[source-bound optimizer diagnostic](https://github.com/nyuolab/tikitorch/blob/main/manuscript/research/EVIDENCE.md#adamw-numerical-diagnostic)
+isolates upstream reduction/cancellation roundoff feeding **eager** AdamW.
+An explicitly configured epsilon passes a bounded fresh-batch CPU check;
+the default failure above is preserved, not retroactively relabeled as passing.

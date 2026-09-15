@@ -87,7 +87,7 @@ version, not yet a published PyPI release.
 | `tikitorch.functional` | Stateless max-plus, min-plus, morphological, and routing operators |
 | `tikitorch.nn` | PyTorch-style tropical layers, blocks, and experimental predictive-coding components |
 | `tikitorch.models` | MorphSSM, tropical transformer, MoTE, MLP, and Forward-Forward families |
-| `tikitorch.optim` | Sign-, shift-, and counter-based optimizers |
+| `tikitorch.optim` | Sign-, shift-, and counter-based optimizers; experimental checked integer EF primitive |
 | `tikitorch.audit` | Static, runtime, and full-step closure checks |
 | `tikitorch.autodiff` | Packed forward-route certificates and exact selected VJP replay |
 | `tikitorch.backend` | Logical devices and execution dispatch |
@@ -238,6 +238,18 @@ with retained evidence under
 
 ### FPGA path
 
+**Current research priority: useful language-model pretraining on FPGA.**
+Add/compare/select arithmetic and routed gradient accumulation are a natural
+custom-hardware opportunity; a GPU speedup is not required for that hypothesis.
+But useful held-out quality, memory traffic and complete-system cost still
+determine whether it pays off. The existing D512 character model has 1.20M
+parameters and is not a scaled LLM result. The
+[FPGA-first plan](manuscript/research/PLAN.md) starts with fresh-text training
+and full C-simulation/silicon checkpoint comparisons, then profiles the
+on-chip-memory bottleneck before an HBM-based redesign. See the
+[new pilot workflow](scripts/README.md#fresh-window-fpga-language-model-pilot)
+for local preparation; cloud launch is not yet enabled.
+
 The repository includes HLS kernels and host bindings for multiplier-free inference and
 learning experiments on AWS F2 hardware. In one configuration-specific 30-update D512
 run, the archived resident accuracy, weight checksum, and 16 sampled predictions match
@@ -279,9 +291,10 @@ mkdocs build
 ## Research artifacts
 
 The single active manuscript is
-[TikiTorch: Route-Sufficient Differentiation for Auditable Tropical Learning](manuscript/README.md).
-It combines the earlier route-certificate and FPGA drafts around an executable
-derivative-state and arithmetic-audit contract. Current-code measurements and
+[TikiTorch: Learning with Additive Hard Routing](manuscript/README.md).
+It explains how additive hard selection turns backward into routing and
+accumulation, and how the library makes that structure usable for training.
+Current-code measurements and
 historical hardware evidence retain separate configurations and claim boundaries.
 The old scientific sources remain preserved under
 [`manuscript/archive/`](manuscript/archive/README.md) as historical drafts.

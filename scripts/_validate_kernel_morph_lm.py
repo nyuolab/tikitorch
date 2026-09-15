@@ -1,4 +1,9 @@
-"""Validation for the config-B MorphSSM LM kernel (forge_train_step_morph_lm).
+"""Historical config-B MorphSSM LM validation; native execution is disabled.
+
+This driver's old layout omits the current kernel's aligned CE_LUT region and
+does not probe the native ABI. Loading it can cause an out-of-bounds native
+access. Use scripts/fpga_lm_pretrain.py with a newly built, verified library.
+The historical numerical reference below remains available for inspection.
 
 1. Controlled-logits bit-exact CE-gradient test: zero ALL weights except
    W_HEAD with constant rows (W_head[v,:] = c_v). With zero embed the residual
@@ -15,7 +20,6 @@
 
 Usage:  PYTHONPATH=. python scripts/_validate_kernel_morph_lm.py
 """
-import ctypes
 import time
 from pathlib import Path
 
@@ -71,13 +75,11 @@ def ref_grad(c, target, zshift=ZSHIFT):
 
 class Kernel:
     def __init__(self):
-        self.off = layout()
-        self.lib = ctypes.CDLL(str(LIB))
-        self.fn = self.lib.forge_train_step_morph_lm
-        self.fn.restype = ctypes.c_int
-        self.fn.argtypes = [ctypes.POINTER(ctypes.c_int32)] + [ctypes.c_int] * 4
-        self.buf = np.zeros(self.off["WORDS"], dtype=np.int32)
-        self._p = self.buf.ctypes.data_as(ctypes.POINTER(ctypes.c_int32))
+        raise RuntimeError(
+            "Legacy MorphLM native execution is disabled: its buffer omits the current "
+            "CE_LUT region and has no native ABI probe. Use scripts/fpga_lm_pretrain.py "
+            "with --build-csim and a new explicit library instead."
+        )
 
     def kick(self, mode, a1, a2, a3):
         rc = self.fn(self._p, mode, a1, a2, a3)

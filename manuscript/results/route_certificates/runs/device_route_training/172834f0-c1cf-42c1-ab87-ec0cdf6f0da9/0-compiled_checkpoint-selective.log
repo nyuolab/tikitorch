@@ -1,0 +1,4 @@
+W0909 10:43:56.207000 43289 site-packages/torch/_logging/_internal.py:1204] [0/0] 
+W0909 10:43:56.207000 43289 site-packages/torch/_logging/_internal.py:1204] [0/0] Detected that context_fn is passed to torch.utils.checkpoint under torch.compile.
+W0909 10:43:56.207000 43289 site-packages/torch/_logging/_internal.py:1204] [0/0] Please make sure the checkpointed region does not contain in-place ops (e.g. torch.relu_).
+W0909 10:43:56.207000 43289 site-packages/torch/_logging/_internal.py:1204] [0/0] 
